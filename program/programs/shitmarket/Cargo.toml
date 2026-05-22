@@ -1,0 +1,23 @@
+[package]
+name = "shitmarket"
+version = "0.1.0"
+description = "ShitMarket — PvP meme coin prediction market"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "shitmarket"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["anchor-lang/idl-build"]
+
+[dependencies]
+anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
+pyth-sdk-solana = "0.9"
+proc-macro-crate = "=3.1.0"
+solana-program = "=1.18.17"

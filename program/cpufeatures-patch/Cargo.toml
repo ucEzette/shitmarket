@@ -1,0 +1,25 @@
+[package]
+name = "cpufeatures"
+version = "0.3.0"
+edition = "2021"
+authors = ["RustCrypto Developers"]
+description = "Lightweight runtime CPU feature detection for aarch64, loongarch64, and x86/x86_64 targets, with no_std support"
+documentation = "https://docs.rs/cpufeatures"
+readme = "README.md"
+keywords = ["cpuid", "target-feature"]
+categories = ["hardware-support", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/RustCrypto/utils"
+resolver = "2"
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[lib]
+name = "cpufeatures"
+path = "src/lib.rs"
+
+[dependencies]
+libc = "0.2"

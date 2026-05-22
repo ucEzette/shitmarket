@@ -1,0 +1,195 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0D0D0A;
+  --foreground: #EDEDED;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-jetbrains-mono), monospace;
+  overflow-x: hidden;
+}
+
+.bg-muddy-map {
+  background-color: #05050A;
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(0, 255, 102, 0.05), transparent 25%),
+    radial-gradient(circle at 85% 30%, rgba(255, 42, 77, 0.05), transparent 25%),
+    linear-gradient(to right, #0F1016 1px, transparent 1px),
+    linear-gradient(to bottom, #0F1016 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+}
+
+/* Glassmorphism Panel */
+.glass-panel {
+  background: rgba(15, 16, 22, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Custom Scrollbar - Gritty Tactician Rail */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0D0D0A;
+  border-left: 2px solid #5C5244;
+}
+::-webkit-scrollbar-thumb {
+  background: #5C5244;
+  border: 1px solid #8B8B7A;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8B8B7A;
+}
+
+/* Glowing Neon Moon (Green) */
+.glow-moon {
+  text-shadow: 0 0 10px #39FF14, 0 0 20px #39FF14;
+}
+
+.shadow-glow-moon {
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.4);
+}
+
+.shadow-glow-moon-strong {
+  box-shadow: 0 0 25px #39FF14;
+}
+
+/* Glowing Neon Jeet (Red) */
+.glow-jeet {
+  text-shadow: 0 0 10px #FF073A, 0 0 20px #FF073A;
+}
+
+.shadow-glow-jeet {
+  box-shadow: 0 0 15px rgba(255, 7, 58, 0.4);
+}
+
+.shadow-glow-jeet-strong {
+  box-shadow: 0 0 25px #FF073A;
+}
+
+/* Glowing Gold */
+.glow-gold {
+  text-shadow: 0 0 10px #FFD700, 0 0 20px #FFD700;
+}
+
+.shadow-glow-gold {
+  box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+}
+
+/* Gritty scanlines for tactical monitor feel */
+.scanlines {
+  position: relative;
+}
+.scanlines::before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(
+    rgba(0, 0, 0, 0) 50%,
+    rgba(0, 0, 0, 0.1) 50%
+  );
+  background-size: 100% 4px;
+  z-index: 999;
+  pointer-events: none;
+  opacity: 0.3;
+}
+
+/* Premium Glass/Gradient Buttons */
+.btn-wood {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 100%);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  font-family: var(--font-staatliches), sans-serif;
+  letter-spacing: 0.05em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  border-radius: 8px;
+}
+.btn-wood:hover {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.btn-wood:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-wood-green {
+  background: linear-gradient(135deg, rgba(0, 255, 102, 0.2) 0%, rgba(0, 255, 102, 0.05) 100%);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0, 255, 102, 0.3);
+  box-shadow: 0 4px 15px rgba(0, 255, 102, 0.1), inset 0 1px 0 rgba(0, 255, 102, 0.3);
+  color: #00FF66;
+  text-shadow: 0 0 10px rgba(0, 255, 102, 0.4);
+  font-family: var(--font-staatliches), sans-serif;
+  letter-spacing: 0.05em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+}
+.btn-wood-green:hover {
+  background: linear-gradient(135deg, rgba(0, 255, 102, 0.3) 0%, rgba(0, 255, 102, 0.1) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 255, 102, 0.2), 0 0 20px rgba(0, 255, 102, 0.2);
+}
+.btn-wood-green:active {
+  transform: translateY(1px);
+}
+
+.btn-wood-red {
+  background: linear-gradient(135deg, rgba(255, 42, 77, 0.2) 0%, rgba(255, 42, 77, 0.05) 100%);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 42, 77, 0.3);
+  box-shadow: 0 4px 15px rgba(255, 42, 77, 0.1), inset 0 1px 0 rgba(255, 42, 77, 0.3);
+  color: #FF2A4D;
+  text-shadow: 0 0 10px rgba(255, 42, 77, 0.4);
+  font-family: var(--font-staatliches), sans-serif;
+  letter-spacing: 0.05em;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+}
+.btn-wood-red:hover {
+  background: linear-gradient(135deg, rgba(255, 42, 77, 0.3) 0%, rgba(255, 42, 77, 0.1) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(255, 42, 77, 0.2), 0 0 20px rgba(255, 42, 77, 0.2);
+}
+.btn-wood-red:active {
+  transform: translateY(1px);
+}
+
+/* Stencil Text Shadow for Heading Panels */
+.stencil-shadow {
+  text-shadow: 2px 2px 0px #000000;
+}
+
+/* Full Degen Mode (Konami easter egg) */
+.full-degen-rainbow {
+  animation: degen-rainbow 1.5s linear infinite;
+}
+
+@keyframes degen-rainbow {
+  0% { color: #ff0000; text-shadow: 0 0 8px #ff0000; }
+  17% { color: #ff7f00; text-shadow: 0 0 8px #ff7f00; }
+  33% { color: #ffff00; text-shadow: 0 0 8px #ffff00; }
+  50% { color: #00ff00; text-shadow: 0 0 8px #00ff00; }
+  67% { color: #0000ff; text-shadow: 0 0 8px #0000ff; }
+  83% { color: #4b0082; text-shadow: 0 0 8px #4b0082; }
+  100% { color: #9400d3; text-shadow: 0 0 8px #9400d3; }
+}

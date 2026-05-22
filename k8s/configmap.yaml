@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shitmarket-config
+  namespace: shitmarket
+  labels:
+    app: shitmarket
+data:
+  # ── Indexer Config ─────────────────────────────────────────────
+  SOLANA_RPC_URL: "https://api.mainnet-beta.solana.com"
+  SOLANA_RPC_WS: "wss://api.mainnet-beta.solana.com"
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  DATABASE_URL: "postgresql://shitmarket:${DB_PASSWORD}@postgres-service:5432/shitmarket?sslmode=require"
+  DATABASE_REPLICA_URL: "postgresql://shitmarket:${DB_PASSWORD}@postgres-replica-service:5432/shitmarket?sslmode=require"
+  INDEXER_PORT: "3001"
+  METRICS_PORT: "9090"
+  WS_PORT: "3002"
+  LOG_LEVEL: "info"
+  CRON_SETTLEMENT_INTERVAL: "*/1 * * * *"
+  CRON_SAMPLE_INTERVAL: "*/5 * * * *"
+  PYTHNET_MIGRATION: "true"
+  TWAP_SAMPLE_SIZE: "5"
+  SETTLEMENT_CONCURRENCY: "3"
+  CIRCUIT_BREAKER_THRESHOLD: "5"
+  CIRCUIT_BREAKER_RESET_MS: "60000"
+  PRICE_STALE_THRESHOLD_MS: "30000"
+  MAX_PRICE_DEVIATION_BPS: "300"
+  LEADERBOARD_CACHE_TTL: "300"
+
+  # ── Frontend Config ────────────────────────────────────────────
+  NEXT_PUBLIC_INDEXER_URL: "https://api.shitmarket"
+  NEXT_PUBLIC_WS_URL: "wss://ws.shitmarket"
+  NEXT_PUBLIC_SOLANA_RPC: "https://api.mainnet-beta.solana.com"
+  NEXT_PUBLIC_PROGRAM_ID: "YOUR_PROGRAM_ID_HERE"
+  NEXT_PUBLIC_ENVIRONMENT: "production"
+  NEXT_PUBLIC_SENTRY_DSN: "https://__SENTRY_DSN_PLACEHOLDER__@o123456.ingest.sentry.io/1234567"
+
+  # ── Resource Limits ────────────────────────────────────────────
+  NODE_OPTIONS: "--max-old-space-size=512"
+  UV_THREADPOOL_SIZE: "8"
+---

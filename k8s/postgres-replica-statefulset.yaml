@@ -1,0 +1,105 @@
+# ── PostgreSQL Read-Replica StatefulSet ─────────────────────────
+# For Phase 4.2: read replicas for scalable query capacity.
+# Requires streaming replication from primary to be configured.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-replica
+  namespace: shitmarket
+  labels:
+    app: postgres
+    role: replica
+spec:
+  serviceName: postgres-replica-service
+  replicas: 2
+  selector:
+    matchLabels:
+      app: postgres
+      role: replica
+  template:
+    metadata:
+      labels:
+        app: postgres
+        role: replica
+    spec:
+      containers:
+        - name: postgres-replica
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: pgport
+          env:
+            - name: POSTGRES_USER
+              value: "shitmarket"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: shitmarket-secrets
+                  key: db-password
+            - name: POSTGRES_DB
+              value: "shitmarket"
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_REPLICATION_MODE
+              value: "replica"
+            - name: POSTGRES_PRIMARY_HOST
+              value: "postgres-service"
+            - name: POSTGRES_REPLICATION_USER
+              value: "replicator"
+            - name: POSTGRES_REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: shitmarket-secrets
+                  key: db-password
+          args:
+            - "-c"
+            - "max_connections=200"
+            - "-c"
+            - "shared_buffers=512MB"
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "shitmarket"]
+            initialDelaySeconds: 60
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "shitmarket"]
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          volumeMounts:
+            - name: postgres-replica-data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-replica-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 50Gi
+        storageClassName: standard
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-replica-service
+  namespace: shitmarket
+  labels:
+    app: postgres
+    role: replica
+spec:
+  selector:
+    app: postgres
+    role: replica
+  ports:
+    - port: 5432
+      targetPort: 5432
+  clusterIP: None
+---

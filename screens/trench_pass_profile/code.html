@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SHITMARKET.GG - Profile</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wght@700;800&amp;family=JetBrains+Mono:wght@400&amp;family=Space+Mono:wght@700&amp;family=Syne:wght@800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-tertiary-fixed": "#221b00",
+                        "on-tertiary": "#3a3000",
+                        "trench-black": "#0D0D0A",
+                        "outline": "#85967c",
+                        "error": "#ffb4ab",
+                        "primary": "#efffe3",
+                        "wood-plank": "#5C3A21",
+                        "mud-brown": "#2A241A",
+                        "primary-container": "#39ff14",
+                        "on-background": "#dae6d0",
+                        "on-secondary-fixed-variant": "#92001c",
+                        "tertiary-fixed-dim": "#e9c400",
+                        "tertiary-fixed": "#ffe16d",
+                        "surface": "#0c1609",
+                        "on-primary-container": "#107100",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "on-primary-fixed-variant": "#095300",
+                        "tertiary-container": "#ffdb40",
+                        "on-tertiary-container": "#736000",
+                        "inverse-surface": "#dae6d0",
+                        "sandbag": "#5C5244",
+                        "surface-bright": "#323c2d",
+                        "on-surface-variant": "#baccb0",
+                        "inverse-primary": "#106e00",
+                        "on-surface": "#dae6d0",
+                        "surface-tint": "#2ae500",
+                        "surface-container-low": "#141e11",
+                        "surface-container-lowest": "#071105",
+                        "error-container": "#93000a",
+                        "surface-variant": "#2d3828",
+                        "secondary": "#ffb3b1",
+                        "surface-container-highest": "#2d3828",
+                        "on-error": "#690005",
+                        "surface-container": "#182214",
+                        "on-secondary-fixed": "#410007",
+                        "gas-mask-grey": "#8B8B7A",
+                        "tertiary": "#fff9f0",
+                        "outline-variant": "#3c4b35",
+                        "surface-container-high": "#222d1e",
+                        "on-primary-fixed": "#022100",
+                        "inverse-on-surface": "#293324",
+                        "primary-fixed": "#79ff5b",
+                        "secondary-fixed": "#ffdad8",
+                        "background": "#0c1609",
+                        "wood-shadow": "#3A2512",
+                        "secondary-fixed-dim": "#ffb3b1",
+                        "surface-dim": "#0c1609",
+                        "secondary-container": "#ff535a",
+                        "on-secondary": "#680011",
+                        "primary-fixed-dim": "#2ae500",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-container": "#5b000e",
+                        "on-primary": "#053900",
+                        "moon-gold": "#FFD700",
+                        "neon-moon": "#39ff14",
+                        "jeet-red": "#ff0000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "margin-mobile": "12px",
+                        "xs": "4px",
+                        "md": "16px",
+                        "unit": "4px",
+                        "gutter": "16px",
+                        "margin-desktop": "32px",
+                        "xl": "40px",
+                        "sm": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["JetBrains Mono"],
+                        "label-md": ["Space Mono"],
+                        "headline-xl": ["Anybody"],
+                        "headline-md": ["Anybody"],
+                        "meme-quote": ["Syne"],
+                        "body-lg": ["JetBrains Mono"],
+                        "headline-lg": ["Anybody"]
+                    },
+                    "fontSize": {
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "headline-xl": ["48px", { "lineHeight": "1.1", "letterSpacing": "0.05em", "fontWeight": "800" }],
+                        "headline-md": ["24px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "700" }],
+                        "meme-quote": ["20px", { "lineHeight": "1.2", "fontWeight": "800" }],
+                        "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body {
+            background-color: theme('colors.trench-black');
+            color: theme('colors.on-surface');
+            background-image: radial-gradient(circle at center, rgba(42,36,26,0.5) 0%, rgba(13,13,10,1) 100%);
+            background-attachment: fixed;
+        }
+        .neon-glow {
+            box-shadow: 0 0 10px theme('colors.primary-container'), 0 0 20px theme('colors.primary-container');
+        }
+        .jeet-glow {
+            box-shadow: 0 0 10px theme('colors.jeet-red'), 0 0 20px theme('colors.jeet-red');
+        }
+        .wood-plank-btn {
+            background-color: theme('colors.wood-plank');
+            border-bottom: 4px solid theme('colors.wood-shadow');
+        }
+        .wood-plank-btn:active {
+            border-bottom-width: 0px;
+            transform: translateY(4px);
+        }
+        .bunker-panel {
+            background-color: theme('colors.mud-brown');
+            border: 2px solid theme('colors.sandbag');
+        }
+        .inset-depth {
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+    </style>
+</head>
+<body class="font-body-md antialiased min-h-screen flex flex-col md:flex-row">
+<!-- SideNav (Desktop) -->
+<nav class="hidden lg:flex flex-col fixed left-0 top-0 h-full z-40 bg-mud-brown dark:bg-mud-brown border-r-2 border-sandbag shadow-[inset_-4px_0_8px_rgba(0,0,0,0.5)] w-64">
+<div class="p-md border-b-2 border-sandbag">
+<h1 class="font-headline-md text-headline-md text-primary-container">TRENCH COMMAND</h1>
+<p class="font-label-md text-label-md text-gas-mask-grey">OPERATOR #7742</p>
+</div>
+<div class="flex-1 flex flex-col gap-sm p-sm mt-md">
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">fort</span>
+                HQ
+            </a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">military_tech</span>
+                War Table
+            </a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">security</span>
+                Bunker
+            </a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">rocket_launch</span>
+                Deploy
+            </a>
+<a class="flex items-center gap-md bg-trench-black text-primary-container border-l-4 border-primary-container px-md py-sm scale-95 transition-transform duration-100 font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">badge</span>
+                Trench Pass
+            </a>
+</div>
+<div class="p-md mt-auto">
+<button class="w-full bg-neon-moon text-trench-black font-label-md text-label-md py-sm neon-glow font-bold">DEPLOY MISSION</button>
+</div>
+<div class="p-sm border-t-2 border-sandbag flex flex-col gap-xs">
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">settings</span>
+                Settings
+            </a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md" href="#">
+<span class="material-symbols-outlined">help</span>
+                Support
+            </a>
+</div>
+</nav>
+<!-- TopAppBar (Mobile & Desktop overrides) -->
+<header class="flex lg:hidden justify-between items-center w-full px-margin-mobile md:px-margin-desktop h-16 z-50 bg-mud-brown border-b-2 border-sandbag sticky top-0">
+<div class="font-headline-lg text-headline-lg font-black text-primary-container tracking-tighter italic">SHITMARKET.GG</div>
+<div class="flex items-center gap-sm">
+<span class="material-symbols-outlined text-primary-container">notifications</span>
+<span class="material-symbols-outlined text-primary-container">account_balance_wallet</span>
+</div>
+</header>
+<!-- Main Content Area -->
+<main class="flex-1 lg:ml-64 p-margin-mobile md:p-margin-desktop pb-24 md:pb-margin-desktop flex flex-col gap-lg max-w-7xl mx-auto w-full">
+<!-- Profile Header / Soldier Card -->
+<section class="bunker-panel p-md md:p-lg flex flex-col md:flex-row gap-lg items-center relative overflow-hidden">
+<!-- Glitch Overlay Effect Placeholder -->
+<div class="absolute inset-0 opacity-10 pointer-events-none bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDUiLz4KPC9zdmc+')] z-0"></div>
+<div class="relative z-10 shrink-0 border-4 border-sandbag p-xs bg-trench-black">
+<img alt="Pixel Art Soldier Avatar" class="w-32 h-32 md:w-48 md:h-48 object-cover pixelated filter grayscale contrast-125 sepia-[.5] hue-rotate-[-30deg]" data-alt="A gritty pixel-art portrait of a battle-hardened soldier character, reminiscent of retro military strategy games. The character wears a worn helmet and has a stern expression, rendered in a chunky 8-bit style. The color palette is dominated by dark, muddy browns, olive greens, and harsh black shadows, fitting a dark, apocalyptic trench warfare aesthetic. The lighting is low and dramatic, suggesting a dark bunker environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYhqNOry6ngcUdtO2QqBKvvxKvgXAHtC99-JyD4xVQroyIsqxLMnXbXD5WCyZUIgd-uoA90jWaaT4x4KH1gOrMBK7Eskd1qcgeBT2aA4C3AAUq1Ja-5HWEi2GlzocyAGexFdoxT2xf0MeOzJVIX09gVrt-jnzFCrONYek9Vb9iQWBy-24r5qdS29WHGFFa7YRYBJA88lDqwYkq_ZZ5ZS-Wk2H_B-wwPd0ONDqaS4hVhUnrJmGw1Ffcjo3fR6yTG0E2GiOMq2x60Ya0"/>
+</div>
+<div class="relative z-10 flex-1 flex flex-col gap-sm w-full">
+<div class="flex justify-between items-start border-b-2 border-sandbag pb-sm w-full">
+<div>
+<h2 class="font-headline-xl text-headline-xl text-white drop-shadow-[0_2px_2px_rgba(0,0,0,0.8)]">OPERATOR #7742</h2>
+<p class="font-label-md text-label-md text-primary-container mt-xs">RANK: S-TIER DEGEN</p>
+</div>
+<div class="bg-trench-black border-2 border-primary-container p-xs flex flex-col items-center">
+<span class="material-symbols-outlined text-primary-container text-4xl" style="font-variation-settings: 'FILL' 1;">military_tech</span>
+<span class="font-label-md text-label-md text-primary-container text-xs mt-1">TRENCH SCORE</span>
+</div>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-md mt-sm">
+<div class="bg-trench-black border border-sandbag p-sm text-center">
+<p class="font-label-md text-label-md text-gas-mask-grey mb-1">TOTAL BETS</p>
+<p class="font-headline-md text-headline-md text-white font-body-md">1,420</p>
+</div>
+<div class="bg-trench-black border border-sandbag p-sm text-center">
+<p class="font-label-md text-label-md text-gas-mask-grey mb-1">WIN RATE</p>
+<p class="font-headline-md text-headline-md text-primary-container font-body-md">51.2%</p>
+</div>
+<div class="bg-trench-black border border-sandbag p-sm text-center">
+<p class="font-label-md text-label-md text-gas-mask-grey mb-1">P/L (ETH)</p>
+<p class="font-headline-md text-headline-md text-primary-container font-body-md">+42.69</p>
+</div>
+<div class="bg-trench-black border border-moon-gold p-sm text-center flex flex-col justify-center items-center shadow-[inset_0_0_10px_rgba(255,215,0,0.2)]">
+<p class="font-label-md text-label-md text-moon-gold mb-1 flex items-center gap-1">
+<span class="material-symbols-outlined text-sm">account_balance_wallet</span> AMMO
+                        </p>
+<p class="font-headline-md text-headline-md text-moon-gold font-body-md">3.42 ETH</p>
+</div>
+</div>
+</div>
+</section>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-lg">
+<!-- Achievements / Medals (Left Col) -->
+<section class="lg:col-span-1 bunker-panel flex flex-col h-full">
+<div class="border-b-2 border-sandbag p-sm bg-trench-black/50">
+<h3 class="font-headline-md text-headline-md text-gas-mask-grey flex items-center gap-2">
+<span class="material-symbols-outlined">workspace_premium</span> MEDALS
+                    </h3>
+</div>
+<div class="p-md flex flex-wrap gap-md justify-center lg:justify-start">
+<div class="flex flex-col items-center gap-xs group">
+<div class="w-16 h-16 rounded-full border-2 border-primary-container bg-trench-black flex items-center justify-center neon-glow group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-primary-container text-3xl" style="font-variation-settings: 'FILL' 1;">water_drop</span>
+</div>
+<span class="font-label-md text-[10px] text-gas-mask-grey text-center w-20 leading-tight">FIRST BLOOD</span>
+</div>
+<div class="flex flex-col items-center gap-xs group">
+<div class="w-16 h-16 rounded-full border-2 border-moon-gold bg-trench-black flex items-center justify-center shadow-[0_0_15px_rgba(255,215,0,0.5)] group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-moon-gold text-3xl" style="font-variation-settings: 'FILL' 1;">rocket_launch</span>
+</div>
+<span class="font-label-md text-[10px] text-gas-mask-grey text-center w-20 leading-tight">MOON MILLIONAIRE</span>
+</div>
+<div class="flex flex-col items-center gap-xs group opacity-50 grayscale">
+<div class="w-16 h-16 rounded-full border-2 border-sandbag bg-trench-black flex items-center justify-center">
+<span class="material-symbols-outlined text-sandbag text-3xl" style="font-variation-settings: 'FILL' 1;">lock</span>
+</div>
+<span class="font-label-md text-[10px] text-gas-mask-grey text-center w-20 leading-tight">LOCKED</span>
+</div>
+</div>
+</section>
+<!-- Transaction History (Right Col) -->
+<section class="lg:col-span-2 bunker-panel flex flex-col h-full">
+<div class="border-b-2 border-sandbag p-sm bg-trench-black/50 flex justify-between items-center">
+<h3 class="font-headline-md text-headline-md text-gas-mask-grey flex items-center gap-2">
+<span class="material-symbols-outlined">history</span> BATTLE LOG
+                    </h3>
+<button class="font-label-md text-label-md text-primary-container hover:underline">VIEW ALL</button>
+</div>
+<div class="flex flex-col">
+<!-- Tx Item 1 -->
+<div class="flex items-center justify-between p-sm border-b border-sandbag hover:bg-surface-variant/30 transition-colors">
+<div class="flex items-center gap-sm">
+<div class="bg-primary-container/20 p-xs rounded">
+<span class="material-symbols-outlined text-primary-container">arrow_upward</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-white">LONG $PEPE</p>
+<p class="font-body-md text-xs text-gas-mask-grey">2 mins ago</p>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<div class="text-right">
+<p class="font-body-md text-primary-container font-bold">+0.5 ETH</p>
+<p class="font-label-md text-[10px] text-gas-mask-grey">WIN</p>
+</div>
+<button class="wood-plank-btn p-xs text-white hover:text-primary-container transition-colors rounded" title="Replay">
+<span class="material-symbols-outlined text-sm">replay</span>
+</button>
+</div>
+</div>
+<!-- Tx Item 2 -->
+<div class="flex items-center justify-between p-sm border-b border-sandbag hover:bg-surface-variant/30 transition-colors">
+<div class="flex items-center gap-sm">
+<div class="bg-jeet-red/20 p-xs rounded">
+<span class="material-symbols-outlined text-jeet-red">arrow_downward</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-white">SHORT $DOGE</p>
+<p class="font-body-md text-xs text-gas-mask-grey">1 hour ago</p>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<div class="text-right">
+<p class="font-body-md text-jeet-red font-bold">-0.1 ETH</p>
+<p class="font-label-md text-[10px] text-gas-mask-grey">LOSS</p>
+</div>
+<button class="wood-plank-btn p-xs text-white hover:text-primary-container transition-colors rounded" title="Replay">
+<span class="material-symbols-outlined text-sm">replay</span>
+</button>
+</div>
+</div>
+<!-- Tx Item 3 -->
+<div class="flex items-center justify-between p-sm hover:bg-surface-variant/30 transition-colors">
+<div class="flex items-center gap-sm">
+<div class="bg-sandbag p-xs rounded">
+<span class="material-symbols-outlined text-on-surface-variant">swap_horiz</span>
+</div>
+<div>
+<p class="font-label-md text-label-md text-white">DEPOSIT</p>
+<p class="font-body-md text-xs text-gas-mask-grey">Yesterday</p>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<div class="text-right">
+<p class="font-body-md text-white font-bold">+5.0 ETH</p>
+<p class="font-label-md text-[10px] text-gas-mask-grey">AMMO REFILL</p>
+</div>
+</div>
+</div>
+</div>
+</section>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 pb-safe bg-mud-brown border-t-2 border-sandbag rounded-t-xl z-50 shadow-[0_-4px_12px_rgba(0,0,0,0.6)]">
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md text-label-md-mobile text-[10px] mt-1">HQ</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">swords</span>
+<span class="font-label-md text-label-md-mobile text-[10px] mt-1">War</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface" href="#">
+<span class="material-symbols-outlined">add_box</span>
+<span class="font-label-md text-label-md-mobile text-[10px] mt-1">Deploy</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary-container bg-trench-black rounded-lg py-1 px-4 border border-sandbag scale-90 duration-150" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">person</span>
+<span class="font-label-md text-label-md-mobile text-[10px] mt-1">Pass</span>
+</a>
+</nav>
+<!-- Footer -->
+<footer class="w-full py-xl border-t-4 border-dashed border-sandbag bg-trench-black dark:bg-trench-black flex flex-col md:flex-row justify-between items-center px-margin-desktop gap-md z-10 relative">
+<div class="font-headline-md text-headline-md text-gas-mask-grey">© 2024 SHITMARKET.GG - NO MERCY IN THE TRENCHES</div>
+<div class="flex gap-md font-label-md text-label-md text-gas-mask-grey">
+<a class="hover:text-primary-container transition-colors text-gas-mask-grey" href="#">Whitepaper</a>
+<a class="hover:text-primary-container transition-colors text-gas-mask-grey" href="#">Twitter</a>
+<a class="hover:text-primary-container transition-colors text-gas-mask-grey" href="#">Discord</a>
+<a class="hover:text-primary-container transition-colors text-gas-mask-grey" href="#">Terms of Engagement</a>
+</div>
+</footer>
+</body></html>

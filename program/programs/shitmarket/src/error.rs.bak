@@ -1,0 +1,58 @@
+use anchor_lang::prelude::*;
+
+#[error_code]
+pub enum ShitMarketError {
+    // Room lifecycle
+    #[msg("Room is not in an active state")]
+    RoomNotActive,
+    #[msg("Room has not expired yet")]
+    RoomNotExpired,
+    #[msg("Room has already been settled")]
+    RoomAlreadySettled,
+    #[msg("Room has expired and is no longer accepting bets")]
+    RoomExpired,
+
+    // Bet & claim
+    #[msg("Bet amount must be greater than zero")]
+    ZeroBetAmount,
+    #[msg("Bet has already been claimed")]
+    AlreadyClaimed,
+    #[msg("User did not bet on the winning side")]
+    NotAWinner,
+    #[msg("Room has not been settled yet")]
+    RoomNotSettled,
+    #[msg("Winning pool is empty — no bets on winning side")]
+    EmptyWinningPool,
+
+    // Price / oracle
+    #[msg("Final price must be non-zero")]
+    InvalidPrice,
+    #[msg("Invalid Pyth price feed account")]
+    InvalidPythFeed,
+    #[msg("Pyth price feed data is stale")]
+    PythPriceStale,
+    #[msg("Pyth price feed is not currently trading")]
+    PythPriceNotTrading,
+    #[msg("Pyth price confidence interval is too wide")]
+    PriceConfidenceTooWide,
+    #[msg("Provided keeper does not match platform config")]
+    UnauthorizedKeeper,
+
+    // Config & admin
+    #[msg("Caller is not authorized")]
+    Unauthorized,
+    #[msg("Bet side does not match existing bet")]
+    SideMismatch,
+    #[msg("Platform fee exceeds maximum allowed (10%)")]
+    FeeTooHigh,
+    #[msg("Duration must be 5, 15, or 60 minutes")]
+    InvalidDuration,
+
+    // Arithmetic
+    #[msg("Arithmetic overflow")]
+    Overflow,
+    #[msg("Arithmetic underflow")]
+    Underflow,
+    #[msg("Division by zero")]
+    DivisionByZero,
+}

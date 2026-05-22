@@ -1,0 +1,686 @@
+<html class="dark" lang="en"><head></head><body class="bg-trench-black text-on-surface font-body-md overflow-x-hidden selection:bg-primary-container selection:text-trench-black">```html
+
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Room Detail - The Bunker | SHITMARKET.GG</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wght@700;800;900&amp;family=JetBrains+Mono:wght@400;700&amp;family=Space+Mono:wght@700&amp;family=Syne:wght@800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Permanent+Marker&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined';
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga';
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Custom Styles from Design System */
+        .wood-btn {
+            background-color: #5C3A21;
+            border-bottom: 4px solid #3A2512;
+            transition: all 0.1s;
+        }
+        .wood-btn:active {
+            border-bottom: 0px solid #3A2512;
+            transform: translateY(4px);
+        }
+
+        .neon-glow {
+            box-shadow: 0 0 15px 2px rgba(57, 255, 20, 0.5);
+        }
+        
+        .jeet-glow {
+            box-shadow: 0 0 15px 2px rgba(255, 83, 90, 0.5);
+        }
+
+        .stamp-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+
+        .shake-animation {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+        }
+        
+        .heavy-shake {
+            animation: heavy-shake 0.8s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+
+        @keyframes heavy-shake {
+            0%, 100% { transform: translate3d(0, 0, 0); }
+            10%, 30%, 50%, 70%, 90% { transform: translate3d(-10px, 5px, 0) rotate(-2deg); }
+            20%, 40%, 60%, 80% { transform: translate3d(10px, -5px, 0) rotate(2deg); }
+        }
+
+        /* Mortar System Styles */
+        .mortar-container {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            z-index: 20;
+            overflow: hidden;
+        }
+
+        .mortar {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            pointer-events: none;
+            animation: mortarArc cubic-bezier(.25,.1,.25,1) forwards;
+        }
+
+        .mortar-moon {
+            background-color: #39ff14;
+            box-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, -10px 10px 20px rgba(57, 255, 20, 0.5);
+        }
+
+        .mortar-jeet {
+            background-color: #ff535a;
+            box-shadow: 0 0 10px #ff535a, 0 0 20px #ff535a, 10px 10px 20px rgba(255, 83, 90, 0.5);
+        }
+
+        @keyframes mortarArc {
+            0% {
+                transform: translate(0, 0) scale(1);
+                opacity: 1;
+            }
+            50% {
+                transform: translate(var(--tx-half), var(--ty-peak)) scale(1.5);
+            }
+            95% {
+                transform: translate(var(--tx), var(--ty)) scale(1);
+                opacity: 1;
+            }
+            100% {
+                transform: translate(var(--tx), var(--ty)) scale(0);
+                opacity: 0;
+            }
+        }
+
+        .explosion {
+            position: absolute;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: explode 0.5s ease-out forwards;
+            pointer-events: none;
+            mix-blend-mode: screen;
+        }
+
+        .explosion-moon {
+            background: radial-gradient(circle, rgba(57,255,20,1) 0%, rgba(57,255,20,0) 70%);
+        }
+
+        .explosion-jeet {
+            background: radial-gradient(circle, rgba(255,83,90,1) 0%, rgba(255,83,90,0) 70%);
+        }
+
+        @keyframes explode {
+            0% {
+                width: 0;
+                height: 0;
+                opacity: 1;
+            }
+            100% {
+                width: 100px;
+                height: 100px;
+                opacity: 0;
+            }
+        }
+        
+        .font-marker {
+            font-family: 'Permanent Marker', cursive;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-tertiary-fixed": "#221b00",
+                        "on-tertiary": "#3a3000",
+                        "trench-black": "#0D0D0A",
+                        "outline": "#85967c",
+                        "error": "#ffb4ab",
+                        "primary": "#efffe3",
+                        "wood-plank": "#5C3A21",
+                        "mud-brown": "#2A241A",
+                        "primary-container": "#39ff14",
+                        "on-background": "#dae6d0",
+                        "on-secondary-fixed-variant": "#92001c",
+                        "tertiary-fixed-dim": "#e9c400",
+                        "tertiary-fixed": "#ffe16d",
+                        "surface": "#0c1609",
+                        "on-primary-container": "#107100",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "on-primary-fixed-variant": "#095300",
+                        "tertiary-container": "#ffdb40",
+                        "on-tertiary-container": "#736000",
+                        "inverse-surface": "#dae6d0",
+                        "sandbag": "#5C5244",
+                        "surface-bright": "#323c2d",
+                        "on-surface-variant": "#baccb0",
+                        "inverse-primary": "#106e00",
+                        "on-surface": "#dae6d0",
+                        "surface-tint": "#2ae500",
+                        "surface-container-low": "#141e11",
+                        "surface-container-lowest": "#071105",
+                        "error-container": "#93000a",
+                        "surface-variant": "#2d3828",
+                        "secondary": "#ffb3b1",
+                        "surface-container-highest": "#2d3828",
+                        "on-error": "#690005",
+                        "surface-container": "#182214",
+                        "on-secondary-fixed": "#410007",
+                        "gas-mask-grey": "#8B8B7A",
+                        "tertiary": "#fff9f0",
+                        "outline-variant": "#3c4b35",
+                        "surface-container-high": "#222d1e",
+                        "on-primary-fixed": "#022100",
+                        "inverse-on-surface": "#293324",
+                        "primary-fixed": "#79ff5b",
+                        "secondary-fixed": "#ffdad8",
+                        "background": "#0c1609",
+                        "wood-shadow": "#3A2512",
+                        "secondary-fixed-dim": "#ffb3b1",
+                        "surface-dim": "#0c1609",
+                        "secondary-container": "#ff535a",
+                        "on-secondary": "#680011",
+                        "primary-fixed-dim": "#2ae500",
+                        "on-error-container": "#ffdad6",
+                        "on-secondary-container": "#5b000e",
+                        "on-primary": "#053900",
+                        "neon-moon": "#39ff14",
+                        "jeet-red": "#ff535a"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "lg": "24px",
+                        "margin-mobile": "12px",
+                        "xs": "4px",
+                        "md": "16px",
+                        "unit": "4px",
+                        "gutter": "16px",
+                        "margin-desktop": "32px",
+                        "xl": "40px",
+                        "sm": "8px",
+                        "safe": "env(safe-area-inset-bottom)"
+                    },
+                    fontFamily: {
+                        "body-md": ["JetBrains Mono"],
+                        "label-md": ["Space Mono"],
+                        "headline-xl": ["Anybody"],
+                        "headline-md": ["Anybody"],
+                        "meme-quote": ["Syne"],
+                        "body-lg": ["JetBrains Mono"],
+                        "headline-lg": ["Anybody"]
+                    },
+                    fontSize: {
+                        "body-md": ["14px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "label-md": ["12px", {"lineHeight": "1.2", "fontWeight": "700"}],
+                        "headline-xl": ["48px", {"lineHeight": "1.1", "letterSpacing": "0.05em", "fontWeight": "800"}],
+                        "headline-md": ["24px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "700"}],
+                        "meme-quote": ["20px", {"lineHeight": "1.2", "fontWeight": "800"}],
+                        "body-lg": ["18px", {"lineHeight": "1.5", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "700"}]
+                    }
+                }
+            }
+        }
+    </script>
+<!-- TopAppBar (Hidden on Mobile, Flex on Desktop) -->
+<nav class="hidden md:flex justify-between items-center w-full px-margin-desktop h-16 z-50 bg-mud-brown border-b-2 border-sandbag sticky top-0 shadow-lg">
+<div class="flex items-center gap-lg">
+<span class="font-headline-lg text-primary-container font-black tracking-tighter italic">SHITMARKET.GG</span>
+<div class="flex items-center gap-md">
+<a class="text-on-surface-variant font-label-md hover:text-primary-container hover:bg-surface-variant/50 transition-colors px-2 py-1 rounded" href="#">WAR TABLE</a>
+<a class="text-on-surface-variant font-label-md hover:text-primary-container hover:bg-surface-variant/50 transition-colors px-2 py-1 rounded" href="#">HEROES</a>
+<a class="text-primary-container font-bold border-b-2 border-primary-container pb-1 hover:text-primary-container hover:bg-surface-variant/50 transition-colors px-2 py-1" href="#">MISSIONS</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="text-primary-container hover:scale-95 transition-transform duration-100 flex items-center justify-center p-1 rounded-full hover:bg-surface-variant/50" id="sound-toggle" title="Toggle Sound">
+<span class="material-symbols-outlined" id="sound-icon">volume_off</span>
+</button>
+<button class="text-primary-container hover:scale-95 transition-transform duration-100 flex items-center justify-center p-1 rounded-full hover:bg-surface-variant/50">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="text-primary-container hover:scale-95 transition-transform duration-100 flex items-center justify-center p-1 rounded-full hover:bg-surface-variant/50">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+</button>
+<button class="wood-btn px-4 py-2 font-label-md text-tertiary uppercase rounded-sm border-2 border-wood-shadow hover:text-primary-container">
+                CONNECT WALLET
+            </button>
+</div>
+</nav>
+<!-- SideNavBar (Hidden on Mobile, Flex on LG) -->
+<div class="hidden lg:flex flex-col fixed left-0 top-16 h-[calc(100vh-64px)] w-64 z-40 bg-mud-brown border-r-2 border-sandbag shadow-[inset_-4px_0_8px_rgba(0,0,0,0.5)]">
+<div class="p-lg border-b-2 border-sandbag">
+<h2 class="font-headline-md text-primary-container uppercase truncate">TRENCH COMMAND</h2>
+<p class="font-label-md text-gas-mask-grey mt-1">OPERATOR #7742</p>
+</div>
+<div class="flex-1 overflow-y-auto py-md flex flex-col gap-sm px-sm">
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm rounded hover:bg-trench-black/50 hover:text-on-surface transition-colors font-label-md" href="#">
+<span class="material-symbols-outlined">fort</span>
+                HQ
+            </a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm rounded hover:bg-trench-black/50 hover:text-on-surface transition-colors font-label-md" href="#">
+<span class="material-symbols-outlined">military_tech</span>
+                War Table
+            </a>
+<a class="flex items-center gap-md bg-trench-black text-primary-container border-l-4 border-primary-container px-md py-sm rounded-r translate-x-1 transition-all duration-200 font-label-md" href="#">
+<span class="material-symbols-outlined">security</span>
+                Bunker
+            </a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm rounded hover:bg-trench-black/50 hover:text-on-surface transition-colors font-label-md" href="#">
+<span class="material-symbols-outlined">rocket_launch</span>
+                Deploy
+            </a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm rounded hover:bg-trench-black/50 hover:text-on-surface transition-colors font-label-md" href="#">
+<span class="material-symbols-outlined">badge</span>
+                Trench Pass
+            </a>
+</div>
+<div class="p-md border-t-2 border-sandbag">
+<button class="w-full bg-neon-moon text-trench-black font-label-md py-2 uppercase rounded-sm border-2 border-primary-container hover:bg-primary-container/80 transition-colors neon-glow mb-4">
+                DEPLOY MISSION
+            </button>
+<div class="flex flex-col gap-sm">
+<a class="flex items-center gap-md text-gas-mask-grey px-md py-sm rounded hover:bg-trench-black/50 hover:text-on-surface transition-colors font-label-md text-sm" href="#">
+<span class="material-symbols-outlined text-[18px]">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-md text-gas-mask-grey px-md py-sm rounded hover:bg-trench-black/50 hover:text-on-surface transition-colors font-label-md text-sm" href="#">
+<span class="material-symbols-outlined text-[18px]">help</span>
+                    Support
+                </a>
+</div>
+</div>
+</div>
+<!-- Main Content Canvas -->
+<main class="lg:ml-64 min-h-screen pb-32 md:pb-0 transition-transform duration-300" id="main-canvas">
+<!-- The Split Screen Trench Header -->
+<section class="relative w-full h-[40vh] md:h-[50vh] overflow-hidden border-b-4 border-sandbag flex" id="battlefield">
+<!-- Mortar Container -->
+<div class="mortar-container" id="mortar-container"></div>
+<!-- Left Side: Moon Army -->
+<div class="w-1/2 h-full bg-surface-container-highest relative group">
+<div class="absolute inset-0 bg-[url('https://lh3.googleusercontent.com/aida-public/AB6AXuCdjoFN1Iwlo__vRGRO4l6BEADWv8C_6VGeEYl8d5Q1qDpby0B5KP615BFFYjECMzQXfdzefuRbd493kgUwc3GZFnLEPhT_Jt358TT-La72aOPPjkJGOidcLjbeHOnl8ZqJQldRhbneuFFGygVecLhZI7GbBMEUxcIdMXBlfzJhYMp7-FOFx1jMbJmGg5t6IsP_6WGSiL_NI8em3O8jiTAOKJdA4QV96QEIteH-WoVoVCcVlziMReuHyg5OTPRW2jFVGiwi4W-cemN5')] opacity-20 mix-blend-overlay"></div>
+<div class="absolute inset-0 flex items-center justify-center p-4">
+<img alt="Placeholder image of a golden bull facing a red skeleton bear" class="w-full h-full object-cover object-center opacity-80 mix-blend-luminosity filter sepia-[0.3] hue-rotate-[90deg] group-hover:scale-105 transition-transform duration-700" data-alt="A gritty, pixel-art style digital painting depicting a chaotic battlefield trench. On the left side, an army of Pepe-like frog characters in ragged green military uniforms are charging forward. The lighting is dominated by toxic, neon green flares illuminating the smoke-filled air. The scene feels dirty, chaotic, and intense, with a dark, low-fidelity 8-bit aesthetic. Mud, sandbags, and barbed wire fill the foreground." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCdjoFN1Iwlo__vRGRO4l6BEADWv8C_6VGeEYl8d5Q1qDpby0B5KP615BFFYjECMzQXfdzefuRbd493kgUwc3GZFnLEPhT_Jt358TT-La72aOPPjkJGOidcLjbeHOnl8ZqJQldRhbneuFFGygVecLhZI7GbBMEUxcIdMXBlfzJhYMp7-FOFx1jMbJmGg5t6IsP_6WGSiL_NI8em3O8jiTAOKJdA4QV96QEIteH-WoVoVCcVlziMReuHyg5OTPRW2jFVGiwi4W-cemN5"/>
+</div>
+<div class="absolute inset-0 bg-gradient-to-r from-trench-black via-transparent to-transparent opacity-50"></div>
+<!-- Moon Stencil -->
+<div class="absolute top-4 left-4 border-2 border-dashed border-primary-container bg-trench-black/80 px-3 py-1 rotate-[-5deg]">
+<span class="font-label-md text-primary-container tracking-widest">BULLISH TRENCH</span>
+</div>
+</div>
+<!-- Right Side: Jeet Army -->
+<div class="w-1/2 h-full bg-error-container relative group">
+<div class="absolute inset-0 bg-[url('https://lh3.googleusercontent.com/aida-public/AB6AXuDQ-s14fqqelqtJ5h-1E1u4wRvm4ajEw6HzZqQhfWbrbnwpc3dCicl3B8-_TI342aBFLTABOx1DK5yEfy2pq460v5dXBQuPm2URJkBwUbxgCqDRWfENqfYi_YuRKztpOPD6r6DvKozqrsdxotUCcCKMEMCHcHAWXNtE-Qw38s9gzDp1wYDB43vGfaZvBg6H_ToZY5kOJoW1G6hAyvZbSOe6xSo34kOSes5sNMSs_dX5fNYYFLctozljvNKQ2g1XHJzWdSMHpIOzMZ2A')] opacity-20 mix-blend-overlay"></div>
+<div class="absolute inset-0 flex items-center justify-center p-4">
+<img alt="Placeholder image of a golden bull facing a red skeleton bear" class="w-full h-full object-cover object-center opacity-80 mix-blend-luminosity filter sepia-[0.8] hue-rotate-[-30deg] saturate-200 group-hover:scale-105 transition-transform duration-700" data-alt="A gritty, pixel-art style digital painting depicting a chaotic battlefield trench. On the right side, an army of horrifying, red-eyed skeleton Wojak figures emerge from the dark smoke. The lighting is harsh, illuminated by deep, blood-red explosions and flares. The scene is grim, apocalyptic, and raw, maintaining a dark, low-fidelity 8-bit aesthetic. Shattered concrete and broken weaponry litter the foreground." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDQ-s14fqqelqtJ5h-1E1u4wRvm4ajEw6HzZqQhfWbrbnwpc3dCicl3B8-_TI342aBFLTABOx1DK5yEfy2pq460v5dXBQuPm2URJkBwUbxgCqDRWfENqfYi_YuRKztpOPD6r6DvKozqrsdxotUCcCKMEMCHcHAWXNtE-Qw38s9gzDp1wYDB43vGfaZvBg6H_ToZY5kOJoW1G6hAyvZbSOe6xSo34kOSes5sNMSs_dX5fNYYFLctozljvNKQ2g1XHJzWdSMHpIOzMZ2A"/>
+</div>
+<div class="absolute inset-0 bg-gradient-to-l from-trench-black via-transparent to-transparent opacity-50"></div>
+<!-- Jeet Stencil -->
+<div class="absolute bottom-4 right-4 border-2 border-dashed border-jeet-red bg-trench-black/80 px-3 py-1 rotate-[5deg]">
+<span class="font-label-md text-jeet-red tracking-widest">BEARISH WASTELAND</span>
+</div>
+</div>
+<!-- Center Badge -->
+<div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center pointer-events-none">
+<div class="bg-mud-brown border-4 border-sandbag rounded-full w-24 h-24 flex items-center justify-center shadow-[0_0_20px_rgba(0,0,0,0.8)] relative">
+<div class="absolute inset-1 rounded-full border border-dashed border-gas-mask-grey opacity-50"></div>
+<span class="material-symbols-outlined text-4xl text-on-surface">swords</span>
+</div>
+<div class="mt-4 bg-trench-black border-2 border-sandbag px-4 py-2 text-center">
+<p class="font-label-md text-gas-mask-grey text-[10px] uppercase mb-1">YOU ARE FIGHTING FOR:</p>
+<p class="font-headline-md text-primary-container animate-pulse neon-glow bg-trench-black px-2 inline-block">MOON</p>
+</div>
+</div>
+<!-- VS Bar Overlay -->
+<div class="absolute bottom-0 left-0 w-full h-2 flex">
+<div class="w-[65%] bg-primary-container neon-glow"></div>
+<div class="w-[35%] bg-jeet-red jeet-glow"></div>
+</div>
+</section>
+<!-- Main Content Area -->
+<div class="max-w-7xl mx-auto px-margin-mobile md:px-margin-desktop py-lg grid grid-cols-1 lg:grid-cols-12 gap-lg">
+<!-- Left Column: Mission Briefing & Chat (Bento Grid Style) -->
+<div class="lg:col-span-8 flex flex-col gap-lg">
+<!-- Mission Details Card -->
+<div class="bg-mud-brown border-2 border-sandbag p-md md:p-lg relative overflow-hidden group">
+<!-- Subtle background pattern -->
+<div class="absolute top-0 right-0 w-32 h-32 bg-surface-variant opacity-10 rounded-full blur-3xl transform translate-x-1/2 -translate-y-1/2"></div>
+<div class="flex justify-between items-start mb-4 border-b-2 border-sandbag pb-4">
+<div>
+<div class="flex items-center gap-2 mb-2">
+<span class="bg-trench-black border border-gas-mask-grey text-gas-mask-grey px-2 py-0.5 font-label-md text-[10px] uppercase rounded-sm">MISSION #042</span>
+<span class="bg-primary-container/10 border border-primary-container text-primary-container px-2 py-0.5 font-label-md text-[10px] uppercase rounded-sm flex items-center gap-1">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">fiber_manual_record</span> LIVE
+                                </span>
+</div>
+<h1 class="font-headline-lg text-on-surface uppercase tracking-tight">Operation: Doge Rescue</h1>
+</div>
+<div class="text-right">
+<p class="font-label-md text-gas-mask-grey uppercase text-[10px] mb-1">TOTAL POOL</p>
+<p class="font-body-lg font-bold text-moon-gold flex items-center gap-1 justify-end">
+<span class="material-symbols-outlined text-sm">monetization_on</span> 45,200
+                            </p>
+</div>
+</div>
+<div class="font-body-md text-on-surface-variant leading-relaxed mb-6">
+<p>Intel suggests a massive supply zone at 0.042. The bulls are attempting a breakout, but bears have fortified the resistance line. Deploy your capital to the frontline. Will it break containment, or get rejected back to the mud?</p>
+</div>
+<!-- Market Stats Mini-Grid -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-sm">
+<div class="bg-trench-black border border-sandbag p-3 rounded-sm flex flex-col items-center justify-center text-center">
+<span class="font-label-md text-gas-mask-grey text-[10px] mb-1">ENTRY PRICE</span>
+<span class="font-body-md text-on-surface font-bold">$0.0384</span>
+</div>
+<div class="bg-trench-black border border-sandbag p-3 rounded-sm flex flex-col items-center justify-center text-center">
+<span class="font-label-md text-gas-mask-grey text-[10px] mb-1">TARGET (MOON)</span>
+<span class="font-body-md text-primary-container font-bold">$0.0500</span>
+</div>
+<div class="bg-trench-black border border-sandbag p-3 rounded-sm flex flex-col items-center justify-center text-center">
+<span class="font-label-md text-gas-mask-grey text-[10px] mb-1">SUPPORT (JEET)</span>
+<span class="font-body-md text-jeet-red font-bold">$0.0300</span>
+</div>
+<div class="bg-trench-black border border-sandbag p-3 rounded-sm flex flex-col items-center justify-center text-center">
+<span class="font-label-md text-gas-mask-grey text-[10px] mb-1">TIME REMAINING</span>
+<span class="font-body-md text-tertiary-fixed font-bold flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">timer</span> 14:22:00
+                            </span>
+</div>
+</div>
+</div>
+<!-- Degen Chat Radio Comms -->
+<div class="bg-mud-brown border-2 border-sandbag flex flex-col h-[400px]">
+<div class="border-b-2 border-sandbag flex bg-trench-black/50">
+<button class="flex-1 py-3 text-center border-b-2 border-primary-container font-label-md text-primary-container uppercase tracking-wide bg-mud-brown transition-colors">
+                            Moon Comms (842)
+                        </button>
+<button class="flex-1 py-3 text-center border-b-2 border-transparent font-label-md text-gas-mask-grey uppercase tracking-wide hover:bg-mud-brown/50 transition-colors">
+                            Jeet Comms (120)
+                        </button>
+</div>
+<div class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 font-body-md text-sm custom-scrollbar" id="chat-container">
+<!-- Chat messages -->
+<div class="flex items-start gap-2">
+<div class="w-6 h-6 rounded bg-surface-variant flex items-center justify-center border border-gas-mask-grey flex-shrink-0">
+<img alt="Pepe wearing a helmet" class="w-full h-full object-cover rounded-sm" data-alt="A tiny pixel-art avatar icon of a Pepe frog character wearing a dirty green military combat helmet. The expression is stoic and slightly depressed. The background is a flat, dark grey color." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6R-TGx3BxfRxjqXIdMwqRAsH7zOrkvrCSbzDkR-eEhJwfPnn8Sp5911CHA6AidPCH1Aj0bwSZjSibmfUZjoyVZHN1xLf8IEuKRRw_Eau0Mh4Hhkr0HuYa_MF-2axSZrY0pBEfJkdSB_lDwQpOTwD0X7oo0BADHEvZZh46-q_Ikxv5IfPLbK4NgO6nLor5q2neiT0rYUR4mFEpOmLZH_xEinR9V0ftQgGdg0Lij8ojpJlVQfV-CGcPX8PNNPjgyTf3n4XBPLMJqxce"/>
+</div>
+<div>
+<div class="flex items-baseline gap-2">
+<span class="font-label-md text-primary-container text-[10px]">TrenchLord99</span>
+<span class="text-gas-mask-grey text-[10px]">12:44 PM</span>
+</div>
+<p class="text-on-surface-variant">Sending reinforcements. We hold the line here. 🚀</p>
+</div>
+</div>
+<div class="flex items-start gap-2">
+<div class="w-6 h-6 rounded bg-surface-variant flex items-center justify-center border border-gas-mask-grey flex-shrink-0">
+<span class="font-label-md text-gas-mask-grey text-[10px]">WG</span>
+</div>
+<div>
+<div class="flex items-baseline gap-2">
+<span class="font-label-md text-on-surface text-[10px]">WAGMI_General</span>
+<span class="text-gas-mask-grey text-[10px]">12:45 PM</span>
+</div>
+<p class="text-on-surface-variant">Apeing in another 100. Don't let the bears win.</p>
+</div>
+</div>
+<div class="flex items-start gap-2 opacity-50">
+<div class="w-6 h-6 rounded bg-surface-variant flex items-center justify-center border border-gas-mask-grey flex-shrink-0">
+<span class="font-label-md text-error text-[10px]">SK</span>
+</div>
+<div>
+<div class="flex items-baseline gap-2">
+<span class="font-label-md text-jeet-red text-[10px]">SkeletonBear</span>
+<span class="text-gas-mask-grey text-[10px]">12:46 PM</span>
+</div>
+<p class="text-on-surface-variant italic">Message intercepted: "Dumping at 0.04..."</p>
+</div>
+</div>
+</div>
+<div class="p-3 border-t-2 border-sandbag bg-trench-black">
+<div class="flex gap-2">
+<input class="flex-1 bg-mud-brown border border-gas-mask-grey text-on-surface font-body-md text-sm px-3 py-2 focus:outline-none focus:border-primary-container focus:ring-1 focus:ring-primary-container placeholder-gas-mask-grey transition-all" placeholder="Transmit message to frontlines..." type="text"/>
+<button class="wood-btn px-4 py-2 font-label-md text-tertiary flex items-center justify-center">
+<span class="material-symbols-outlined text-[18px]">send</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: The Action Panel (Ammo Crate) -->
+<div class="lg:col-span-4 relative">
+<div class="sticky top-24 bg-mud-brown border-4 border-sandbag p-md shadow-2xl relative" id="bet-panel">
+<!-- Decorative Screws -->
+<div class="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-sandbag"></div>
+<div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-sandbag"></div>
+<div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-sandbag"></div>
+<div class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-sandbag"></div>
+<div class="text-center border-b-2 border-sandbag pb-4 mb-4">
+<h3 class="font-headline-md text-on-surface uppercase tracking-wider">Deploy Capital</h3>
+<p class="font-label-md text-gas-mask-grey mt-1 text-[10px]">SELECT AMMUNITION YIELD</p>
+</div>
+<!-- Faction Selector -->
+<div class="flex gap-2 mb-6">
+<button class="flex-1 py-3 border-2 border-primary-container bg-primary-container/20 text-primary-container font-label-md uppercase tracking-wider relative overflow-hidden group">
+<span class="relative z-10 flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">rocket_launch</span> MOON
+                            </span>
+<div class="absolute inset-0 bg-primary-container/30 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
+</button>
+<button class="flex-1 py-3 border-2 border-surface-variant bg-trench-black text-gas-mask-grey font-label-md uppercase tracking-wider hover:border-jeet-red hover:text-jeet-red transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">trending_down</span> JEET
+                        </button>
+</div>
+<!-- Amount Slider -->
+<div class="mb-6 bg-trench-black p-4 border border-sandbag rounded-sm">
+<div class="flex justify-between items-center mb-4">
+<span class="font-label-md text-gas-mask-grey text-[10px]">PAYLOAD AMOUNT</span>
+<span class="font-body-md text-on-surface font-bold font-mono">1,000 USDC</span>
+</div>
+<!-- Custom Range Slider styling -->
+<div class="relative w-full h-2 bg-surface-variant rounded-full mb-4">
+<div class="absolute top-0 left-0 h-full bg-primary-container w-[25%] rounded-l-full neon-glow"></div>
+<div class="absolute top-1/2 -translate-y-1/2 left-[25%] w-4 h-6 bg-mud-brown border-2 border-sandbag cursor-pointer shadow-md hover:bg-surface-bright transition-colors transform -translate-x-1/2"></div>
+</div>
+<div class="flex justify-between gap-2 mt-4">
+<button class="flex-1 py-1 bg-mud-brown border border-sandbag text-gas-mask-grey font-label-md text-[10px] hover:text-on-surface transition-colors">25%</button>
+<button class="flex-1 py-1 bg-mud-brown border border-sandbag text-gas-mask-grey font-label-md text-[10px] hover:text-on-surface transition-colors">50%</button>
+<button class="flex-1 py-1 bg-mud-brown border border-sandbag text-gas-mask-grey font-label-md text-[10px] hover:text-on-surface transition-colors">75%</button>
+<button class="flex-1 py-1 bg-mud-brown border border-sandbag text-primary-container font-label-md text-[10px] hover:bg-primary-container/10 transition-colors border-primary-container/50">MAX</button>
+</div>
+</div>
+<!-- Order Details -->
+<div class="space-y-2 mb-6 font-body-md text-sm">
+<div class="flex justify-between text-on-surface-variant">
+<span>Expected Return</span>
+<span class="text-primary-container font-mono">+1,850 USDC</span>
+</div>
+<div class="flex justify-between text-on-surface-variant">
+<span>Current Multiplier</span>
+<span class="font-mono">1.85x</span>
+</div>
+<div class="flex justify-between text-gas-mask-grey text-xs">
+<span>Network Fee</span>
+<span class="font-mono">0.05 USDC</span>
+</div>
+</div>
+<!-- Confirm Button -->
+<button class="w-full py-4 text-center font-headline-md text-trench-black uppercase tracking-widest bg-primary-container border-2 border-primary-container neon-glow hover:bg-primary-fixed transition-colors relative overflow-hidden group" id="confirm-btn">
+<span class="relative z-10">CONFIRM CHARGE</span>
+<!-- Shimmer effect -->
+<div class="absolute top-0 -left-[100%] w-1/2 h-full bg-white/20 skew-x-[-20deg] group-hover:animate-[shimmer_1s_ease-in-out_infinite]"></div>
+</button>
+<!-- Settlement Area (Hidden by default, shown on action) -->
+<div class="stamp-overlay border-4 border-error text-error font-headline-xl uppercase p-2 tracking-widest bg-trench-black/90 backdrop-blur-sm z-50 mix-blend-screen pointer-events-none" id="settlement-stamp">
+                        GET REKT
+                    </div>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Hidden on Desktop, Flex on Mobile) -->
+<nav class="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 pb-safe bg-mud-brown border-t-2 border-sandbag shadow-[0_-4px_12px_rgba(0,0,0,0.6)] rounded-t-xl z-50">
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md text-[10px] mt-1">HQ</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined">swords</span>
+<span class="font-label-md text-[10px] mt-1">War</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary-container bg-trench-black rounded-lg py-1 px-4 border border-sandbag scale-90 duration-150 relative" href="#">
+<div class="absolute inset-0 border border-primary-container rounded-lg animate-ping opacity-20"></div>
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">add_box</span>
+<span class="font-label-md text-[10px] mt-1 font-bold">Deploy</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-md text-[10px] mt-1">Pass</span>
+</a>
+</nav>
+<!-- Footer -->
+<footer class="w-full flex flex-col md:flex-row justify-between items-center px-margin-desktop py-xl gap-md bg-trench-black border-t-4 border-dashed border-sandbag mb-16 lg:ml-64 lg:w-[calc(100%-16rem)] md:mb-0">
+<span class="font-headline-md text-headline-md text-gas-mask-grey text-center md:text-left">
+            © 2024 SHITMARKET.GG - NO MERCY IN THE TRENCHES
+        </span>
+<div class="flex flex-wrap justify-center gap-md font-label-md text-label-md">
+<a class="text-gas-mask-grey hover:text-primary-container transition-colors" href="#">Whitepaper</a>
+<a class="text-gas-mask-grey hover:text-primary-container transition-colors" href="#">Twitter</a>
+<a class="text-gas-mask-grey hover:text-primary-container transition-colors" href="#">Discord</a>
+<a class="text-gas-mask-grey hover:text-primary-container transition-colors" href="#">Terms of Engagement</a>
+</div>
+</footer>
+<!-- Floating Pepe Mascot -->
+<div class="fixed bottom-4 right-4 z-[100] flex flex-col items-center pointer-events-none hidden md:flex" id="mascot-container">
+<!-- Speech Bubble -->
+<div class="opacity-0 transition-opacity duration-300 bg-surface-bright border-4 border-trench-black p-3 mb-4 rounded relative shadow-2xl transform -rotate-2 min-w-[120px] pointer-events-none" id="mascot-speech">
+<p class="font-marker text-primary-container text-lg text-center uppercase leading-tight tracking-wider" id="mascot-text" style="text-shadow: 2px 2px 0px #0D0D0A;"></p>
+<!-- Speech Bubble Tail -->
+<div class="absolute -bottom-3 right-8 w-0 h-0 border-l-[10px] border-l-transparent border-t-[15px] border-t-trench-black border-r-[10px] border-r-transparent"></div>
+<div class="absolute -bottom-1.5 right-8 w-0 h-0 border-l-[6px] border-l-transparent border-t-[10px] border-t-surface-bright border-r-[6px] border-r-transparent"></div>
+</div>
+<!-- Mascot Image -->
+<div class="w-24 h-24 rounded-full bg-mud-brown border-4 border-primary-container shadow-[0_0_15px_rgba(57,255,20,0.5)] overflow-hidden flex items-center justify-center pointer-events-auto hover:scale-105 transition-transform animate-[bounce_3s_infinite]">
+<img alt="Pepe Mascot" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6R-TGx3BxfRxjqXIdMwqRAsH7zOrkvrCSbzDkR-eEhJwfPnn8Sp5911CHA6AidPCH1Aj0bwSZjSibmfUZjoyVZHN1xLf8IEuKRRw_Eau0Mh4Hhkr0HuYa_MF-2axSZrY0pBEfJkdSB_lDwQpOTwD0X7oo0BADHEvZZh46-q_Ikxv5IfPLbK4NgO6nLor5q2neiT0rYUR4mFEpOmLZH_xEinR9V0ftQgGdg0Lij8ojpJlVQfV-CGcPX8PNNPjgyTf3n4XBPLMJqxce"/>
+</div>
+</div>
+<script>
+        // Audio System
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        let isMuted = true;
+        let drumInterval;
+
+        const soundToggle = document.getElementById('sound-toggle');
+        const soundIcon = document.getElementById('sound-icon');
+
+        if (soundToggle) {
+            soundToggle.addEventListener('click', () => {
+                if (!audioCtx) {
+                    audioCtx = new AudioContext();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                isMuted = !isMuted;
+                soundIcon.innerText = isMuted ? 'volume_off' : 'volume_up';
+                
+                if (!isMuted) {
+                    startDrums();
+                } else {
+                    stopDrums();
+                }
+            });
+        }
+
+        function playWhistle(duration = 1.5, isFast = false) {
+            if (isMuted || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(isFast ? 1200 : 800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + duration);
+            
+            gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playExplosion() {
+            if (isMuted || !audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 0.5;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 1000;
+            
+            const gain = audioCtx.createGain();
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            noise.start();
+        }
+
+        function playDrum() {
+            if (isMuted || !audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+            
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);</script></body></html>

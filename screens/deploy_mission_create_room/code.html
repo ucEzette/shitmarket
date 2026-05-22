@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>SHITMARKET.GG - Deploy Mission</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:wght@700;800&amp;family=JetBrains+Mono:wght@400&amp;family=Space+Mono:wght@700&amp;family=Syne:wght@800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "on-tertiary-fixed": "#221b00",
+                      "on-tertiary": "#3a3000",
+                      "trench-black": "#0D0D0A",
+                      "outline": "#85967c",
+                      "error": "#ffb4ab",
+                      "primary": "#efffe3",
+                      "wood-plank": "#5C3A21",
+                      "mud-brown": "#2A241A",
+                      "primary-container": "#39ff14",
+                      "on-background": "#dae6d0",
+                      "on-secondary-fixed-variant": "#92001c",
+                      "tertiary-fixed-dim": "#e9c400",
+                      "tertiary-fixed": "#ffe16d",
+                      "surface": "#0c1609",
+                      "on-primary-container": "#107100",
+                      "on-tertiary-fixed-variant": "#544600",
+                      "on-primary-fixed-variant": "#095300",
+                      "tertiary-container": "#ffdb40",
+                      "on-tertiary-container": "#736000",
+                      "inverse-surface": "#dae6d0",
+                      "sandbag": "#5C5244",
+                      "surface-bright": "#323c2d",
+                      "on-surface-variant": "#baccb0",
+                      "inverse-primary": "#106e00",
+                      "on-surface": "#dae6d0",
+                      "surface-tint": "#2ae500",
+                      "surface-container-low": "#141e11",
+                      "surface-container-lowest": "#071105",
+                      "error-container": "#93000a",
+                      "surface-variant": "#2d3828",
+                      "secondary": "#ffb3b1",
+                      "surface-container-highest": "#2d3828",
+                      "on-error": "#690005",
+                      "surface-container": "#182214",
+                      "on-secondary-fixed": "#410007",
+                      "gas-mask-grey": "#8B8B7A",
+                      "tertiary": "#fff9f0",
+                      "outline-variant": "#3c4b35",
+                      "surface-container-high": "#222d1e",
+                      "on-primary-fixed": "#022100",
+                      "inverse-on-surface": "#293324",
+                      "primary-fixed": "#79ff5b",
+                      "secondary-fixed": "#ffdad8",
+                      "background": "#0c1609",
+                      "wood-shadow": "#3A2512",
+                      "secondary-fixed-dim": "#ffb3b1",
+                      "surface-dim": "#0c1609",
+                      "secondary-container": "#ff535a",
+                      "on-secondary": "#680011",
+                      "primary-fixed-dim": "#2ae500",
+                      "on-error-container": "#ffdad6",
+                      "on-secondary-container": "#5b000e",
+                      "on-primary": "#053900",
+                      "neon-moon": "#39ff14",
+                      "moon-gold": "#FFD700",
+                      "jeet-red": "#FF0000"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "lg": "24px",
+                      "margin-mobile": "12px",
+                      "xs": "4px",
+                      "md": "16px",
+                      "unit": "4px",
+                      "gutter": "16px",
+                      "margin-desktop": "32px",
+                      "xl": "40px",
+                      "sm": "8px",
+                      "safe": "env(safe-area-inset-bottom)"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "JetBrains Mono"
+                      ],
+                      "label-md": [
+                              "Space Mono"
+                      ],
+                      "headline-xl": [
+                              "Anybody"
+                      ],
+                      "headline-md": [
+                              "Anybody"
+                      ],
+                      "meme-quote": [
+                              "Syne"
+                      ],
+                      "body-lg": [
+                              "JetBrains Mono"
+                      ],
+                      "headline-lg": [
+                              "Anybody"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "12px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "label-md-mobile": [
+                              "10px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-xl": [
+                              "48px",
+                              {
+                                      "lineHeight": "1.1",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "meme-quote": [
+                              "20px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "fontWeight": "800"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "1.5",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "1.2",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "700"
+                              }
+                      ]
+              }
+            },
+          },
+        }
+    </script>
+<style>
+        body {
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.05"/></svg>');
+            background-color: theme('colors.trench-black');
+            background-blend-mode: overlay;
+        }
+        .glow-moon {
+            box-shadow: 0 0 15px theme('colors.neon-moon'), inset 0 0 5px theme('colors.neon-moon');
+        }
+        .text-glow-moon {
+            text-shadow: 0 0 10px theme('colors.neon-moon');
+        }
+        
+        .clipboard-clip {
+            background: linear-gradient(to bottom, #8B8B7A 0%, #5C5244 100%);
+            border-bottom: 4px solid #3A2512;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        }
+
+        .paper-texture {
+            background-image: repeating-linear-gradient(transparent, transparent 24px, rgba(92, 82, 68, 0.2) 24px, rgba(92, 82, 68, 0.2) 25px);
+        }
+    </style>
+</head>
+<body class="text-on-surface font-body-md antialiased min-h-screen flex flex-col md:flex-row">
+<!-- TopAppBar (Mobile) / SideNavBar (Desktop) Logic -->
+<!-- TopAppBar (Web & Mobile Header) -->
+<header class="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop h-16 z-50 bg-mud-brown dark:bg-mud-brown border-b-2 border-sandbag md:hidden sticky top-0">
+<div class="font-headline-lg-mobile text-headline-lg-mobile font-black text-primary-container tracking-tighter italic">SHITMARKET.GG</div>
+<div class="flex items-center gap-md text-primary-container dark:text-primary-container">
+<span class="material-symbols-outlined hover:text-primary-container hover:bg-surface-variant/50 transition-colors cursor-pointer p-1 rounded-sm">notifications</span>
+<span class="material-symbols-outlined hover:text-primary-container hover:bg-surface-variant/50 transition-colors cursor-pointer p-1 rounded-sm">account_balance_wallet</span>
+</div>
+</header>
+<!-- SideNavBar (Desktop) -->
+<nav class="hidden md:flex flex-col fixed left-0 top-0 h-full z-40 w-64 border-r-2 border-sandbag bg-mud-brown dark:bg-mud-brown shadow-[inset_-4px_0_8px_rgba(0,0,0,0.5)]">
+<div class="p-lg border-b-2 border-sandbag">
+<div class="font-headline-md text-headline-md text-primary-container mb-xs">TRENCH COMMAND</div>
+<div class="font-label-md text-label-md text-gas-mask-grey">OPERATOR #7742</div>
+</div>
+<div class="flex-1 py-lg overflow-y-auto">
+<ul class="space-y-sm px-sm">
+<li>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md rounded-sm transition-colors" href="#">
+<span class="material-symbols-outlined">fort</span>
+                        HQ
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md rounded-sm transition-colors" href="#">
+<span class="material-symbols-outlined">military_tech</span>
+                        War Table
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md rounded-sm transition-colors" href="#">
+<span class="material-symbols-outlined">security</span>
+                        Bunker
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-md bg-trench-black text-primary-container border-l-4 border-primary-container px-md py-sm font-label-md text-label-md rounded-r-sm translate-x-1 transition-all duration-200" href="#">
+<span class="material-symbols-outlined">rocket_launch</span>
+                        Deploy
+                    </a>
+</li>
+<li>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md rounded-sm transition-colors" href="#">
+<span class="material-symbols-outlined">badge</span>
+                        Trench Pass
+                    </a>
+</li>
+</ul>
+</div>
+<div class="p-md border-t-2 border-sandbag">
+<button class="w-full bg-wood-plank border-b-4 border-wood-shadow text-on-surface font-label-md text-label-md py-sm px-md rounded-sm hover:brightness-110 active:border-b-0 active:translate-y-[4px] transition-all">
+                DEPLOY MISSION
+            </button>
+<div class="mt-md space-y-sm">
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md rounded-sm transition-colors" href="#">
+<span class="material-symbols-outlined">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-trench-black/50 hover:text-on-surface font-label-md text-label-md rounded-sm transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+                    Support
+                </a>
+</div>
+</div>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-1 w-full md:ml-64 p-margin-mobile md:p-margin-desktop min-h-[calc(100vh-64px)] md:min-h-screen pb-24 md:pb-margin-desktop flex items-center justify-center relative overflow-hidden">
+<!-- Hero Background Image for Vibe -->
+<div class="absolute inset-0 z-0 opacity-20 pointer-events-none">
+<img alt="Abstract gritty battlefield texture" class="w-full h-full object-cover mix-blend-overlay" data-alt="A dark, gritty, abstract texture resembling a war-torn battlefield or trench environment. The lighting is moody and low-key, with subtle hints of toxic green and muddy browns seeping through deep blacks. The style is raw and military-inspired, evoking a sense of danger and high stakes in a digital underground setting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCEBBceU-Xlos-F47dt5OYD_5s-cnKsHuuZePU1tAD2GtJ37aFcPExG5dz8DNVjKYPwd6SYgJSELNa6EDhqPBBDaQAMBHcA48wxs7az84ai6LVq48Ir8RMVsP2fUvxojHqWlb3qWh2EdGdNlggkiiVz2XMl6H60qxmoGV9aEuVNxmWVi22-aZrhp_O-MqQt7mCdXGREPmnttRDNuJzX7jSCrJr9TVgikcexImiCaANL_8t30EFmbOtU5CGSYIK1QQCdeL9j_eZ0oPwn"/>
+</div>
+<!-- Clipboard Form Container -->
+<div class="relative z-10 w-full max-w-2xl bg-[#3A3022] rounded-lg shadow-2xl border-2 border-sandbag p-2 md:p-4 transform rotate-1 md:rotate-2">
+<!-- Clipboard Clip Hardware -->
+<div class="absolute -top-4 left-1/2 -translate-x-1/2 w-32 h-8 clipboard-clip rounded-t-md z-20 flex items-center justify-center">
+<div class="w-20 h-2 bg-trench-black rounded-full opacity-50"></div>
+</div>
+<!-- Paper Sheet -->
+<div class="bg-mud-brown border-2 border-sandbag rounded-sm p-margin-mobile md:p-lg relative overflow-hidden paper-texture shadow-inner h-full flex flex-col">
+<!-- TOP SECRET STAMP -->
+<div class="absolute top-8 right-8 transform rotate-12 opacity-80 pointer-events-none z-10">
+<div class="border-4 border-error text-error font-headline-md text-headline-md p-2 rounded-sm uppercase tracking-widest bg-trench-black/50 backdrop-blur-sm shadow-[0_0_10px_rgba(255,180,171,0.5)]">
+                        TOP SECRET
+                    </div>
+</div>
+<div class="mb-lg border-b-2 border-sandbag pb-sm">
+<h1 class="font-headline-xl text-headline-lg-mobile md:text-headline-xl text-primary-container font-black uppercase tracking-tighter text-glow-moon">MISSION BRIEFING</h1>
+<p class="font-label-md text-label-md text-gas-mask-grey mt-xs">OPERATIONAL COMMAND / DEPLOYMENT PROTOCOL v2.1</p>
+</div>
+<form class="space-y-lg flex-1 relative z-20">
+<!-- Token Address -->
+<div class="space-y-sm">
+<label class="block font-label-md text-label-md text-on-surface uppercase tracking-wider flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-gas-mask-grey">radar</span>
+                            Target Coordinates (Contract Address)
+                        </label>
+<div class="relative">
+<input class="w-full bg-trench-black border-2 border-gas-mask-grey text-on-surface font-body-md p-md rounded-sm focus:border-moon-gold focus:outline-none focus:ring-1 focus:ring-moon-gold transition-colors font-mono placeholder:text-gas-mask-grey/50" placeholder="0x..." type="text"/>
+<div class="absolute right-3 top-1/2 -translate-y-1/2 text-primary-container text-xs font-label-md border border-primary-container/50 bg-primary-container/10 px-2 py-1 rounded-sm uppercase flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">verified</span>
+                                Liquidity OK
+                            </div>
+</div>
+</div>
+<!-- Mission Duration (Bento-ish Grid) -->
+<div class="space-y-sm">
+<label class="block font-label-md text-label-md text-on-surface uppercase tracking-wider flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-gas-mask-grey">timer</span>
+                            Engagement Duration
+                        </label>
+<div class="grid grid-cols-3 gap-sm">
+<label class="relative cursor-pointer group">
+<input checked="" class="peer sr-only" name="duration" type="radio" value="5m"/>
+<div class="h-full bg-trench-black border-2 border-gas-mask-grey rounded-sm p-sm text-center peer-checked:border-primary-container peer-checked:bg-primary-container/10 transition-all flex flex-col items-center justify-center gap-1 group-hover:border-gas-mask-grey/80">
+<span class="font-headline-md text-headline-md text-on-surface peer-checked:text-primary-container peer-checked:text-glow-moon transition-colors">5M</span>
+<span class="font-label-md text-[10px] text-gas-mask-grey uppercase">Recon</span>
+</div>
+</label>
+<label class="relative cursor-pointer group">
+<input class="peer sr-only" name="duration" type="radio" value="15m"/>
+<div class="h-full bg-trench-black border-2 border-gas-mask-grey rounded-sm p-sm text-center peer-checked:border-primary-container peer-checked:bg-primary-container/10 transition-all flex flex-col items-center justify-center gap-1 group-hover:border-gas-mask-grey/80">
+<span class="font-headline-md text-headline-md text-on-surface peer-checked:text-primary-container peer-checked:text-glow-moon transition-colors">15M</span>
+<span class="font-label-md text-[10px] text-gas-mask-grey uppercase">Skirmish</span>
+</div>
+</label>
+<label class="relative cursor-pointer group">
+<input class="peer sr-only" name="duration" type="radio" value="1h"/>
+<div class="h-full bg-trench-black border-2 border-gas-mask-grey rounded-sm p-sm text-center peer-checked:border-primary-container peer-checked:bg-primary-container/10 transition-all flex flex-col items-center justify-center gap-1 group-hover:border-gas-mask-grey/80">
+<span class="font-headline-md text-headline-md text-on-surface peer-checked:text-primary-container peer-checked:text-glow-moon transition-colors">1H</span>
+<span class="font-label-md text-[10px] text-gas-mask-grey uppercase">Siege</span>
+</div>
+</label>
+</div>
+</div>
+<!-- Initial Stake -->
+<div class="space-y-sm">
+<label class="block font-label-md text-label-md text-on-surface uppercase tracking-wider flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px] text-gas-mask-grey">local_fire_department</span>
+                            Initial Ammunition (Stake)
+                        </label>
+<div class="flex items-center gap-sm bg-trench-black border-2 border-gas-mask-grey rounded-sm focus-within:border-moon-gold focus-within:ring-1 focus-within:ring-moon-gold transition-colors p-1">
+<span class="text-moon-gold font-headline-md text-headline-md pl-md">$</span>
+<input class="w-full bg-transparent border-none text-on-surface font-body-lg text-body-lg focus:ring-0 p-sm font-mono" min="0" placeholder="100.00" step="0.01" type="number"/>
+<button class="bg-surface-variant hover:bg-outline-variant text-on-surface-variant font-label-md text-[10px] uppercase px-2 py-1 rounded-sm mr-1 transition-colors" type="button">MAX</button>
+</div>
+</div>
+<!-- Action Area -->
+<div class="pt-lg border-t-2 border-dashed border-sandbag mt-xl flex flex-col items-center gap-md">
+<button class="w-full bg-moon-gold text-trench-black font-headline-md text-headline-md py-md px-lg rounded-sm uppercase tracking-widest glow-moon hover:brightness-110 active:scale-95 transition-all flex justify-center items-center gap-2" type="button">
+<span class="material-symbols-outlined font-bold">rocket_launch</span>
+                            LAUNCH ARENA
+                        </button>
+<p class="font-label-md text-label-md text-gas-mask-grey flex items-center gap-1">
+<span class="material-symbols-outlined text-[14px]">info</span>
+                            2% platform fee - fair and simple.
+                        </p>
+</div>
+</form>
+</div>
+</div>
+</main>
+<!-- BottomNavBar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 py-2 pb-safe bg-mud-brown border-t-2 border-sandbag z-50 shadow-[0_-4px_12px_rgba(0,0,0,0.6)] rounded-t-xl">
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md text-label-md-mobile mt-1">HQ</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined">swords</span>
+<span class="font-label-md text-label-md-mobile mt-1">War</span>
+</a>
+<a class="flex flex-col items-center justify-center text-primary-container bg-trench-black rounded-lg py-1 px-4 border border-sandbag scale-90 duration-150" href="#">
+<span class="material-symbols-outlined">add_box</span>
+<span class="font-label-md text-label-md-mobile mt-1">Deploy</span>
+</a>
+<a class="flex flex-col items-center justify-center text-gas-mask-grey py-1 hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined">person</span>
+<span class="font-label-md text-label-md-mobile mt-1">Pass</span>
+</a>
+</nav>
+<!-- Interactive script for radio buttons to update UI slightly based on selection (lightweight atmospheric effect) -->
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const radioButtons = document.querySelectorAll('input[name="duration"]');
+            const submitButton = document.querySelector('button[type="button"]');
+            
+            radioButtons.forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    // Just a tiny visual feedback when changing duration
+                    submitButton.style.transform = 'scale(0.98)';
+                    setTimeout(() => {
+                        submitButton.style.transform = 'scale(1)';
+                    }, 100);
+                });
+            });
+        });
+    </script>
+</body></html>

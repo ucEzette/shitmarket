@@ -1,0 +1,133 @@
+// This is your Prisma schema file
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Rooms ────────────────────────────────────────────────────────────────────
+
+model Room {
+  id              String   @id @default(uuid()) @db.Uuid
+  roomPubkey      String   @unique @map("room_pubkey") @db.VarChar(44)
+  tokenMint       String   @map("token_mint") @db.VarChar(44)
+  priceFeed       String?  @map("price_feed") @db.VarChar(44)
+  switchboardFeed String?  @map("switchboard_feed") @db.VarChar(44)
+  tokenName       String?  @map("token_name")
+  tokenSymbol     String?  @map("token_symbol")
+  tokenImageUrl   String?  @map("token_image_url")
+  chainId         String?  @default("solana") @map("chain_id")
+  originalAddress String?  @map("original_address")
+  duration        Int      @db.SmallInt
+  openingPrice    BigInt   @map("opening_price")
+  expiry          DateTime @db.Timestamptz()
+  status          String   @default("active") @db.VarChar(10)
+  winner          String?  @db.VarChar(5)
+  finalPrice      BigInt?  @map("final_price")
+  twapFinalPrice  BigInt?  @map("twap_final_price")
+  totalPool       BigInt   @default(0) @map("total_pool")
+  platformFee     BigInt   @default(0) @map("platform_fee")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  bets            Bet[]
+  payouts         Payout[]
+
+  @@map("rooms")
+}
+
+// ─── Bets ─────────────────────────────────────────────────────────────────────
+
+model Bet {
+  id          String   @id @default(uuid()) @db.Uuid
+  roomPubkey  String   @map("room_pubkey") @db.VarChar(44)
+  userPubkey  String   @map("user_pubkey") @db.VarChar(44)
+  side        String   @db.VarChar(5)
+  amount      BigInt
+  claimed     Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  room        Room     @relation(fields: [roomPubkey], references: [roomPubkey])
+
+  @@index([roomPubkey])
+  @@index([userPubkey])
+  @@map("bets")
+}
+
+// ─── User Profiles ────────────────────────────────────────────────────────────
+
+model UserProfile {
+  userPubkey   String   @id @map("user_pubkey") @db.VarChar(44)
+  totalBets    Int      @default(0) @map("total_bets")
+  wins         Int      @default(0)
+  losses       Int      @default(0)
+  profit       BigInt   @default(0)
+  trenchScore  String   @default("D") @map("trench_score") @db.Char(1)
+  achievements Json     @default("[]")
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  reputation   Reputation?
+
+  @@map("user_profiles")
+}
+
+// ─── Price Samples for TWAP (Phase 3.2) ────────────────────────────────────
+
+model PriceSample {
+  id          String   @id @default(uuid()) @db.Uuid
+  tokenMint   String   @map("token_mint") @db.VarChar(44)
+  price       BigInt
+  source      String   @default("unknown") @db.VarChar(20)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([tokenMint, createdAt])
+  @@map("price_samples")
+}
+
+// ─── Reputation (Phase 3.5) ─────────────────────────────────────────────────
+
+model Reputation {
+  id          String   @id @default(uuid()) @db.Uuid
+  userPubkey  String   @unique @map("user_pubkey") @db.VarChar(44)
+  tier        String   @default("D") @db.Char(1) // D, C, B, A, S
+  totalBets   BigInt   @default(0) @map("total_bets")
+  totalWins   BigInt   @default(0) @map("total_wins")
+  totalVolume BigInt   @default(0) @map("total_volume")
+  totalProfit BigInt   @default(0) @map("total_profit")
+  lastEval    DateTime @default(now()) @map("last_evaluated") @db.Timestamptz()
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  userProfile UserProfile? @relation(fields: [userPubkey], references: [userPubkey])
+
+  @@map("reputations")
+}
+
+// ─── Processed Transactions (idempotency) ────────────────────────────────────
+
+model ProcessedTx {
+  signature   String   @id @db.VarChar(88)
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz()
+
+  @@map("processed_txs")
+}
+
+// ─── Payouts (computed at settlement) ────────────────────────────────────────
+
+model Payout {
+  id          String   @id @default(uuid()) @db.Uuid
+  roomPubkey  String   @map("room_pubkey") @db.VarChar(44)
+  userPubkey  String   @map("user_pubkey") @db.VarChar(44)
+  amount      BigInt
+  claimedAt   DateTime? @map("claimed_at") @db.Timestamptz()
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  room        Room     @relation(fields: [roomPubkey], references: [roomPubkey])
+
+  @@unique([roomPubkey, userPubkey])
+  @@index([roomPubkey])
+  @@index([userPubkey])
+  @@map("payouts")
+}

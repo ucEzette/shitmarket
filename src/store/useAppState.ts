@@ -22,6 +22,16 @@ export interface Bet {
   timestamp: number;
 }
 
+export interface Activity {
+  id: string;
+  type: 'bet' | 'win' | 'settlement';
+  title: string;
+  message: string;
+  timestamp: number;
+  read: boolean;
+  link?: string;
+}
+
 export interface Room {
   id: string;
   token: {
@@ -40,7 +50,7 @@ export interface Room {
   jeetPool: number;
   expiry: number; // unix timestamp in ms
   status: 'active' | 'settled' | 'cancelled';
-  winner?: 'moon' | 'jeet';
+  winner?: 'moon' | 'jeet' | 'draw';
   createdAt: number;
   duration: 5 | 15 | 60; // minutes
   openingPrice?: number;
@@ -89,6 +99,7 @@ export interface AppState {
     jeet: LeaderboardEntry[];
   };
   chatMessages: ChatMessage[];
+  activityLog: Activity[];
   fullDegenMode: boolean;
   
   // Transactional & Web3 states
@@ -105,7 +116,9 @@ export interface AppState {
   setWallet: (wallet: any) => void;
   setWalletAddress: (address: string | null) => void;
   addMessage: (msg: ChatMessage) => void;
-  settleRoom: (roomId: string, winner: 'moon' | 'jeet') => void;
+  addActivity: (activity: Omit<Activity, 'id' | 'timestamp' | 'read'>) => void;
+  markActivitiesRead: () => void;
+  settleRoom: (roomId: string, winner: 'moon' | 'jeet' | 'draw') => void;
   updateUserStats: (betResult: 'win' | 'loss', amount: number, wonAmount?: number) => void;
   tickTimers: () => void;
   setFullDegenMode: (val: boolean) => void;
@@ -325,11 +338,27 @@ export const useAppState = create<AppState>((set, get) => ({
     ]
   },
   chatMessages: seedChats(),
+  activityLog: [],
   fullDegenMode: false,
 
   wallet: null,
   isTransactionLoading: false,
   transactionError: null,
+
+  addActivity: (activity) => {
+    set((state) => ({
+      activityLog: [
+        { ...activity, id: Date.now().toString() + Math.random(), timestamp: Date.now(), read: false },
+        ...state.activityLog
+      ]
+    }));
+  },
+
+  markActivitiesRead: () => {
+    set((state) => ({
+      activityLog: state.activityLog.map(a => ({ ...a, read: true }))
+    }));
+  },
 
   setWallet: (wallet: any) => {
     set({ wallet });
@@ -343,7 +372,44 @@ export const useAppState = create<AppState>((set, get) => ({
       const res = await fetchWithTimeout('http://localhost:3001/api/rooms?status=all&limit=50', {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
-        const mapped = json.data.map(mapApiRoom);
+        let mapped = json.data.map(mapApiRoom);
+
+        // HYDRATE ON-CHAIN STATE
+        try {
+          const program = getAnchorProgram(null as any);
+          const pubkeys = mapped.map((r: Room) => new PublicKey(r.id));
+          const onChainRooms = await withTimeout(
+            program.account.room.fetchMultiple(pubkeys),
+            3000,
+            'On-chain room fetch timed out'
+          );
+
+          mapped = mapped.map((room: Room, index: number) => {
+            const onChain = onChainRooms[index];
+            if (onChain) {
+              const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
+              let winnerStr = undefined;
+              if (onChain.winner) {
+                winnerStr = Object.keys(onChain.winner)[0].toLowerCase();
+              }
+              return {
+                ...room,
+                moonPool: onChain.moonPool.toNumber() / 1e9,
+                jeetPool: onChain.jeetPool.toNumber() / 1e9,
+                status: statusStr,
+                winner: winnerStr,
+                expiry: onChain.expiryTimestamp.toNumber() * 1000,
+                token: {
+                  ...room.token,
+                }
+              };
+            }
+            return room;
+          });
+        } catch (e) {
+          console.warn('Could not hydrate on-chain room state', e);
+        }
+
         set({ rooms: mapped });
       }
 
@@ -356,7 +422,7 @@ export const useAppState = create<AppState>((set, get) => ({
           3000,
           'PlatformConfig fetch timed out'
         );
-        set({ isPaused: configAccount.paused });
+        set({ isPaused: (configAccount as any).paused });
       } catch (e) {
         console.warn('Could not fetch PlatformConfig for paused state', e);
       }
@@ -464,12 +530,47 @@ export const useAppState = create<AppState>((set, get) => ({
 
       const program = getAnchorProgram(wallet);
       const tokenMintPubkey = new PublicKey(onChainPubkeyStr);
-      const roomPda = getRoomPda(tokenMintPubkey, wallet.publicKey);
       
-      // Prevent duplicate seed room initialization simulation failure
-      const roomAccountInfo = await connection.getAccountInfo(roomPda);
-      if (roomAccountInfo !== null && roomAccountInfo.owner.equals(program.programId)) {
-        console.log("Room already exists on-chain! Syncing with indexer and proceeding...");
+      let roomPda: PublicKey | null = null;
+      let chosenNonce = 0;
+      let alreadyExists = false;
+
+      // Scan sequentially for the next available/active nonce
+      for (let n = 0; n < 256; n++) {
+        const currentPda = getRoomPda(tokenMintPubkey, wallet.publicKey, n);
+        const accountInfo = await connection.getAccountInfo(currentPda);
+
+        if (accountInfo === null) {
+          // This nonce is unused and completely clean!
+          roomPda = currentPda;
+          chosenNonce = n;
+          break;
+        }
+
+        // The room exists on-chain, check if it's currently active and unexpired
+        try {
+          const roomData: any = await program.account.room.fetch(currentPda);
+          const now = Math.floor(Date.now() / 1000);
+          const isExpired = now >= roomData.expiryTimestamp.toNumber();
+
+          if (!isExpired && roomData.status.active !== undefined) {
+            // There is still a valid active room running for this token. Block duplicate creation.
+            roomPda = currentPda;
+            chosenNonce = n;
+            alreadyExists = true;
+            break;
+          }
+        } catch (fetchErr) {
+          console.warn(`Failed to fetch room account at nonce ${n}, assuming expired/unusable:`, fetchErr);
+        }
+      }
+
+      if (!roomPda) {
+        throw new Error("Unable to resolve a clean room PDA (maximum nonces exhausted).");
+      }
+
+      if (alreadyExists) {
+        console.log("Room already exists and is active on-chain! Syncing with indexer and proceeding...");
         
         // Trigger self-healing sync on indexer
         try {
@@ -501,17 +602,18 @@ export const useAppState = create<AppState>((set, get) => ({
       if (livePriceUsd) {
         const priceVal = parseFloat(livePriceUsd);
         if (isFinite(priceVal) && priceVal > 0) {
-          openingPriceParam = new anchor.BN(Math.round(priceVal * 1e8));
+          openingPriceParam = new BN(Math.round(priceVal * 1e8));
         }
       }
-      
-      const tx = await program.methods
+
+      const tx = await (program.methods as any)
         .createRoom(
           tokenMintPubkey,
           room.token.name || 'Unknown Token',
           room.duration,
           null, // switchboardFeed Option<Pubkey>
-          openingPriceParam // openingPriceParam Option<i64>
+          openingPriceParam, // openingPriceParam Option<i64>
+          chosenNonce // new nonce parameter
         )
         .accounts({
           room: roomPda,
@@ -557,7 +659,7 @@ export const useAppState = create<AppState>((set, get) => ({
       const program = getAnchorProgram(wallet);
       const roomPda = new PublicKey(roomId);
       const escrowPda = getEscrowPda(roomPda);
-      const betPda = getBetPda(roomPda, wallet.publicKey);
+      const betPda = getBetPda(roomPda, wallet.publicKey, side);
       const configPda = getPlatformConfigPda();
       
       // Optional account resolution for reputation Pda:
@@ -565,7 +667,7 @@ export const useAppState = create<AppState>((set, get) => ({
       const repAccountInfo = await connection.getAccountInfo(reputationPda);
       const reputationAccount = repAccountInfo ? reputationPda : program.programId;
       
-      const tx = await program.methods
+      const tx = await (program.methods as any)
         .placeBet(
           side === 'moon' ? { moon: {} } : { jeet: {} },
           new BN(amount * 1e9) // convert SOL to lamports
@@ -583,6 +685,15 @@ export const useAppState = create<AppState>((set, get) => ({
         
       console.log("Bet placed successfully on-chain! Tx:", tx);
       
+      // Broadcast handled via WebSocket (ClientWrapper) from the indexer
+      // Add to personal activity log
+      get().addActivity({
+        type: 'bet',
+        title: `DEPLOYED ${amount} SOL ON ${side.toUpperCase()}`,
+        message: `You stacked ${amount} SOL on ${side.toUpperCase()} in room ${roomId}.`,
+        link: `/room/${roomId}`
+      });
+
       // Refresh user balance immediately
       await get().fetchBalance();
       
@@ -605,24 +716,58 @@ export const useAppState = create<AppState>((set, get) => ({
     setTransactionError(null);
     
     try {
+      const rooms = get().rooms;
+      const room = rooms.find((r) => r.id === roomId);
+      
+      if (room && room.status === 'active' && room.expiry <= Date.now()) {
+        console.log(`Room is active but expired. Triggering on-demand settlement first for room ${roomId}...`);
+        const indexerUrl = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+        const settleRes = await fetch(`${indexerUrl}/api/rooms/${roomId}/settle`, {
+          method: 'POST',
+        });
+        if (!settleRes.ok) {
+          const errData = await settleRes.json().catch(() => ({}));
+          throw new Error(errData.error || `Settlement request failed with status ${settleRes.status}`);
+        }
+        const settleJson = await settleRes.json();
+        console.log(`On-demand settlement completed! txSig: ${settleJson.txSig}`);
+        
+        // Wait a small moment (500ms) for the event listener to catch up and DB to update.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        
+        // Refresh rooms to update frontend state
+        await get().fetchRooms();
+      }
+
       const program = getAnchorProgram(wallet);
       const roomPda = new PublicKey(roomId);
       const escrowPda = getEscrowPda(roomPda);
-      const betPda = getBetPda(roomPda, wallet.publicKey);
       
-      const tx = await program.methods
+      const winningSide = room?.winner === 'moon' ? 'moon' : 'jeet';
+      const betPda = getBetPda(roomPda, wallet.publicKey, winningSide);
+      
+      const tx = await (program.methods as any)
         .claimWinnings()
         .accounts({
           room: roomPda,
           escrow: escrowPda,
           bet: betPda,
           user: wallet.publicKey,
+          payer: wallet.publicKey,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
         
       console.log("Winnings claimed successfully! Tx:", tx);
       
+      // Add to personal activity log
+      get().addActivity({
+        type: 'win',
+        title: `BOOTY CLAIMED IN ROOM ${roomId.substring(0, 4)}`,
+        message: `Successfully recovered spoils from ${winningSide.toUpperCase()} victory.`,
+        link: `/room/${roomId}`
+      });
+
       // Reload balance and user stats
       await get().fetchBalance();
       
@@ -728,7 +873,7 @@ export const useAppState = create<AppState>((set, get) => ({
     }));
   },
 
-  settleRoom: (roomId: string, winner: 'moon' | 'jeet') => {
+  settleRoom: (roomId: string, winner: 'moon' | 'jeet' | 'draw') => {
     console.log(`Keeper event settleRoom triggered for room ${roomId} with winner ${winner}`);
     set((state) => ({
       rooms: state.rooms.map((r) =>

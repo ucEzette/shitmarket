@@ -17,9 +17,9 @@ export const getPlatformConfigPda = (): PublicKey => {
   return pda;
 };
 
-export const getRoomPda = (tokenMint: PublicKey, creator: PublicKey): PublicKey => {
+export const getRoomPda = (tokenMint: PublicKey, creator: PublicKey, nonce: number): PublicKey => {
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from('room'), tokenMint.toBuffer(), creator.toBuffer()],
+    [Buffer.from('room'), tokenMint.toBuffer(), creator.toBuffer(), Buffer.from([nonce])],
     PROGRAM_ID
   );
   return pda;
@@ -33,9 +33,14 @@ export const getEscrowPda = (room: PublicKey): PublicKey => {
   return pda;
 };
 
-export const getBetPda = (room: PublicKey, user: PublicKey): PublicKey => {
+export const getBetPda = (room: PublicKey, user: PublicKey, side: 'moon' | 'jeet'): PublicKey => {
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from('bet'), room.toBuffer(), user.toBuffer()],
+    [
+      Buffer.from('bet'), 
+      room.toBuffer(), 
+      user.toBuffer(),
+      Buffer.from([side === 'moon' ? 0 : 1])
+    ],
     PROGRAM_ID
   );
   return pda;

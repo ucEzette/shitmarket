@@ -1,10 +1,174 @@
 import express from 'express';
 import { prisma, prismaRead } from '../../db';
-import { getCachedRoom } from '../../redis';
+import { getCachedRoom, cacheRoom } from '../../redis';
 import { logger } from '../../logger';
 import { validate, roomsQuerySchema, roomPubkeyParamSchema } from '../validation';
+import { Connection, PublicKey } from '@solana/web3.js';
+import * as anchor from '@coral-xyz/anchor';
+import { config } from '../../config';
+import { settleRoomByPubkey } from '../../keeper/settlementKeeper';
 
 export const roomsRouter = express.Router();
+
+// Helper to fetch token metadata from DexScreener
+async function fetchTokenMeta(mintAddress: string): Promise<any> {
+  try {
+    const url = `${config.external.dexscreenerUrl}/tokens/${mintAddress}`;
+    const response = await fetch(url);
+    if (!response.ok) return {};
+    const data = await response.json();
+    const pairs: any[] = data?.pairs ?? [];
+    if (!pairs.length) return {};
+    const best = pairs.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
+    return {
+      name: best.baseToken?.name,
+      symbol: best.baseToken?.symbol,
+      imageUrl: best.info?.imageUrl ?? undefined,
+      chainId: best.chainId ?? 'solana',
+      originalAddress: mintAddress,
+    };
+  } catch {
+    return {};
+  }
+}
+
+// Self-healing sync room function
+async function syncRoomFromChain(pubkeyStr: string): Promise<any> {
+  try {
+    logger.info({ msg: 'Triggering on-chain room fetch for sync', pubkeyStr });
+    const connection = new Connection(config.solana.rpcUrl, 'confirmed');
+    const programId = new PublicKey(config.solana.programId);
+    
+    // Load IDL
+    let idl: any;
+    try {
+      idl = require('../../../../program/target/idl/shitmarket.json');
+    } catch {
+      try {
+        idl = require('../../../../src/utils/idl.json');
+      } catch {
+        logger.error({ msg: 'Failed to load IDL for syncRoomFromChain' });
+        return null;
+      }
+    }
+    
+    // Build dummy provider and program
+    const wallet = new anchor.Wallet(anchor.web3.Keypair.generate());
+    const provider = new anchor.AnchorProvider(connection, wallet, {
+      commitment: 'confirmed',
+    });
+    
+    const idlWithAddress = { ...idl, address: programId.toBase58() };
+    
+    // Normalization logic just like main index.ts
+    function normalizeIdl(obj: any): void {
+      if (Array.isArray(obj)) {
+        obj.forEach(normalizeIdl);
+      } else if (obj !== null && typeof obj === 'object') {
+        for (const key in obj) {
+          if (key === 'defined' && typeof obj[key] === 'string') {
+            obj[key] = { name: obj[key] };
+          } else {
+            normalizeIdl(obj[key]);
+          }
+        }
+      }
+    }
+    normalizeIdl(idlWithAddress);
+    
+    const program = new anchor.Program(idlWithAddress as anchor.Idl, provider);
+    const roomPubkey = new PublicKey(pubkeyStr);
+    
+    const roomData: any = await (program.account as any).room.fetch(roomPubkey);
+    if (!roomData) {
+      logger.warn({ msg: 'Failed to fetch room account from Solana chain', pubkeyStr });
+      return null;
+    }
+    
+    const tokenMintStr = roomData.tokenMint.toBase58();
+    const priceFeedStr = roomData.priceFeed.toBase58();
+    const duration = roomData.durationMinutes;
+    const openingPrice = BigInt(roomData.openingPrice.toString());
+    
+    const nameBytes = roomData.tokenName as number[];
+    const decodedName = Buffer.from(nameBytes).toString('utf8').replace(/\0/g, '').trim();
+    
+    const expiry = new Date(roomData.expiryTimestamp.toNumber() * 1000);
+    
+    // Parse status enum
+    const statusStr = Object.keys(roomData.status)[0].toLowerCase(); // 'active' or 'settled'
+    
+    // Parse winner
+    let winnerStr: string | null = null;
+    if (roomData.winner) {
+      winnerStr = Object.keys(roomData.winner)[0].toLowerCase(); // 'moon' or 'jeet'
+    }
+    
+    const finalPrice = roomData.finalPrice ? BigInt(roomData.finalPrice.toString()) : BigInt(0);
+    const twapFinalPrice = roomData.twapFinalPrice ? BigInt(roomData.twapFinalPrice.toString()) : BigInt(0);
+    
+    const meta = await fetchTokenMeta(tokenMintStr);
+    
+    const moonPool = roomData.moonPool.toString();
+    const jeetPool = roomData.jeetPool.toString();
+    const totalPool = BigInt(roomData.moonPool.toString()) + BigInt(roomData.jeetPool.toString());
+    
+    // Save to Prisma
+    const createdRoom = await prisma.room.upsert({
+      where: { roomPubkey: pubkeyStr },
+      create: {
+        roomPubkey: pubkeyStr,
+        tokenMint: tokenMintStr,
+        priceFeed: priceFeedStr,
+        tokenName: meta.name ?? decodedName,
+        tokenSymbol: meta.symbol,
+        tokenImageUrl: meta.imageUrl,
+        chainId: meta.chainId ?? 'solana',
+        originalAddress: meta.originalAddress ?? tokenMintStr,
+        duration,
+        openingPrice,
+        expiry,
+        status: statusStr === 'settled' ? 'settled' : 'active',
+        winner: winnerStr,
+        finalPrice: statusStr === 'settled' ? finalPrice : null,
+        twapFinalPrice: statusStr === 'settled' ? twapFinalPrice : null,
+        totalPool,
+      },
+      update: {
+        status: statusStr === 'settled' ? 'settled' : 'active',
+        winner: winnerStr,
+        finalPrice: statusStr === 'settled' ? finalPrice : null,
+        twapFinalPrice: statusStr === 'settled' ? twapFinalPrice : null,
+        totalPool,
+      }
+    });
+    
+    // Cache in Redis
+    const redisCacheData: Record<string, string> = {
+      status: statusStr === 'settled' ? 'settled' : 'active',
+      tokenMint: tokenMintStr,
+      tokenName: meta.name ?? decodedName,
+      tokenSymbol: meta.symbol ?? '',
+      tokenImageUrl: meta.imageUrl ?? '',
+      openingPrice: openingPrice.toString(),
+      moonPool,
+      jeetPool,
+      expiry: expiry.toISOString(),
+      finalPrice: finalPrice.toString(),
+      twapFinalPrice: twapFinalPrice.toString(),
+    };
+    if (winnerStr) {
+      redisCacheData.winner = winnerStr;
+    }
+    await cacheRoom(pubkeyStr, redisCacheData);
+    
+    logger.info({ msg: 'On-chain room sync complete', pubkeyStr });
+    return createdRoom;
+  } catch (err: any) {
+    logger.error({ msg: 'Error in syncRoomFromChain', pubkeyStr, err: err?.message });
+    return null;
+  }
+}
 
 // ── GET /api/rooms ─────────────────────────────────────────────────────────────
 
@@ -79,7 +243,7 @@ roomsRouter.get('/:pubkey', validate(roomPubkeyParamSchema, 'params'), async (re
   try {
     const { pubkey } = req.params;
 
-    const room = await prismaRead.room.findUnique({
+    let room = await prismaRead.room.findUnique({
       where: { roomPubkey: pubkey },
       include: {
         bets: {
@@ -88,6 +252,22 @@ roomsRouter.get('/:pubkey', validate(roomPubkeyParamSchema, 'params'), async (re
         },
       },
     });
+
+    if (!room) {
+      logger.info({ msg: 'Room not found in DB. Attempting sync from chain...', pubkey });
+      const synced = await syncRoomFromChain(pubkey);
+      if (synced) {
+        room = await prismaRead.room.findUnique({
+          where: { roomPubkey: pubkey },
+          include: {
+            bets: {
+              orderBy: { createdAt: 'desc' },
+              take: 50,
+            },
+          },
+        });
+      }
+    }
 
     if (!room) {
       return res.status(404).json({ success: false, error: 'Room not found' });
@@ -131,4 +311,22 @@ roomsRouter.get('/:pubkey', validate(roomPubkeyParamSchema, 'params'), async (re
 roomsRouter.get('/config/pyth-feeds', (_req, res) => {
   const pythFeedMap = require('../../feeds/pythFeedMap.json');
   res.json({ success: true, data: pythFeedMap });
+});
+
+// ── POST /api/rooms/:pubkey/settle ──────────────────────────────────────────────
+
+roomsRouter.post('/:pubkey/settle', validate(roomPubkeyParamSchema, 'params'), async (req, res) => {
+  try {
+    const { pubkey } = req.params;
+    logger.info({ msg: 'On-demand settlement requested via API', pubkey });
+    const result = await settleRoomByPubkey(pubkey);
+    if (result.success) {
+      return res.json({ success: true, txSig: result.txSig });
+    } else {
+      return res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (err: any) {
+    logger.error({ msg: 'POST /api/rooms/:pubkey/settle error', err: err?.message });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
 });

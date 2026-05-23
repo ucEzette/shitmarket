@@ -14,8 +14,9 @@ if (initInstr) {
 }
 
 async function main() {
-    // 1. Connect to devnet
-    const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+    // 1. Connect to local/devnet
+    const rpcUrl = process.env.SOLANA_RPC_URL || "http://127.0.0.1:8899";
+    const connection = new Connection(rpcUrl, "confirmed");
 
     // 2. Load deployer wallet
     const secretKeyPath = os.homedir() + "/.config/solana/id.json";

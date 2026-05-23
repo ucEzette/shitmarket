@@ -8,6 +8,11 @@ node_modules/
 
 # testing
 coverage/
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
 
 # next.js
 .next/
@@ -51,6 +56,7 @@ target/
 
 # dumps and local databases
 dump.rdb
+test-ledger/
 
 # log files
 *.log

@@ -202,7 +202,7 @@ export async function aggregatePrice(
     fetchJupiter(tokenMint).then((p) => ({ source: 'jupiter', price: p })),
   ];
 
-  if (pythFeedId) {
+  if (pythFeedId && pythFeedId !== '11111111111111111111111111111111') {
     fetches.push(fetchPythRest(pythFeedId).then((p) => ({ source: 'pyth', price: p })));
   }
 

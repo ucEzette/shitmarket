@@ -22,7 +22,7 @@ model Room {
   tokenImageUrl   String?  @map("token_image_url")
   chainId         String?  @default("solana") @map("chain_id")
   originalAddress String?  @map("original_address")
-  duration        Int      @db.SmallInt
+  duration        Int
   openingPrice    BigInt   @map("opening_price")
   expiry          DateTime @db.Timestamptz()
   status          String   @default("active") @db.VarChar(10)

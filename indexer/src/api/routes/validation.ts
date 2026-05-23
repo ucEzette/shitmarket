@@ -66,12 +66,21 @@ validationRouter.get('/validate', async (req, res) => {
 
     // Save metadata so eventListener can construct the Room later
     await redis.set(`tokenmeta:${pubkeyStr}`, JSON.stringify({
+      name: mainPair.baseToken?.name,
+      symbol: mainPair.baseToken?.symbol,
+      imageUrl: mainPair.info?.imageUrl || '',
+      chainId: mainPair.chainId || 'solana',
       originalAddress: mint,
-      chainId: mainPair.chainId,
-      imageUrl: mainPair.info?.imageUrl || ''
+      priceUsd: mainPair.priceUsd ? mainPair.priceUsd : undefined,
     }), 'EX', 86400);
 
-    return res.status(200).json({ valid: true, marketCap, ageMinutes: Math.floor(ageMinutes), pubkeyStr });
+    return res.status(200).json({ 
+      valid: true, 
+      marketCap, 
+      ageMinutes: Math.floor(ageMinutes), 
+      pubkeyStr, 
+      priceUsd: mainPair.priceUsd 
+    });
   } catch (error: any) {
     console.error('Validation error:', error);
     return res.status(500).json({ valid: false, reason: 'Internal validation error' });

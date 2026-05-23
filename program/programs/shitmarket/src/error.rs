@@ -49,7 +49,7 @@ pub enum ShitMarketError {
     SideMismatch,
     #[msg("Platform fee exceeds maximum allowed (10%)")]
     FeeTooHigh,
-    #[msg("Duration must be 5, 15, or 60 minutes")]
+    #[msg("Duration must be between 1 and 525,600 minutes")]
     InvalidDuration,
 
     // Phase 3: Circuit breaker & liquidity

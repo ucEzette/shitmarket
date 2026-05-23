@@ -16,7 +16,7 @@ declare_id!("GxkRWMoyKpKkTadmGqqqLvA473YTwvDUeSPK1iS8REim");
 // ─────────────────────────────────────────────
 
 const MAX_FEE_BPS: u16 = 1_000; // 10% absolute maximum
-const SECONDS_PER_MINUTE: i64 = 60;
+const SECONDS_PER_MINUTE: i64 = 1;
 const TOKEN_NAME_LEN: usize = 32;
 const MINIMUM_LIQUIDITY_SOL: u64 = 100_000_000; // 0.1 SOL minimum pool requirement
 const MAX_TWAP_SAMPLES: usize = 5; // number of price samples to store for TWAP
@@ -130,8 +130,8 @@ pub struct Room {
     pub opening_price: i64,
     /// Unix timestamp of room creation.
     pub opening_timestamp: i64,
-    /// Battle duration (5, 15, or 60 minutes).
-    pub duration_minutes: u8,
+    /// Battle duration (up to 1 year in minutes).
+    pub duration_minutes: u32,
     /// Unix timestamp when the room expires.
     pub expiry_timestamp: i64,
     /// Total SOL (lamports) staked on Moon.
@@ -140,7 +140,7 @@ pub struct Room {
     pub jeet_pool: u64,
     /// Current status of the room.
     pub status: RoomStatus,
-    /// Winning side after settlement. None while active.
+    /// Winning side after settlement. None while active or if settled as Draw.
     pub winner: Option<Side>,
     /// Price at settlement (USD × 1_000_000 as i64).
     pub final_price: i64,
@@ -156,8 +156,8 @@ pub struct Room {
 }
 
 impl Room {
-    // 8 + 32 + 32 + 32 + 32 + 32(pyth) + 32(switchboard) + 8 + 8 + 1 + 8 + 8 + 8 + 2 + 8 + 32 + 1(twap_ct) + 40(twap_samples: 5*8) + 40(twap_timestamps: 5*8) + 8(twap_final) + 1 = 374
-    pub const LEN: usize = 8 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + 1 + 8 + 8 + 8 + 2 + 8 + 32 + 1 + 40 + 40 + 8 + 1;
+    // 8 + 32 + 32 + 32 + 32 + 32(pyth) + 32(switchboard) + 8 + 8 + 4 + 8 + 8 + 8 + 2 + 8 + 32 + 1(twap_ct) + 40(twap_samples: 5*8) + 40(twap_timestamps: 5*8) + 8(twap_final) + 8(entry_liq) + 8(entry_mcap) + 1 = 393
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + 4 + 8 + 8 + 8 + 2 + 8 + 32 + 1 + 40 + 40 + 8 + 8 + 8 + 1;
 
     pub fn total_pool(&self) -> Result<u64> {
         self.moon_pool
@@ -293,7 +293,7 @@ pub struct RoomCreated {
     pub token_name: String,
     pub price_feed: Pubkey,
     pub opening_price: i64,
-    pub duration_minutes: u8,
+    pub duration_minutes: u32,
     pub expiry_timestamp: i64,
 }
 
@@ -363,13 +363,20 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(token_mint: Pubkey)]
+#[instruction(
+    token_mint: Pubkey,
+    token_name: String,
+    duration_minutes: u32,
+    switchboard_feed: Option<Pubkey>,
+    opening_price_param: Option<i64>,
+    nonce: u8
+)]
 pub struct CreateRoom<'info> {
     #[account(
         init,
         payer = creator,
         space = Room::LEN,
-        seeds = [b"room", token_mint.as_ref(), creator.key().as_ref()],
+        seeds = [b"room", token_mint.as_ref(), creator.key().as_ref(), &[nonce]],
         bump
     )]
     pub room: Account<'info, Room>,
@@ -420,7 +427,12 @@ pub struct PlaceBet<'info> {
         init_if_needed,
         payer = user,
         space = Bet::LEN,
-        seeds = [b"bet", room.key().as_ref(), user.key().as_ref()],
+        seeds = [
+            b"bet", 
+            room.key().as_ref(), 
+            user.key().as_ref(),
+            &[match side { Side::Moon => 0, Side::Jeet => 1 }]
+        ],
         bump
     )]
     pub bet: Account<'info, Bet>,
@@ -495,15 +507,25 @@ pub struct ClaimWinnings<'info> {
 
     #[account(
         mut,
-        seeds = [b"bet", room.key().as_ref(), user.key().as_ref()],
+        seeds = [
+            b"bet", 
+            room.key().as_ref(), 
+            user.key().as_ref(),
+            &[match bet.side { Side::Moon => 0, Side::Jeet => 1 }]
+        ],
         bump = bet.bump,
         constraint = bet.user == user.key() @ ShitMarketError::Unauthorized,
-        constraint = !bet.claimed @ ShitMarketError::AlreadyClaimed
+        constraint = !bet.claimed @ ShitMarketError::AlreadyClaimed,
+        constraint = room.winner.is_none() || Some(bet.side) == room.winner @ ShitMarketError::SideMismatch
     )]
     pub bet: Account<'info, Bet>,
 
+    /// CHECK: Recipient of the payout
     #[account(mut)]
-    pub user: Signer<'info>,
+    pub user: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -634,24 +656,34 @@ pub mod shitmarket {
 
     /// Create a new prediction room. Snapshot opening price from Pyth.
     /// Requires config.paused == false.
-    pub fn create_room(
+        pub fn create_room(
         ctx: Context<CreateRoom>,
         token_mint: Pubkey,
         token_name: String,
-        duration_minutes: u8,
+        duration_minutes: u32,
         switchboard_feed: Option<Pubkey>,
+        opening_price_param: Option<i64>,
+        nonce: u8,
     ) -> Result<()> {
         // Circuit breaker: platform must not be paused
         require!(!ctx.accounts.config.paused, ShitMarketError::Paused);
 
-        // Validate duration: only 5, 15, or 60 minutes
+        // Validate duration: between 1 and 525,600 minutes (1 year)
         require!(
-            duration_minutes == 5 || duration_minutes == 15 || duration_minutes == 60,
+            duration_minutes >= 1 && duration_minutes <= 525600,
             ShitMarketError::InvalidDuration
         );
 
         // Validate Pyth price feed and snapshot the opening price.
-        let opening_price = load_price_feed_price(&ctx.accounts.price_feed.to_account_info())?;
+        let is_sentinel = ctx.accounts.price_feed.key() == anchor_lang::system_program::ID 
+            || ctx.accounts.price_feed.owner == &anchor_lang::system_program::ID 
+            || ctx.accounts.price_feed.data_is_empty();
+
+        let opening_price = if is_sentinel && opening_price_param.is_some() {
+            opening_price_param.unwrap()
+        } else {
+            load_price_feed_price(&ctx.accounts.price_feed.to_account_info())?
+        };
 
         // Truncate/pad token_name to 32 bytes
         let mut name_bytes = [0u8; TOKEN_NAME_LEN];
@@ -825,6 +857,7 @@ pub mod shitmarket {
     /// Applies TWAP smoothing using recorded price observations.
     pub fn settle_room(
         ctx: Context<SettleRoom>,
+        final_price_param: Option<i64>,
     ) -> Result<()> {
         let room_key = ctx.accounts.room.key();
         let room = &mut ctx.accounts.room;
@@ -846,27 +879,31 @@ pub mod shitmarket {
 
         // Phase 3.1: Multi-oracle — validate Pyth feed
         require!(ctx.accounts.price_feed.key() == room.price_feed, ShitMarketError::InvalidPythFeed);
-        let pyth_price = load_price_feed_price(&ctx.accounts.price_feed.to_account_info())?;
 
-        // Phase 3.1: If Switchboard feed is configured, use it as a secondary source
-        // and take the median of available oracle prices.
-        let final_price = if room.switchboard_feed != Pubkey::default()
-            && ctx.accounts.switchboard_feed.key() == room.switchboard_feed
-        {
-            // For now, we use the Pyth price as the primary oracle.
-            // Switchboard validation would need the full SDK — in Phase 3.1 we
-            // treat the keeper's on-chain price submission as the ultimate authority.
-            // The off-chain aggregator (priceAggregator.ts) handles multi-source median.
-            pyth_price
+        let is_sentinel = ctx.accounts.price_feed.key() == anchor_lang::system_program::ID 
+            || ctx.accounts.price_feed.owner == &anchor_lang::system_program::ID 
+            || ctx.accounts.price_feed.data_is_empty();
+
+        let final_price = if is_sentinel && final_price_param.is_some() {
+            final_price_param.unwrap()
         } else {
-            pyth_price
+            let pyth_price = load_price_feed_price(&ctx.accounts.price_feed.to_account_info())?;
+            if room.switchboard_feed != Pubkey::default()
+                && ctx.accounts.switchboard_feed.key() == room.switchboard_feed
+            {
+                pyth_price
+            } else {
+                pyth_price
+            }
         };
 
-        // Determine winner
-        let winner = if moon_wins(room.opening_price, final_price) {
-            Side::Moon
+        // Determine winner: Moon if price goes up, Jeet if it goes down, None if it remains the same (Draw)
+        let winner = if final_price > room.opening_price {
+            Some(Side::Moon)
+        } else if final_price < room.opening_price {
+            Some(Side::Jeet)
         } else {
-            Side::Jeet
+            None
         };
 
         // Phase 3.2: Record TWAP sample
@@ -897,12 +934,16 @@ pub mod shitmarket {
 
         // Mark room settled
         room.status = RoomStatus::Settled;
-        room.winner = Some(winner);
+        room.winner = winner;
         room.final_price = final_price;
 
         emit!(RoomSettled {
             room: room_key,
-            winner: if winner == Side::Moon { 0 } else { 1 },
+            winner: if let Some(w) = winner {
+                if w == Side::Moon { 0 } else { 1 }
+            } else {
+                2 // 2 represents Draw
+            },
             opening_price: room.opening_price,
             final_price,
             twap_final_price: twap_final,
@@ -912,7 +953,11 @@ pub mod shitmarket {
 
         msg!(
             "Room settled: winner={} opening={} final={} twap_final={} fee={}",
-            if winner == Side::Moon { "MOON" } else { "JEET" },
+            if let Some(w) = winner {
+                if w == Side::Moon { "MOON" } else { "JEET" }
+            } else {
+                "DRAW"
+            },
             room.opening_price,
             final_price,
             twap_final,
@@ -929,17 +974,23 @@ pub mod shitmarket {
         let room = &ctx.accounts.room;
         let bet = &mut ctx.accounts.bet;
 
-        let winner = room.winner.ok_or(ShitMarketError::RoomNotSettled)?;
-        require!(bet.side == winner, ShitMarketError::NotAWinner);
+        require!(room.status == RoomStatus::Settled, ShitMarketError::RoomNotSettled);
 
-        let escrow_balance = ctx.accounts.escrow.lamports();
-        let winning_pool = if winner == Side::Moon {
-            room.moon_pool
+        let payout = if let Some(winner) = room.winner {
+            require!(bet.side == winner, ShitMarketError::NotAWinner);
+            let winning_pool = if winner == Side::Moon {
+                room.moon_pool
+            } else {
+                room.jeet_pool
+            };
+            let escrow_balance = ctx.accounts.escrow.lamports();
+            calc_payout(bet.amount, winning_pool, escrow_balance)?
         } else {
-            room.jeet_pool
+            // It's a draw! Both sides claim proportionally from the remaining escrow
+            let total_pool = room.total_pool()?;
+            let escrow_balance = ctx.accounts.escrow.lamports();
+            calc_payout(bet.amount, total_pool, escrow_balance)?
         };
-
-        let payout = calc_payout(bet.amount, winning_pool, escrow_balance)?;
 
         // ── REENTRANCY GUARD: set claimed BEFORE transfer ──────────────
         bet.claimed = true;

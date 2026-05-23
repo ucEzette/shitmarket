@@ -10,6 +10,14 @@ import { synthSound } from '@/components/ClientWrapper';
 import { Search, Flame, Bomb, ArrowRight, UserPlus } from 'lucide-react';
 
 export default function RoomsPage() {
+  const formatDuration = (mins: number) => {
+    if (mins >= 43200) return `${Math.floor(mins/43200)} MONTH`;
+    if (mins >= 10080) return `${Math.floor(mins/10080)} WEEK`;
+    if (mins >= 1440) return `${Math.floor(mins/1440)} DAY`;
+    if (mins >= 60) return `${Math.floor(mins/60)} HR`;
+    return `${mins} MIN`;
+  };
+
   const router = useRouter();
   const { rooms, user, placeBet, connectWallet } = useAppState();
   const [filter, setFilter] = useState<'ending' | 'biggest' | 'active-bets'>('ending');
@@ -247,7 +255,7 @@ export default function RoomsPage() {
                     </span>
                   </div>
                   <div className="text-[10px] font-mono text-trench-gasmask font-bold bg-trench-black px-2 py-0.5 rounded border border-trench-sandbag/30 uppercase">
-                    {room.duration} MIN ROUND
+                    {formatDuration(room.duration)} ROUND
                   </div>
                 </div>
 

@@ -62,6 +62,19 @@ export const FloatingPepe: React.FC = () => {
     };
   }, []);
 
+  // Auto-dismiss morale boost after 5 seconds
+  useEffect(() => {
+    let dismissTimer: NodeJS.Timeout;
+    if (moraleBoost) {
+      dismissTimer = setTimeout(() => {
+        setMoraleBoost(null);
+      }, 5000);
+    }
+    return () => {
+      if (dismissTimer) clearTimeout(dismissTimer);
+    };
+  }, [moraleBoost]);
+
   return (
     <>
       {/* Floating Pepe in bottom-right corner */}

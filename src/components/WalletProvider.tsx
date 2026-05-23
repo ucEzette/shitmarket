@@ -22,11 +22,15 @@ export const SolanaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
     [network]
   );
 
+  const ConnectionProviderCast = ConnectionProvider as any;
+  const WalletProviderCast = WalletProvider as any;
+  const WalletModalProviderCast = WalletModalProvider as any;
+
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
-      </WalletProvider>
-    </ConnectionProvider>
+    <ConnectionProviderCast endpoint={endpoint}>
+      <WalletProviderCast wallets={wallets} autoConnect>
+        <WalletModalProviderCast>{children}</WalletModalProviderCast>
+      </WalletProviderCast>
+    </ConnectionProviderCast>
   );
 };

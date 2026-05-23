@@ -7,6 +7,7 @@ import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useAppState } from '@/store/useAppState';
 import { PepePortrait, PEPE_ASSETS } from './MemeAssets';
 import { LogOut, Loader2, Coins } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
 
 export const Header: React.FC = () => {
   const { user, disconnectWallet: mockDisconnect } = useAppState();
@@ -47,6 +48,9 @@ export const Header: React.FC = () => {
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {user && user.wallet ? (
             <div className="flex items-center gap-1 sm:gap-2 bg-trench-black border-2 border-trench-sandbag rounded p-0.5 sm:p-1">
+              {/* Notification Bell */}
+              <NotificationBell />
+
               {/* Ammo Display */}
               <div className="flex items-center gap-1 px-1.5 py-0.5 sm:px-3 sm:py-1 bg-trench-mud border border-trench-sandbag rounded-sm">
                 <Coins size={12} className="text-moon-gold sm:size-[14px]" />

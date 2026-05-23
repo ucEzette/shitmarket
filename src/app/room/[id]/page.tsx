@@ -32,7 +32,7 @@ export default function RoomDetailPage() {
   const router = useRouter();
   const roomId = params.id as string;
 
-  const { rooms, user, chatMessages, placeBet, claimWinnings, addMessage, connectWallet } = useAppState();
+  const { rooms, user, chatMessages, placeBet, claimWinnings, addMessage, connectWallet, isTransactionLoading } = useAppState();
 
   const [selectedSide, setSelectedSide] = useState<'moon' | 'jeet'>('moon');
   const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
@@ -530,12 +530,20 @@ export default function RoomDetailPage() {
             {/* Comprehensive Stats Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 relative z-10">
               <div className="bg-trench-black border border-trench-sandbag p-3 rounded text-center shadow-inner">
-                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">ENTRY LIQUIDITY</span>
-                <span className="font-staatliches text-lg text-white block mt-0.5">{room.token.liquidity ? `$${room.token.liquidity.toLocaleString()}` : 'UNKNOWN'}</span>
+                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">ENTRY PRICE</span>
+                <span className="font-staatliches text-lg text-white block mt-0.5">
+                  {room.openingPrice !== undefined 
+                    ? `$${room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` 
+                    : 'UNKNOWN'}
+                </span>
               </div>
               <div className="bg-trench-black border border-trench-sandbag p-3 rounded text-center shadow-inner">
-                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">ENTRY MCAP (FDV)</span>
-                <span className="font-staatliches text-lg text-white block mt-0.5">{room.token.marketCap ? `$${room.token.marketCap.toLocaleString()}` : 'UNKNOWN'}</span>
+                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">LAST PRICE</span>
+                <span className="font-staatliches text-lg text-white block mt-0.5">
+                  {room.status === 'settled' && room.finalTWAP !== undefined
+                    ? `$${room.finalTWAP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
+                    : 'ACTIVE'}
+                </span>
               </div>
               <div className="bg-trench-mud border border-neon-moon/40 p-3 rounded text-center shadow-glow-moon">
                 <span className="font-mono text-[9px] text-neon-moon block font-bold uppercase">MOON POT</span>
@@ -588,40 +596,10 @@ export default function RoomDetailPage() {
               RADIO BANDWIDTH
             </div>
 
-            {/* Comms tabs */}
-            <div className="grid grid-cols-2 border-b-2 border-trench-sandbag mt-3 bg-trench-black">
-              <button
-                onClick={() => {
-                  setActiveChatTab('moon');
-                  synthSound('bet');
-                }}
-                className={`py-3.5 font-staatliches text-lg tracking-wider transition-all border-b-4 uppercase ${
-                  activeChatTab === 'moon'
-                    ? 'text-neon-moon border-neon-moon bg-neon-moon/5 font-bold glow-moon'
-                    : 'text-trench-gasmask border-transparent hover:text-white'
-                }`}
-              >
-                🟢 MOON SQUAD ({activeRoomChats.filter(c => c.side === 'moon').length || 8})
-              </button>
-              <button
-                onClick={() => {
-                  setActiveChatTab('jeet');
-                  synthSound('bet');
-                }}
-                className={`py-3.5 font-staatliches text-lg tracking-wider transition-all border-b-4 uppercase ${
-                  activeChatTab === 'jeet'
-                    ? 'text-jeet-red border-jeet-red bg-jeet-red/5 font-bold glow-jeet'
-                    : 'text-trench-gasmask border-transparent hover:text-white'
-                }`}
-              >
-                🔴 JEET SQUAD ({activeRoomChats.filter(c => c.side === 'jeet').length || 4})
-              </button>
-            </div>
-
             {/* Radio feed */}
             <div
               ref={chatScrollRef}
-              className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs select-text scrollbar"
+              className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs select-text scrollbar mt-2"
             >
               {activeRoomChats.length > 0 ? (
                 activeRoomChats.map((msg, index) => {
@@ -676,7 +654,7 @@ export default function RoomDetailPage() {
             >
               <input
                 type="text"
-                placeholder={`BROADCAST TO ${activeChatTab.toUpperCase()} SQUAD...`}
+                placeholder={`BROADCAST TO SQUAD...`}
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 className="flex-1 px-3 py-2 bg-trench-mud border border-trench-sandbag text-white text-xs font-mono rounded focus:border-neon-moon focus:outline-none uppercase placeholder-trench-gasmask/50 font-bold"
@@ -729,9 +707,17 @@ export default function RoomDetailPage() {
                     {hasUnclaimed ? (
                       <button
                         onClick={handleClaim}
-                        className="w-full mt-4 py-3 bg-neon-moon hover:bg-green-500 font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold"
+                        disabled={isTransactionLoading}
+                        className="w-full mt-4 py-3 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold flex items-center justify-center gap-2"
                       >
-                        CLAIM WAR WINNINGS🏆
+                        {isTransactionLoading ? (
+                          <>
+                            <Loader2 className="animate-spin text-black shrink-0" size={20} />
+                            <span>CLAIMING BOOTY...</span>
+                          </>
+                        ) : (
+                          <span>CLAIM WAR WINNINGS🏆</span>
+                        )}
                       </button>
                     ) : (
                       <div className="mt-4 p-2 bg-trench-mud border border-trench-sandbag rounded font-mono text-[9px] text-moon-gold uppercase font-bold">
@@ -769,6 +755,58 @@ export default function RoomDetailPage() {
                   </div>
                 )}
 
+              </div>
+            ) : room.expiry <= Date.now() ? (
+              // Expired but not settled yet (Pending telemetry resolving)
+              <div className="space-y-4 text-center py-4 animate-pulse">
+                <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
+                  <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME PENDING</span>
+                  <span className="font-staatliches text-2xl block mt-1 tracking-wider text-moon-gold glow-moon uppercase">
+                    TELEMETRY RESOLVING
+                  </span>
+                </div>
+
+                {userBetsInRoom.length > 0 ? (
+                  <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
+                    <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed mb-4">
+                      YOU HAVE ACTIVE FORCES IN THIS SECTOR! CHOOSE TO RESOLVE TRENCH VIA DEXSCREENER DATA TO REVEAL THE OUTCOME AND CLAIM BOOTY.
+                    </p>
+                    <button
+                      onClick={handleClaim}
+                      disabled={isTransactionLoading}
+                      className="w-full py-3 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold flex items-center justify-center gap-2 uppercase tracking-wider transition-all"
+                    >
+                      {isTransactionLoading ? (
+                        <>
+                          <Loader2 className="animate-spin text-black shrink-0" size={20} />
+                          <span>RESOLVING DEXSCREENER & SETTLING...</span>
+                        </>
+                      ) : (
+                        <span>RESOLVE & CLAIM🏆</span>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
+                    <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold leading-relaxed mb-4">
+                      Sector concluded. Settle now to process telemetry resolution.
+                    </p>
+                    <button
+                      onClick={handleClaim}
+                      disabled={isTransactionLoading}
+                      className="w-full py-3 bg-trench-sandbag hover:bg-trench-gasmask disabled:bg-trench-black disabled:text-trench-gasmask text-white font-staatliches text-base uppercase rounded font-bold flex items-center justify-center gap-2"
+                    >
+                      {isTransactionLoading ? (
+                        <>
+                          <Loader2 className="animate-spin text-white shrink-0" size={16} />
+                          <span>RESOLVING DEXSCREENER DATA...</span>
+                        </>
+                      ) : (
+                        <span>RESOLVE TRENCH FOR KEEPER</span>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               // Active Faction Selector + Slider controls

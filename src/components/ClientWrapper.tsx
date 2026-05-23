@@ -297,14 +297,23 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
     prevSettledCount.current = settledRooms.length;
   }, [rooms, audioEnabled]);
 
-  // Timer Tick Loop
+  // Timer Tick Loop & On-Chain Polling
   useEffect(() => {
     const interval = setInterval(() => {
       tickTimers();
     }, 2500); // tick pools and countdown timers every 2.5s
 
-    return () => clearInterval(interval);
-  }, [tickTimers]);
+    // Hydrate data directly from the blockchain every 5 seconds 
+    // to bypass Indexer delays or outages.
+    const onChainPoller = setInterval(() => {
+      fetchRooms().catch(console.error);
+    }, 5000);
+
+    return () => {
+      clearInterval(interval);
+      clearInterval(onChainPoller);
+    };
+  }, [tickTimers, fetchRooms]);
 
   // Tactical Web3 WebSocket Integration
   useEffect(() => {
@@ -377,8 +386,8 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               addMessage({
                 roomId: roomPubkey,
                 side: data.side,
-                user: formattedUser,
-                message: `💥 DEPLOYED ${betSol.toFixed(2)} SOL to ${data.side.toUpperCase()}! 🔥`,
+                user: 'COMMAND HQ',
+                message: `> DEPLOYMENT RECOGNIZED: ${formattedUser} STACKED ${betSol.toFixed(2)} SOL ON ${data.side.toUpperCase()} <`,
                 timestamp: Date.now(),
               });
               

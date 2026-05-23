@@ -23,7 +23,7 @@ export default function CreateRoomPage() {
 
   // Form State
   const [contractAddress, setContractAddress] = useState('');
-  const [duration, setDuration] = useState<number>(15);
+  const [duration, setDuration] = useState<number>(30);
   const [seedSide, setSeedSide] = useState<'none' | 'moon' | 'jeet'>('none');
   const [seedAmount, setSeedAmount] = useState<number>(0.1);
 
@@ -334,33 +334,55 @@ export default function CreateRoomPage() {
           )}
 
           {/* 3. Duration Selector */}
-          <div className="space-y-2">
+          <div className="space-y-3">
             <label className="block font-mono text-xs font-bold text-white uppercase tracking-wider">
               Battle Duration Option:
             </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            
+            {/* Slider */}
+            <div className="px-1">
+              <input 
+                type="range" 
+                min="5" 
+                max="525600" 
+                step="5"
+                value={duration} 
+                onChange={(e) => setDuration(Math.max(5, parseInt(e.target.value) || 5))}
+                className="w-full accent-neon-moon cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-trench-gasmask font-mono mt-1">
+                <span>5 MIN</span>
+                <span>1 YEAR</span>
+              </div>
+            </div>
+
+            {/* Presets */}
+            <div className="flex flex-wrap gap-2">
               {[
-                { time: 5, label: 'SKIRMISH', desc: '5 min' },
-                { time: 15, label: 'OPERATION', desc: '15 min' },
-                { time: 30, label: 'BLITZ', desc: '30 min' },
-                { time: 60, label: 'SIEGE', desc: '60 min' }
+                { time: 30, label: '30 MIN' },
+                { time: 60, label: '60 MIN' },
+                { time: 240, label: '4 HRS' },
+                { time: 720, label: '12 HRS' },
+                { time: 1440, label: '24 HRS' },
+                { time: 4320, label: '3 DAYS' },
+                { time: 10080, label: '1 WEEK' },
+                { time: 43200, label: '1 MONTH' }
               ].map((opt) => (
-                <div
+                <button
                   key={opt.time}
+                  type="button"
                   onClick={() => {
                     setDuration(opt.time);
                     synthSound('bet');
                   }}
-                  className={`bg-trench-black p-3.5 border-2 rounded text-center cursor-pointer transition-all hover:scale-102 flex flex-col justify-center ${
+                  className={`px-3 py-1.5 border rounded font-mono text-xs transition-all ${
                     duration === opt.time
-                      ? 'border-neon-moon bg-neon-moon/5 shadow-glow-moon'
-                      : 'border-trench-sandbag text-trench-gasmask hover:text-white'
+                      ? 'border-neon-moon bg-neon-moon/10 text-neon-moon shadow-glow-moon'
+                      : 'border-trench-sandbag bg-trench-black text-trench-gasmask hover:text-white hover:border-gray-500'
                   }`}
                 >
-                  <Clock size={16} className="mx-auto mb-1 text-inherit" />
-                  <span className="font-staatliches text-lg block leading-none">{opt.time} MINS</span>
-                  <span className="font-mono text-[8px] font-bold uppercase tracking-wider block mt-1">{opt.label}</span>
-                </div>
+                  {opt.label}
+                </button>
               ))}
             </div>
             
@@ -370,8 +392,8 @@ export default function CreateRoomPage() {
               <div className="relative flex-1">
                 <input
                   type="number"
-                  min="1"
-                  max="1440"
+                  min="5"
+                  max="525600"
                   value={duration}
                   onChange={(e) => setDuration(Math.max(1, parseInt(e.target.value) || 1))}
                   className="w-full bg-trench-black/50 border border-trench-sandbag rounded px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-neon-moon"

@@ -15,10 +15,10 @@ if [ $total -eq 0 ]; then
   exit 0
 fi
 
-for ((i=0; i<total; i+=3)); do
-  batch=("${files[@]:i:3}")
+for ((i=0; i<total; i+=6)); do
+  batch=("${files[@]:i:6}")
   echo ""
-  echo "--- Processing batch $((i/3 + 1)) / $(((total+2)/3)) ---"
+  echo "--- Processing batch $((i/6 + 1)) / $(((total+5)/6)) ---"
   
   # Add files in this batch
   commit_msg="Update: "
@@ -39,9 +39,9 @@ for ((i=0; i<total; i+=3)); do
   # you might need to handle unrelated histories or force pushing manually once.
   git push origin main
   
-  if [ $((i + 3)) -lt $total ]; then
-    # Sleep between 120 and 180 seconds
-    sleep_time=$((120 + RANDOM % 60))
+  if [ $((i + 6)) -lt $total ]; then
+    # Sleep between 120 and 240 seconds
+    sleep_time=$((120 + RANDOM % 121))
     echo "Waiting for $sleep_time seconds before next batch to simulate slow activity..."
     sleep $sleep_time
   fi

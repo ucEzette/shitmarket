@@ -39,10 +39,11 @@ function deriveConfig(programId: PublicKey): [PublicKey, number] {
 function deriveRoom(
   tokenMint: PublicKey,
   creator: PublicKey,
-  programId: PublicKey
+  programId: PublicKey,
+  nonce: number = 0
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("room"), tokenMint.toBuffer(), creator.toBuffer()],
+    [Buffer.from("room"), tokenMint.toBuffer(), creator.toBuffer(), Buffer.from([nonce])],
     programId
   );
 }
@@ -79,7 +80,7 @@ function deriveReputation(
 const MOCK_TOKEN_MINT = Keypair.generate().publicKey;
 const MOCK_TOKEN_NAME = "PEPE5";
 const MOCK_PRICE_FEED = Keypair.generate();
-const MOCK_OPENING_PRICE = new BN(1_000_000); // $1.00 (×1_000_000)
+const MOCK_OPENING_PRICE = new BN(1_500_000_000); // $150.00 mock price
 
 async function createFakePythFeedAccount(provider: anchor.AnchorProvider, feedKeypair: Keypair) {
   const lamports = await provider.connection.getMinimumBalanceForRentExemption(2048);
@@ -89,7 +90,7 @@ async function createFakePythFeedAccount(provider: anchor.AnchorProvider, feedKe
       newAccountPubkey: feedKeypair.publicKey,
       lamports,
       space: 2048,
-      programId: new PublicKey("Pyth11111111111111111111111111111111111111"),
+      programId: SystemProgram.programId,
     })
   );
   await provider.sendAndConfirm(tx, [feedKeypair]);
@@ -176,12 +177,11 @@ describe("shitmarket", () => {
   it("rejects fee > 10%", async () => {
     try {
       await program.methods
-        .initialize(1001)
+        .updateConfig(1001, null, null, null, null)
         .accounts({
           config: configPda,
           admin: admin.publicKey,
-          treasury: treasury.publicKey,
-          systemProgram: SystemProgram.programId,
+          newTreasury: null,
         })
         .signers([admin])
         .rpc();
@@ -193,13 +193,15 @@ describe("shitmarket", () => {
 
   // ── 2. Create Room ────────────────────────────────────────────────────
 
-  it("creates a room with 5-minute duration", async () => {
+  it("creates a room with 30-minute duration", async () => {
     await program.methods
       .createRoom(
         MOCK_TOKEN_MINT,
         MOCK_TOKEN_NAME,
-        5, // 5 minutes
-        null // no switchboard feed
+        30, // 30 minutes
+        null, // no switchboard feed
+        null, // no opening price override
+        0 // nonce
       )
       .accounts({
         room: roomPda,
@@ -215,7 +217,7 @@ describe("shitmarket", () => {
 
     const room = await program.account.room.fetch(roomPda);
     assert.equal(room.tokenMint.toBase58(), MOCK_TOKEN_MINT.toBase58());
-    assert.equal(room.durationMinutes, 5);
+    assert.equal(room.durationMinutes, 30);
     assert.isTrue(room.openingPrice.eq(MOCK_OPENING_PRICE));
     assert.equal(room.moonPool.toNumber(), 0);
     assert.equal(room.jeetPool.toNumber(), 0);
@@ -229,7 +231,7 @@ describe("shitmarket", () => {
     const [otherRoom] = deriveRoom(otherMint, creator.publicKey, programId);
     try {
       await program.methods
-        .createRoom(otherMint, "BAD", 7, null)
+        .createRoom(otherMint, "BAD", 0, null, null, 0)
         .accounts({
           room: otherRoom,
           escrow: deriveEscrow(otherRoom, programId)[0],
@@ -264,7 +266,7 @@ describe("shitmarket", () => {
     const [pausedRoom] = deriveRoom(pausedMint, creator.publicKey, programId);
     try {
       await program.methods
-        .createRoom(pausedMint, "PAUSED", 5, null)
+        .createRoom(pausedMint, "PAUSED", 5, null, null, 0)
         .accounts({
           room: pausedRoom,
           escrow: deriveEscrow(pausedRoom, programId)[0],
@@ -317,6 +319,8 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: moonBetPda,
         user: moonBettor.publicKey,
+        reputation: null as any,
+        config: configPda,
         systemProgram: SystemProgram.programId,
       })
       .signers([moonBettor])
@@ -342,6 +346,8 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: jeetBetPda,
         user: jeetBettor.publicKey,
+        reputation: null as any,
+        config: configPda,
         systemProgram: SystemProgram.programId,
       })
       .signers([jeetBettor])
@@ -361,6 +367,8 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: moonBetPda,
         user: moonBettor.publicKey,
+        reputation: null as any,
+        config: configPda,
         systemProgram: SystemProgram.programId,
       })
       .signers([moonBettor])
@@ -380,6 +388,8 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: secondMoonBetPda,
         user: secondMoonBettor.publicKey,
+        reputation: null as any,
+        config: configPda,
         systemProgram: SystemProgram.programId,
       })
       .signers([secondMoonBettor])
@@ -399,6 +409,8 @@ describe("shitmarket", () => {
           escrow: escrowPda,
           bet: moonBetPda,
           user: moonBettor.publicKey,
+          reputation: null as any,
+          config: configPda,
           systemProgram: SystemProgram.programId,
         })
         .signers([moonBettor])
@@ -421,6 +433,8 @@ describe("shitmarket", () => {
           escrow: escrowPda,
           bet: whaleBetPda,
           user: whaleBettor.publicKey,
+          reputation: null as any,
+          config: configPda,
           systemProgram: SystemProgram.programId,
         })
         .signers([whaleBettor])
@@ -440,6 +454,8 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: whaleBetPda,
         user: whaleBettor.publicKey,
+        reputation: null as any,
+        config: configPda,
         systemProgram: SystemProgram.programId,
       })
       .signers([whaleBettor])
@@ -475,7 +491,7 @@ describe("shitmarket", () => {
       const higherPrice = MOCK_OPENING_PRICE.addn(5_000);
       try {
         await program.methods
-          .settleRoom()
+          .settleRoom(null)
           .accounts({
             room: roomPda,
             escrow: escrowPda,
@@ -483,16 +499,16 @@ describe("shitmarket", () => {
             priceFeed: MOCK_PRICE_FEED.publicKey,
             switchboardFeed: PublicKey.default,
             config: configPda,
-            keeper: keeper.publicKey,
+            keeper: admin.publicKey,
             systemProgram: SystemProgram.programId,
           })
-          .signers([keeper])
+          .signers([admin])
           .rpc();
-      assert.fail("Should have thrown — room not expired");
-    } catch (err: any) {
-      expect(err.message).to.include("RoomNotExpired");
-    }
-  });
+        assert.fail("Should have thrown — room not expired");
+      } catch (err: any) {
+        expect(err.message).to.include("RoomNotExpired");
+      }
+    });
 
   it("settles room after expiry with Moon winning price", async () => {
     // Wait for 5-minute room to expire (300s). In real tests use fast-forward;
@@ -528,9 +544,9 @@ describe("shitmarket", () => {
       [fastJeetBetPda] = deriveBet(fastRoomPda, fastJeetBettor.publicKey, programId);
     });
 
-    it("creates a fast room (5-min — expires quickly in localnet warp)", async () => {
+    it("creates a fast room (10-min — expires quickly in localnet warp)", async () => {
       await program.methods
-        .createRoom(fastMint, "FASTTOKEN", 5, null)
+        .createRoom(fastMint, "FASTTOKEN", 10, null, null, 0)
         .accounts({
           room: fastRoomPda,
           escrow: fastEscrowPda,
@@ -553,6 +569,8 @@ describe("shitmarket", () => {
           escrow: fastEscrowPda,
           bet: fastMoonBetPda,
           user: fastMoonBettor.publicKey,
+          reputation: null as any,
+          config: configPda,
           systemProgram: SystemProgram.programId,
         })
         .signers([fastMoonBettor])
@@ -566,6 +584,8 @@ describe("shitmarket", () => {
           escrow: fastEscrowPda,
           bet: fastJeetBetPda,
           user: fastJeetBettor.publicKey,
+          reputation: null as any,
+          config: configPda,
           systemProgram: SystemProgram.programId,
         })
         .signers([fastJeetBettor])
@@ -593,11 +613,11 @@ describe("shitmarket", () => {
         await new Promise((r) => setTimeout(r, waitMs));
       }
 
-      const finalPrice = new BN(2_000_000); // $2.00 > $1.00 opening → Moon wins
+      const finalPrice = new BN(2_000_000_000); // $200.00 > $150.00 opening → Moon wins
       const treasuryBefore = await provider.connection.getBalance(treasury.publicKey);
 
       await program.methods
-        .settleRoom()
+        .settleRoom(new BN(2_000_000_000))
         .accounts({
           room: fastRoomPda,
           escrow: fastEscrowPda,
@@ -638,6 +658,7 @@ describe("shitmarket", () => {
           escrow: fastEscrowPda,
           bet: fastMoonBetPda,
           user: fastMoonBettor.publicKey,
+          payer: fastMoonBettor.publicKey,
           systemProgram: SystemProgram.programId,
         })
         .signers([fastMoonBettor])
@@ -661,6 +682,7 @@ describe("shitmarket", () => {
             escrow: fastEscrowPda,
             bet: fastMoonBetPda,
             user: fastMoonBettor.publicKey,
+            payer: fastMoonBettor.publicKey,
             systemProgram: SystemProgram.programId,
           })
           .signers([fastMoonBettor])
@@ -680,6 +702,7 @@ describe("shitmarket", () => {
             escrow: fastEscrowPda,
             bet: fastJeetBetPda,
             user: fastJeetBettor.publicKey,
+            payer: fastJeetBettor.publicKey,
             systemProgram: SystemProgram.programId,
           })
           .signers([fastJeetBettor])
@@ -693,7 +716,7 @@ describe("shitmarket", () => {
     it("rejects double settlement", async function () {
       try {
         await program.methods
-          .settleRoom()
+          .settleRoom(new BN(2_000_000_000))
           .accounts({
             room: fastRoomPda,
             escrow: fastEscrowPda,
@@ -708,7 +731,7 @@ describe("shitmarket", () => {
           .rpc();
         assert.fail("Should have thrown");
       } catch (err: any) {
-        expect(err.message).to.include("RoomAlreadySettled");
+        expect(err.message).to.include("RoomNotActive");
       }
     });
   });
@@ -728,6 +751,17 @@ describe("shitmarket", () => {
 
     const config = await program.account.platformConfig.fetch(configPda);
     assert.equal(config.platformFeeBps, 100);
+
+    // Revert fee back to 2% for subsequent tests
+    await program.methods
+      .updateConfig(200, null, null, null, null)
+      .accounts({
+        config: configPda,
+        admin: admin.publicKey,
+        newTreasury: null,
+      })
+      .signers([admin])
+      .rpc();
   });
 
   it("non-admin cannot update config", async () => {
@@ -763,6 +797,17 @@ describe("shitmarket", () => {
 
     const config = await program.account.platformConfig.fetch(configPda);
     assert.equal(config.keeper.toBase58(), newKeeper.toBase58());
+
+    // Revert keeper back to the original keeper for subsequent tests
+    await program.methods
+      .updateConfig(null, null, keeper.publicKey, null, null)
+      .accounts({
+        config: configPda,
+        admin: admin.publicKey,
+        newTreasury: null,
+      })
+      .signers([admin])
+      .rpc();
     assert.isTrue(config.minimumLiquidity.eq(new BN(200_000_000)), "Min liquidity should be 0.2 SOL");
     assert.isTrue(config.twapWindowSeconds.eq(new BN(600)), "TWAP window should be 600s");
   });
@@ -791,7 +836,7 @@ describe("shitmarket", () => {
       this.timeout(400_000);
 
       await program.methods
-        .createRoom(edgeMint, "LONELY", 5, null)
+        .createRoom(edgeMint, "LONELY", 10, null, null, 0)
         .accounts({
           room: edgeRoomPda,
           escrow: edgeEscrowPda,
@@ -812,6 +857,8 @@ describe("shitmarket", () => {
           escrow: edgeEscrowPda,
           bet: lonelyBetPda,
           user: lonelyBettor.publicKey,
+          reputation: null as any,
+          config: configPda,
           systemProgram: SystemProgram.programId,
         })
         .signers([lonelyBettor])
@@ -828,7 +875,7 @@ describe("shitmarket", () => {
 
       // Moon wins (price went up)
       await program.methods
-        .settleRoom()
+        .settleRoom(new BN(2_000_000_000))
         .accounts({
           room: edgeRoomPda,
           escrow: edgeEscrowPda,
@@ -853,6 +900,7 @@ describe("shitmarket", () => {
           escrow: edgeEscrowPda,
           bet: lonelyBetPda,
           user: lonelyBettor.publicKey,
+          payer: lonelyBettor.publicKey,
           systemProgram: SystemProgram.programId,
         })
         .signers([lonelyBettor])

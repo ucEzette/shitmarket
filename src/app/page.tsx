@@ -7,10 +7,23 @@ import { PixelBarbedWire } from '@/components/PixelArt';
 import { useAppState } from '@/store/useAppState';
 import { PEPE_ASSETS, DegenQuoteBanner, PepePortrait, WarPropaganda, MascotRow } from '@/components/MemeAssets';
 import { AgentKeyAlphaZone } from '@/components/AgentKeyAlphaZone';
+import { IntroScreen } from '@/components/IntroScreen';
 import { Flame, ShieldAlert, Award, ArrowUpRight, Zap, Target, Users, Swords, Skull, Rocket } from 'lucide-react';
 
 export default function Home() {
   const { leaderboard, isPaused } = useAppState();
+  const [showIntro, setShowIntro] = React.useState(true);
+
+  React.useEffect(() => {
+    if (sessionStorage.getItem('intro_played')) {
+      setShowIntro(false);
+    }
+  }, []);
+
+  const handleIntroComplete = () => {
+    sessionStorage.setItem('intro_played', 'true');
+    setShowIntro(false);
+  };
 
   // Combine top leaderboard profiles to showcase a mixed 'War Heroes' list
   const topHeroes = [
@@ -47,6 +60,10 @@ export default function Home() {
       pepe: PEPE_ASSETS.neonWojak
     },
   ];
+
+  if (showIntro) {
+    return <IntroScreen onComplete={handleIntroComplete} />;
+  }
 
   return (
     <div className="relative flex flex-col w-full overflow-hidden select-none">

@@ -87,7 +87,7 @@ function buildAnchorProgram(circuitBreaker: RpcCircuitBreaker): {
             { name: 'tokenName', type: 'string', index: false },
             { name: 'priceFeed', type: 'publicKey', index: false },
             { name: 'openingPrice', type: 'i64', index: false },
-            { name: 'durationMinutes', type: 'u8', index: false },
+            { name: 'durationMinutes', type: 'u32', index: false },
             { name: 'expiryTimestamp', type: 'i64', index: false },
           ],
         },

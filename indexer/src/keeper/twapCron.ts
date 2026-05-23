@@ -29,9 +29,12 @@ export async function runTwapCron() {
   logger.info({ msg: 'Running TWAP cron job...' });
 
   try {
-    // Find all active rooms
+    // Find all active rooms that have not expired yet
     const activeRooms = await prisma.room.findMany({
-      where: { status: 'active' },
+      where: {
+        status: 'active',
+        expiry: { gt: new Date() },
+      },
     });
 
     if (activeRooms.length === 0) {
@@ -54,8 +57,7 @@ export async function runTwapCron() {
         const tokenMint = room.tokenMint;
         
         // Find Pyth feed
-        const pythFeedMap = config.pythFeedMapping;
-        const feedStr = pythFeedMap[tokenMint] || "H6ARHf6YXhGYeQfUzQNGk6rDNnLBQKrenN712K4GGKAD";
+        const feedStr = room.priceFeed || "11111111111111111111111111111111";
         const priceFeed = new PublicKey(feedStr);
 
         await program.methods

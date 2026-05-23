@@ -33,7 +33,7 @@ import bs58 from 'bs58';
 import { config } from '../config';
 import { logger } from '../logger';
 import { prisma } from '../db';
-import { aggregatePrice } from '../feeds/priceAggregator';
+import { aggregatePrice, mockAggregatePrice } from '../feeds/priceAggregator';
 import { updateEloAfterSettlement } from '../elo';
 import {
   keeperSuccessTotal,
@@ -42,6 +42,9 @@ import {
 import { acquireRoomLock, releaseLock } from './keeperLock';
 
 // ─── Keeper wallet ────────────────────────────────────────────────────────────
+
+let activeConnection: Connection | null = null;
+let activeProgram: anchor.Program | null = null;
 
 function loadKeeperKeypair(): Keypair {
   const raw = config.solana.keeperPrivateKey;
@@ -96,7 +99,7 @@ async function settleRoom(
     priceFeed: string | null;
     switchboardFeed: string | null;
   }
-): Promise<void> {
+): Promise<string> {
   const roomPubkeyStr = roomRecord.roomPubkey;
   const roomPubkey = new PublicKey(roomPubkeyStr);
   const programId = program.programId;
@@ -105,7 +108,7 @@ async function settleRoom(
   const lockValue = await acquireRoomLock(roomPubkeyStr);
   if (!lockValue) {
     // Another keeper is handling this room
-    return;
+    return 'lock_held';
   }
 
   // Ensure lock is always released
@@ -130,20 +133,14 @@ async function settleRoom(
     } catch (err: any) {
       logger.error({ msg: 'Failed to fetch platform config', err: err?.message });
       await release();
-      return;
+      throw err;
     }
 
-    // Resolve Pyth feed ID
+    // Resolve Pyth feed ID (defaults to on-chain SystemProgram sentinel to bypass reverts for custom tokens)
     const pythFeedId =
       roomRecord.priceFeed ||
-      (config.pythFeedMapping as Record<string, string>)[roomRecord.tokenMint];
-
-    if (!pythFeedId) {
-      logger.warn(`No Pyth feed found for room ${roomPubkeyStr}:${roomRecord.tokenMint}`);
-      keeperFailureTotal.inc();
-      await release();
-      return;
-    }
+      (config.pythFeedMapping as Record<string, string>)[roomRecord.tokenMint] ||
+      '11111111111111111111111111111111';
 
     // Phase 3.1: Resolve Switchboard feed
     const switchboardFeedStr =
@@ -167,12 +164,21 @@ async function settleRoom(
       timestamp: Math.floor(s.createdAt.getTime() / 1000),
     }));
 
-    const result = await aggregatePrice(roomRecord.tokenMint, pythFeedId, historicalSamples);
+    let result = await aggregatePrice(roomRecord.tokenMint, pythFeedId, historicalSamples);
     if (!result) {
-      logger.error({ msg: 'Price aggregation failed — skipping room', room: roomPubkeyStr });
-      keeperFailureTotal.inc();
-      await release();
-      return;
+      if (process.env.NODE_ENV === 'development') {
+        logger.info({
+          msg: 'Price aggregation failed in development mode. Falling back to mockAggregatePrice.',
+          room: roomPubkeyStr,
+        });
+        const openingPriceNum = Number(roomRecord.openingPrice);
+        result = await mockAggregatePrice(roomRecord.tokenMint, openingPriceNum);
+      } else {
+        logger.error({ msg: 'Price aggregation failed — skipping room', room: roomPubkeyStr });
+        keeperFailureTotal.inc();
+        await release();
+        throw new Error('Price aggregation failed for token settlement');
+      }
     }
 
     logger.info({
@@ -200,8 +206,11 @@ async function settleRoom(
         systemProgram: SystemProgram.programId,
       };
 
+      const scaledPrice = result.priceI64 * 100;
+      const finalPriceParam = new anchor.BN(scaledPrice);
+
       const txSig = await program.methods
-        .settleRoom()
+        .settleRoom(finalPriceParam)
         .accounts(accounts)
         .signers([keeper])
         .rpc({ commitment: 'confirmed', skipPreflight: false });
@@ -254,6 +263,8 @@ async function settleRoom(
           err: eloErr?.message,
         });
       }
+
+      return txSig;
     } catch (err: any) {
       const msg = err?.message ?? String(err);
       // Gracefully handle already-settled rooms (race condition with another keeper)
@@ -264,9 +275,11 @@ async function settleRoom(
           where: { roomPubkey: roomPubkeyStr },
           data: { status: 'settled' },
         }).catch(() => {}); // Best-effort
+        return 'already_settled';
       } else {
         logger.error({ msg: 'settle_room failed', room: roomPubkeyStr, err: msg });
         keeperFailureTotal.inc();
+        throw err;
       }
     }
   } finally {
@@ -280,6 +293,9 @@ export function startSettlementKeeper(
   connection: Connection,
   program: anchor.Program
 ): cron.ScheduledTask {
+  activeConnection = connection;
+  activeProgram = program;
+
   let keeper: Keypair;
   try {
     keeper = loadKeeperKeypair();
@@ -331,4 +347,85 @@ export function startSettlementKeeper(
 
   logger.info('Settlement keeper started — running every 3 seconds');
   return task;
+}
+
+export async function settleRoomByPubkey(pubkeyStr: string): Promise<{ success: boolean; txSig?: string; error?: string }> {
+  try {
+    const roomRecord = await prisma.room.findUnique({
+      where: { roomPubkey: pubkeyStr },
+      select: {
+        roomPubkey: true,
+        tokenMint: true,
+        openingPrice: true,
+        priceFeed: true,
+        switchboardFeed: true,
+        status: true,
+        expiry: true,
+      },
+    });
+
+    if (!roomRecord) {
+      return { success: false, error: 'Room not found in database' };
+    }
+
+    if (roomRecord.status === 'settled') {
+      return { success: true, error: 'Room is already settled' };
+    }
+
+    if (roomRecord.expiry > new Date()) {
+      return { success: false, error: 'Room has not expired yet' };
+    }
+
+    let connection = activeConnection;
+    let program = activeProgram;
+
+    if (!connection || !program) {
+      logger.info({ msg: 'Initializing on-demand connection and program for settlement' });
+      connection = new Connection(config.solana.rpcUrl, 'confirmed');
+      const programId = new PublicKey(config.solana.programId);
+      
+      // Load IDL
+      let idl: any;
+      try {
+        idl = require('../../../program/target/idl/shitmarket.json');
+      } catch {
+        try {
+          idl = require('../../../src/utils/idl.json');
+        } catch {
+          throw new Error('Failed to load IDL for on-demand settlement');
+        }
+      }
+
+      const wallet = new anchor.Wallet(anchor.web3.Keypair.generate());
+      const provider = new anchor.AnchorProvider(connection, wallet, {
+        commitment: 'confirmed',
+      });
+      
+      const idlWithAddress = { ...idl, address: programId.toBase58() };
+      
+      function normalizeIdl(obj: any): void {
+        if (Array.isArray(obj)) {
+          obj.forEach(normalizeIdl);
+        } else if (obj !== null && typeof obj === 'object') {
+          for (const key in obj) {
+            if (key === 'defined' && typeof obj[key] === 'string') {
+              obj[key] = { name: obj[key] };
+            } else {
+              normalizeIdl(obj[key]);
+            }
+          }
+        }
+      }
+      normalizeIdl(idlWithAddress);
+      
+      program = new anchor.Program(idlWithAddress as anchor.Idl, provider);
+    }
+
+    const keeper = loadKeeperKeypair();
+    const txSig = await settleRoom(program, connection, keeper, roomRecord);
+    return { success: true, txSig };
+  } catch (err: any) {
+    logger.error({ msg: 'On-demand settlement error', pubkeyStr, err: err?.message });
+    return { success: false, error: err?.message || String(err) };
+  }
 }

@@ -120,7 +120,7 @@ export function createApiServer(circuitBreaker?: RpcCircuitBreaker): express.App
   app.use('/api/reserves', reservesRouter);
 
   // ── Enhanced health check ────────────────────────────────────────────────────
-  app.get('/health', async (_req, res) => {
+  app.get('/api/health', async (_req, res) => {
     const [db, rds, rpcResult, replicaDb] = await Promise.all([
       checkDb(),
       checkRedis(),

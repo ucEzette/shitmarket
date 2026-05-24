@@ -27,7 +27,7 @@ export const config = {
     url: optional('REDIS_URL', 'redis://localhost:6379'),
   },
   api: {
-    restPort: parseInt(optional('REST_API_PORT', '3001'), 10),
+    restPort: parseInt(optional('PORT', optional('REST_API_PORT', '3001')), 10),
     wsPort: parseInt(optional('WS_PORT', '3002'), 10),
   },
   external: {

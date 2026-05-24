@@ -19,7 +19,7 @@ validationRouter.get('/validate', async (req, res) => {
       return res.status(500).json({ valid: false, reason: 'Failed to fetch token data from DexScreener' });
     }
 
-    const data = await response.json();
+    const data: any = await response.json();
     if (!data || !data.pairs || data.pairs.length === 0) {
       return res.status(404).json({ valid: false, reason: 'Token not found on DexScreener or no pairs available' });
     }

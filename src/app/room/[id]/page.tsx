@@ -32,7 +32,7 @@ export default function RoomDetailPage() {
   const router = useRouter();
   const roomId = params.id as string;
 
-  const { rooms, user, chatMessages, placeBet, claimWinnings, addMessage, connectWallet, isTransactionLoading, fetchSingleRoom } = useAppState();
+  const { rooms, user, chatMessages, placeBet, claimWinnings, addMessage, connectWallet, isTransactionLoading, fetchSingleRoom, fetchRoomChats, sendRoomChat } = useAppState();
 
   const [selectedSide, setSelectedSide] = useState<'moon' | 'jeet'>('moon');
   const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
@@ -57,13 +57,14 @@ export default function RoomDetailPage() {
   useEffect(() => {
     let active = true;
     setIsLoading(true);
-    fetchSingleRoom(roomId)
-      .then(() => {
-        if (active) setIsLoading(false);
-      })
-      .catch(() => {
-        if (active) setIsLoading(false);
-      });
+    Promise.all([
+      fetchSingleRoom(roomId),
+      fetchRoomChats(roomId)
+    ]).then(() => {
+      if (active) setIsLoading(false);
+    }).catch(() => {
+      if (active) setIsLoading(false);
+    });
 
     const interval = setInterval(() => {
       fetchSingleRoom(roomId);
@@ -280,13 +281,7 @@ export default function RoomDetailPage() {
 
     const userAddr = user && user.wallet ? `${user.wallet.substring(0, 6)}...${user.wallet.substring(user.wallet.length - 4)}` : 'Recruit';
     
-    addMessage({
-      roomId: room.id,
-      side: activeChatTab,
-      user: userAddr,
-      message: chatInput.trim(),
-      timestamp: Date.now()
-    });
+    sendRoomChat(room.id, activeChatTab, userAddr, chatInput.trim());
 
     setChatInput('');
     synthSound('bet');

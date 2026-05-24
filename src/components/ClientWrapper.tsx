@@ -421,6 +421,16 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               }
             }
             
+            else if (data.type === 'NewChatMessage') {
+              addMessage({
+                roomId: roomPubkey,
+                side: data.side,
+                user: data.user,
+                message: data.message,
+                timestamp: data.timestamp,
+              });
+            }
+            
             else if (data.type === 'RoomSettled') {
               settleRoom(roomPubkey, data.winner);
               

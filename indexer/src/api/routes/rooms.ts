@@ -1,6 +1,6 @@
 import express from 'express';
 import { prisma, prismaRead } from '../../db';
-import { getCachedRoom, cacheRoom } from '../../redis';
+import { getCachedRoom, cacheRoom, publishRoomUpdate } from '../../redis';
 import { logger } from '../../logger';
 import { validate, roomsQuerySchema, roomPubkeyParamSchema } from '../validation';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -16,7 +16,7 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
     const url = `${config.external.dexscreenerUrl}/tokens/${mintAddress}`;
     const response = await fetch(url);
     if (!response.ok) return {};
-    const data = await response.json();
+    const data: any = await response.json();
     const pairs: any[] = data?.pairs ?? [];
     if (!pairs.length) return {};
     const best = pairs.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
@@ -331,6 +331,83 @@ roomsRouter.post('/:pubkey/settle', validate(roomPubkeyParamSchema, 'params'), a
     }
   } catch (err: any) {
     logger.error({ msg: 'POST /api/rooms/:pubkey/settle error', err: err?.message });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ── GET /api/rooms/:pubkey/chats ──────────────────────────────────────────────
+
+roomsRouter.get('/:pubkey/chats', validate(roomPubkeyParamSchema, 'params'), async (req, res) => {
+  try {
+    const { pubkey } = req.params;
+    const chats = await prisma.chatMessage.findMany({
+      where: { roomPubkey: pubkey },
+      orderBy: { timestamp: 'asc' },
+      take: 100,
+    });
+    return res.json({
+      success: true,
+      data: chats.map((c) => ({
+        roomId: c.roomPubkey,
+        side: c.side,
+        user: c.user,
+        message: c.message,
+        timestamp: c.timestamp.getTime(),
+      })),
+    });
+  } catch (err: any) {
+    logger.error({ msg: 'GET /api/rooms/:pubkey/chats error', err: err?.message });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/rooms/:pubkey/chats ─────────────────────────────────────────────
+
+roomsRouter.post('/:pubkey/chats', validate(roomPubkeyParamSchema, 'params'), async (req, res) => {
+  try {
+    const { pubkey } = req.params;
+    const { user, side, message } = req.body;
+
+    if (!user || !side || !message || typeof message !== 'string' || message.trim() === '') {
+      return res.status(400).json({ success: false, error: 'Missing or invalid chat properties' });
+    }
+
+    if (side !== 'moon' && side !== 'jeet' && side !== 'all') {
+      return res.status(400).json({ success: false, error: 'Invalid chat channel side' });
+    }
+
+    // Verify room exists in database
+    const roomExists = await prisma.room.findUnique({
+      where: { roomPubkey: pubkey },
+    });
+    if (!roomExists) {
+      return res.status(404).json({ success: false, error: 'Arena sector not found' });
+    }
+
+    // Save to Postgres / Supabase
+    const saved = await prisma.chatMessage.create({
+      data: {
+        roomPubkey: pubkey,
+        side,
+        user,
+        message: message.trim(),
+      },
+    });
+
+    const chatData = {
+      type: 'NewChatMessage',
+      user: saved.user,
+      side: saved.side,
+      message: saved.message,
+      timestamp: saved.timestamp.getTime(),
+    };
+
+    // Broadcast in real-time via Redis Pub/Sub → WebSocket Relay
+    await publishRoomUpdate(pubkey, chatData);
+
+    return res.json({ success: true, data: chatData });
+  } catch (err: any) {
+    logger.error({ msg: 'POST /api/rooms/:pubkey/chats error', err: err?.message });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

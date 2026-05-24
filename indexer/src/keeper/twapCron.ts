@@ -4,7 +4,7 @@ import bs58 from 'bs58';
 import { prisma } from '../db';
 import { config } from '../config';
 import { logger } from '../logger';
-import idl from '../../../src/utils/idl.json';
+import idl from '../utils/idl.json';
 
 const PROGRAM_ID = new PublicKey(config.solana.programId);
 

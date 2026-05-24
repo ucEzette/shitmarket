@@ -56,7 +56,7 @@ function getProgram(connection: Connection): anchor.Program {
     idl = require('../../../program/target/idl/shitmarket.json');
   } catch {
     try {
-      idl = require('../../src/utils/idl.json');
+      idl = require('../utils/idl.json');
     } catch {
       try {
         idl = require('../utils/idl.json');

@@ -407,7 +407,7 @@ export async function settleRoomByPubkey(pubkeyStr: string): Promise<{ success: 
         idl = require('../../../program/target/idl/shitmarket.json');
       } catch {
         try {
-          idl = require('../../../src/utils/idl.json');
+          idl = require('../utils/idl.json');
         } catch {
           throw new Error('Failed to load IDL for on-demand settlement');
         }

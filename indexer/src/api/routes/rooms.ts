@@ -46,7 +46,7 @@ async function syncRoomFromChain(pubkeyStr: string): Promise<any> {
       idl = require('../../../../program/target/idl/shitmarket.json');
     } catch {
       try {
-        idl = require('../../../../src/utils/idl.json');
+        idl = require('../../utils/idl.json');
       } catch {
         logger.error({ msg: 'Failed to load IDL for syncRoomFromChain' });
         return null;

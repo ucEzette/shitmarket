@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
-const idlPath = path.resolve(__dirname, "../../src/utils/idl.json");
+const idlPath = path.resolve(__dirname, "../src/utils/idl.json");
 const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
 
 async function main() {

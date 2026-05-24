@@ -69,7 +69,7 @@ function buildAnchorProgram(circuitBreaker: RpcCircuitBreaker): {
     logger.info('Loaded IDL from anchor build output');
   } catch {
     try {
-      idl = require('../../src/utils/idl.json') as anchor.Idl;
+      idl = require('./utils/idl.json') as anchor.Idl;
       logger.info('Loaded IDL from frontend source utils/idl.json');
     } catch {
       logger.warn('Could not load anchor IDL — using minimal fallback. Run `anchor build` first.');

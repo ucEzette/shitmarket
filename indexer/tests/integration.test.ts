@@ -101,7 +101,7 @@ beforeAll(async () => {
     idl = require('../../program/target/idl/shitmarket.json') as anchor.Idl;
   } catch {
     try {
-      idl = require('../../src/utils/idl.json') as anchor.Idl;
+      idl = require('../src/utils/idl.json') as anchor.Idl;
     } catch {
       throw new Error('Run `anchor build` before integration tests');
     }

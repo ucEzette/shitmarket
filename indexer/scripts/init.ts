@@ -11,7 +11,7 @@ import bs58 from "bs58";
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 // We load the IDL. Because it is JSON, we can just require it or read it.
-const idlPath = path.resolve(__dirname, "../../src/utils/idl.json");
+const idlPath = path.resolve(__dirname, "../src/utils/idl.json");
 const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
 
 // PATCH the outdated IDL in-memory

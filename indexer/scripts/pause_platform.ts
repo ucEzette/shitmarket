@@ -3,7 +3,7 @@ import { Connection, Keypair, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import bs58 from 'bs58';
 import { config } from '../src/config';
-import idl from '../../src/utils/idl.json';
+import idl from '../src/utils/idl.json';
 
 const PROGRAM_ID = new PublicKey(config.solana.programId);
 

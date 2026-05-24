@@ -53,7 +53,7 @@ async function run() {
 
     // 1. Setup Solana Connection and Program
     const connection = new Connection("http://127.0.0.1:8899", "confirmed");
-    const idlPath = path.resolve(__dirname, "../../src/utils/idl.json");
+    const idlPath = path.resolve(__dirname, "../src/utils/idl.json");
     const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
     const programId = new PublicKey("GxkRWMoyKpKkTadmGqqqLvA473YTwvDUeSPK1iS8REim");
     

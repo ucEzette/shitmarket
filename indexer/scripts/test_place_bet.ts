@@ -4,7 +4,7 @@ import fs from "fs";
 import os from "os";
 
 // Load the IDL.
-const idlPath = "../../src/utils/idl.json";
+const idlPath = "../src/utils/idl.json";
 const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
 
 // PATCH the outdated IDL in-memory

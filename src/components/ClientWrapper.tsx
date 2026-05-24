@@ -338,8 +338,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
     let reconnectTimeout: any;
 
     const connect = () => {
-      // Connect to the indexer WS server on port 3002
-      socket = new WebSocket('ws://localhost:3002');
+      // Connect to the indexer WS server using environment variable or fallback to local
+      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3002';
+      socket = new WebSocket(wsUrl);
       wsRef.current = socket;
 
       socket.onopen = () => {

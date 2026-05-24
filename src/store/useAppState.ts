@@ -995,7 +995,8 @@ export const useAppState = create<AppState>((set, get) => ({
       let referralPayouts: any[] = [];
       
       try {
-        const res = await fetchWithTimeout(`http://localhost:3001/api/profile/${address}`, {}, 3000);
+        const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+        const res = await fetchWithTimeout(`${indexerApi}/api/profile/${address}`, {}, 3000);
         const json = await res.json();
         if (json.success && json.data) {
           trenchScore = json.data.trenchScore || 'D';
@@ -1035,7 +1036,8 @@ export const useAppState = create<AppState>((set, get) => ({
         if (cachedRef && cachedRef !== address && cachedRef !== referralCode) {
           console.log(`Auto-linking referrer ${cachedRef} for wallet ${address}...`);
           try {
-            await fetchWithTimeout('http://localhost:3001/api/profile/update', {
+            const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+            await fetchWithTimeout(`${indexerApi}/api/profile/update`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ userPubkey: address, referredBy: cachedRef }),
@@ -1087,7 +1089,8 @@ export const useAppState = create<AppState>((set, get) => ({
     }
 
     try {
-      const res = await fetchWithTimeout('http://localhost:3001/api/profile/update', {
+      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const res = await fetchWithTimeout(`${indexerApi}/api/profile/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

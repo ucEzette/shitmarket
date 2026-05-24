@@ -25,6 +25,7 @@ import { connectRedis, disconnectRedis } from './redis';
 import { createApiServer, startApiServer } from './api/server';
 import { startWsServer } from './websocket/wsServer';
 import { startEventListener, stopEventListener } from './listener/eventListener';
+import { runBackfiller } from './listener/backfiller';
 import { startSettlementKeeper } from './keeper/settlementKeeper';
 import { runTwapCron } from './keeper/twapCron';
 import { RpcCircuitBreaker } from './solana/rpcCircuitBreaker';
@@ -244,6 +245,16 @@ async function main(): Promise<void> {
   setInterval(() => {
     runTwapCron().catch(err => logger.error({ msg: 'twapCron failed', error: err }));
   }, 60000);
+
+  // 10. Self-Healing Backfiller failsafe (Startup run + 15-second interval)
+  runBackfiller(connection, program, eventParser).catch(err =>
+    logger.error({ msg: 'Startup self-healing backfiller failed', error: err })
+  );
+  setInterval(() => {
+    runBackfiller(connection, program, eventParser).catch(err =>
+      logger.error({ msg: 'Interval self-healing backfiller failed', error: err })
+    );
+  }, 15000);
 
   // Graceful shutdown handlers
   process.on('SIGTERM', () => shutdown(circuitBreaker));

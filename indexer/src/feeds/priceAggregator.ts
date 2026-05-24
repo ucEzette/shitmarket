@@ -43,7 +43,13 @@ export interface PriceSample {
 async function fetchDexScreener(tokenMint: string): Promise<number | null> {
   try {
     const url = `${config.external.dexscreenerUrl}/tokens/${tokenMint}`;
-    const { data } = await axios.get(url, { timeout: 5000 });
+    const { data } = await axios.get(url, { 
+      timeout: 5000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+      }
+    });
     const pairs: any[] = data?.pairs ?? [];
     if (!pairs.length) return null;
 
@@ -126,7 +132,13 @@ async function fetchPythRest(priceFeedId: string): Promise<number | null> {
 async function fetchJupiter(tokenMint: string): Promise<number | null> {
   try {
     const url = `${config.external.jupiterPriceUrl}?ids=${tokenMint}`;
-    const { data } = await axios.get(url, { timeout: 5000 });
+    const { data } = await axios.get(url, { 
+      timeout: 5000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Accept": "application/json"
+      }
+    });
     const priceData = data?.data?.[tokenMint];
     if (!priceData) return null;
 

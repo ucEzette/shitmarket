@@ -168,6 +168,7 @@ interface TokenMeta {
   chainId?: string;
   originalAddress?: string;
   priceUsd?: string;
+  pairAddress?: string;
 }
 
 async function fetchTokenMeta(mintAddress: string): Promise<TokenMeta> {
@@ -190,6 +191,7 @@ async function fetchTokenMeta(mintAddress: string): Promise<TokenMeta> {
       chainId: best.chainId ?? 'solana',
       originalAddress: mintAddress,
       priceUsd: best.priceUsd ? best.priceUsd : undefined,
+      pairAddress: best.pairAddress,
     };
 
     await redis.set(`tokenmeta:${mintAddress}`, JSON.stringify(meta), 'EX', 3600); // 1 hour cache
@@ -250,6 +252,7 @@ async function handleRoomCreated(event: RoomCreatedEvent): Promise<void> {
       moonPool: '0',
       jeetPool: '0',
       expiry: expiry.toISOString(),
+      pairAddress: meta.pairAddress ?? '',
     });
 
     await publishRoomUpdate(roomPubkey, {
@@ -487,7 +490,19 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
         const BATCH_SIZE = 5;
         for (let i = 0; i < instructions.length; i += BATCH_SIZE) {
           const batch = instructions.slice(i, i + BATCH_SIZE);
-          const tx = new anchor.web3.Transaction().add(...batch);
+          const tx = new anchor.web3.Transaction();
+          
+          // Add Compute Budget limit & Priority Fee instructions to guarantee inclusion in congested blocks
+          const modifyComputeBudget = anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({ 
+            units: 150000 * batch.length // 150k compute budget per instruction is extremely safe
+          });
+          const addPriorityFee = anchor.web3.ComputeBudgetProgram.setComputeUnitPrice({ 
+            microLamports: 50000 
+          });
+          
+          tx.add(modifyComputeBudget);
+          tx.add(addPriorityFee);
+          tx.add(...batch);
           
           const txSig = await anchor.web3.sendAndConfirmTransaction(
             activeConnection,
@@ -508,6 +523,86 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
           roomPubkey,
           err: payoutErr?.message || String(payoutErr),
         });
+      }
+    }
+
+    // ─── Automatic Referral Payouts (0.1% reward) ───
+    if (activeConnection) {
+      try {
+        const keeper = getKeeperKeypair();
+        const roomBets = await prisma.bet.findMany({
+          where: { roomPubkey },
+        });
+
+        const referralIxs: anchor.web3.TransactionInstruction[] = [];
+        const referralPayoutData: { referrer: string; invitee: string; betAmount: bigint; rewardAmount: bigint }[] = [];
+
+        for (const bet of roomBets) {
+          const bettorProfile = await prisma.userProfile.findUnique({
+            where: { userPubkey: bet.userPubkey },
+            select: { referredBy: true }
+          });
+
+          if (bettorProfile && bettorProfile.referredBy) {
+            const referrerWallet = new PublicKey(bettorProfile.referredBy);
+            
+            // Referrer gets 0.1% of bet amount (1/1000 of lamports)
+            const betAmount = BigInt(bet.amount);
+            const rewardAmount = betAmount / BigInt(1000);
+
+            if (rewardAmount > BigInt(0)) {
+              const ix = anchor.web3.SystemProgram.transfer({
+                fromPubkey: keeper.publicKey,
+                toPubkey: referrerWallet,
+                lamports: Number(rewardAmount),
+              });
+              referralIxs.push(ix);
+              referralPayoutData.push({
+                referrer: bettorProfile.referredBy,
+                invitee: bet.userPubkey,
+                betAmount,
+                rewardAmount
+              });
+            }
+          }
+        }
+
+        if (referralIxs.length > 0) {
+          logger.info({ msg: 'Triggering on-chain referral payouts', count: referralIxs.length, roomPubkey });
+          
+          const REF_BATCH_SIZE = 10;
+          for (let i = 0; i < referralIxs.length; i += REF_BATCH_SIZE) {
+            const batchIxs = referralIxs.slice(i, i + REF_BATCH_SIZE);
+            const batchData = referralPayoutData.slice(i, i + REF_BATCH_SIZE);
+
+            const tx = new anchor.web3.Transaction();
+            tx.add(...batchIxs);
+
+            const txSig = await anchor.web3.sendAndConfirmTransaction(
+              activeConnection,
+              tx,
+              [keeper],
+              { commitment: 'confirmed', skipPreflight: true }
+            );
+
+            logger.info({ msg: 'Referral payout batch confirmed on-chain', txSig, count: batchIxs.length });
+
+            for (const item of batchData) {
+              await prisma.referralPayout.create({
+                data: {
+                  referrer: item.referrer,
+                  invitee: item.invitee,
+                  roomPubkey,
+                  betAmount: item.betAmount,
+                  rewardAmount: item.rewardAmount,
+                  txSig,
+                }
+              });
+            }
+          }
+        }
+      } catch (refErr: any) {
+        logger.error({ msg: 'Referral payout failed', roomPubkey, err: refErr?.message || String(refErr) });
       }
     }
   } finally {
@@ -649,6 +744,42 @@ async function handleReputationUpdated(event: ReputationUpdatedEvent): Promise<v
 
 let subscriptionId: number | null = null;
 
+export async function processParsedEvents(events: any[], signature: string): Promise<void> {
+  if (await isAlreadyProcessed(signature)) {
+    logger.debug({ msg: 'Duplicate tx skipped', signature });
+    return;
+  }
+
+  for (const event of events) {
+    logger.debug({ msg: 'Processing event', name: event.name, signature });
+
+    switch (event.name) {
+      case 'RoomCreated':
+        await handleRoomCreated(event.data as RoomCreatedEvent);
+        break;
+      case 'BetPlaced':
+        await handleBetPlaced(event.data as BetPlacedEvent);
+        break;
+      case 'RoomSettled':
+        await handleRoomSettled(event.data as RoomSettledEvent);
+        break;
+      case 'WinningsClaimed':
+        await handleWinningsClaimed(event.data as WingsClaimedEvent);
+        break;
+      case 'PlatformPaused':
+        await handlePlatformPaused(event.data as PlatformPausedEvent);
+        break;
+      case 'ReputationUpdated':
+        await handleReputationUpdated(event.data as ReputationUpdatedEvent);
+        break;
+      default:
+        logger.warn({ msg: 'Unknown event', name: event.name });
+    }
+  }
+
+  await markProcessed(signature);
+}
+
 export function startEventListener(
   connection: Connection,
   eventParser: anchor.EventParser
@@ -674,36 +805,10 @@ export function startEventListener(
 
       // Parse Anchor events from log lines
       try {
-        const events = eventParser.parseLogs(logLines);
-
-        for (const event of events) {
-          logger.debug({ msg: 'Anchor event received', name: event.name, signature });
-
-          switch (event.name) {
-            case 'RoomCreated':
-              await handleRoomCreated(event.data as RoomCreatedEvent);
-              break;
-            case 'BetPlaced':
-              await handleBetPlaced(event.data as BetPlacedEvent);
-              break;
-            case 'RoomSettled':
-              await handleRoomSettled(event.data as RoomSettledEvent);
-              break;
-            case 'WinningsClaimed':
-              await handleWinningsClaimed(event.data as WingsClaimedEvent);
-              break;
-            case 'PlatformPaused':
-              await handlePlatformPaused(event.data as PlatformPausedEvent);
-              break;
-            case 'ReputationUpdated':
-              await handleReputationUpdated(event.data as ReputationUpdatedEvent);
-              break;
-            default:
-              logger.warn({ msg: 'Unknown event', name: event.name });
-          }
+        const events = Array.from(eventParser.parseLogs(logLines));
+        if (events.length > 0) {
+          await processParsedEvents(events, signature);
         }
-
-        await markProcessed(signature);
       } catch (err: any) {
         logger.error({ msg: 'Event processing error', signature, err: err?.message, stack: err?.stack });
       }

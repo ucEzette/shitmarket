@@ -26,6 +26,7 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
       imageUrl: best.info?.imageUrl ?? undefined,
       chainId: best.chainId ?? 'solana',
       originalAddress: mintAddress,
+      pairAddress: best.pairAddress,
     };
   } catch {
     return {};
@@ -156,6 +157,7 @@ async function syncRoomFromChain(pubkeyStr: string): Promise<any> {
       expiry: expiry.toISOString(),
       finalPrice: finalPrice.toString(),
       twapFinalPrice: twapFinalPrice.toString(),
+      pairAddress: meta.pairAddress ?? '',
     };
     if (winnerStr) {
       redisCacheData.winner = winnerStr;
@@ -286,10 +288,12 @@ roomsRouter.get('/:pubkey', validate(roomPubkeyParamSchema, 'params'), async (re
         ...room,
         openingPrice: room.openingPrice.toString(),
         finalPrice: room.finalPrice?.toString() ?? null,
+        twapFinalPrice: room.twapFinalPrice?.toString() ?? null,
         totalPool: room.totalPool.toString(),
         platformFee: room.platformFee.toString(),
         moonPool: cached?.moonPool ?? '0',
         jeetPool: cached?.jeetPool ?? '0',
+        pairAddress: cached?.pairAddress || (await fetchTokenMeta(room.tokenMint)).pairAddress || '',
         bets: room.bets.map((b) => ({
           ...b,
           amount: b.amount.toString(),

@@ -174,7 +174,7 @@ describe('Platform Initialization', () => {
     );
 
     await program.methods
-      .initialize(200)
+      .initialize(125)
       .accounts({
         config: configPda,
         admin: admin.publicKey,
@@ -197,7 +197,7 @@ describe('Platform Initialization', () => {
       .rpc();
 
     const configAccount = await (program.account as any).platformConfig.fetch(configPda);
-    expect(configAccount.platformFeeBps).toBe(200);
+    expect(configAccount.platformFeeBps).toBe(125);
     expect(configAccount.keeper.toBase58()).toBe(keeper.publicKey.toBase58());
   }, 30_000);
 });

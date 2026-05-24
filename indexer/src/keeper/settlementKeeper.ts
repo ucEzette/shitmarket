@@ -209,11 +209,28 @@ async function settleRoom(
       const scaledPrice = result.priceI64 * 100;
       const finalPriceParam = new anchor.BN(scaledPrice);
 
-      const txSig = await program.methods
+      const tx = await program.methods
         .settleRoom(finalPriceParam)
         .accounts(accounts)
-        .signers([keeper])
-        .rpc({ commitment: 'confirmed', skipPreflight: false });
+        .transaction();
+
+      // Add Compute Budget limit & Priority Fee instructions to guarantee inclusion in congested blocks
+      const modifyComputeBudget = anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({ 
+        units: 100000 
+      });
+      const addPriorityFee = anchor.web3.ComputeBudgetProgram.setComputeUnitPrice({ 
+        microLamports: 50000 
+      });
+      
+      tx.add(modifyComputeBudget);
+      tx.add(addPriorityFee);
+
+      const txSig = await anchor.web3.sendAndConfirmTransaction(
+        connection,
+        tx,
+        [keeper],
+        { commitment: 'confirmed', skipPreflight: false }
+      );
 
       logger.info({ msg: 'settle_room confirmed', room: roomPubkeyStr, txSig });
       keeperSuccessTotal.inc();

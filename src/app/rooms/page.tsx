@@ -19,10 +19,19 @@ export default function RoomsPage() {
   };
 
   const router = useRouter();
-  const { rooms, user, placeBet, connectWallet } = useAppState();
+  const { rooms, roomsLoaded, user, placeBet, connectWallet } = useAppState();
   const [filter, setFilter] = useState<'ending' | 'biggest' | 'active-bets'>('ending');
   const [search, setSearch] = useState('');
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
+  const [showSkeleton, setShowSkeleton] = useState(true);
+
+  // Show loading skeleton for at least 2 seconds while rooms are syncing
+  useEffect(() => {
+    if (roomsLoaded) {
+      const timer = setTimeout(() => setShowSkeleton(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [roomsLoaded]);
 
   // Real-time ticking state for timer clocks
   useEffect(() => {
@@ -221,8 +230,43 @@ export default function RoomsPage() {
 
       </div>
 
-      {/* List on mobile, Grid on desktop */}
-      {activeFiltered.length > 0 ? (
+      {/* Loading Skeleton while syncing with backend */}
+      {showSkeleton && activeFiltered.length === 0 ? (
+        <div className="flex flex-col md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 animate-pulse">
+          {[1, 2, 3, 4, 5, 6].map((n) => (
+            <div key={n} className="bg-trench-mud border-2 md:border-4 border-trench-sandbag rounded-lg p-3 md:p-5 flex flex-col justify-between shadow-lg scanlines">
+              <div className="flex justify-between items-center mb-2 md:mb-4">
+                <div className="h-5 w-24 bg-trench-sandbag/40 rounded" />
+                <div className="h-4 w-16 bg-trench-sandbag/40 rounded" />
+              </div>
+              <div className="flex items-center gap-2 md:gap-3.5 mb-2 md:mb-4 border-b border-trench-sandbag/40 pb-2 md:pb-3">
+                <div className="w-[36px] h-[36px] md:w-[48px] md:h-[48px] bg-trench-sandbag/40 rounded" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-5 w-36 bg-trench-sandbag/40 rounded" />
+                  <div className="h-3 w-20 bg-trench-sandbag/30 rounded" />
+                </div>
+              </div>
+              <div className="space-y-1.5 md:space-y-2 mb-3 md:mb-5">
+                <div className="flex justify-between">
+                  <div className="h-3 w-20 bg-trench-sandbag/40 rounded" />
+                  <div className="h-3 w-20 bg-trench-sandbag/40 rounded" />
+                </div>
+                <div className="h-2 md:h-3 bg-trench-sandbag/30 rounded" />
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 md:gap-2">
+                <div className="h-8 md:h-10 bg-trench-sandbag/30 rounded" />
+                <div className="h-8 md:h-10 bg-trench-sandbag/30 rounded" />
+              </div>
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-neon-moon/40 animate-ping" />
+                <span className="font-mono text-[9px] text-trench-gasmask/60 uppercase font-bold tracking-wider">
+                  SYNCING WITH COMMAND HQ...
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : activeFiltered.length > 0 ? (
         <div className="flex flex-col md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
           {activeFiltered.map((room) => {
             const isMoonLeading = room.moonPool > room.jeetPool;
@@ -391,7 +435,7 @@ export default function RoomsPage() {
                 FIGHT IN COLD BLOOD? CONNECT YOUR AMMO WALLET!
               </h4>
               <p className="font-mono text-xs text-trench-gasmask font-bold uppercase mt-0.5">
-                Connecting generates a mock sandbox degen profile with 4.2 SOL for full-feature betting rooms.
+                Connect your Solana wallet to stack ammo on Moon or Jeet across live prediction rooms.
               </p>
             </div>
           </div>

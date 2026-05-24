@@ -102,6 +102,7 @@ interface LeaderboardEntry {
 export interface AppState {
   isPaused: boolean;
   rooms: Room[];
+  roomsLoaded: boolean;
   user: UserProfile | null;
   leaderboard: {
     moon: LeaderboardEntry[];
@@ -153,37 +154,6 @@ export interface AppState {
   markBetClaimed: (roomId: string, userAddress: string) => void;
   addUserBet: (bet: Bet) => void;
 }
-
-// ── Solana Base58 address generator (mock) ─────────────────────
-const BASE58_CHARS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-
-function generateBase58String(length: number): string {
-  let result = '';
-  for (let i = 0; i < length; i++) {
-    result += BASE58_CHARS[Math.floor(Math.random() * BASE58_CHARS.length)];
-  }
-  return result;
-}
-
-function generateSolanaAddress(): string {
-  return generateBase58String(44);
-}
-
-function generateShortAddress(): string {
-  // Generate a shorter Solana-style address for display (truncated form)
-  const full = generateBase58String(44);
-  return `${full.slice(0, 6)}...${full.slice(-4)}`;
-}
-
-// ── Seed mock chats ────────────────────────────────────────────
-const seedChats = (): ChatMessage[] => {
-  return [
-    { roomId: '1', side: 'moon', user: 'DegenChad', message: 'LFG $WIFEY TO THE MOON! 🚀🚀', timestamp: 1716000000000 },
-    { roomId: '1', side: 'jeet', user: 'WojakBear', message: 'Liquidity is thin, this is dumping hard. Jeets, assemble!', timestamp: 1716000005000 },
-    { roomId: '1', side: 'moon', user: 'SolMaxi', message: 'Pushed another 0.5 SOL in. Easiest pump of my life.', timestamp: 1716000015000 },
-    { roomId: '1', side: 'jeet', user: 'RamenDeity', message: 'Get rekt moonboys, Dev already dumped his bag.', timestamp: 1716000025000 },
-  ];
-};
 
 // ── Fetch with Timeout helper to prevent offline backend hangs ───
 async function fetchWithTimeout(resource: string, options: RequestInit = {}, timeoutMs = 3000): Promise<Response> {
@@ -241,100 +211,8 @@ export const mapApiRoom = (apiRoom: any): Room => {
 };
 
 export const useAppState = create<AppState>((set, get) => ({
-  rooms: [
-    {
-      id: '1',
-      token: {
-        address: '7GCihgDB8fe6KNjn2MYtkzNc8oV1VfF7L4y3L5gF7VxL',
-        name: 'Wife Husband Meme Coin',
-        symbol: 'WIFEY',
-        icon: '👰',
-        chainId: 'solana',
-        pairAddress: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263'
-      },
-      creator: 'G5C3A21...XyB3',
-      moonPool: 4.85,
-      jeetPool: 6.20,
-      expiry: 1716000180000, // Fixed time
-      status: 'active',
-      createdAt: 1716000000000,
-      duration: 5
-    },
-    {
-      id: '2',
-      token: {
-        address: '6E9f28c89b7b92f75a7db0f3a6cf67f082e69888',
-        name: 'Pepe 5.0 Retro Classic',
-        symbol: 'PEPE5.0',
-        icon: '🐸',
-        chainId: 'solana',
-        pairAddress: 'JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbAbdFsSAgwX'
-      },
-      creator: 'A3A2512...GzA1',
-      moonPool: 18.25,
-      jeetPool: 14.10,
-      expiry: 1716000480000, // Fixed time
-      status: 'active',
-      createdAt: 1716000000000,
-      duration: 15
-    },
-    {
-      id: '3',
-      token: {
-        address: '992451f28b7e283fb7ea0d2f3a61c3f282e69777',
-        name: 'Jeet Slayer Terminator',
-        symbol: 'JEETSLAYER',
-        icon: '🗡️',
-        chainId: 'solana',
-        pairAddress: '7GCihgDB8fe6KNjn2MYtkzNc8oV1VfF7L4y3L5gF7VxL'
-      },
-      creator: 'B9B2200...ZwF2',
-      moonPool: 1.2,
-      jeetPool: 0.8,
-      expiry: 1716003600000,
-      status: 'active',
-      createdAt: 1716000000000,
-      duration: 60
-    },
-    {
-      id: '4',
-      token: {
-        address: '12928c89b7b92f75a7db0f3a6cf67f082e69111',
-        name: 'Safe Rug Inu',
-        symbol: 'SAFERUG',
-        icon: '🦮',
-        chainId: 'solana',
-        pairAddress: '7X2WpM6z1u5q8v3JFLXq9YbG9fLkYq6Qp9SDFjKL'
-      },
-      creator: 'C8A1100...HyD2',
-      moonPool: 45.1,
-      jeetPool: 2.2,
-      expiry: 1716000000000 - 10000,
-      status: 'settled',
-      winner: 'moon',
-      createdAt: 1716000000000 - 360000,
-      duration: 5
-    },
-    {
-      id: '5',
-      token: {
-        address: '9f928c89b7b92f75a7db0f3a6cf67f082e691234',
-        name: 'Wojak Sad Cry Club',
-        symbol: 'WOJAK',
-        icon: '😭',
-        chainId: 'solana',
-        pairAddress: '88e6a0c2ddd26feeb64f039a2c41296fcb3f5640'
-      },
-      creator: 'D4D0010...JxE3',
-      moonPool: 11.4,
-      jeetPool: 23.5,
-      expiry: 1716000000000 - 5000,
-      status: 'settled',
-      winner: 'jeet',
-      createdAt: 1716000000000 - 305000,
-      duration: 5
-    }
-  ],
+  rooms: [],
+  roomsLoaded: false,
   isPaused: false,
   user: null,
   leaderboard: {
@@ -353,7 +231,7 @@ export const useAppState = create<AppState>((set, get) => ({
       { address: '6e9f...ff33', name: 'LiquidationStation', profit: 21.05, winRate: 55.4 }
     ]
   },
-  chatMessages: seedChats(),
+  chatMessages: [],
   activityLog: [],
   fullDegenMode: false,
 
@@ -450,8 +328,11 @@ export const useAppState = create<AppState>((set, get) => ({
         console.warn('Could not fetch PlatformConfig for paused state', e);
       }
 
+      // Mark rooms as loaded even if the request failed (so skeleton goes away)
+      set({ roomsLoaded: true });
     } catch (err) {
       console.error('Failed to fetch rooms from indexer REST API:', err);
+      set({ roomsLoaded: true });
     }
   },
 

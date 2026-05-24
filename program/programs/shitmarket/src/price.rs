@@ -204,9 +204,9 @@ mod tests {
 
     #[test]
     fn test_calc_platform_fee() {
-        // 2% of 2 SOL = 0.04 SOL
-        let fee = calc_platform_fee(2_000_000_000, 200).unwrap();
-        assert_eq!(fee, 40_000_000);
+        // 1.25% of 2 SOL = 0.025 SOL
+        let fee = calc_platform_fee(2_000_000_000, 125).unwrap();
+        assert_eq!(fee, 25_000_000);
     }
 
     #[test]

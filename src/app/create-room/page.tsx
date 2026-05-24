@@ -24,7 +24,7 @@ export default function CreateRoomPage() {
   // Form State
   const [contractAddress, setContractAddress] = useState('');
   const [duration, setDuration] = useState<number>(30);
-  const [seedSide, setSeedSide] = useState<'none' | 'moon' | 'jeet'>('none');
+  const [seedSide, setSeedSide] = useState<'moon' | 'jeet'>('moon');
   const [seedAmount, setSeedAmount] = useState<number>(0.1);
 
   // Scanner Loading and Results
@@ -150,7 +150,12 @@ export default function CreateRoomPage() {
     }
 
     // Deduct user seed amount if applicable
-    if (seedSide !== 'none' && user) {
+    if (seedAmount < 0.01) {
+      alert('MINIMUM ARENA INITIAL SEEDING IS 0.01 SOL!');
+      return;
+    }
+
+    if (user) {
       if (user.balance < seedAmount) {
         alert('INSUFFICIENT AMMO SOL TO SEED THIS ROOM!');
         return;
@@ -175,12 +180,12 @@ export default function CreateRoomPage() {
         pairAddress: tokenInfo.pairAddress
       },
       creator: user && user.wallet ? `${user.wallet.substring(0, 6)}...${user.wallet.substring(user.wallet.length-4)}` : 'AnonCommander',
-      moonPool: moonSeed > 0 ? moonSeed : 0.05, // default basic seed pools if none
-      jeetPool: jeetSeed > 0 ? jeetSeed : 0.05,
+      moonPool: moonSeed > 0 ? moonSeed : 0.01, // default basic seed pools if none
+      jeetPool: jeetSeed > 0 ? jeetSeed : 0.01,
       expiry: Date.now() + duration * 60000,
       status: 'active',
       createdAt: Date.now(),
-      duration: duration as any
+      duration: duration
     };
 
     try {
@@ -188,9 +193,9 @@ export default function CreateRoomPage() {
       const res = await createRoom(newRoom);
       
       // If they seeded and it's a brand new room, place the bet
-      if (res && !res.alreadyExists && seedSide !== 'none') {
+      if (res && !res.alreadyExists) {
         try {
-          await placeBet(res.roomPda, seedSide, seedAmount);
+          await placeBet(res.roomPda, seedSide as any, seedAmount);
         } catch (betErr) {
           console.error("Initial seeding bet failed, but room was created:", betErr);
         }
@@ -406,76 +411,85 @@ export default function CreateRoomPage() {
             </div>
           </div>
 
-          {/* 4. Optional Initial Seed Stake */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <label className="block font-mono text-xs font-bold text-white uppercase tracking-wider">
-                Initial Seeding Ammo (Optional):
+          {/* 4. Required Initial Seed Stake */}
+          <div className="space-y-3 bg-trench-mud border-2 border-trench-sandbag p-4 rounded-lg shadow-inner">
+            <div className="flex justify-between items-center border-b border-trench-sandbag/40 pb-2">
+              <label className="block font-staatliches text-lg text-white uppercase tracking-wider">
+                ⚔️ Initial Seeding Ammo (*Required)
               </label>
-              {seedSide !== 'none' && (
-                <span className="font-mono text-xs text-moon-gold font-bold">{seedAmount} SOL</span>
-              )}
+              <span className="font-mono text-sm text-moon-gold font-bold glow-gold">
+                {seedAmount} SOL
+              </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 bg-trench-black p-1 border border-trench-sandbag rounded">
+
+            <div className="grid grid-cols-2 gap-2 bg-trench-black p-1 border border-trench-sandbag rounded">
               <button
                 type="button"
-                onClick={() => setSeedSide('none')}
-                className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
-                  seedSide === 'none' ? 'bg-trench-sandbag text-white font-bold' : 'text-trench-gasmask'
-                }`}
-              >
-                Zero Seeding
-              </button>
-              <button
-                type="button"
-                onClick={() => setSeedSide('moon')}
-                className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
-                  seedSide === 'moon' ? 'bg-neon-moon text-black font-bold' : 'text-trench-gasmask'
+                onClick={() => {
+                  setSeedSide('moon');
+                  synthSound('bet');
+                }}
+                className={`py-2 font-staatliches text-sm tracking-wider uppercase rounded transition-all ${
+                  seedSide === 'moon' ? 'bg-neon-moon text-black font-bold shadow-glow-moon' : 'text-trench-gasmask hover:text-white'
                 }`}
               >
                 Seed Moon
               </button>
               <button
                 type="button"
-                onClick={() => setSeedSide('jeet')}
-                className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
-                  seedSide === 'jeet' ? 'bg-jeet-red text-white font-bold' : 'text-trench-gasmask'
+                onClick={() => {
+                  setSeedSide('jeet');
+                  synthSound('bet');
+                }}
+                className={`py-2 font-staatliches text-sm tracking-wider uppercase rounded transition-all ${
+                  seedSide === 'jeet' ? 'bg-jeet-red text-white font-bold shadow-glow-jeet' : 'text-trench-gasmask hover:text-white'
                 }`}
               >
                 Seed Jeet
               </button>
             </div>
 
-            {seedSide !== 'none' && (
-              <div className="pt-2 bg-trench-black border border-trench-sandbag rounded p-3 space-y-3">
-
+            <div className="space-y-3 pt-2">
+              {/* Custom Input Amount */}
+              <div className="relative flex items-center bg-trench-black border-2 border-trench-sandbag rounded focus-within:border-neon-moon transition-all">
                 <input
-                  type="range"
-                  min="0.05"
-                  max="2.0"
-                  step="0.05"
-                  value={seedAmount}
-                  onChange={(e) => setSeedAmount(parseFloat(e.target.value))}
-                  className="w-full h-1.5 bg-trench-mud rounded-lg appearance-none cursor-pointer accent-neon-moon"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  placeholder="Seeding Ammo Amount (SOL)"
+                  value={seedAmount || ''}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setSeedAmount(isNaN(val) ? 0 : val);
+                  }}
+                  className="w-full bg-transparent px-3 py-2.5 text-white font-mono text-sm focus:outline-none"
                 />
-                <div className="flex gap-2">
-                  {[0.05, 0.1, 0.5, 1.0, 2.0].map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setSeedAmount(v)}
-                      className={`flex-1 py-0.5 text-center font-mono text-[10px] rounded border ${
-                        seedAmount === v
-                          ? 'bg-moon-gold text-black border-moon-gold'
-                          : 'bg-trench-black text-trench-gasmask border-trench-sandbag'
-                      }`}
-                    >
-                      {v}
-                    </button>
-                  ))}
-                </div>
+                <span className="absolute right-3 font-mono text-[10px] text-trench-gasmask font-bold tracking-wider uppercase">
+                  SOL AMMO
+                </span>
               </div>
-            )}
+
+              {/* Default Presets (Selections) */}
+              <div className="flex gap-2">
+                {[0.01, 0.05, 0.1, 0.5, 1.0, 2.0].map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => {
+                      setSeedAmount(v);
+                      synthSound('bet');
+                    }}
+                    className={`flex-1 py-1 text-center font-mono text-xs rounded border transition-all ${
+                      seedAmount === v
+                        ? 'bg-moon-gold text-black border-moon-gold font-bold shadow'
+                        : 'bg-trench-black text-trench-gasmask border-trench-sandbag hover:text-white hover:border-trench-gasmask'
+                    }`}
+                  >
+                    {v}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* 5. Launch CTA Trigger */}
@@ -502,7 +516,7 @@ export default function CreateRoomPage() {
         <div className="mt-6 border-t-2 border-trench-sandbag/45 pt-4 flex gap-2 items-start text-trench-gasmask">
           <PepePortrait src={PEPE_ASSETS.apeGeneral} size={32} glowColor="gold" className="rounded shrink-0" />
           <p className="font-mono text-[9px] uppercase leading-tight font-bold">
-            Notice: Seeding immediately locks your specified Ammo SOL into the battlefield pot. Plat takes exactly 2.0% upon final settlement clock detonation. Play hard.
+            Notice: Seeding immediately locks your specified Ammo SOL into the battlefield pot. Plat takes exactly 1.25% upon final settlement clock detonation. Play hard.
           </p>
         </div>
 

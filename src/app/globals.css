@@ -304,3 +304,87 @@ body {
   0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.2; }
   50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.4; }
 }
+
+/* ─────────────────────────────────────────────
+   RETRO DEGEN BATTLEFIELD LOADING SCREEN
+   ───────────────────────────────────────────── */
+
+.intro-battlefield-bg {
+  position: absolute;
+  top: -10%; left: -10%; width: 120%; height: 120%;
+  background-image: url('/pepes/meme-trench-battlefield.png');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.22;
+  filter: grayscale(0.4) sepia(0.1) hue-rotate(65deg) brightness(0.6) contrast(1.1);
+  z-index: 1;
+  pointer-events: none;
+  animation: intro-pan-bg 45s linear infinite alternate;
+}
+
+@keyframes intro-pan-bg {
+  0% { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.12) translate(-3%, -2%); }
+}
+
+.intro-moon-juice {
+  position: fixed;
+  width: 70px; height: 70px;
+  background-image: url('/pepes/moon-juice-trench.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 12px #39ff14);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.intro-jeet-skeleton-fly {
+  position: fixed;
+  width: 60px; height: 60px;
+  background-image: url('/pepes/jeet-skeleton.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 8px #ff2525);
+  pointer-events: none;
+  z-index: 40;
+}
+
+/* Floating decor Moon Juice bottles */
+.intro-decor-juice-left {
+  position: fixed;
+  left: 8%; top: 30%;
+  width: 60px; height: 60px;
+  background-image: url('/pepes/moon-juice-trench.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 10px #39ff14);
+  opacity: 0.6;
+  z-index: 5;
+  pointer-events: none;
+  animation: intro-float-decor-left 8s ease-in-out infinite;
+}
+
+.intro-decor-juice-right {
+  position: fixed;
+  right: 8%; top: 40%;
+  width: 60px; height: 60px;
+  background-image: url('/pepes/moon-juice-trench.png');
+  background-size: contain;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 0 10px #39ff14);
+  opacity: 0.6;
+  z-index: 5;
+  pointer-events: none;
+  animation: intro-float-decor-right 10s ease-in-out infinite;
+}
+
+@keyframes intro-float-decor-left {
+  0%, 100% { transform: translateY(0) rotate(-15deg); }
+  50% { transform: translateY(-25px) rotate(15deg); }
+}
+
+@keyframes intro-float-decor-right {
+  0%, 100% { transform: translateY(0) rotate(15deg); }
+  50% { transform: translateY(-30px) rotate(-15deg); }
+}
+

@@ -99,7 +99,7 @@ pub struct PlatformConfig {
     pub treasury: Pubkey,
     /// The keeper wallet authorised to settle rooms.
     pub keeper: Pubkey,
-    /// Fee in basis points (e.g. 200 = 2%). Maximum 1000 (10%).
+    /// Fee in basis points (e.g. 125 = 1.25%). Maximum 1000 (10%).
     pub platform_fee_bps: u16,
     /// Phase 3.3: Circuit breaker — if true, no new rooms, bets, or settlements.
     pub paused: bool,

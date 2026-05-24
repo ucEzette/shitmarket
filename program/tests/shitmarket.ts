@@ -157,7 +157,7 @@ describe("shitmarket", () => {
 
   it("initializes platform config with 2% fee", async () => {
     await program.methods
-      .initialize(200) // 200 bps = 2%
+      .initialize(125) // 125 bps = 1.25%
       .accounts({
         config: configPda,
         admin: admin.publicKey,
@@ -170,7 +170,7 @@ describe("shitmarket", () => {
     const config = await program.account.platformConfig.fetch(configPda);
     assert.equal(config.admin.toBase58(), admin.publicKey.toBase58());
     assert.equal(config.treasury.toBase58(), treasury.publicKey.toBase58());
-    assert.equal(config.platformFeeBps, 200);
+    assert.equal(config.platformFeeBps, 125);
     assert.equal(config.paused, false, "Should start unpaused");
   });
 
@@ -638,10 +638,10 @@ describe("shitmarket", () => {
       assert.isTrue(room.twapFinalPrice.gt(new BN(0)), "TWAP final price should be set");
 
       // Verify platform fee arrived at treasury
-      // Total pool = 1.5 SOL; fee = 2% = 0.03 SOL = 30_000_000 lamports
+      // Total pool = 1.5 SOL; fee = 1.25% = 0.01875 SOL = 18_750_000 lamports
       const treasuryAfter = await provider.connection.getBalance(treasury.publicKey);
       const feeReceived = treasuryAfter - treasuryBefore;
-      assert.isAtLeast(feeReceived, 29_000_000, "Treasury should receive ~2% fee");
+      assert.isAtLeast(feeReceived, 18_000_000, "Treasury should receive ~1.25% fee");
     });
 
     it("(TIME-DEPENDENT) winning Moon bettor claims proportional winnings", async function () {
@@ -752,9 +752,9 @@ describe("shitmarket", () => {
     const config = await program.account.platformConfig.fetch(configPda);
     assert.equal(config.platformFeeBps, 100);
 
-    // Revert fee back to 2% for subsequent tests
+    // Revert fee back to 1.25% for subsequent tests
     await program.methods
-      .updateConfig(200, null, null, null, null)
+      .updateConfig(125, null, null, null, null)
       .accounts({
         config: configPda,
         admin: admin.publicKey,

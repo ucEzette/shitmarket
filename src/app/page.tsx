@@ -142,7 +142,7 @@ export default function Home() {
               </motion.h2>
 
               <p className="font-mono text-[11px] sm:text-sm text-trench-gasmask mt-4 sm:mt-6 max-w-lg uppercase font-bold leading-relaxed">
-                Bet on coin pumps (Moon) or dumps (Jeet) within short windows (5m, 15m, 60m). You never hold the actual token. You bet against other degens. Plat fee is 2%.
+                Bet on coin pumps (Moon) or dumps (Jeet) within short windows (5m, 15m, 60m). You never hold the actual token. You bet against other degens. Plat fee is 1.25%.
               </p>
 
               {/* Enter Trenches CTA Button */}
@@ -290,7 +290,7 @@ export default function Home() {
                   <Award size={14} className="text-moon-gold" /> Claim Booty & Collect Medals
                 </h4>
                 <p className="mt-1">
-                  Once the countdown bomb detonates, the room settles. The winning army takes the entire losing army&apos;s pool (minus a flat 2% HQ fee) divided proportionally.
+                  Once the countdown bomb detonates, the room settles. The winning army takes the entire losing army&apos;s pool (minus a flat 1.25% HQ fee) divided proportionally.
                 </p>
               </div>
             </div>

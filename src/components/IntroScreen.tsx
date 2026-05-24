@@ -152,6 +152,65 @@ export function IntroScreen({ onComplete }: { onComplete: () => void }) {
       if (Math.random() < 0.03) triggerQuote();
     }, 100);
 
+    const spawnDebris = () => {
+      if (!containerRef.current) return;
+      
+      // Spawn 2-3 flying jeet skeletons shooting from bottom-center
+      const skelCount = 2 + Math.floor(Math.random() * 2);
+      for(let i=0; i<skelCount; i++) {
+        const skeleton = document.createElement('div');
+        skeleton.className = 'intro-jeet-skeleton-fly';
+        skeleton.style.left = (40 + Math.random() * 20) + '%';
+        skeleton.style.bottom = '10%';
+        containerRef.current.appendChild(skeleton);
+        
+        const velocity = 8 + Math.random() * 12;
+        let x = 0, y = 0;
+        let vy = -velocity;
+        let vx = (Math.random() - 0.5) * 16;
+        let rot = 0;
+        const rotSpeed = (Math.random() - 0.5) * 10;
+        
+        const anim = setInterval(() => {
+          x += vx;
+          y += vy;
+          vy += 0.5; // gravity
+          rot += rotSpeed;
+          skeleton.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+          if (y > window.innerHeight) {
+            clearInterval(anim);
+            skeleton.remove();
+          }
+        }, 16);
+      }
+      
+      // Spawn 1 moon juice bottle launching up
+      const juice = document.createElement('div');
+      juice.className = 'intro-moon-juice';
+      juice.style.left = (45 + Math.random() * 10) + '%';
+      juice.style.bottom = '10%';
+      containerRef.current.appendChild(juice);
+      
+      const velocity = 10 + Math.random() * 8;
+      let x = 0, y = 0;
+      let vy = -velocity;
+      let vx = (Math.random() - 0.5) * 8;
+      let rot = 0;
+      const rotSpeed = (Math.random() - 0.5) * 5;
+      
+      const anim = setInterval(() => {
+        x += vx;
+        y += vy;
+        vy += 0.4; // gravity
+        rot += rotSpeed;
+        juice.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+        if (y > window.innerHeight) {
+          clearInterval(anim);
+          juice.remove();
+        }
+      }, 16);
+    };
+
     const triggerMortar = () => {
       setShake(true);
       setFlash(true);
@@ -175,6 +234,7 @@ export function IntroScreen({ onComplete }: { onComplete: () => void }) {
       }, 400);
 
       spawnCoins();
+      spawnDebris();
     };
 
     const triggerQuote = () => {
@@ -203,14 +263,19 @@ export function IntroScreen({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div ref={containerRef} className={`fixed inset-0 z-[9999] bg-[#0c1609] text-white flex items-center justify-center font-mono overflow-hidden select-none ${shake ? 'intro-shake' : ''}`} onClick={handleStart}>
+      {/* Premium Battlefield Assets */}
+      <div className="intro-battlefield-bg"></div>
+      <div className="intro-decor-juice-left"></div>
+      <div className="intro-decor-juice-right"></div>
+      
       <div className="intro-overlay"></div>
       <div className={`intro-scanlines ${showQuote ? 'intro-glitch-active' : ''}`}></div>
       <div className="intro-flash" style={{ opacity: flash ? 0.4 : 0 }}></div>
-      <img alt="Wojak Ghost" className="intro-ghost-wojak" style={{ opacity: flash ? 0.15 : 0 }} src="https://lh3.googleusercontent.com/aida/ADBb0ui_VhkgsKJxiW4V3TytDjBhGrtZuVC16yf9O_hZmZjHBoMlHJl3FPb1eR3zB2qaU9vfOHiES0pE7WeEOUMNz1B96bHKm9DC64HngIhrOiwha0a8oxYgBccKknDIX-4pt3_DKA2Pw3zuDOwoTBxArVnWpoHDF9wyRia99H3qUHcu1g4Ko2zlI9KBWnxDaHzX2Wewt81K4jht28gu0KoM_3PevyNHGPwhaXr7QJMd96Q8ThqzWCRckK7A0-J7"/>
+      <img alt="Neon Wojak" className="intro-ghost-wojak" style={{ opacity: flash ? 0.22 : 0 }} src="/pepes/neon-wojak.png"/>
       
-      {/* Side Assets */}
-      <img alt="Pepe Trench" className="intro-pepe-sprite" src="https://lh3.googleusercontent.com/aida/ADBb0ujxWJR0WRCa0I3B34k8OM0Sw6wUsQyYS7mWVhvEoGQpxjPS4RySKv1yUz_lkpEpX-Gm2lTdVLSjTxVeD5cu6tZqXm9N26hTPjckWQT2j5jpl8KndRzz-EWydURvz71-zQJWDMN8dxO0m5FOERtR9NMsE-oO7PRUrW0rhapk4SDQgGBOGut2crwUCm58sxjWqCE3lVd5Jy7MAZW6N1MhUaf6Kk5ZdSbXBx29F8J7OrHi_kUbwSESWjlRO9Zs" style={{ left: '5%', bottom: pepeLeftUp ? '-10px' : '-100px' }}/>
-      <img alt="Pepe Trench" className="intro-pepe-sprite" src="https://lh3.googleusercontent.com/aida/ADBb0ujxWJR0WRCa0I3B34k8OM0Sw6wUsQyYS7mWVhvEoGQpxjPS4RySKv1yUz_lkpEpX-Gm2lTdVLSjTxVeD5cu6tZqXm9N26hTPjckWQT2j5jpl8KndRzz-EWydURvz71-zQJWDMN8dxO0m5FOERtR9NMsE-oO7PRUrW0rhapk4SDQgGBOGut2crwUCm58sxjWqCE3lVd5Jy7MAZW6N1MhUaf6Kk5ZdSbXBx29F8J7OrHi_kUbwSESWjlRO9Zs" style={{ right: '5%', transform: 'scaleX(-1)', bottom: pepeRightUp ? '-10px' : '-100px' }}/>
+      {/* Side Popups - Degen Generals */}
+      <img alt="Ape General" className="intro-pepe-sprite" src="/pepes/ape-general.png" style={{ left: '5%', bottom: pepeLeftUp ? '-10px' : '-180px', width: '130px' }}/>
+      <img alt="Chad Bull General" className="intro-pepe-sprite" src="/pepes/chad-bull-general.png" style={{ right: '5%', bottom: pepeRightUp ? '-10px' : '-180px', width: '130px' }}/>
       
       <div className="intro-few-understand-sign" style={{ left: signVisible ? '5%' : '-400px' }}>FEW UNDERSTAND</div>
       
@@ -223,7 +288,7 @@ export function IntroScreen({ onComplete }: { onComplete: () => void }) {
         ) : (
           <div className="flex flex-col items-center">
             <div className="intro-mascot-container">
-              <img alt="ShitMarket Mascot" className="intro-mascot" src="https://lh3.googleusercontent.com/aida/ADBb0ugOJ8pE-qA0J42JP6297hKKlxOSZ760tcKMuFt1T3KMxp4aECzeb6tJmuyRDTOMX20HUXqh5yScDphKL-UkyF7kps_Q0zBME1rnVJ-HgYQhN6gDA61T0ulFS1_TlHKoMH4CCVzkRglw7uy9WdXbH33_YB_W5b1A0rbcV-z4nkzt16ugJjal-F1nm3hVLfV_gzMo_opLXzFTQJDGlOlvoqP24DqqcNfC0tqzHMuMZeN1z8os42sRG8K2zycy"/>
+              <img alt="Diamond Hands Ape" className="intro-mascot" src="/pepes/diamond-hands-ape.png"/>
               <div className="intro-quote" style={{ opacity: showQuote ? 1 : 0 }}>{quote}</div>
             </div>
             <div className="intro-loading-text">{statusMsg}</div>

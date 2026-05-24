@@ -52,9 +52,11 @@ export interface Room {
   status: 'active' | 'settled' | 'cancelled';
   winner?: 'moon' | 'jeet' | 'draw';
   createdAt: number;
-  duration: 5 | 15 | 60; // minutes
+  duration: number; // minutes
   openingPrice?: number;
   finalTWAP?: number;
+  finalPrice?: number;
+  twapFinalPrice?: number;
 }
 
 export interface UserProfile {
@@ -72,11 +74,18 @@ export interface UserProfile {
     biggestBet: number; // SOL
   };
   trenchScore: 'S' | 'A' | 'B' | 'C' | 'D';
+  username: string | null;
+  avatarUrl: string | null;
+  referredBy: string | null;
+  referralCode: string | null;
+  referralsCount: number;
+  referralEarnings: string;
+  referralPayouts: any[];
 }
 
 export interface ChatMessage {
   roomId: string;
-  side: 'moon' | 'jeet';
+  side: 'moon' | 'jeet' | 'all';
   user: string;
   message: string;
   timestamp: number;
@@ -116,6 +125,8 @@ export interface AppState {
   setWallet: (wallet: any) => void;
   setWalletAddress: (address: string | null) => void;
   addMessage: (msg: ChatMessage) => void;
+  fetchRoomChats: (roomId: string) => Promise<void>;
+  sendRoomChat: (roomId: string, side: 'moon' | 'jeet' | 'all', user: string, message: string) => Promise<void>;
   addActivity: (activity: Omit<Activity, 'id' | 'timestamp' | 'read'>) => void;
   markActivitiesRead: () => void;
   settleRoom: (roomId: string, winner: 'moon' | 'jeet' | 'draw') => void;
@@ -131,8 +142,10 @@ export interface AppState {
   setTransactionLoading: (loading: boolean) => void;
   setTransactionError: (error: string | null) => void;
   fetchRooms: () => Promise<void>;
+  fetchSingleRoom: (roomId: string) => Promise<void>;
   fetchLeaderboard: () => Promise<void>;
   fetchBalance: () => Promise<void>;
+  updateProfile: (username: string | null, avatarUrl: string | null, referredBy?: string | null) => Promise<{ success: boolean; error?: string }>;
   
   // Real-time synchronization actions
   addRoom: (room: Room) => void;
@@ -210,6 +223,7 @@ export const mapApiRoom = (apiRoom: any): Room => {
       symbol: apiRoom.tokenSymbol || 'UNKNWN',
       icon: apiRoom.tokenImageUrl || '💰',
       chainId: apiRoom.chainId || 'solana',
+      pairAddress: apiRoom.pairAddress || '',
     },
     creator: 'Unknown',
     moonPool: Number(apiRoom.moonPool || 0) / 1e9,
@@ -218,9 +232,11 @@ export const mapApiRoom = (apiRoom: any): Room => {
     status: apiRoom.status as 'active' | 'settled' | 'cancelled',
     winner: apiRoom.winner || undefined,
     createdAt: new Date(apiRoom.createdAt).getTime(),
-    duration: apiRoom.duration as 5 | 15 | 60,
+    duration: Number(apiRoom.duration || 30),
     openingPrice: apiRoom.openingPrice ? Number(apiRoom.openingPrice) / 1e8 : undefined,
     finalTWAP: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e8 : undefined,
+    finalPrice: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e8 : undefined,
+    twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e8 : undefined,
   };
 };
 
@@ -379,18 +395,21 @@ export const useAppState = create<AppState>((set, get) => ({
           const program = getAnchorProgram(null as any);
           const pubkeys = mapped.map((r: Room) => new PublicKey(r.id));
           const onChainRooms = await withTimeout(
-            program.account.room.fetchMultiple(pubkeys),
+            (program.account as any).room.fetchMultiple(pubkeys),
             3000,
             'On-chain room fetch timed out'
-          );
+          ) as any[];
 
           mapped = mapped.map((room: Room, index: number) => {
             const onChain = onChainRooms[index];
             if (onChain) {
               const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
-              let winnerStr = undefined;
+              let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
               if (onChain.winner) {
-                winnerStr = Object.keys(onChain.winner)[0].toLowerCase();
+                const wKey = Object.keys(onChain.winner)[0].toLowerCase();
+                if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
+                  winnerStr = wKey;
+                }
               }
               return {
                 ...room,
@@ -399,6 +418,7 @@ export const useAppState = create<AppState>((set, get) => ({
                 status: statusStr,
                 winner: winnerStr,
                 expiry: onChain.expiryTimestamp.toNumber() * 1000,
+                duration: onChain.durationMinutes,
                 token: {
                   ...room.token,
                 }
@@ -410,7 +430,9 @@ export const useAppState = create<AppState>((set, get) => ({
           console.warn('Could not hydrate on-chain room state', e);
         }
 
-        set({ rooms: mapped });
+        const currentRooms = get().rooms;
+        const missingRooms = currentRooms.filter(cr => !mapped.some((mr: Room) => mr.id === cr.id));
+        set({ rooms: [...mapped, ...missingRooms] });
       }
 
       // Fetch PlatformConfig to see if paused
@@ -429,6 +451,129 @@ export const useAppState = create<AppState>((set, get) => ({
 
     } catch (err) {
       console.error('Failed to fetch rooms from indexer REST API:', err);
+    }
+  },
+
+  fetchSingleRoom: async (roomId: string) => {
+    try {
+      let room: Room | null = null;
+
+      try {
+        const res = await fetchWithTimeout(`http://localhost:3001/api/rooms/${roomId}`, {}, 3000);
+        const json = await res.json();
+        if (json.success && json.data) {
+          room = mapApiRoom(json.data);
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch room ${roomId} from indexer API:`, err);
+      }
+
+      // Safe Fallback: Hydrate/Fetch from on-chain room account directly
+      try {
+        const program = getAnchorProgram(null as any);
+        const onChain = await withTimeout(
+          (program.account as any).room.fetch(new PublicKey(roomId)),
+          3000,
+          'On-chain room fetch timed out'
+        ) as any;
+
+        if (onChain) {
+          const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
+          let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
+          if (onChain.winner) {
+            const wKey = Object.keys(onChain.winner)[0].toLowerCase();
+            if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
+              winnerStr = wKey;
+            }
+          }
+
+          if (!room) {
+            // Decode token name bytes safely
+            const rawNameBytes = onChain.tokenName as number[] | Uint8Array;
+            let decodedName = '';
+            if (rawNameBytes) {
+              const buffer = Buffer.from(rawNameBytes);
+              const nullIndex = buffer.indexOf(0);
+              decodedName = buffer.toString('utf8', 0, nullIndex === -1 ? buffer.length : nullIndex).trim();
+            }
+            if (!decodedName) decodedName = 'Unknown Token';
+
+            room = {
+              id: roomId,
+              token: {
+                address: onChain.tokenMint.toBase58(),
+                name: decodedName,
+                symbol: decodedName.substring(0, 10).toUpperCase(),
+                icon: '💰',
+                chainId: 'solana',
+                pairAddress: '',
+              },
+              creator: onChain.creator.toBase58(),
+              moonPool: onChain.moonPool.toNumber() / 1e9,
+              jeetPool: onChain.jeetPool.toNumber() / 1e9,
+              expiry: onChain.expiryTimestamp.toNumber() * 1000,
+              status: statusStr,
+              winner: winnerStr,
+              createdAt: onChain.openingTimestamp.toNumber() * 1000,
+              duration: onChain.durationMinutes as any,
+              openingPrice: onChain.openingPrice.toNumber() / 1e8,
+              finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e8 : undefined,
+              twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e8 : undefined,
+            };
+          } else {
+            room = {
+              ...room,
+              moonPool: onChain.moonPool.toNumber() / 1e9,
+              jeetPool: onChain.jeetPool.toNumber() / 1e9,
+              status: statusStr,
+              winner: winnerStr,
+              expiry: onChain.expiryTimestamp.toNumber() * 1000,
+              duration: onChain.durationMinutes,
+              openingPrice: onChain.openingPrice.toNumber() / 1e8,
+              finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e8 : undefined,
+              twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e8 : undefined,
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('Could not fetch or hydrate single on-chain room state:', e);
+      }
+
+      if (room && (!room.token.icon || !room.token.icon.startsWith('http'))) {
+        try {
+          const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${room.token.address}`;
+          const dsRes = await fetch(dsUrl);
+          if (dsRes.ok) {
+            const dsJson = await dsRes.json();
+            const pairs = dsJson?.pairs || [];
+            if (pairs.length > 0) {
+              const bestPair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+              const imageUrl = bestPair.info?.imageUrl;
+              if (imageUrl) {
+                room.token.icon = imageUrl;
+                if (bestPair.baseToken?.name) room.token.name = bestPair.baseToken.name;
+                if (bestPair.baseToken?.symbol) room.token.symbol = bestPair.baseToken.symbol;
+                if (bestPair.chainId) room.token.chainId = bestPair.chainId;
+                if (bestPair.pairAddress) room.token.pairAddress = bestPair.pairAddress;
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch fallback token image from DexScreener:', err);
+        }
+      }
+
+      if (room) {
+        set((state) => {
+          const exists = state.rooms.some((r) => r.id === roomId);
+          const newRooms = exists
+            ? state.rooms.map((r) => (r.id === roomId ? room! : r))
+            : [room!, ...state.rooms];
+          return { rooms: newRooms };
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to fetch single room ${roomId}:`, err);
     }
   },
 
@@ -549,16 +694,13 @@ export const useAppState = create<AppState>((set, get) => ({
 
         // The room exists on-chain, check if it's currently active and unexpired
         try {
-          const roomData: any = await program.account.room.fetch(currentPda);
+          const roomData: any = await (program.account as any).room.fetch(currentPda);
           const now = Math.floor(Date.now() / 1000);
           const isExpired = now >= roomData.expiryTimestamp.toNumber();
 
           if (!isExpired && roomData.status.active !== undefined) {
-            // There is still a valid active room running for this token. Block duplicate creation.
-            roomPda = currentPda;
-            chosenNonce = n;
-            alreadyExists = true;
-            break;
+            // Previously we blocked duplicate creation here. Now we let it continue to find the next clean nonce!
+            continue;
           }
         } catch (fetchErr) {
           console.warn(`Failed to fetch room account at nonce ${n}, assuming expired/unusable:`, fetchErr);
@@ -628,8 +770,29 @@ export const useAppState = create<AppState>((set, get) => ({
         
       console.log("Room created successfully on-chain! Tx:", tx);
       
+      let onChainExpiry = room.expiry;
+      let onChainCreatedAt = room.createdAt;
+      try {
+        const onChain = await (program.account as any).room.fetch(roomPda);
+        if (onChain) {
+          onChainExpiry = onChain.expiryTimestamp.toNumber() * 1000;
+          onChainCreatedAt = onChain.openingTimestamp.toNumber() * 1000;
+        }
+      } catch (fetchErr) {
+        console.warn("Failed to fetch on-chain room right after creation for precise countdown:", fetchErr);
+      }
+
+      // Optimistically inject the new room into local state to prevent 'TRENCH RUGGED' 404s before indexer syncs
+      const optimisticRoom = { 
+        ...room, 
+        id: roomPda.toBase58(),
+        expiry: onChainExpiry,
+        createdAt: onChainCreatedAt
+      };
+      set((state) => ({ rooms: [optimisticRoom, ...state.rooms] }));
+      
       // Force refreshing the rooms list in the background
-      await get().fetchRooms();
+      get().fetchRooms();
       return {
         tx,
         roomPda: roomPda.toBase58(),
@@ -820,12 +983,26 @@ export const useAppState = create<AppState>((set, get) => ({
       };
       let achievements: string[] = [];
       let bets: Bet[] = [];
+      let username: string | null = null;
+      let avatarUrl: string | null = null;
+      let referredBy: string | null = null;
+      let referralCode: string | null = null;
+      let referralsCount = 0;
+      let referralEarnings = '0';
+      let referralPayouts: any[] = [];
       
       try {
         const res = await fetchWithTimeout(`http://localhost:3001/api/profile/${address}`, {}, 3000);
         const json = await res.json();
         if (json.success && json.data) {
           trenchScore = json.data.trenchScore || 'D';
+          username = json.data.username || null;
+          avatarUrl = json.data.avatarUrl || null;
+          referredBy = json.data.referredBy || null;
+          referralCode = json.data.referralCode || null;
+          referralsCount = json.data.referralsCount || 0;
+          referralEarnings = json.data.referralEarnings || '0';
+          referralPayouts = json.data.referralPayouts || [];
           stats = {
             totalBets: json.data.totalBets || 0,
             wins: json.data.wins || 0,
@@ -849,6 +1026,31 @@ export const useAppState = create<AppState>((set, get) => ({
         console.error('Failed to fetch profile from indexer:', err);
       }
       
+      // Auto-affiliation linkage checks
+      if (typeof window !== 'undefined' && !referredBy) {
+        const cachedRef = localStorage.getItem('ref');
+        if (cachedRef && cachedRef !== address && cachedRef !== referralCode) {
+          console.log(`Auto-linking referrer ${cachedRef} for wallet ${address}...`);
+          try {
+            await fetchWithTimeout('http://localhost:3001/api/profile/update', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userPubkey: address, referredBy: cachedRef }),
+            }, 3000).then(r => r.json()).then(data => {
+              if (data.success) {
+                referredBy = data.data.referredBy || null;
+                referralCode = data.data.referralCode || null;
+                username = data.data.username || null;
+                avatarUrl = data.data.avatarUrl || null;
+                localStorage.removeItem('ref'); // successfully linked
+              }
+            });
+          } catch (e) {
+            console.error('Failed to auto-link referrer:', e);
+          }
+        }
+      }
+      
       set({
         user: {
           wallet: address,
@@ -857,6 +1059,13 @@ export const useAppState = create<AppState>((set, get) => ({
           achievements,
           stats,
           trenchScore,
+          username,
+          avatarUrl,
+          referredBy,
+          referralCode,
+          referralsCount,
+          referralEarnings,
+          referralPayouts,
         }
       });
     } else {
@@ -867,10 +1076,85 @@ export const useAppState = create<AppState>((set, get) => ({
     }
   },
 
+  updateProfile: async (username: string | null, avatarUrl: string | null, referredBy?: string | null) => {
+    const { wallet, user } = get();
+    const address = wallet?.publicKey?.toBase58() || user?.wallet;
+    if (!address) {
+      return { success: false, error: 'No wallet connected' };
+    }
+
+    try {
+      const res = await fetchWithTimeout('http://localhost:3001/api/profile/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userPubkey: address,
+          username: username === undefined ? undefined : username,
+          avatarUrl: avatarUrl === undefined ? undefined : avatarUrl,
+          referredBy: referredBy === undefined ? undefined : referredBy,
+        }),
+      }, 5000);
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        return { success: false, error: json.error || 'Failed to update profile' };
+      }
+
+      // Refresh local user state fields
+      if (user) {
+        set({
+          user: {
+            ...user,
+            username: json.data.username || null,
+            avatarUrl: json.data.avatarUrl || null,
+            referredBy: json.data.referredBy || null,
+            referralCode: json.data.referralCode || null,
+          }
+        });
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('Failed to update profile:', err);
+      return { success: false, error: err.message || 'Internal server error' };
+    }
+  },
+
   addMessage: (msg: ChatMessage) => {
     set((state) => ({
       chatMessages: [...state.chatMessages, msg].slice(-100)
     }));
+  },
+
+  fetchRoomChats: async (roomId: string) => {
+    try {
+      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const res = await fetch(`${indexerApi}/api/rooms/${roomId}/chats`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data) {
+          set((state) => {
+            const otherChats = state.chatMessages.filter((c) => c.roomId !== roomId);
+            return { chatMessages: [...otherChats, ...json.data].slice(-500) };
+          });
+        }
+      }
+    } catch (err) {
+      console.warn(`Failed to fetch chats for room ${roomId}:`, err);
+    }
+  },
+
+  sendRoomChat: async (roomId: string, side: 'moon' | 'jeet' | 'all', user: string, message: string) => {
+    try {
+      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      await fetch(`${indexerApi}/api/rooms/${roomId}/chats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, side, message }),
+      });
+    } catch (err) {
+      console.warn(`Failed to send chat for room ${roomId}:`, err);
+    }
   },
 
   settleRoom: (roomId: string, winner: 'moon' | 'jeet' | 'draw') => {

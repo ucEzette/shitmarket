@@ -221,9 +221,9 @@ export default function RoomsPage() {
 
       </div>
 
-      {/* Grid of rooms */}
+      {/* List on mobile, Grid on desktop */}
       {activeFiltered.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="flex flex-col md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
           {activeFiltered.map((room) => {
             const isMoonLeading = room.moonPool > room.jeetPool;
             const totalPot = room.moonPool + room.jeetPool;
@@ -244,66 +244,68 @@ export default function RoomsPage() {
               <div
                 key={room.id}
                 onClick={() => router.push(`/room/${room.id}`)}
-                className={`bg-trench-mud border-4 border-trench-sandbag rounded-lg p-5 cursor-pointer flex flex-col justify-between shadow-lg relative group transition-all duration-200 hover:-translate-y-1 select-none scanlines ${hoverGlow}`}
+                className={`bg-trench-mud border-2 md:border-4 border-trench-sandbag rounded-lg md:rounded-lg p-3 md:p-5 cursor-pointer flex flex-col justify-between shadow-lg relative group transition-all duration-200 hover:-translate-y-1 select-none scanlines ${hoverGlow}`}
               >
                 {/* Timer Bomb Clock Header */}
-                <div className="flex justify-between items-center mb-4">
-                  <div className="flex items-center gap-1 bg-trench-black border border-trench-sandbag/80 rounded px-2.5 py-1">
-                    <Bomb size={12} className={isSettled ? 'text-moon-gold' : 'text-jeet-red animate-pulse'} />
-                    <span className={`font-mono text-xs font-bold ${isSettled ? 'text-moon-gold' : 'text-white'}`}>
+                <div className="flex justify-between items-center mb-2 md:mb-4">
+                  <div className="flex items-center gap-1 bg-trench-black border border-trench-sandbag/80 rounded px-2 md:px-2.5 py-0.5 md:py-1">
+                    <Bomb size={10} className={isSettled ? 'text-moon-gold' : 'text-jeet-red animate-pulse'} />
+                    <span className={`font-mono text-[10px] md:text-xs font-bold ${isSettled ? 'text-moon-gold' : 'text-white'}`}>
                       {timeText}
                     </span>
                   </div>
-                  <div className="text-[10px] font-mono text-trench-gasmask font-bold bg-trench-black px-2 py-0.5 rounded border border-trench-sandbag/30 uppercase">
+                  <div className="text-[9px] md:text-[10px] font-mono text-trench-gasmask font-bold bg-trench-black px-1.5 md:px-2 py-0.5 rounded border border-trench-sandbag/30 uppercase">
                     {formatDuration(room.duration)} ROUND
                   </div>
                 </div>
 
-                {/* Token Details with Helmet overlay */}
-                <div className="flex items-center gap-3.5 mb-4 border-b border-trench-sandbag/40 pb-3">
-                  <div className="relative bg-trench-black p-0.5 border border-trench-sandbag rounded group-hover:scale-105 transition-transform duration-200 overflow-hidden shrink-0 w-[48px] h-[48px] flex items-center justify-center">
+                {/* Token Details with Helmet overlay — more compact row on mobile */}
+                <div className="flex items-center gap-2 md:gap-3.5 mb-2 md:mb-4 border-b border-trench-sandbag/40 pb-2 md:pb-3">
+                  <div className="relative bg-trench-black p-0.5 border border-trench-sandbag rounded group-hover:scale-105 transition-transform duration-200 overflow-hidden shrink-0 w-[36px] h-[36px] md:w-[48px] md:h-[48px] flex items-center justify-center">
                     {room.token.icon && room.token.icon.startsWith('http') ? (
                       <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded" />
                     ) : (
                       <PepePortrait
                         src={isMoonLeading ? MOON_PEPES[parseInt(room.id) % MOON_PEPES.length] : JEET_PEPES[parseInt(room.id) % JEET_PEPES.length]}
-                        size={44}
+                        size={32}
                         glowColor={isMoonLeading ? 'moon' : 'jeet'}
                         className="rounded"
                       />
                     )}
                   </div>
-                  <div>
-                    <h4 className="font-staatliches text-2xl text-white tracking-wide group-hover:text-neon-moon transition-colors -mb-1">
-                      {room.token.name}
-                    </h4>
-                    <span className="font-mono text-xs text-neon-moon font-bold flex items-center gap-2">
-                      ${room.token.symbol}
-                      {room.token.chainId && (
-                        <span className="text-[9px] bg-trench-black text-gray-400 px-1.5 py-0.5 rounded border border-trench-sandbag uppercase">
-                          {room.token.chainId}
-                        </span>
-                      )}
-                    </span>
-                    <span className="font-mono text-[9px] text-trench-gasmask/60 block font-bold mt-0.5">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4 className="font-staatliches text-lg md:text-2xl text-white tracking-wide group-hover:text-neon-moon transition-colors -mb-1 truncate max-w-[160px] md:max-w-none">
+                        {room.token.name}
+                      </h4>
+                      <span className="font-mono text-[10px] md:text-xs text-neon-moon font-bold flex items-center gap-1 shrink-0">
+                        ${room.token.symbol}
+                        {room.token.chainId && (
+                          <span className="text-[8px] md:text-[9px] bg-trench-black text-gray-400 px-1 md:px-1.5 py-0.5 rounded border border-trench-sandbag uppercase">
+                            {room.token.chainId}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[8px] md:text-[9px] text-trench-gasmask/60 block font-bold mt-0.5 truncate">
                       {room.token.address.substring(0, 8)}...{room.token.address.substring(room.token.address.length - 8)}
                     </span>
                   </div>
                 </div>
 
-                {/* Pools Breakdown progress bar */}
-                <div className="space-y-2 mb-5">
-                  <div className="flex justify-between text-xs font-mono font-bold leading-none">
+                {/* Pools Breakdown progress bar — stacked on mobile too */}
+                <div className="space-y-1.5 md:space-y-2 mb-3 md:mb-5">
+                  <div className="flex justify-between text-[10px] md:text-xs font-mono font-bold leading-none">
                     <span className="text-neon-moon flex items-center gap-1">
-                      🟢 MOON: {room.moonPool.toFixed(2)} SOL
+                      🟢 <span className="hidden sm:inline">MOON:</span> {room.moonPool.toFixed(2)} SOL
                     </span>
                     <span className="text-jeet-red flex items-center gap-1">
-                      🔴 JEET: {room.jeetPool.toFixed(2)} SOL
+                      🔴 <span className="hidden sm:inline">JEET:</span> {room.jeetPool.toFixed(2)} SOL
                     </span>
                   </div>
 
                   {/* Dual Bar */}
-                  <div className="w-full h-3 bg-trench-black border border-trench-sandbag/80 rounded overflow-hidden flex">
+                  <div className="w-full h-2 md:h-3 bg-trench-black border border-trench-sandbag/80 rounded overflow-hidden flex">
                     <div
                       style={{ width: `${moonPercentage}%` }}
                       className="bg-neon-moon h-full transition-all duration-500 shadow-[inset_0_0_5px_rgba(0,0,0,0.6)]"
@@ -314,47 +316,48 @@ export default function RoomsPage() {
                     />
                   </div>
                   
-                  <div className="flex justify-between font-mono text-[9px] text-trench-gasmask font-bold uppercase mt-1">
-                    <span>MOON ARMY ({moonPercentage.toFixed(0)}%)</span>
-                    <span>JEET SQUAD ({jeetPercentage.toFixed(0)}%)</span>
+                  <div className="flex justify-between font-mono text-[8px] md:text-[9px] text-trench-gasmask font-bold uppercase mt-0.5 md:mt-1">
+                    <span>MOON ({moonPercentage.toFixed(0)}%)</span>
+                    <span>JEET ({jeetPercentage.toFixed(0)}%)</span>
                   </div>
                 </div>
 
                 {/* Quick Bet Buttons */}
                 {!isSettled ? (
-                  <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div className="grid grid-cols-2 gap-1.5 md:gap-2 mt-1 md:mt-2">
                     <button
                       onClick={(e) => handleQuickBet(e, room.id, 'moon', 0.01)}
-                      className="btn-wood-green py-1.5 px-1 sm:py-2 sm:px-2.5 rounded font-staatliches text-xs sm:text-sm tracking-wider uppercase text-center active:translate-y-1 transition-transform"
+                      className="btn-wood-green py-1 md:py-1.5 px-1 md:px-2.5 rounded font-staatliches text-[10px] md:text-sm tracking-wider uppercase text-center active:translate-y-0.5 md:active:translate-y-1 transition-transform"
                     >
-                      BET MOON 0.01
+                      MOON 0.01
                     </button>
                     <button
                       onClick={(e) => handleQuickBet(e, room.id, 'jeet', 0.05)}
-                      className="btn-wood-red py-1.5 px-1 sm:py-2 sm:px-2.5 rounded font-staatliches text-xs sm:text-sm tracking-wider uppercase text-center active:translate-y-1 transition-transform"
+                      className="btn-wood-red py-1 md:py-1.5 px-1 md:px-2.5 rounded font-staatliches text-[10px] md:text-sm tracking-wider uppercase text-center active:translate-y-0.5 md:active:translate-y-1 transition-transform"
                     >
-                      BET JEET 0.05
+                      JEET 0.05
                     </button>
                   </div>
                 ) : (
-                  <div className="w-full py-2 bg-trench-black border-2 border-dashed border-moon-gold/40 text-center rounded">
-                    <span className="font-staatliches text-base text-moon-gold uppercase tracking-widest glow-gold font-bold">
+                  <div className="w-full py-1.5 md:py-2 bg-trench-black border border-dashed md:border-2 border-moon-gold/40 text-center rounded">
+                    <span className="font-staatliches text-sm md:text-base text-moon-gold uppercase tracking-widest glow-gold font-bold">
                       WINNER: {room.winner?.toUpperCase() || 'MOON'}
                     </span>
-                    <span className="block font-mono text-[9px] text-trench-gasmask font-bold mt-0.5">
+                    <span className="block font-mono text-[8px] md:text-[9px] text-trench-gasmask font-bold mt-0.5">
                       BATTLE DECREED • CLICK FOR BOOTY
                     </span>
                   </div>
                 )}
 
                 {/* Room Detail Entry Overlay Chevron */}
-                <div className="absolute bottom-2.5 right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none text-white">
-                  <ArrowRight size={14} className="animate-ping" />
+                <div className="absolute bottom-2 right-2 md:bottom-2.5 md:right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none text-white">
+                  <ArrowRight size={10} className="animate-ping" />
                 </div>
               </div>
             );
           })}
         </div>
+
       ) : (
         /* Empty State */
         <div className="flex flex-col items-center justify-center py-20 bg-trench-mud border-4 border-dashed border-trench-sandbag rounded-lg shadow-inner text-center p-6 scanlines">

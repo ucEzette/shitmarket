@@ -32,7 +32,7 @@ export default function RoomDetailPage() {
   const router = useRouter();
   const roomId = params.id as string;
 
-  const { rooms, user, chatMessages, placeBet, claimWinnings, addMessage, connectWallet, isTransactionLoading } = useAppState();
+  const { rooms, user, chatMessages, placeBet, claimWinnings, addMessage, connectWallet, isTransactionLoading, fetchSingleRoom } = useAppState();
 
   const [selectedSide, setSelectedSide] = useState<'moon' | 'jeet'>('moon');
   const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
@@ -42,6 +42,9 @@ export default function RoomDetailPage() {
   const [isRoomSettling, setIsRoomSettling] = useState(false);
   const [localShake, setLocalShake] = useState(false);
   const [isChartLoading, setIsChartLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isChartCollapsed, setIsChartCollapsed] = useState(false);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
   
   // Mortar animation states
   const [mortars, setMortars] = useState<MortarProjectile[]>([]);
@@ -49,6 +52,58 @@ export default function RoomDetailPage() {
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
   const room = rooms.find((r) => r.id === roomId);
+
+  // Synchronize room details from indexer API and chain on mount & periodically
+  useEffect(() => {
+    let active = true;
+    setIsLoading(true);
+    fetchSingleRoom(roomId)
+      .then(() => {
+        if (active) setIsLoading(false);
+      })
+      .catch(() => {
+        if (active) setIsLoading(false);
+      });
+
+    const interval = setInterval(() => {
+      fetchSingleRoom(roomId);
+    }, 5000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [roomId, fetchSingleRoom]);
+
+  // Poll DexScreener for live token price updating every 5 seconds
+  useEffect(() => {
+    if (!room || room.status !== 'active') return;
+
+    const fetchLivePrice = async () => {
+      try {
+        const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${room.token.address}`;
+        const res = await fetch(dsUrl);
+        if (res.ok) {
+          const json = await res.json();
+          const pairs = json?.pairs || [];
+          if (pairs.length > 0) {
+            const sorted = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
+            const bestPair = sorted[0];
+            const price = parseFloat(bestPair.priceUsd);
+            if (isFinite(price) && price > 0) {
+              setLivePrice(price);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch live price inside room details:', err);
+      }
+    };
+
+    fetchLivePrice();
+    const priceInterval = setInterval(fetchLivePrice, 5000);
+    return () => clearInterval(priceInterval);
+  }, [room?.token?.address, room?.status]);
 
   // Auto scroll chat list to bottom
   useEffect(() => {
@@ -87,6 +142,18 @@ export default function RoomDetailPage() {
     return () => clearInterval(timer);
   }, [room]);
 
+  if (isLoading && !room) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center py-24 text-center select-none bg-trench-black scanlines">
+        <Loader2 size={48} className="animate-spin text-neon-moon mb-4" />
+        <h3 className="font-staatliches text-2xl text-white uppercase tracking-wider">RECONSTRUCTING COURIER INTEL...</h3>
+        <p className="font-mono text-xs text-trench-gasmask mt-2 uppercase font-bold tracking-widest animate-pulse">
+          Decrypting block records and indexing battlefield sector...
+        </p>
+      </div>
+    );
+  }
+
   if (!room) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-24 text-center select-none bg-trench-black">
@@ -107,7 +174,7 @@ export default function RoomDetailPage() {
   const moonPercentage = totalPot > 0 ? (room.moonPool / totalPot) * 100 : 50;
   const jeetPercentage = totalPot > 0 ? (room.jeetPool / totalPot) * 100 : 50;
 
-  // Potential payout calculation (plat fee is 2%)
+  // Potential payout calculation (plat fee is 1.25%)
   const getPotentialPayout = (side: 'moon' | 'jeet') => {
     const isMoon = side === 'moon';
     const futureWinningPool = (isMoon ? room.moonPool : room.jeetPool) + stakeAmount;
@@ -225,14 +292,14 @@ export default function RoomDetailPage() {
     synthSound('bet');
   };
 
-  // Filter messages for current room and active chat tab
+  // Filter messages for current room and active chat tab (plus all-channels alerts)
   const activeRoomChats = chatMessages.filter(
-    (c) => c.roomId === room.id && c.side === activeChatTab
+    (c) => c.roomId === room.id && (c.side === activeChatTab || c.side === 'all')
   );
 
   const isSettled = room.status === 'settled';
-  const userWon = isSettled && room.winner && userSidesChosen.includes(room.winner);
-  const userLost = isSettled && room.winner && userSidesChosen.length > 0 && !userSidesChosen.includes(room.winner);
+  const userWon = isSettled && room.winner && userSidesChosen.includes(room.winner as any);
+  const userLost = isSettled && room.winner && userSidesChosen.length > 0 && !userSidesChosen.includes(room.winner as any);
   const hasUnclaimed = isSettled && userWon && userBetsInRoom.some((b) => !b.claimed);
 
   return (
@@ -539,9 +606,11 @@ export default function RoomDetailPage() {
               </div>
               <div className="bg-trench-black border border-trench-sandbag p-3 rounded text-center shadow-inner">
                 <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">LAST PRICE</span>
-                <span className="font-staatliches text-lg text-white block mt-0.5">
+                <span className="font-staatliches text-lg text-white block mt-0.5 animate-pulse">
                   {room.status === 'settled' && room.finalTWAP !== undefined
                     ? `$${room.finalTWAP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
+                    : livePrice !== null
+                    ? `$${livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
                     : 'ACTIVE'}
                 </span>
               </div>
@@ -567,24 +636,41 @@ export default function RoomDetailPage() {
 
           {/* DexScreener Live Chart */}
           {room.token.chainId && room.token.pairAddress && (
-            <div className="bg-trench-black border-4 border-trench-sandbag rounded-lg shadow-2xl relative overflow-hidden h-[500px]">
+            <div className={`bg-trench-black border-4 border-trench-sandbag rounded-lg shadow-2xl relative overflow-hidden transition-all duration-300 ${
+              isChartCollapsed ? 'h-[60px]' : 'h-[500px]'
+            }`}>
+              <div className="absolute top-2 right-4 z-30">
+                <button
+                  type="button"
+                  onClick={() => setIsChartCollapsed(!isChartCollapsed)}
+                  className="bg-trench-mud hover:bg-trench-sandbag border border-trench-sandbag text-neon-moon px-2.5 py-1 rounded font-mono text-[10px] font-bold uppercase tracking-wider transition-all"
+                >
+                  {isChartCollapsed ? 'EXPAND TERMINAL' : 'COLLAPSE TERMINAL'}
+                </button>
+              </div>
+
               <div className="absolute top-[-16px] left-[50%] -translate-x-[50%] bg-trench-sandbag border-2 border-trench-gasmask text-white px-6 py-1 rounded font-staatliches text-sm tracking-widest shadow uppercase z-20">
                 LIVE TERMINAL
               </div>
-              {isChartLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-trench-black z-10 animate-pulse">
-                  <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
-                  <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
-                    CONNECTING TO DEXSCREENER TERMINAL...
-                  </span>
-                </div>
+
+              {!isChartCollapsed && (
+                <>
+                  {isChartLoading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-trench-black z-10 animate-pulse">
+                      <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
+                      <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
+                        CONNECTING TO DEXSCREENER TERMINAL...
+                      </span>
+                    </div>
+                  )}
+                  <iframe
+                    className={`w-full h-full mt-4 border-none transition-opacity duration-500 ${isChartLoading ? 'opacity-0' : 'opacity-100'}`}
+                    src={`https://dexscreener.com/${room.token.chainId}/${room.token.pairAddress}?embed=1&theme=dark&info=0&trades=0`}
+                    title="DexScreener Chart"
+                    onLoad={() => setIsChartLoading(false)}
+                  ></iframe>
+                </>
               )}
-              <iframe
-                className={`w-full h-full mt-4 border-none transition-opacity duration-500 ${isChartLoading ? 'opacity-0' : 'opacity-100'}`}
-                src={`https://dexscreener.com/${room.token.chainId}/${room.token.pairAddress}?embed=1&theme=dark&info=0&trades=0`}
-                title="DexScreener Chart"
-                onLoad={() => setIsChartLoading(false)}
-              ></iframe>
             </div>
           )}
 
@@ -696,6 +782,43 @@ export default function RoomDetailPage() {
                   }`}>
                     {room.winner === 'moon' ? 'MOON ARMY WON' : 'JEET SQUADRON WON'}
                   </span>
+                </div>
+
+                {/* Tactical Skirmish Receipt / Evidence Card */}
+                <div className="bg-trench-black border border-dashed border-trench-sandbag p-4 rounded text-left font-mono text-[10px] text-trench-gasmask uppercase space-y-2 relative">
+                  <div className="absolute top-3 right-3 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-neon-moon animate-pulse" />
+                    <span className="text-[7px] text-neon-moon font-bold tracking-wider">VERIFIED ON-CHAIN</span>
+                  </div>
+                  <h4 className="font-staatliches text-xs text-white tracking-widest border-b border-trench-sandbag pb-1.5 mb-2 flex items-center gap-1 font-bold">
+                    🛡️ SKIRMISH RECEIPT & EVIDENCE
+                  </h4>
+                  <div className="flex justify-between items-center mt-1">
+                    <span>SECTOR TARGET:</span>
+                    <span className="text-white font-bold">${room.token.symbol}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>ENTRY PRICE:</span>
+                    <span className="text-white font-bold">
+                      ${room.openingPrice !== undefined ? room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>EXIT PRICE (SPOT):</span>
+                    <span className="text-white font-bold">
+                      ${room.finalPrice !== undefined ? room.finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>TWAP EXIT (EMA):</span>
+                    <span className="text-moon-gold font-bold">
+                      ${room.twapFinalPrice !== undefined ? room.twapFinalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="border-t border-dashed border-trench-sandbag pt-2 mt-2 flex justify-between items-center text-[7px] text-trench-gasmask/60">
+                    <span>SECTOR KEY:</span>
+                    <span className="select-all font-mono font-bold">{room.id.substring(0, 14)}...</span>
+                  </div>
                 </div>
 
                 {userWon && (

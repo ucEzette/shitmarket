@@ -14,16 +14,100 @@ import {
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, Award, Zap, TrendingUp, TrendingDown, RefreshCw, X, Play } from 'lucide-react';
+import { ShieldCheck, Award, Zap, TrendingUp, TrendingDown, RefreshCw, X, Play, Edit2, Camera, AlertTriangle, Save, Loader2, Copy, Check, Users, Coins, ExternalLink } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user, connectWallet } = useAppState();
+  const { user, connectWallet, updateProfile } = useAppState();
   const [replayBet, setReplayBet] = useState<{
     token: string;
     side: 'moon' | 'jeet';
     amount: number;
     result: 'win' | 'loss';
   } | null>(null);
+
+  // --- Profile Edit State ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [editUsername, setEditUsername] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+  
+  // --- Referral State ---
+  const [copiedLink, setCopiedLink] = useState(false);
+
+  React.useEffect(() => {
+    if (user && !isEditing) {
+      setEditUsername(user.username || '');
+      setEditAvatar(user.avatarUrl || '');
+    }
+  }, [user, isEditing]);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setEditError('IMAGE TOO LARGE (MAX 2MB)');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setEditAvatar(event.target?.result as string);
+      setEditError('');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    setEditError('');
+    
+    // Client-side username (callsign) validation
+    const callsign = editUsername.trim();
+    if (!callsign) {
+      setEditError('CALLSIGN CANNOT BE EMPTY');
+      synthSound('defeat');
+      setIsSaving(false);
+      return;
+    }
+    if (callsign.length < 3 || callsign.length > 15) {
+      setEditError('CALLSIGN MUST BE 3-15 CHARACTERS');
+      synthSound('defeat');
+      setIsSaving(false);
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(callsign)) {
+      setEditError('CALLSIGN MUST BE ALPHANUMERIC & UNDERSCORES ONLY');
+      synthSound('defeat');
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      const res = await updateProfile(callsign, editAvatar);
+      if (res.success) {
+        setIsEditing(false);
+        synthSound('bet');
+      } else {
+        setEditError(res.error || 'FAILED TO UPDATE');
+        synthSound('defeat');
+      }
+    } catch (err) {
+      setEditError('NETWORK ERROR');
+      synthSound('defeat');
+    }
+    setIsSaving(false);
+  };
+
+  const handleCopyLink = () => {
+    if (user?.referralCode) {
+      const link = `${window.location.origin}/rooms?ref=${user.referralCode}`;
+      navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      synthSound('bet');
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  };
+
 
   const handleReplayClick = (bet: any, outcome: 'win' | 'loss') => {
     synthSound('bet');
@@ -137,8 +221,11 @@ export default function ProfilePage() {
             {/* Left Column: Soldier Passport ID Card (5 cols) */}
             <div className="lg:col-span-5 bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 flex flex-col justify-between relative shadow-lg scanlines">
               {/* Clipboard corner details */}
-              <div className="absolute top-2 right-2 font-mono text-[8px] text-trench-gasmask/50 uppercase font-bold">
+              <div className="absolute top-2 right-2 font-mono text-[8px] text-trench-gasmask/50 uppercase font-bold flex items-center gap-2">
                 HQ-DOCS #8420-AA
+                <button onClick={() => { setIsEditing(!isEditing); setEditError(''); }} className="text-neon-moon hover:text-white transition-colors bg-neon-moon/10 px-1.5 py-0.5 rounded flex items-center gap-1 border border-neon-moon/30">
+                  {isEditing ? <X size={10} /> : <Edit2 size={10} />} {isEditing ? 'CANCEL' : 'EDIT'}
+                </button>
               </div>
 
               <div>
@@ -148,28 +235,82 @@ export default function ProfilePage() {
                 </h3>
 
                 {/* Passport Card details */}
-                <div className="flex gap-4 items-start">
-                  
-                  {/* Deterministic Pixel Avatar — now uses real pixel art */}
-                  <div className={`w-28 h-28 bg-gradient-to-br ${getAvatarBg()} border-4 border-trench-sandbag rounded flex items-center justify-center relative shadow-inner overflow-hidden shrink-0 group`}>
-                    <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.35)_50%)] bg-[size:100%_4px] pointer-events-none" />
-                    <img src={PEPE_ASSETS.chadBull} alt="Commander Avatar" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+                <div className="flex flex-col gap-4">
+                  <div className="flex gap-4 items-start">
+                    <div className={`w-28 h-28 bg-gradient-to-br ${getAvatarBg()} border-4 border-trench-sandbag rounded flex items-center justify-center relative shadow-inner overflow-hidden shrink-0 group`}>
+                      <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.35)_50%)] bg-[size:100%_4px] pointer-events-none z-10" />
+                      <img src={isEditing ? (editAvatar || PEPE_ASSETS.fewUnderstand) : (user.avatarUrl || PEPE_ASSETS.chadBull)} alt="Commander Avatar" className="w-full h-full object-cover relative z-0 group-hover:scale-110 transition-transform duration-300" />
+                    </div>
+
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <span className="font-mono text-[9px] text-neon-moon font-bold bg-neon-moon/10 px-2 py-0.5 border border-neon-moon/30 rounded uppercase tracking-wider inline-block">
+                        COMMAND SQUAD ACTIVE
+                      </span>
+                      {isEditing ? (
+                        <input
+                          type="text"
+                          value={editUsername}
+                          onChange={(e) => setEditUsername(e.target.value)}
+                          maxLength={30}
+                          placeholder="ENTER CALLSIGN"
+                          className="w-full bg-trench-black border border-trench-sandbag text-white font-staatliches text-xl px-2 py-1 outline-none focus:border-neon-moon mt-1"
+                        />
+                      ) : (
+                        <h4 className="font-staatliches text-2xl text-white tracking-wide truncate leading-none mt-1" title={user.username || `COMMANDER_${user.wallet!.substring(0, 6)}`}>
+                          {user.username || `COMMANDER_${user.wallet!.substring(0, 6)}`}
+                        </h4>
+                      )}
+                      <p className="font-mono text-[10px] text-trench-gasmask truncate uppercase leading-tight font-bold">
+                        {user.wallet}
+                      </p>
+                      <p className="font-mono text-xs text-moon-gold font-bold">
+                        Balance: {user.balance.toFixed(2)} Ammo SOL
+                      </p>
+                    </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <span className="font-mono text-[9px] text-neon-moon font-bold bg-neon-moon/10 px-2 py-0.5 border border-neon-moon/30 rounded uppercase tracking-wider">
-                      COMMAND SQUAD ACTIVE
-                    </span>
-                    <h4 className="font-staatliches text-2xl text-white tracking-wide break-all leading-none mt-1">
-                      COMMANDER_{user.wallet!.substring(0, 6)}
-                    </h4>
-                    <p className="font-mono text-[10px] text-trench-gasmask break-all uppercase leading-tight font-bold">
-                      {user.wallet}
-                    </p>
-                    <p className="font-mono text-xs text-moon-gold font-bold">
-                      Balance: {user.balance.toFixed(2)} Ammo SOL
-                    </p>
-                  </div>
+                  {/* Edit Controls */}
+                  <AnimatePresence>
+                    {isEditing && (
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                        <div className="mt-4 border-t border-trench-sandbag/40 pt-4">
+                          <span className="font-mono text-[10px] text-trench-gasmask uppercase font-bold mb-2 block">SELECT AVATAR PRESET</span>
+                          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                            {[PEPE_ASSETS.chadBull, PEPE_ASSETS.apeGeneral, PEPE_ASSETS.diamondHands, PEPE_ASSETS.neonWojak, PEPE_ASSETS.jeetSkeleton, PEPE_ASSETS.fewUnderstand].map((preset, idx) => (
+                              <button key={idx} onClick={() => setEditAvatar(preset)} className={`w-12 h-12 shrink-0 border-2 rounded overflow-hidden ${editAvatar === preset ? 'border-neon-moon shadow-glow-moon' : 'border-trench-sandbag hover:border-white/50'} transition-all`}>
+                                <img src={preset} className="w-full h-full object-cover" />
+                              </button>
+                            ))}
+                          </div>
+                          
+                          <div className="mt-3 flex items-center gap-3">
+                            <label className="flex-1 cursor-pointer bg-trench-black hover:bg-[#1a1c23] border border-dashed border-trench-sandbag text-trench-gasmask hover:text-white font-mono text-[10px] uppercase font-bold py-2 text-center rounded transition-colors flex justify-center items-center gap-2">
+                              <Camera size={14} /> UPLOAD CUSTOM AVI
+                              <input type="file" accept="image/png, image/jpeg, image/gif, image/webp" className="hidden" onChange={handleFileUpload} />
+                            </label>
+                          </div>
+
+                          {editError && (
+                            <div className="mt-3 font-mono text-[11px] text-jeet-red bg-trench-black border-2 border-jeet-red p-3 rounded shadow-[0_0_12px_rgba(255,7,58,0.25)] text-left relative overflow-hidden scanlines">
+                              <div className="absolute top-0 left-0 right-0 h-[2px] bg-jeet-red/35" />
+                              <div className="flex items-center gap-2 text-jeet-red font-bold mb-1.5 uppercase tracking-widest text-[10px]">
+                                <AlertTriangle size={12} className="animate-pulse shrink-0" />
+                                <span>[COMMAND_ERROR] ACCESS DENIED</span>
+                              </div>
+                              <div className="text-white/90 uppercase leading-relaxed font-bold">
+                                &gt; ERROR: {editError}
+                                <span className="animate-pulse">_</span>
+                              </div>
+                            </div>
+                          )}
+
+                          <button onClick={handleSaveProfile} disabled={isSaving} className="mt-4 w-full bg-neon-moon/20 hover:bg-neon-moon/40 border border-neon-moon text-neon-moon py-2 font-staatliches text-lg uppercase tracking-wider rounded transition-all flex items-center justify-center gap-2">
+                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} SAVE RECRUIT ID
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Gritty Rating Badge with ELO */}
@@ -436,6 +577,142 @@ export default function ProfilePage() {
             )}
           </div>
 
+          {/* 5. TRENCH REFERRAL HQ */}
+          <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 relative shadow-lg scanlines mt-8">
+            <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
+              <Users className="text-neon-moon animate-pulse" />
+              TRENCH REFERRAL HQ
+            </h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left side: Link and Metrics */}
+              <div className="space-y-6">
+                <div className={`bg-trench-black border rounded p-5 shadow-inner relative overflow-hidden transition-all duration-300 ${
+                  copiedLink 
+                    ? 'border-neon-moon bg-neon-moon/5 shadow-[0_0_20px_rgba(57,255,20,0.2)]' 
+                    : 'border-trench-sandbag'
+                }`}>
+                  <div className="absolute top-0 right-0 p-2 opacity-10">
+                    <Users size={64} />
+                  </div>
+                  <span className="font-mono text-[10px] text-trench-gasmask block uppercase font-bold mb-2">
+                    YOUR UNIQUE INVITATION CODE
+                  </span>
+                  
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="flex-1 bg-trench-mud border-2 border-trench-sandbag rounded px-3 py-2 font-mono text-xs text-white truncate shadow-inner flex items-center">
+                      {typeof window !== 'undefined' ? window.location.origin : ''}/rooms?ref={user?.referralCode}
+                    </div>
+                    <button 
+                      onClick={handleCopyLink}
+                      className={`shrink-0 py-2 px-4 font-staatliches text-lg uppercase tracking-wider rounded transition-all flex items-center justify-center gap-2 border-b-4 active:translate-y-1 ${
+                        copiedLink 
+                          ? 'bg-neon-moon text-trench-black border-neon-moon/50 shadow-glow-moon' 
+                          : 'bg-jeet-red hover:bg-red-700 text-white border-red-950 shadow-glow-jeet'
+                      }`}
+                    >
+                      {copiedLink ? <><Check size={16} /> COPIED</> : <><Copy size={16} /> COPY LINK</>}
+                    </button>
+                  </div>
+                  <p className="font-mono text-[9px] text-neon-moon uppercase font-bold mt-3 max-w-[250px] leading-relaxed">
+                    Earn 0.1% ammo SOL on every mission deployed by your enlisted recruits. Paid automatically on-chain.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-trench-black border border-trench-sandbag rounded p-4 text-center shadow-inner">
+                    <span className="font-mono text-[9px] text-trench-gasmask uppercase font-bold block">ENLISTED RECRUITS</span>
+                    <span className="font-staatliches text-3xl text-white block mt-1 glow-white">{user.referralsCount || 0}</span>
+                  </div>
+                  <div className="bg-trench-black border border-trench-sandbag rounded p-4 text-center shadow-inner">
+                    <span className="font-mono text-[9px] text-trench-gasmask uppercase font-bold block">COMMISSION (SOL)</span>
+                    <span className="font-staatliches text-3xl text-moon-gold block mt-1 glow-gold">
+                      {((Number(user.referralEarnings) || 0) / 1e9).toFixed(3)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right side: Ledger */}
+              <div className="bg-trench-black border border-trench-sandbag rounded flex flex-col shadow-inner overflow-hidden max-h-[300px]">
+                <div className="border-b border-trench-sandbag p-3 bg-trench-mud/50">
+                  <span className="font-mono text-[10px] text-trench-gasmask uppercase font-bold flex items-center gap-1.5">
+                    <Coins size={12} className="text-moon-gold" />
+                    RECENT COMMISSION PAYOUTS
+                  </span>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {user.referralPayouts && user.referralPayouts.length > 0 ? (
+                    user.referralPayouts.map((p, idx) => {
+                      const inviteeFormatted = p.invitee 
+                        ? `${p.invitee.substring(0, 6)}...${p.invitee.substring(p.invitee.length - 4)}` 
+                        : 'UNKNOWN_RECRUIT';
+                      const betSol = ((Number(p.betAmount) || 0) / 1e9).toFixed(2);
+                      const rewardSol = ((Number(p.rewardAmount) || 0) / 1e9).toFixed(4);
+                      const formattedDate = new Date(p.createdAt).toLocaleString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      });
+                      const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+                      const txUrl = p.txSig 
+                        ? isLocal 
+                          ? `https://explorer.solana.com/tx/${p.txSig}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899` 
+                          : `https://solscan.io/tx/${p.txSig}?cluster=devnet`
+                        : '#';
+
+                      return (
+                        <div key={idx} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-trench-mud border border-trench-sandbag p-3 rounded font-mono text-[11px] gap-2 hover:border-neon-moon/50 transition-all hover:bg-trench-black/30">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-white font-bold tracking-wider">{inviteeFormatted}</span>
+                              <span className="text-[9px] text-neon-moon bg-neon-moon/10 px-1.5 py-0.2 border border-neon-moon/20 rounded font-bold uppercase">
+                                RECRUIT
+                              </span>
+                            </div>
+                            <div className="text-trench-gasmask text-[9px] uppercase font-semibold">
+                              WAGER SIZE: <span className="text-white font-bold">{betSol} SOL</span>
+                            </div>
+                            <div className="text-[9px] text-trench-gasmask">
+                              {formattedDate}
+                            </div>
+                          </div>
+                          
+                          <div className="text-right w-full sm:w-auto flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-trench-sandbag/30 pt-2 sm:pt-0 mt-1 sm:mt-0">
+                            <div>
+                              <span className="text-neon-moon font-bold text-xs block glow-moon">+{rewardSol} SOL</span>
+                              <span className="text-[8px] text-trench-gasmask uppercase font-bold block leading-none mt-0.5">0.1% PAYOUT</span>
+                            </div>
+                            {p.txSig && (
+                              <a 
+                                href={txUrl} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="text-neon-moon hover:text-white underline text-[9px] uppercase font-bold tracking-wide sm:mt-1.5 flex items-center gap-1"
+                              >
+                                <span>EXPLORER</span>
+                                <ExternalLink size={10} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                      <span className="font-staatliches text-lg text-trench-gasmask uppercase">NO PAYOUTS YET</span>
+                      <span className="font-mono text-[9px] text-trench-gasmask/50 uppercase font-bold mt-1">
+                        Distribute your invite code to start earning.
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Degen Quote at bottom */}
           <div className="mt-4">
             <DegenQuoteBanner />
@@ -546,7 +823,7 @@ export default function ProfilePage() {
                   BATTLE RECONSTRUCTION OUTCOME
                 </span>
                 <span className={`font-staatliches text-2xl block uppercase mt-1 ${replayBet.result === 'win' ? 'text-neon-moon' : 'text-jeet-red'}`}>
-                  {replayBet.result === 'win' ? 'VICTORY • 2% TAX APPLIED' : 'ELIMINATED • EXIT LIQUIDITY'}
+                  {replayBet.result === 'win' ? 'VICTORY • 1.25% TAX APPLIED' : 'ELIMINATED • EXIT LIQUIDITY'}
                 </span>
                 <p className="font-mono text-[10px] text-trench-gasmask uppercase mt-2 leading-tight font-bold">
                   Commander chose the <span className={replayBet.side === 'moon' ? 'text-neon-moon font-bold' : 'text-jeet-red font-bold'}>{replayBet.side.toUpperCase()}</span> side. Action successfully executed and logged on chain.

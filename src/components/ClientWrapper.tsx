@@ -208,6 +208,17 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
   const audioEnabledRef = useRef(audioEnabled);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const ref = searchParams.get('ref');
+      if (ref) {
+        localStorage.setItem('ref', ref);
+        console.log('Successfully captured referral code from URL:', ref);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     userRef.current = user;
   }, [user]);
 
@@ -360,7 +371,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
             
             addMessage({
               roomId: newRoomObj.id,
-              side: 'moon',
+              side: 'all',
               user: 'COMMAND HQ',
               message: `🚨 NEW DEGEN ARENA DEPLOYED: $${newRoomObj.token.symbol} is ready for action! 🚨`,
               timestamp: Date.now(),
@@ -385,9 +396,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               
               addMessage({
                 roomId: roomPubkey,
-                side: data.side,
+                side: 'all', // Show in all tabs (Moon & Jeet)
                 user: 'COMMAND HQ',
-                message: `> DEPLOYMENT RECOGNIZED: ${formattedUser} STACKED ${betSol.toFixed(2)} SOL ON ${data.side.toUpperCase()} <`,
+                message: `💥 BATTLE UPDATE: ${formattedUser} stacked ${betSol.toFixed(2)} SOL on ${data.side.toUpperCase()}! 💥`,
                 timestamp: Date.now(),
               });
               
@@ -415,7 +426,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               
               addMessage({
                 roomId: roomPubkey,
-                side: data.winner,
+                side: 'all',
                 user: 'KEEPER SYSTEM',
                 message: `⚡ ARENA SETTLED! WINNER: ${data.winner.toUpperCase()} at TWAP ${Number(data.twapFinalPrice) / 1e8} USD ⚡`,
                 timestamp: Date.now(),
@@ -457,7 +468,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               
               addMessage({
                 roomId: roomPubkey,
-                side: 'moon',
+                side: 'all',
                 user: formattedUser,
                 message: `💎 SECURED WAR BOOTY OF ${claimedSol.toFixed(2)} SOL! LFG! 💎`,
                 timestamp: Date.now(),

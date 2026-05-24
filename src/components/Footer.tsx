@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 import { useAppState } from '@/store/useAppState';
 import { PixelBarbedWire } from './PixelArt';
 import { ShieldAlert, MessageSquareCode, Flame, HelpCircle } from 'lucide-react';
@@ -48,7 +49,7 @@ export const Footer: React.FC = () => {
           </div>
           <div className="bg-trench-mud border border-trench-sandbag rounded px-3 py-1 text-center shadow-md">
             <p className="font-mono text-[9px] text-trench-gasmask font-bold">COMMISSION FEE</p>
-            <p className="font-staatliches text-xl text-moon-gold tracking-wide">2.0% PER ROOM</p>
+            <p className="font-staatliches text-xl text-moon-gold tracking-wide">1.25% PER ROOM</p>
           </div>
           <div className="bg-trench-mud border border-trench-sandbag rounded px-3 py-1 text-center shadow-md">
             <p className="font-mono text-[9px] text-trench-gasmask font-bold">SETTLEMENT ENGINE</p>
@@ -82,18 +83,21 @@ export const Footer: React.FC = () => {
             >
               <MessageSquareCode size={16} />
             </a>
-            <a
-              href="#rules"
+            <Link
+              href="/rules"
               className="p-2 bg-trench-mud border-2 border-trench-sandbag hover:border-neon-moon text-trench-gasmask hover:text-neon-moon transition-all rounded shadow-inner"
               title="War Manual"
             >
               <HelpCircle size={16} />
-            </a>
+            </Link>
           </div>
         </div>
       </div>
 
       <div className="mx-auto max-w-7xl px-4 mt-6 text-center border-t border-trench-sandbag/40 pt-4">
+        <p className="font-mono text-[10px] text-neon-moon uppercase tracking-wider font-bold mb-1.5">
+          HQ RADIO COURIER: <a href="mailto:contact@shitmarket.lol" className="underline hover:text-white transition-colors">contact@shitmarket.lol</a>
+        </p>
         <p className="font-mono text-[9px] text-trench-gasmask/60">
           © {new Date().getFullYear()} ShitMarket. Created by and for degenerate trench commanders. Built with no corporate support whatsoever.
         </p>

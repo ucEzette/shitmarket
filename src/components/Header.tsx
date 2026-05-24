@@ -39,7 +39,7 @@ export const Header: React.FC = () => {
               decoding="sync"
             />
             <p className="hidden sm:block font-mono text-[9px] text-trench-gasmask uppercase tracking-widest mt-1 font-bold pl-2">
-              PvP Meme Trenches • 2% Settle Fee
+              PvP Meme Trenches • 1.25% Settle Fee
             </p>
           </div>
         </Link>
@@ -64,9 +64,9 @@ export const Header: React.FC = () => {
                 href="/profile"
                 className="flex items-center gap-1 px-1.5 py-0.5 sm:px-3 sm:py-1 bg-trench-sandbag hover:bg-trench-gasmask transition-all rounded-sm text-white"
               >
-                <PepePortrait src={PEPE_ASSETS.chadBull} size={16} loading="eager" className="rounded-full sm:size-[20px]" />
-                <span className="font-mono text-[10px] sm:text-xs font-bold pl-0.5">
-                  {user.wallet.substring(0, 4)}...{user.wallet.substring(user.wallet.length - 4)}
+                <PepePortrait src={user.avatarUrl || PEPE_ASSETS.fewUnderstand} size={16} loading="eager" className="rounded-full sm:size-[20px]" />
+                <span className="font-mono text-[10px] sm:text-xs font-bold pl-0.5 max-w-[80px] sm:max-w-[120px] truncate block">
+                  {user.username || `${user.wallet.substring(0, 4)}...${user.wallet.substring(user.wallet.length - 4)}`}
                 </span>
               </Link>
 

@@ -15,7 +15,7 @@ const PEPE_QUOTES = [
   'Are you buying the top or charging the trench?',
   'I survived the great dev dump of 2024.',
   'HODL? No, we BET and settled in 5 mins!',
-  'Pot fee is only 2%. Easiest PvP in crypto.',
+  'Pot fee is only 1.25%. Easiest PvP in crypto.',
   'If you get rekt, don\'t call your mom. Cry in the Jeet chat.'
 ];
 

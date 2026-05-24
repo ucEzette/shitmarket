@@ -61,6 +61,10 @@ model Bet {
 
 model UserProfile {
   userPubkey   String   @id @map("user_pubkey") @db.VarChar(44)
+  username     String?  @unique @db.VarChar(30)
+  avatarUrl    String?  @map("avatar_url")
+  referredBy   String?  @map("referred_by") @db.VarChar(44)
+  referralCode String?  @unique @map("referral_code") @db.VarChar(20)
   totalBets    Int      @default(0) @map("total_bets")
   wins         Int      @default(0)
   losses       Int      @default(0)
@@ -131,3 +135,20 @@ model Payout {
   @@index([userPubkey])
   @@map("payouts")
 }
+
+// ─── Referral Payouts ────────────────────────────────────────────────────────
+
+model ReferralPayout {
+  id           String   @id @default(uuid()) @db.Uuid
+  referrer     String   @map("referrer_pubkey") @db.VarChar(44)
+  invitee      String   @map("invitee_pubkey") @db.VarChar(44)
+  roomPubkey   String   @map("room_pubkey") @db.VarChar(44)
+  betAmount    BigInt   @map("bet_amount")
+  rewardAmount BigInt   @map("reward_amount")
+  txSig        String?  @map("tx_sig") @db.VarChar(88)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@index([referrer])
+  @@map("referral_payouts")
+}
+

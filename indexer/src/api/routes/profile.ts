@@ -15,6 +15,19 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
       where: { userPubkey: wallet },
     });
 
+    // Compute referral stats
+    const referralsCount = await prisma.userProfile.count({
+      where: { referredBy: wallet },
+    });
+
+    const referralPayouts = await prisma.referralPayout.findMany({
+      where: { referrer: wallet },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    const totalReferralEarnings = referralPayouts.reduce((acc, p) => acc + BigInt(p.rewardAmount), BigInt(0));
+
     if (!profile) {
       // Return empty profile for unknown wallets (not an error)
       return res.json({
@@ -28,6 +41,13 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
           trenchScore: 'D',
           achievements: [],
           winRate: 0,
+          username: null,
+          avatarUrl: null,
+          referredBy: null,
+          referralCode: wallet.slice(0, 6) + Math.floor(1000 + Math.random() * 9000),
+          referralsCount: 0,
+          referralEarnings: '0',
+          referralPayouts: [],
         },
       });
     }
@@ -62,6 +82,13 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
         ...profile,
         profit: profile.profit.toString(),
         winRate,
+        referralsCount,
+        referralEarnings: totalReferralEarnings.toString(),
+        referralPayouts: referralPayouts.map(p => ({
+          ...p,
+          betAmount: p.betAmount.toString(),
+          rewardAmount: p.rewardAmount.toString(),
+        })),
         bets: bets.map((b) => ({
           ...b,
           amount: b.amount.toString(),
@@ -72,5 +99,91 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
   } catch (err: any) {
     logger.error({ msg: 'GET /api/profile/:wallet error', err: err?.message });
     return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/profile/update ─────────────────────────────────────────────────
+
+profileRouter.post('/update', async (req, res) => {
+  try {
+    const { userPubkey, username, avatarUrl, referredBy } = req.body;
+
+    if (!userPubkey) {
+      return res.status(400).json({ success: false, error: 'userPubkey is required' });
+    }
+
+    // Clean up username
+    const cleanUsername = username ? username.trim().slice(0, 30) : undefined;
+
+    // Generate unique referral code
+    let referralCode = undefined;
+    if (cleanUsername) {
+      referralCode = cleanUsername.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 15);
+      const codeExists = await prisma.userProfile.findFirst({
+        where: { referralCode }
+      });
+      if (codeExists) {
+        referralCode = `${referralCode}${Math.floor(100 + Math.random() * 900)}`;
+      }
+    } else {
+      referralCode = userPubkey.slice(0, 6) + Math.floor(1000 + Math.random() * 9000);
+    }
+
+    const existingProfile = await prisma.userProfile.findUnique({
+      where: { userPubkey },
+    });
+
+    // Check if username is already taken by another wallet
+    if (cleanUsername) {
+      const taken = await prisma.userProfile.findFirst({
+        where: {
+          username: { equals: cleanUsername, mode: 'insensitive' },
+          NOT: { userPubkey }
+        }
+      });
+      if (taken) {
+        return res.status(400).json({ success: false, error: 'Username is already taken' });
+      }
+    }
+
+    let finalReferredBy: string | undefined = undefined;
+    if (referredBy && referredBy !== userPubkey) {
+      let resolvedReferrer: string | null = null;
+      if (referredBy.length !== 44) {
+        const refProfile = await prisma.userProfile.findFirst({
+          where: { referralCode: { equals: referredBy, mode: 'insensitive' } }
+        });
+        if (refProfile) {
+          resolvedReferrer = refProfile.userPubkey;
+        }
+      } else {
+        resolvedReferrer = referredBy;
+      }
+
+      if (resolvedReferrer && resolvedReferrer !== userPubkey) {
+        finalReferredBy = resolvedReferrer;
+      }
+    }
+
+    const profile = await prisma.userProfile.upsert({
+      where: { userPubkey },
+      create: {
+        userPubkey,
+        username: cleanUsername,
+        avatarUrl,
+        referredBy: finalReferredBy,
+        referralCode,
+      },
+      update: {
+        username: cleanUsername !== undefined ? cleanUsername : undefined,
+        avatarUrl: avatarUrl !== undefined ? avatarUrl : undefined,
+        referredBy: existingProfile?.referredBy ? undefined : finalReferredBy, // set only once
+      }
+    });
+
+    return res.json({ success: true, data: profile });
+  } catch (err: any) {
+    logger.error({ msg: 'POST /api/profile/update error', err: err?.message });
+    return res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
   }
 });

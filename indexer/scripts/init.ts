@@ -2,9 +2,16 @@ import * as anchor from "@coral-xyz/anchor";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import fs from "fs";
 import os from "os";
+import path from "path";
+import dotenv from "dotenv";
+import bs58 from "bs58";
+
+
+// Load environment variables from .env
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 // We load the IDL. Because it is JSON, we can just require it or read it.
-const idlPath = "../src/utils/idl.json";
+const idlPath = path.resolve(__dirname, "../../src/utils/idl.json");
 const idl = JSON.parse(fs.readFileSync(idlPath, "utf8"));
 
 // PATCH the outdated IDL in-memory
@@ -40,8 +47,17 @@ async function main() {
     );
     console.log("Config PDA:", configPda.toBase58());
 
+    // Load keeper public key from environment
+    const keeperPrivateKeyBase58 = process.env.KEEPER_PRIVATE_KEY;
+    if (!keeperPrivateKeyBase58) {
+        throw new Error("KEEPER_PRIVATE_KEY is not defined in environment");
+    }
+    const keeperKeypair = Keypair.fromSecretKey(bs58.decode(keeperPrivateKeyBase58));
+    const keeperPubkey = keeperKeypair.publicKey;
+    console.log("Keeper wallet to authorize:", keeperPubkey.toBase58());
+
     // 5. Initialize
-    const feeBps = 200; // 2%
+    const feeBps = 125; // 1.25%
     console.log(`Sending initialize tx... Treasury: ${deployer.publicKey.toBase58()}, Fee: ${feeBps} bps`);
 
     try {
@@ -56,20 +72,36 @@ async function main() {
             .rpc();
 
         console.log("Initialization successful! Tx:", tx);
+
+        // Now update config to authorize the keeper wallet
+        console.log("Updating platform config to authorize keeper...");
+        const tx2 = await program.methods.updateConfig(
+            null, // new_fee_bps
+            null, // new_treasury
+            keeperPubkey, // new_keeper
+            null, // new_min_liquidity
+            null, // new_twap_window
+        ).accounts({
+            config: configPda,
+            admin: deployer.publicKey,
+            newTreasury: null as any,
+        }).signers([deployer]).rpc();
+        console.log("Config update successful! Authorized keeper:", keeperPubkey.toBase58(), "Tx:", tx2);
     } catch (e: any) {
         if (e.message.includes("already in use") || String(e).includes("already in use")) {
             console.log("Contract is already initialized. Let's update the config instead.");
             const tx2 = await program.methods.updateConfig(
-                deployer.publicKey, // new_treasury
-                null, // new_keeper
                 feeBps, // new_fee_bps
+                deployer.publicKey, // new_treasury
+                keeperPubkey, // new_keeper
                 null, // new_min_liquidity
                 null, // new_twap_window
             ).accounts({
                 config: configPda,
                 admin: deployer.publicKey,
+                newTreasury: deployer.publicKey as any,
             }).signers([deployer]).rpc();
-            console.log("Update config successful! Tx:", tx2);
+            console.log("Update config successful! Authorized keeper:", keeperPubkey.toBase58(), "Tx:", tx2);
         } else {
             console.error("Error initializing:", e);
             throw e;

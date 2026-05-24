@@ -385,7 +385,8 @@ export const useAppState = create<AppState>((set, get) => ({
 
   fetchRooms: async () => {
     try {
-      const res = await fetchWithTimeout('http://localhost:3001/api/rooms?status=all&limit=50', {}, 3000);
+      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const res = await fetchWithTimeout(`${indexerApi}/api/rooms?status=all&limit=50`, {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
         let mapped = json.data.map(mapApiRoom);
@@ -459,7 +460,8 @@ export const useAppState = create<AppState>((set, get) => ({
       let room: Room | null = null;
 
       try {
-        const res = await fetchWithTimeout(`http://localhost:3001/api/rooms/${roomId}`, {}, 3000);
+        const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+        const res = await fetchWithTimeout(`${indexerApi}/api/rooms/${roomId}`, {}, 3000);
         const json = await res.json();
         if (json.success && json.data) {
           room = mapApiRoom(json.data);
@@ -579,7 +581,8 @@ export const useAppState = create<AppState>((set, get) => ({
 
   fetchLeaderboard: async () => {
     try {
-      const res = await fetchWithTimeout('http://localhost:3001/api/leaderboard?sortBy=profit&limit=50', {}, 3000);
+      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const res = await fetchWithTimeout(`${indexerApi}/api/leaderboard?sortBy=profit&limit=50`, {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
         const mapped = json.data.map((u: any) => ({

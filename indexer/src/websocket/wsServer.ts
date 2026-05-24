@@ -105,8 +105,8 @@ async function startRedisRelay(): Promise<void> {
 
 // ─── WebSocket server ─────────────────────────────────────────────────────────
 
-export function startWsServer(): WebSocketServer {
-  const server = http.createServer();
+export function startWsServer(existingServer?: http.Server): WebSocketServer {
+  const server = existingServer || http.createServer();
   const wss = new WebSocketServer({ server });
 
   wss.on('connection', (ws: WebSocket, req) => {
@@ -171,9 +171,11 @@ export function startWsServer(): WebSocketServer {
     });
   });
 
-  server.listen(config.api.wsPort, () => {
-    logger.info({ msg: 'WebSocket server listening', port: config.api.wsPort });
-  });
+  if (!existingServer) {
+    server.listen(config.api.wsPort, () => {
+      logger.info({ msg: 'WebSocket server listening', port: config.api.wsPort });
+    });
+  }
 
   // Start relaying Redis events to WebSocket clients
   startRedisRelay().catch((err) =>

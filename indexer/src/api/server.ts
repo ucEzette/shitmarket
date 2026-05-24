@@ -167,8 +167,8 @@ export function createApiServer(circuitBreaker?: RpcCircuitBreaker): express.App
   return app;
 }
 
-export function startApiServer(app: express.Application): void {
-  app.listen(config.api.restPort, () => {
+export function startApiServer(app: express.Application): import('http').Server {
+  return app.listen(config.api.restPort, () => {
     logger.info({ msg: 'REST API server listening', port: config.api.restPort });
   });
 }

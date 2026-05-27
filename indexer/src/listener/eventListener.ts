@@ -159,6 +159,12 @@ interface ReputationUpdatedEvent {
   totalWins: anchor.BN;
 }
 
+interface RoomVoidedEvent {
+  room: anchor.web3.PublicKey;
+  totalRefundPool: anchor.BN;
+  reason: string;
+}
+
 // ─── Token metadata fetch ─────────────────────────────────────────────────────
 
 interface TokenMeta {
@@ -742,6 +748,155 @@ async function handleReputationUpdated(event: ReputationUpdatedEvent): Promise<v
   }
 }
 
+async function handleRoomVoided(event: RoomVoidedEvent): Promise<void> {
+  const end = eventProcessingDuration.startTimer({ event_type: 'RoomVoided' });
+  try {
+    const roomPubkey = event.room.toBase58();
+
+    logger.info({
+      msg: 'Processing RoomVoided event (one-sided void)',
+      roomPubkey,
+      reason: event.reason,
+    });
+
+    const totalPool = BigInt(event.totalRefundPool.toString());
+    const platformFee = BigInt(0);
+
+    // In a voided room, everyone wins (i.e. receives full refund)
+    const winningBets = await prisma.bet.findMany({ where: { roomPubkey } });
+
+    // Compute and store individual payouts (100% refund of bet amount)
+    for (const bet of winningBets) {
+      const payout = bet.amount;
+
+      const existingPayout = await prisma.payout.findFirst({
+        where: { roomPubkey, userPubkey: bet.userPubkey },
+      });
+      if (existingPayout) {
+        await prisma.payout.update({
+          where: { id: existingPayout.id },
+          data: { amount: payout },
+        });
+      } else {
+        await prisma.payout.create({
+          data: {
+            roomPubkey,
+            userPubkey: bet.userPubkey,
+            amount: payout,
+          },
+        });
+      }
+    }
+
+    // Mark room settled in DB as draw (representing void refund path)
+    await prisma.room.update({
+      where: { roomPubkey },
+      data: {
+        status: 'settled',
+        winner: 'draw',
+        platformFee,
+      },
+    });
+
+    // Update Redis cache
+    await cacheRoom(roomPubkey, {
+      status: 'settled',
+      winner: 'draw',
+    });
+
+    await publishRoomUpdate(roomPubkey, {
+      type: 'RoomSettled',
+      winner: 'draw',
+      totalPool: totalPool.toString(),
+      platformFee: platformFee.toString(),
+    });
+
+    roomsSettledTotal.inc({ winner: 'draw' });
+
+    const activeCount = await prisma.room.count({ where: { status: 'active' } });
+    activeRoomsGauge.set(activeCount);
+
+    logger.info({ msg: 'RoomVoided processed successfully', roomPubkey });
+
+    // ─── Automatic Winner Payout Distribution ───
+    if (winningBets.length > 0 && activeConnection) {
+      logger.info({ msg: 'Triggering automatic on-chain payouts for voided refunds', roomPubkey, winnersCount: winningBets.length });
+      try {
+        const keeper = getKeeperKeypair();
+        const program = getProgram(activeConnection);
+        const instructions: anchor.web3.TransactionInstruction[] = [];
+        
+        for (const bet of winningBets) {
+          const winnerPubkey = new PublicKey(bet.userPubkey);
+          const [escrowPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from('escrow'), event.room.toBuffer()],
+            program.programId
+          );
+          const sideByte = bet.side === 'moon' ? 0 : 1;
+          const [betPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from('bet'), event.room.toBuffer(), winnerPubkey.toBuffer(), Buffer.from([sideByte])],
+            program.programId
+          );
+          
+          const ix = await program.methods
+            .claimWinnings()
+            .accounts({
+              room: event.room,
+              escrow: escrowPda,
+              bet: betPda,
+              user: winnerPubkey,
+              payer: keeper.publicKey,
+              systemProgram: anchor.web3.SystemProgram.programId,
+            })
+            .instruction();
+            
+          instructions.push(ix);
+        }
+        
+        // Batch instructions into transactions of at most 5 claims to avoid transaction size limits
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < instructions.length; i += BATCH_SIZE) {
+          const batch = instructions.slice(i, i + BATCH_SIZE);
+          const tx = new anchor.web3.Transaction();
+          
+          // Add Compute Budget limit & Priority Fee instructions to guarantee inclusion in congested blocks
+          const modifyComputeBudget = anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({ 
+            units: 150000 * batch.length
+          });
+          const addPriorityFee = anchor.web3.ComputeBudgetProgram.setComputeUnitPrice({ 
+            microLamports: 50000 
+          });
+          
+          tx.add(modifyComputeBudget);
+          tx.add(addPriorityFee);
+          tx.add(...batch);
+          
+          const txSig = await anchor.web3.sendAndConfirmTransaction(
+            activeConnection,
+            tx,
+            [keeper],
+            { commitment: 'confirmed', skipPreflight: true }
+          );
+          logger.info({
+            msg: 'Automatic void refund batch confirmed on-chain',
+            roomPubkey,
+            txSig,
+            winnersCount: batch.length,
+          });
+        }
+      } catch (payoutErr: any) {
+        logger.error({
+          msg: 'Automatic void refund payout distribution failed',
+          roomPubkey,
+          err: payoutErr?.message || String(payoutErr),
+        });
+      }
+    }
+  } finally {
+    end();
+  }
+}
+
 let subscriptionId: number | null = null;
 
 export async function processParsedEvents(events: any[], signature: string): Promise<void> {
@@ -771,6 +926,9 @@ export async function processParsedEvents(events: any[], signature: string): Pro
         break;
       case 'ReputationUpdated':
         await handleReputationUpdated(event.data as ReputationUpdatedEvent);
+        break;
+      case 'RoomVoided':
+        await handleRoomVoided(event.data as RoomVoidedEvent);
         break;
       default:
         logger.warn({ msg: 'Unknown event', name: event.name });

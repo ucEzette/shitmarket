@@ -122,6 +122,14 @@ function buildAnchorProgram(circuitBreaker: RpcCircuitBreaker): {
             { name: 'amount', type: 'u64', index: false },
           ],
         },
+        {
+          name: 'RoomVoided',
+          fields: [
+            { name: 'room', type: 'publicKey', index: false },
+            { name: 'totalRefundPool', type: 'u64', index: false },
+            { name: 'reason', type: 'string', index: false },
+          ],
+        },
       ],
       errors: [],
     } as unknown as anchor.Idl;

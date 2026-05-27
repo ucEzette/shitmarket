@@ -20,16 +20,15 @@ export default function RoomsPage() {
 
   const router = useRouter();
   const { rooms, roomsLoaded, user, placeBet, connectWallet } = useAppState();
-  const [filter, setFilter] = useState<'ending' | 'biggest' | 'active-bets'>('ending');
+  const [filter, setFilter] = useState<'ending' | 'biggest' | 'active-bets' | 'expired'>('ending');
   const [search, setSearch] = useState('');
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
   const [showSkeleton, setShowSkeleton] = useState(true);
 
-  // Show loading skeleton for at least 2 seconds while rooms are syncing
+  // Show loading skeleton while rooms are syncing, hide instantly when loaded
   useEffect(() => {
     if (roomsLoaded) {
-      const timer = setTimeout(() => setShowSkeleton(false), 2000);
-      return () => clearTimeout(timer);
+      setShowSkeleton(false);
     }
   }, [roomsLoaded]);
 
@@ -70,6 +69,14 @@ export default function RoomsPage() {
   // Filtering Logic
   const getFilteredRooms = () => {
     let list = [...rooms];
+    const now = Date.now();
+
+    // Separate active and expired rooms
+    if (filter !== 'expired') {
+      list = list.filter((r) => r.status === 'active' && r.expiry > now);
+    } else {
+      list = list.filter((r) => r.status !== 'active' || r.expiry <= now);
+    }
 
     // Filter by search query
     if (search.trim()) {
@@ -91,13 +98,8 @@ export default function RoomsPage() {
 
     // Sorting
     if (filter === 'ending') {
-      // nearest expiry first, active rooms first
-      list.sort((a, b) => {
-        if (a.status !== b.status) {
-          return a.status === 'active' ? -1 : 1;
-        }
-        return a.expiry - b.expiry;
-      });
+      // nearest expiry first
+      list.sort((a, b) => a.expiry - b.expiry);
     } else if (filter === 'biggest') {
       // total pot descending
       list.sort((a, b) => {
@@ -105,6 +107,9 @@ export default function RoomsPage() {
         const potB = b.moonPool + b.jeetPool;
         return potB - potA;
       });
+    } else if (filter === 'expired') {
+      // newest expired/settled first
+      list.sort((a, b) => b.expiry - a.expiry);
     }
 
     return list;
@@ -188,6 +193,16 @@ export default function RoomsPage() {
             }`}
           >
             🎖️ My Active Bets
+          </button>
+          <button
+            onClick={() => setFilter('expired')}
+            className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
+              filter === 'expired'
+                ? 'bg-trench-sandbag text-moon-gold font-bold'
+                : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
+            }`}
+          >
+            💀 Expired Rooms
           </button>
         </div>
 
@@ -295,11 +310,11 @@ export default function RoomsPage() {
                   <div className="flex items-center gap-1 bg-trench-black border border-trench-sandbag/80 rounded px-2 md:px-2.5 py-0.5 md:py-1">
                     <Bomb size={10} className={isSettled ? 'text-moon-gold' : 'text-jeet-red'} />
                     <span className={`font-mono text-[10px] md:text-xs font-bold ${isSettled ? 'text-moon-gold' : 'text-white'}`}>
-                      {timeText}
+                      {formatDuration(room.duration)} ROUND
                     </span>
                   </div>
-                  <div className="text-[9px] md:text-[10px] font-mono text-trench-gasmask font-bold bg-trench-black px-1.5 md:px-2 py-0.5 rounded border border-trench-sandbag/30 uppercase">
-                    {formatDuration(room.duration)} ROUND
+                  <div className={`text-[9px] md:text-[10px] font-mono font-bold bg-trench-black px-1.5 md:px-2 py-0.5 rounded border border-trench-sandbag/30 uppercase ${isSettled ? 'text-moon-gold' : 'text-neon-moon animate-pulse'}`}>
+                    {timeText}
                   </div>
                 </div>
 
@@ -331,8 +346,21 @@ export default function RoomsPage() {
                         )}
                       </span>
                     </div>
-                    <span className="font-mono text-[8px] md:text-[9px] text-trench-gasmask/60 block font-bold mt-0.5 truncate">
-                      {room.token.address.substring(0, 8)}...{room.token.address.substring(room.token.address.length - 8)}
+                    <div className="flex items-center gap-1 mt-1">
+                      <span 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(room.token.address);
+                          alert("CONTRACT ADDRESS COPIED TO CLIPBOARD!");
+                        }}
+                        className="font-mono text-[8px] md:text-[9px] text-neon-moon hover:text-white transition-colors bg-trench-black/60 px-1.5 py-0.5 rounded border border-trench-sandbag/30 cursor-pointer select-all truncate block w-full max-w-[180px] md:max-w-[240px]"
+                        title="Click to copy full contract address"
+                      >
+                        📋 {room.token.address}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[7px] md:text-[8px] text-trench-gasmask block mt-1 uppercase font-bold">
+                      ⚔️ LISTED: {new Date(room.createdAt).toISOString().replace('T', ' ').substring(0, 19)} UTC
                     </span>
                   </div>
                 </div>

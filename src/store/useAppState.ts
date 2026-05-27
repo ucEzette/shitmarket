@@ -222,20 +222,8 @@ export const useAppState = create<AppState>((set, get) => ({
   isPaused: false,
   user: null,
   leaderboard: {
-    moon: [
-      { address: '45bf...2d3a', name: 'MoonChad_69', profit: 142.55, winRate: 82.4 },
-      { address: '77c2...fa91', name: 'BullRunBeliever', profit: 94.20, winRate: 75.0 },
-      { address: '89ee...4c10', name: 'PumpFiend', profit: 78.90, winRate: 68.2 },
-      { address: '32ab...df88', name: 'WhaleShaker', profit: 54.12, winRate: 61.5 },
-      { address: 'ba24...cc51', name: 'HODL_Commander', profit: 32.88, winRate: 59.8 }
-    ],
-    jeet: [
-      { address: '90ff...8a12', name: 'JeetSniperPro', profit: 120.40, winRate: 79.1 },
-      { address: '22c9...bc77', name: 'BearPlague', profit: 89.60, winRate: 71.3 },
-      { address: 'ee92...99ff', name: 'DumpGod', profit: 64.50, winRate: 65.0 },
-      { address: 'ab67...cc88', name: 'FudSoldier', profit: 45.10, winRate: 62.1 },
-      { address: '6e9f...ff33', name: 'LiquidationStation', profit: 21.05, winRate: 55.4 }
-    ]
+    moon: [],
+    jeet: []
   },
   chatMessages: [],
   activityLog: [],
@@ -273,51 +261,54 @@ export const useAppState = create<AppState>((set, get) => ({
       const res = await fetchWithTimeout(`${indexerApi}/api/rooms?status=all&limit=50`, {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
-        let mapped = json.data.map(mapApiRoom);
+        const mapped = json.data.map(mapApiRoom);
 
-        // HYDRATE ON-CHAIN STATE
-        try {
-          const program = getAnchorProgram(null as any);
-          const pubkeys = mapped.map((r: Room) => new PublicKey(r.id));
-          const onChainRooms = await withTimeout(
-            (program.account as any).room.fetchMultiple(pubkeys),
-            3000,
-            'On-chain room fetch timed out'
-          ) as any[];
-
-          mapped = mapped.map((room: Room, index: number) => {
-            const onChain = onChainRooms[index];
-            if (onChain) {
-              const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
-              let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
-              if (onChain.winner) {
-                const wKey = Object.keys(onChain.winner)[0].toLowerCase();
-                if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
-                  winnerStr = wKey;
-                }
-              }
-              return {
-                ...room,
-                moonPool: onChain.moonPool.toNumber() / 1e9,
-                jeetPool: onChain.jeetPool.toNumber() / 1e9,
-                status: statusStr,
-                winner: winnerStr,
-                expiry: onChain.expiryTimestamp.toNumber() * 1000,
-                duration: onChain.durationMinutes,
-                token: {
-                  ...room.token,
-                }
-              };
-            }
-            return room;
-          });
-        } catch (e) {
-          console.warn('Could not hydrate on-chain room state', e);
-        }
-
+        // Industry Standard Fast-Path: Render indexer data immediately!
         const currentRooms = get().rooms;
         const missingRooms = currentRooms.filter(cr => !mapped.some((mr: Room) => mr.id === cr.id));
-        set({ rooms: [...mapped, ...missingRooms] });
+        set({ rooms: [...mapped, ...missingRooms], roomsLoaded: true });
+
+        // Hydrate on-chain state asynchronously in the background so it doesn't block UI rendering!
+        (async () => {
+          try {
+            const program = getAnchorProgram(null as any);
+            const pubkeys = mapped.map((r: Room) => new PublicKey(r.id));
+            const onChainRooms = await withTimeout(
+              (program.account as any).room.fetchMultiple(pubkeys),
+              3000,
+              'On-chain room fetch timed out'
+            ) as any[];
+
+            const hydrated = get().rooms.map((room: Room) => {
+              const apiIndex = mapped.findIndex((m: Room) => m.id === room.id);
+              if (apiIndex === -1) return room;
+              const onChain = onChainRooms[apiIndex];
+              if (onChain) {
+                const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
+                let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
+                if (onChain.winner) {
+                  const wKey = Object.keys(onChain.winner)[0].toLowerCase();
+                  if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
+                    winnerStr = wKey;
+                  }
+                }
+                return {
+                  ...room,
+                  moonPool: onChain.moonPool.toNumber() / 1e9,
+                  jeetPool: onChain.jeetPool.toNumber() / 1e9,
+                  status: statusStr,
+                  winner: winnerStr,
+                  expiry: onChain.expiryTimestamp.toNumber() * 1000,
+                  duration: onChain.durationMinutes,
+                };
+              }
+              return room;
+            });
+            set({ rooms: hydrated });
+          } catch (e) {
+            console.warn('Could not hydrate on-chain room state in background', e);
+          }
+        })();
       }
 
       // Fetch PlatformConfig to see if paused
@@ -352,50 +343,61 @@ export const useAppState = create<AppState>((set, get) => ({
         const json = await res.json();
         if (json.success && json.data) {
           room = mapApiRoom(json.data);
+          // Fast-Path: render indexing results immediately!
+          set((state) => {
+            const exists = state.rooms.some((r) => r.id === roomId);
+            const newRooms = exists
+              ? state.rooms.map((r) => (r.id === roomId ? room! : r))
+              : [room!, ...state.rooms];
+            return { rooms: newRooms };
+          });
         }
       } catch (err) {
         console.warn(`Failed to fetch room ${roomId} from indexer API:`, err);
       }
 
-      // Safe Fallback: Hydrate/Fetch from on-chain room account directly
-      try {
-        const program = getAnchorProgram(null as any);
-        const onChain = await withTimeout(
-          (program.account as any).room.fetch(new PublicKey(roomId)),
-          3000,
-          'On-chain room fetch timed out'
-        ) as any;
+      // Safe Fallback & Background Hydration: Fetch from on-chain room account directly
+      (async () => {
+        try {
+          const program = getAnchorProgram(null as any);
+          const onChain = await withTimeout(
+            (program.account as any).room.fetch(new PublicKey(roomId)),
+            3000,
+            'On-chain room fetch timed out'
+          ) as any;
 
-        if (onChain) {
-          const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
-          let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
-          if (onChain.winner) {
-            const wKey = Object.keys(onChain.winner)[0].toLowerCase();
-            if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
-              winnerStr = wKey;
+          if (onChain) {
+            const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
+            let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
+            if (onChain.winner) {
+              const wKey = Object.keys(onChain.winner)[0].toLowerCase();
+              if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
+                winnerStr = wKey;
+              }
             }
-          }
 
-          if (!room) {
+            const current = get().rooms.find((r) => r.id === roomId) || room;
+            
             // Decode token name bytes safely
-            const rawNameBytes = onChain.tokenName as number[] | Uint8Array;
-            let decodedName = '';
-            if (rawNameBytes) {
-              const buffer = Buffer.from(rawNameBytes);
-              const nullIndex = buffer.indexOf(0);
-              decodedName = buffer.toString('utf8', 0, nullIndex === -1 ? buffer.length : nullIndex).trim();
+            let decodedName = current?.token?.name || 'Unknown Token';
+            if (!current) {
+              const rawNameBytes = onChain.tokenName as number[] | Uint8Array;
+              if (rawNameBytes) {
+                const buffer = Buffer.from(rawNameBytes);
+                const nullIndex = buffer.indexOf(0);
+                decodedName = buffer.toString('utf8', 0, nullIndex === -1 ? buffer.length : nullIndex).trim();
+              }
             }
-            if (!decodedName) decodedName = 'Unknown Token';
 
-            room = {
+            const updatedRoom: Room = {
               id: roomId,
               token: {
                 address: onChain.tokenMint.toBase58(),
                 name: decodedName,
-                symbol: decodedName.substring(0, 10).toUpperCase(),
-                icon: '💰',
-                chainId: 'solana',
-                pairAddress: '',
+                symbol: current?.token?.symbol || decodedName.substring(0, 10).toUpperCase(),
+                icon: current?.token?.icon || '💰',
+                chainId: current?.token?.chainId || 'solana',
+                pairAddress: current?.token?.pairAddress || '',
               },
               creator: onChain.creator.toBase58(),
               moonPool: onChain.moonPool.toNumber() / 1e9,
@@ -409,58 +411,43 @@ export const useAppState = create<AppState>((set, get) => ({
               finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e8 : undefined,
               twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e8 : undefined,
             };
-          } else {
-            room = {
-              ...room,
-              moonPool: onChain.moonPool.toNumber() / 1e9,
-              jeetPool: onChain.jeetPool.toNumber() / 1e9,
-              status: statusStr,
-              winner: winnerStr,
-              expiry: onChain.expiryTimestamp.toNumber() * 1000,
-              duration: onChain.durationMinutes,
-              openingPrice: onChain.openingPrice.toNumber() / 1e8,
-              finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e8 : undefined,
-              twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e8 : undefined,
-            };
-          }
-        }
-      } catch (e) {
-        console.warn('Could not fetch or hydrate single on-chain room state:', e);
-      }
 
-      if (room && (!room.token.icon || !room.token.icon.startsWith('http'))) {
-        try {
-          const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${room.token.address}`;
-          const dsRes = await fetch(dsUrl);
-          if (dsRes.ok) {
-            const dsJson = await dsRes.json();
-            const pairs = dsJson?.pairs || [];
-            if (pairs.length > 0) {
-              const bestPair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-              const imageUrl = bestPair.info?.imageUrl;
-              if (imageUrl) {
-                room.token.icon = imageUrl;
-                if (bestPair.baseToken?.name) room.token.name = bestPair.baseToken.name;
-                if (bestPair.baseToken?.symbol) room.token.symbol = bestPair.baseToken.symbol;
-                if (bestPair.chainId) room.token.chainId = bestPair.chainId;
-                if (bestPair.pairAddress) room.token.pairAddress = bestPair.pairAddress;
+            if (!updatedRoom.token.icon || !updatedRoom.token.icon.startsWith('http')) {
+              try {
+                const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${updatedRoom.token.address}`;
+                const dsRes = await fetch(dsUrl);
+                if (dsRes.ok) {
+                  const dsJson = await dsRes.json();
+                  const pairs = dsJson?.pairs || [];
+                  if (pairs.length > 0) {
+                    const bestPair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+                    const imageUrl = bestPair.info?.imageUrl;
+                    if (imageUrl) {
+                      updatedRoom.token.icon = imageUrl;
+                      if (bestPair.baseToken?.name) updatedRoom.token.name = bestPair.baseToken.name;
+                      if (bestPair.baseToken?.symbol) updatedRoom.token.symbol = bestPair.baseToken.symbol;
+                      if (bestPair.chainId) updatedRoom.token.chainId = bestPair.chainId;
+                      if (bestPair.pairAddress) updatedRoom.token.pairAddress = bestPair.pairAddress;
+                    }
+                  }
+                }
+              } catch (err) {
+                console.warn('Failed to fetch fallback token image from DexScreener:', err);
               }
             }
-          }
-        } catch (err) {
-          console.warn('Failed to fetch fallback token image from DexScreener:', err);
-        }
-      }
 
-      if (room) {
-        set((state) => {
-          const exists = state.rooms.some((r) => r.id === roomId);
-          const newRooms = exists
-            ? state.rooms.map((r) => (r.id === roomId ? room! : r))
-            : [room!, ...state.rooms];
-          return { rooms: newRooms };
-        });
-      }
+            set((state) => {
+              const exists = state.rooms.some((r) => r.id === roomId);
+              const newRooms = exists
+                ? state.rooms.map((r) => (r.id === roomId ? updatedRoom : r))
+                : [updatedRoom, ...state.rooms];
+              return { rooms: newRooms };
+            });
+          }
+        } catch (e) {
+          console.warn('Could not fetch or hydrate single on-chain room state in background:', e);
+        }
+      })();
     } catch (err) {
       console.error(`Failed to fetch single room ${roomId}:`, err);
     }

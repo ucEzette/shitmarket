@@ -86,6 +86,7 @@ beforeAll(async () => {
   await connectRedis();
 
   // Clean DB for test isolation
+  await prisma.chatMessage.deleteMany();
   await prisma.payout.deleteMany();
   await prisma.bet.deleteMany();
   await prisma.room.deleteMany();

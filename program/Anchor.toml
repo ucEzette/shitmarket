@@ -3,13 +3,13 @@ seeds = false
 skip-lint = false
 
 [programs.mainnet]
-shitmarket = "GxkRWMoyKpKkTadmGqqqLvA473YTwvDUeSPK1iS8REim"
+shitmarket = "2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ"
 
 [programs.devnet]
-shitmarket = "GxkRWMoyKpKkTadmGqqqLvA473YTwvDUeSPK1iS8REim"
+shitmarket = "2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ"
 
 [programs.localnet]
-shitmarket = "GxkRWMoyKpKkTadmGqqqLvA473YTwvDUeSPK1iS8REim"
+shitmarket = "2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ"
 
 [registry]
 url = "https://api.apr.dev"

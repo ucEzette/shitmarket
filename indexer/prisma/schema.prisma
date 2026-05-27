@@ -49,6 +49,7 @@ model Bet {
   side        String   @db.VarChar(5)
   amount      BigInt
   claimed     Boolean  @default(false)
+  txSig       String?  @map("tx_sig") @db.VarChar(88)
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   room        Room     @relation(fields: [roomPubkey], references: [roomPubkey])

@@ -535,7 +535,7 @@ export default function ProfilePage() {
                       </div>
 
                       <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
-                        <div className="text-left md:text-right">
+                        <div className="text-left md:text-right flex flex-col items-start md:items-end gap-1">
                           {roomActive ? (
                             <span className="text-yellow-500 font-bold uppercase text-[10px] px-2 py-0.5 bg-yellow-500/5 border border-yellow-500/20 rounded">
                               UNDER SIEGE (ACTIVE)
@@ -548,6 +548,23 @@ export default function ProfilePage() {
                             <span className="text-jeet-red font-bold uppercase text-[10px] px-2 py-0.5 bg-jeet-red/5 border border-jeet-red/20 rounded">
                               DECREED: ELIMINATED (REKT) 💀
                             </span>
+                          )}
+                          
+                          {bet.txSig && (
+                            <a 
+                              href={bet.txSig 
+                                ? (typeof window !== 'undefined' && window.location.hostname === 'localhost') 
+                                  ? `https://explorer.solana.com/tx/${bet.txSig}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899` 
+                                  : `https://solscan.io/tx/${bet.txSig}?cluster=devnet`
+                                : '#'
+                              } 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              className="text-neon-moon hover:text-white underline text-[9px] uppercase font-bold tracking-wide flex items-center gap-0.5 mt-0.5"
+                            >
+                              <span>TX LINK</span>
+                              <ExternalLink size={8} />
+                            </a>
                           )}
                         </div>
 

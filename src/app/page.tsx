@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { PixelBarbedWire } from '@/components/PixelArt';
 import { useAppState } from '@/store/useAppState';
@@ -10,15 +11,24 @@ import { AgentKeyAlphaZone } from '@/components/AgentKeyAlphaZone';
 import { IntroScreen } from '@/components/IntroScreen';
 import { Flame, ShieldAlert, Award, ArrowUpRight, Zap, Target, Users, Swords, Skull, Rocket } from 'lucide-react';
 
-export default function Home() {
+function HomeContent() {
   const { leaderboard, isPaused } = useAppState();
   const [showIntro, setShowIntro] = React.useState(true);
+  const searchParams = useSearchParams();
 
   React.useEffect(() => {
-    if (sessionStorage.getItem('intro_played')) {
+    if (searchParams && searchParams.get('play_intro') === 'true') {
+      sessionStorage.removeItem('intro_played');
+      setShowIntro(true);
+      
+      // Clean up the query parameter to avoid looping on refreshes
+      const url = new URL(window.location.href);
+      url.searchParams.delete('play_intro');
+      window.history.replaceState({}, '', url.toString());
+    } else if (sessionStorage.getItem('intro_played')) {
       setShowIntro(false);
     }
-  }, []);
+  }, [searchParams]);
 
   const handleIntroComplete = () => {
     sessionStorage.setItem('intro_played', 'true');
@@ -80,7 +90,7 @@ export default function Home() {
         </div>
         {/* Atmospheric Overlays */}
         <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#05050A_85%)] pointer-events-none" />
-        <div className="absolute inset-0 z-0 bg-neon-moon/5 pointer-events-none animate-pulse-fast" />
+        <div className="absolute inset-0 z-0 bg-neon-moon/5 pointer-events-none" />
 
         <div className="mx-auto max-w-7xl px-4 flex flex-col items-center justify-between gap-12 relative z-10 w-full">
 
@@ -425,5 +435,18 @@ export default function Home() {
       </div>
 
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <React.Suspense fallback={
+      <div className="min-h-screen bg-[#071105] flex flex-col items-center justify-center font-mono text-yellow-400 gap-2">
+        <div className="w-8 h-8 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+        <span className="text-xs uppercase tracking-widest font-bold">Loading Frontline Comms...</span>
+      </div>
+    }>
+      <HomeContent />
+    </React.Suspense>
   );
 }

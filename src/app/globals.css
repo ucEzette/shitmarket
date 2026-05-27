@@ -388,3 +388,72 @@ body {
   50% { transform: translateY(-30px) rotate(-15deg); }
 }
 
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes crt-flicker {
+  0% { opacity: 0.98; }
+  50% { opacity: 1; }
+  100% { opacity: 0.99; }
+}
+
+.crt-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.crt-effect::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 50;
+  background-size: 100% 3px, 6px 100%;
+  pointer-events: none;
+}
+
+.crt-effect::after {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: rgba(18, 16, 16, 0.03); /* Fixated subtle CRT shadow tint */
+  z-index: 50;
+  pointer-events: none;
+}
+
+/* Retro CRT Animated Scrolling Grid */
+@keyframes grid-scroll-diagonal {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 40px 40px;
+  }
+}
+
+@keyframes grid-glow-pulse {
+  0%, 100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.scrolling-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-size: 32px 32px;
+  background-image: 
+    linear-gradient(to right, rgba(57, 255, 20, 0.08) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(57, 255, 20, 0.08) 1px, transparent 1px);
+  animation: grid-scroll-diagonal 4s linear infinite, grid-glow-pulse 8s ease-in-out infinite;
+  z-index: 0;
+}
+
+

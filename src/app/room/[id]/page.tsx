@@ -5,11 +5,74 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppState, Room, ChatMessage } from '@/store/useAppState';
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
-import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from '@/components/MemeAssets';
-import { synthSound } from '@/components/ClientWrapper';
-import { Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, AlertTriangle, Swords, Flame, Coins, Loader2 } from 'lucide-react';
+import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
+import { synthSound as originalSynthSound } from '@/components/ClientWrapper';
+import { 
+  Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, 
+  AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal 
+} from 'lucide-react';
 import * as Slider from '@radix-ui/react-slider';
 import confetti from 'canvas-confetti';
+
+// 1. Stable, Static, and Dynamic Memoized DexScreener Iframe Chart Component
+// Encapsulates local loading states internally to prevent parent state updates or callback prop changes,
+// guaranteeing that the chart remains perfectly stable and never flashes or reloads on periodic state poll updates!
+const StableDexChart = React.memo(({ chainId, pairAddress }: { chainId: string; pairAddress: string }) => {
+  const [localLoading, setLocalLoading] = useState(true);
+  
+  // Track the actual active loaded pair to prevent loading empty strings or reloading on parent ticks
+  const [activePair, setActivePair] = useState<{ chainId: string; pairAddress: string } | null>(null);
+
+  // Update active pair ONLY when we receive a valid, non-empty pair address!
+  useEffect(() => {
+    if (chainId && pairAddress && pairAddress !== '') {
+      if (!activePair || activePair.pairAddress !== pairAddress || activePair.chainId !== chainId) {
+        setActivePair({ chainId, pairAddress });
+        setLocalLoading(true);
+      }
+    }
+  }, [chainId, pairAddress, activePair]);
+
+  // If we don't have a valid active pair yet, show a loader
+  if (!activePair) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] pt-12 z-10 animate-pulse">
+        <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
+        <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
+          WAITING FOR MARKET TELEMETRY...
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-full relative">
+      {localLoading && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#070c04] z-10 animate-pulse pt-12">
+          <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
+          <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
+            CONNECTING TO DEXSCREENER TERMINAL...
+          </span>
+        </div>
+      )}
+      <iframe
+        className="w-full h-full border-none"
+        src={`https://dexscreener.com/${activePair.chainId}/${activePair.pairAddress}?embed=1&theme=dark&info=0&trades=0`}
+        title="DexScreener Chart"
+        onLoad={() => setLocalLoading(false)}
+      ></iframe>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Memoization rule: only re-render if the room actually changes to a different valid pair address
+  // If nextProps has an empty pairAddress (due to polling reset), we completely ignore it and preserve our current view!
+  if (!nextProps.pairAddress || nextProps.pairAddress === '') {
+    return true; 
+  }
+  return prevProps.chainId === nextProps.chainId && prevProps.pairAddress === nextProps.pairAddress;
+});
+
+StableDexChart.displayName = 'StableDexChart';
 
 interface MortarProjectile {
   id: number;
@@ -32,7 +95,11 @@ export default function RoomDetailPage() {
   const router = useRouter();
   const roomId = params.id as string;
 
-  const { rooms, user, chatMessages, placeBet, claimWinnings, addMessage, connectWallet, isTransactionLoading, fetchSingleRoom, fetchRoomChats, sendRoomChat } = useAppState();
+  const { 
+    rooms, user, chatMessages, placeBet, claimWinnings, 
+    addMessage, connectWallet, isTransactionLoading, 
+    fetchSingleRoom, fetchRoomChats, sendRoomChat 
+  } = useAppState();
 
   const [selectedSide, setSelectedSide] = useState<'moon' | 'jeet'>('moon');
   const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
@@ -41,17 +108,43 @@ export default function RoomDetailPage() {
   const [countdownText, setCountdownText] = useState('00:00:00');
   const [isRoomSettling, setIsRoomSettling] = useState(false);
   const [localShake, setLocalShake] = useState(false);
-  const [isChartLoading, setIsChartLoading] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
-  const [isChartCollapsed, setIsChartCollapsed] = useState(false);
   const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
+    if (!isMuted) {
+      originalSynthSound(type);
+    }
+  };
   
   // Mortar animation states
   const [mortars, setMortars] = useState<MortarProjectile[]>([]);
   const [explosions, setExplosions] = useState<ExplosionParticles[]>([]);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  const battleLogScrollRef = useRef<HTMLDivElement>(null);
 
   const room = rooms.find((r) => r.id === roomId);
+
+  // Top 10 Trending Meme Tokens Data for continuous marquee tape
+  const top10Tokens = [
+    { name: "TRENCH PEPE", symbol: "PEPE", price: "$0.00000864", change: "+101.4%" },
+    { name: "SOLDIER DOG", symbol: "WIF", price: "$0.9420", change: "-77.8%" },
+    { name: "TRENCH SHOVEL", symbol: "BONK", price: "$0.00001380", change: "+5.6%" },
+    { name: "BREADLINE SKELETON", symbol: "JEET", price: "$0.00000001", change: "-1456%" },
+    { name: "POPCAT TRUCKER", symbol: "POPCAT", price: "$1.2400", change: "+14.8%" },
+    { name: "BOOK OF MEME", symbol: "BOME", price: "$0.008450", change: "-12.3%" },
+    { name: "CAT IN WORLD", symbol: "MEW", price: "$0.005120", change: "+22.4%" },
+    { name: "SLERF LAZY", symbol: "SLERF", price: "$0.2150", change: "-8.7%" },
+    { name: "WODGE SOLDIER", symbol: "WODGE", price: "$0.000450", change: "+156.4%" },
+    { name: "CHAD BULL", symbol: "CHAD", price: "$0.04560", change: "+342.1%" }
+  ];
+
+  // Tactical custom command/battle log entries
+  const [battleLogs, setBattleLogs] = useState<string[]>([
+    "[SYSTEM ONLINE] Battle arena telemetry initialized.",
+    "[CHAD SQUAD] Parachute division waiting for deployment orders."
+  ]);
 
   // Synchronize room details from indexer API and chain on mount & periodically
   useEffect(() => {
@@ -68,6 +161,7 @@ export default function RoomDetailPage() {
 
     const interval = setInterval(() => {
       fetchSingleRoom(roomId);
+      fetchRoomChats(roomId);
     }, 5000);
 
     return () => {
@@ -112,6 +206,13 @@ export default function RoomDetailPage() {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
   }, [chatMessages, activeChatTab]);
+
+  // Auto scroll battle logs to bottom
+  useEffect(() => {
+    if (battleLogScrollRef.current) {
+      battleLogScrollRef.current.scrollTop = battleLogScrollRef.current.scrollHeight;
+    }
+  }, [battleLogs]);
 
   // Real-time ticking clock for this specific room
   useEffect(() => {
@@ -237,6 +338,10 @@ export default function RoomDetailPage() {
     setMortars((prev) => [...prev, newMortar]);
     setLocalShake(true);
 
+    // Append to battle logs
+    const newLog = `[ARTILLERY SHELL] Fired ${stakeAmount.toFixed(2)} SOL ammo payload on ${selectedSide.toUpperCase()} side!`;
+    setBattleLogs((prev) => [...prev, newLog]);
+
     // After flight finishes (800ms)
     setTimeout(() => {
       setLocalShake(false);
@@ -258,6 +363,9 @@ export default function RoomDetailPage() {
       setTimeout(() => {
         setExplosions((prev) => prev.filter((e) => e.id !== newExplosion.id));
       }, 500);
+
+      // Append hit confirmation to logs
+      setBattleLogs((prev) => [...prev, `[IMPACT CONFIRMED] Shell detonated on opposing faction trenches!`]);
     }, 800);
 
     placeBet(room.id, selectedSide, stakeAmount);
@@ -273,11 +381,18 @@ export default function RoomDetailPage() {
       origin: { y: 0.8 },
       colors: ['#FFD700', '#39FF14']
     });
+    setBattleLogs((prev) => [...prev, `[BOOTY DISPATCHED] User claimed on-chain winnings/refund!`]);
   };
 
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
+
+    // Restrict broadcasting to active bettors inside this room sector only
+    if (!user || !user.wallet || userBetsInRoom.length === 0) {
+      alert("SIGNAL INTRUSION DETECTED: BROADCAST DENIED! ONLY ENLISTED SOLDIER BECTORS WHO HAVE STAKED SOL ON A SIDE IN THIS SECTOR TRENCH ARE AUTHORIZED TO TRANSMIT RADIO SIGNALS.");
+      return;
+    }
 
     const userAddr = user && user.wallet ? `${user.wallet.substring(0, 6)}...${user.wallet.substring(user.wallet.length - 4)}` : 'Recruit';
     
@@ -293,16 +408,17 @@ export default function RoomDetailPage() {
   );
 
   const isSettled = room.status === 'settled';
-  const userWon = isSettled && room.winner && userSidesChosen.includes(room.winner as any);
-  const userLost = isSettled && room.winner && userSidesChosen.length > 0 && !userSidesChosen.includes(room.winner as any);
-  const hasUnclaimed = isSettled && userWon && userBetsInRoom.some((b) => !b.claimed);
+  const isDrawOrVoid = isSettled && (!room.winner || room.winner === 'draw');
+  const userWon = isSettled && room.winner && room.winner !== 'draw' && userSidesChosen.includes(room.winner as any);
+  const userLost = isSettled && room.winner && room.winner !== 'draw' && userSidesChosen.length > 0 && !userSidesChosen.includes(room.winner as any);
+  const hasUnclaimed = isSettled && (userWon || (isDrawOrVoid && userBetsInRoom.length > 0)) && userBetsInRoom.some((b) => !b.claimed);
 
   return (
-    <div className={`w-full flex-1 flex flex-col select-none relative transition-transform duration-100 ${
+    <div className={`w-full flex-1 flex flex-col select-none relative transition-transform duration-100 bg-[#060a04] min-h-screen text-white font-mono ${
       localShake || (userLost && isSettled) ? 'heavy-shake' : ''
     }`}>
       
-      {/* 1. Wood buttons style sheet */}
+      {/* Dynamic inline style sheets */}
       <style dangerouslySetInnerHTML={{ __html: `
         .wood-btn {
             background-color: #5C3A21;
@@ -330,6 +446,20 @@ export default function RoomDetailPage() {
             0%, 100% { transform: translate3d(0, 0, 0); }
             10%, 30%, 50%, 70%, 90% { transform: translate3d(-8px, 4px, 0) rotate(-1deg); }
             20%, 40%, 60%, 80% { transform: translate3d(8px, -4px, 0) rotate(1deg); }
+        }
+
+        /* Continuous scrolling tape marquee animation */
+        @keyframes marquee {
+            0% { transform: translate3d(0, 0, 0); }
+            100% { transform: translate3d(-50%, 0, 0); }
+        }
+        .animate-marquee {
+            animation: marquee 35s linear infinite;
+        }
+
+        /* Diagonal stripes/hatch pattern background */
+        .hatch-pattern {
+            background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.08), rgba(0,0,0,0.08) 6px, transparent 6px, transparent 12px);
         }
 
         /* Mortar System Styles */
@@ -407,10 +537,18 @@ export default function RoomDetailPage() {
                 opacity: 0;
             }
         }
+
+        @keyframes radar-sweep {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(380px); }
+        }
+        .radar-sweep-line {
+            animation: radar-sweep 6s linear infinite;
+        }
       ` }} />
 
       {/* 2. THE SPLIT-SCREEN TRENCH HEADER (Full-Bleed Across Screen) */}
-      <section className="relative w-full h-[28vh] sm:h-[40vh] md:h-[48vh] overflow-hidden border-b-4 border-trench-sandbag flex z-10 scanlines" id="battlefield">
+      <section className="relative w-full h-[24vh] sm:h-[30vh] md:h-[38vh] overflow-hidden border-b-4 border-trench-sandbag flex z-10 scanlines bg-[#020501]" id="battlefield">
         
         {/* Real-time Mortar Container Overlay */}
         <div className="mortar-container" id="mortar-container">
@@ -453,12 +591,12 @@ export default function RoomDetailPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-trench-black/80 via-transparent to-transparent pointer-events-none"></div>
           
           {/* Moon Army Commander Portrait */}
-          <div className="absolute top-2 left-2 md:top-4 md:left-4 border-2 border-dashed border-neon-moon bg-trench-black/85 px-1.5 py-0.5 md:px-3 md:py-1 rotate-[-4deg] shadow-lg flex items-center gap-1.5">
+          <div className="absolute top-2 left-2 md:top-4 md:left-4 border-2 border-dashed border-neon-moon bg-trench-black/85 px-1.5 py-0.5 md:px-3 md:py-1 rotate-[-4deg] shadow-lg flex items-center gap-1.5 z-10">
             <PepePortrait src={PEPE_ASSETS.chadBull} size={20} loading="eager" className="rounded-full sm:size-[28px]" />
             <span className="font-staatliches text-neon-moon text-[8px] sm:text-[10px] md:text-base tracking-widest block glow-moon">BULLISH TRENCH</span>
           </div>
 
-          <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 bg-trench-black/90 border border-neon-moon/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px]">
+          <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 bg-trench-black/90 border border-neon-moon/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] z-10">
             <span className="font-mono text-[7px] sm:text-[9px] text-neon-moon block font-bold uppercase tracking-wider">MOON POT</span>
             <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{room.moonPool.toFixed(2)} SOL</span>
           </div>
@@ -477,12 +615,12 @@ export default function RoomDetailPage() {
           <div className="absolute inset-0 bg-gradient-to-l from-trench-black/80 via-transparent to-transparent pointer-events-none"></div>
 
           {/* Jeet Commander Portrait */}
-          <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 border-2 border-dashed border-jeet-red bg-trench-black/85 px-1.5 py-0.5 md:px-3 md:py-1 rotate-[4deg] shadow-lg flex items-center gap-1.5">
+          <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 border-2 border-dashed border-jeet-red bg-trench-black/85 px-1.5 py-0.5 md:px-3 md:py-1 rotate-[4deg] shadow-lg flex items-center gap-1.5 z-10">
             <span className="font-staatliches text-jeet-red text-[8px] sm:text-[10px] md:text-base tracking-widest block glow-jeet">BEARISH WASTELAND</span>
             <PepePortrait src={PEPE_ASSETS.neonWojak} size={20} loading="eager" className="rounded-full sm:size-[28px]" />
           </div>
 
-          <div className="absolute top-2 right-2 md:top-4 md:right-4 bg-trench-black/90 border border-jeet-red/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] text-right">
+          <div className="absolute top-2 right-2 md:top-4 md:right-4 bg-trench-black/90 border border-jeet-red/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] text-right z-10">
             <span className="font-mono text-[7px] sm:text-[9px] text-jeet-red block font-bold uppercase tracking-wider">JEET POT</span>
             <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{room.jeetPool.toFixed(2)} SOL</span>
           </div>
@@ -490,9 +628,9 @@ export default function RoomDetailPage() {
 
         {/* Absolute Center Swords Emblem & Active Target Status */}
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center pointer-events-none text-center">
-          <div className="bg-trench-mud border-2 sm:border-4 border-trench-sandbag rounded-full w-12 h-12 sm:w-16 sm:h-16 md:w-24 md:h-24 flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.9)] relative animate-pulse">
+          <div className="bg-trench-mud border-2 sm:border-4 border-trench-sandbag rounded-full w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.9)] relative animate-pulse">
             <div className="absolute inset-1 rounded-full border border-dashed border-trench-gasmask/60 opacity-60"></div>
-            <Swords size={18} className="text-white sm:size-[24px] md:size-[36px]" />
+            <Swords size={18} className="text-white sm:size-[24px] md:size-[30px]" />
           </div>
           <div className="mt-2 md:mt-4 bg-trench-black border-2 border-trench-sandbag px-2 py-0.5 md:px-3.5 md:py-1.5 shadow-2xl rounded">
             <p className="font-mono text-[6px] sm:text-[8px] text-trench-gasmask uppercase font-bold tracking-widest">YOU ARE FIGHTING FOR:</p>
@@ -518,6 +656,20 @@ export default function RoomDetailPage() {
           </div>
         </div>
 
+        {/* Sounds Toggle Button */}
+        <button
+          type="button"
+          onClick={() => {
+            setIsMuted(!isMuted);
+            if (isMuted) {
+              synthSound('bet');
+            }
+          }}
+          className="absolute top-2 right-2 md:top-4 md:right-4 z-40 bg-trench-black/85 hover:bg-trench-sandbag border border-trench-sandbag text-[8px] sm:text-[10px] uppercase px-2 py-0.5 sm:px-2.5 sm:py-1 rounded font-mono font-bold tracking-widest transition-colors flex items-center gap-1 text-white shadow-lg pointer-events-auto"
+        >
+          <span>{isMuted ? '🔇 SOUNDS MUTED' : '🔊 SOUNDS PLAYING'}</span>
+        </button>
+
         {/* Dynamic Double-Bar VS Progress Indicator Overlay */}
         <div className="absolute bottom-0 left-0 w-full h-3 flex">
           <div style={{ width: `${moonPercentage}%` }} className="bg-neon-moon h-full shadow-[inset_0_-2px_10px_#39ff14]" />
@@ -525,547 +677,753 @@ export default function RoomDetailPage() {
         </div>
       </section>
 
-      {/* 3. MAIN GRID WRAPPER */}
-      <div className="max-w-7xl w-full mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative z-10">
-        
-        {/* Left Column: Briefing & Comms Panel */}
-        <div className="lg:col-span-8 flex flex-col gap-8">
-          
-          {/* Back Navigation Bar */}
-          <div className="flex items-center justify-between bg-trench-mud border-2 border-trench-sandbag p-3 rounded">
-            <Link href="/rooms" className="inline-flex items-center gap-1.5 text-trench-gasmask hover:text-white font-mono text-xs uppercase font-bold transition-colors">
-              <ArrowLeft size={14} /> RETREAT TO WAR TABLE
-            </Link>
-            <div className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-neon-moon animate-ping" />
-              <span className="font-mono text-[10px] text-neon-moon font-bold uppercase tracking-wider">POT LIVE</span>
-            </div>
-          </div>
-
-          {/* Unified Operation & Stats Section */}
-          <div className="bg-trench-black/80 border-b-4 border-trench-sandbag p-6 relative overflow-hidden space-y-6">
-            
-            {/* Header: Token Info & Total Pot */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10">
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <span className="bg-trench-black border border-trench-sandbag text-trench-gasmask px-2.5 py-0.5 font-mono text-[9px] uppercase rounded-sm font-bold">
-                    SECTOR #{room.id.substring(0, 4)}
-                  </span>
-                  <span className="bg-neon-moon/10 border border-neon-moon text-neon-moon px-2.5 py-0.5 font-mono text-[9px] uppercase rounded-sm font-bold animate-pulse">
-                    BATTLE LIVE
-                  </span>
-                </div>
-                <h1 className="font-staatliches text-3xl md:text-4xl text-white tracking-wider uppercase flex items-center gap-3">
-                  <div className="w-10 h-10 flex items-center justify-center shrink-0">
-                    {room.token.icon && room.token.icon.startsWith('http') ? (
-                      <img src={room.token.icon} alt={room.token.symbol} className="w-full h-full object-cover rounded-full border-2 border-neon-moon shadow-glow-moon" />
-                    ) : (
-                      <span className="text-3xl">{room.token.icon || '📊'}</span>
-                    )}
+      {/* 1. AUTO-SCROLLING HORIZONTAL TREND SLIDER (At the absolute top of the page - duplicate header writeup removed!) */}
+      <div className="w-full bg-[#050803] border-b border-[#193012] py-2.5 overflow-hidden font-mono relative z-20 shadow-inner">
+        <div className="flex animate-marquee whitespace-nowrap gap-8 min-w-full">
+          {Array.from({ length: 2 }).map((_, loopIdx) => (
+            <div key={loopIdx} className="flex gap-8 items-center shrink-0">
+              {top10Tokens.map((tok, idx) => {
+                const isPositive = tok.change.startsWith('+');
+                const badgeColor = isPositive ? 'text-[#39ff14] glow-moon' : 'text-[#ff535a] glow-jeet';
+                const arrow = isPositive ? '↗' : '↘';
+                return (
+                  <div key={`${loopIdx}-${idx}`} className="flex items-center gap-2.5 bg-black/50 border border-[#172c12] px-3.5 py-1.5 rounded-md text-xs select-none">
+                    <span className="font-staatliches tracking-wider text-white uppercase">{tok.name}</span>
+                    <span className="text-[10px] text-trench-gasmask font-bold">(${tok.symbol})</span>
+                    <span className="text-yellow-500 font-bold ml-1">{tok.price}</span>
+                    <span className={`font-extrabold ml-1.5 ${badgeColor}`}>{arrow} {tok.change}</span>
                   </div>
-                  OPERATION: {room.token.name} (${room.token.symbol})
-                  {room.token.chainId && (
-                    <span className="ml-3 text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded-full uppercase border border-gray-600">
-                      {room.token.chainId}
-                    </span>
-                  )}
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 2. MAIN GRID WRAPPER (2-column layout - Active Combat lg:col-span-9, Stance Configurator lg:col-span-3) */}
+      <main className="max-w-none w-full px-2 sm:px-4 md:px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative z-10 flex-1">
+        
+        {/* COLUMN 1: ACTIVE COIN COMBAT (lg:col-span-9) */}
+        <section className="lg:col-span-9 flex flex-col gap-6">
+          
+          {/* Header Panel with countdown bomb, back to war room, and mission briefing buttons */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-trench-mud border-2 border-trench-sandbag p-3.5 rounded gap-4">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <Link href="/rooms">
+                <button className="px-3 py-1.5 bg-trench-black hover:bg-trench-sandbag text-trench-gasmask hover:text-white border border-trench-sandbag rounded font-staatliches text-xs sm:text-sm tracking-wider uppercase transition-colors shrink-0 font-bold">
+                  ← WAR ROOM
+                </button>
+              </Link>
+              <Link href="/?play_intro=true">
+                <button className="px-3 py-1.5 bg-trench-black hover:bg-trench-sandbag text-trench-gasmask hover:text-white border border-trench-sandbag rounded font-staatliches text-xs sm:text-sm tracking-wider uppercase transition-colors shrink-0 font-bold">
+                  📜 MISSION BRIEFING
+                </button>
+              </Link>
+              <div className="flex flex-col ml-1 sm:ml-2">
+                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">ACTIVE COIN COMBAT</span>
+                <h1 className="font-staatliches text-xl sm:text-2xl text-neon-moon tracking-wider uppercase leading-none mt-0.5">
+                  {room.token.name} (${room.token.symbol})
                 </h1>
               </div>
-              <div className="text-left md:text-right bg-trench-mud border-2 border-trench-sandbag p-3 rounded-lg shadow-lg">
-                <p className="font-mono text-[9px] text-trench-gasmask font-bold uppercase tracking-wider">TOTAL POT SIZE</p>
-                <p className="font-staatliches text-3xl text-moon-gold flex items-center gap-1 md:justify-end glow-gold leading-none mt-1">
-                  <Flame size={22} className="text-moon-gold" />
-                  <span>{totalPot.toFixed(2)} SOL</span>
-                </p>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <div className="flex items-center gap-2 bg-red-950/80 border border-red-500/50 text-red-400 px-3 py-1.5 rounded-lg shadow">
+                <span className="font-mono text-[9px] text-red-500 font-bold uppercase tracking-wider hidden sm:inline">ARENA CLOSING</span>
+                <Bomb size={14} className="animate-pulse text-red-500" />
+                <span className="font-staatliches text-sm tracking-widest text-red-400 bg-red-900/60 px-2 py-0.5 rounded border border-red-700">{countdownText}</span>
               </div>
             </div>
-
-            {/* Degen Briefing */}
-            <div className="font-mono text-sm text-trench-gasmask leading-relaxed font-bold uppercase bg-trench-black border border-trench-sandbag p-4 rounded border-l-4 border-l-neon-moon">
-              <p>
-                INTEL BRIEF: A massive breakout attempt is underway for <span className="text-neon-moon">${room.token.symbol}</span>. 
-                Jeet and Moon forces are locked in heavy combat. Will the chart go parabolic, or will it drill to the Earth's core? Stake your Ammo SOL to tilt the battlefield before the bomb drops!
-              </p>
-            </div>
-
-            {/* Comprehensive Stats Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 relative z-10">
-              <div className="bg-trench-black border border-trench-sandbag p-3 rounded text-center shadow-inner">
-                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">ENTRY PRICE</span>
-                <span className="font-staatliches text-lg text-white block mt-0.5">
-                  {room.openingPrice !== undefined 
-                    ? `$${room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` 
-                    : 'UNKNOWN'}
-                </span>
-              </div>
-              <div className="bg-trench-black border border-trench-sandbag p-3 rounded text-center shadow-inner">
-                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">LAST PRICE</span>
-                <span className="font-staatliches text-lg text-white block mt-0.5 animate-pulse">
-                  {room.status === 'settled' && room.finalTWAP !== undefined
-                    ? `$${room.finalTWAP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
-                    : livePrice !== null
-                    ? `$${livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
-                    : 'ACTIVE'}
-                </span>
-              </div>
-              <div className="bg-trench-mud border border-neon-moon/40 p-3 rounded text-center shadow-glow-moon">
-                <span className="font-mono text-[9px] text-neon-moon block font-bold uppercase">MOON POT</span>
-                <span className="font-staatliches text-xl text-neon-moon block mt-0.5">{room.moonPool.toFixed(2)} SOL</span>
-              </div>
-              <div className="bg-trench-mud border border-jeet-red/40 p-3 rounded text-center shadow-glow-jeet">
-                <span className="font-mono text-[9px] text-jeet-red block font-bold uppercase">JEET POT</span>
-                <span className="font-staatliches text-xl text-jeet-red block mt-0.5">{room.jeetPool.toFixed(2)} SOL</span>
-              </div>
-              <div className="bg-trench-black border border-trench-sandbag p-3 rounded text-center relative overflow-hidden col-span-2 sm:col-span-1">
-                <div className="absolute inset-0 bg-moon-gold/5 animate-pulse" />
-                <span className="font-mono text-[9px] text-moon-gold block font-bold uppercase relative z-10">BOMB DROPS IN</span>
-                <span className="font-staatliches text-xl text-moon-gold block mt-0.5 tracking-wider flex items-center gap-1 justify-center relative z-10">
-                  <Bomb size={16} className="text-moon-gold" />
-                  <span>{countdownText}</span>
-                </span>
-              </div>
-            </div>
-
           </div>
 
-          {/* DexScreener Live Chart */}
-          {room.token.chainId && room.token.pairAddress && (
-            <div className={`bg-trench-black border-4 border-trench-sandbag rounded-lg shadow-2xl relative overflow-hidden transition-all duration-300 ${
-              isChartCollapsed ? 'h-[60px]' : 'h-[500px]'
-            }`}>
-              <div className="absolute top-2 right-4 z-30">
-                <button
-                  type="button"
-                  onClick={() => setIsChartCollapsed(!isChartCollapsed)}
-                  className="bg-trench-mud hover:bg-trench-sandbag border border-trench-sandbag text-neon-moon px-2.5 py-1 rounded font-mono text-[10px] font-bold uppercase tracking-wider transition-all"
-                >
-                  {isChartCollapsed ? 'EXPAND TERMINAL' : 'COLLAPSE TERMINAL'}
-                </button>
+          {/* Toggle buttons for Chart view */}
+          <div className="flex justify-end gap-2 font-mono text-[10px]">
+            <button className="px-3.5 py-1 bg-neon-moon text-black font-bold rounded uppercase tracking-wider border border-neon-moon">
+              Line
+            </button>
+            <button className="px-3.5 py-1 bg-transparent text-trench-gasmask border border-trench-sandbag rounded uppercase tracking-wider hover:text-white transition-colors">
+              Crates
+            </button>
+          </div>
+
+          {/* Stable and Static DexScreener Chart Terminal with Militarized Console Shell Frame (Permanently Flicker-Free) */}
+          {room.token.chainId && (
+            <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[410px] flex flex-col justify-between z-10 scanlines">
+              
+              {/* Steel Console Top Header Bar */}
+              <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex items-center justify-between font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">
+                {/* corner rivets */}
+                <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                
+                <div className="flex items-center gap-2 pl-4">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#39ff14] shadow-[0_0_8px_#39ff14]" />
+                  <span className="text-white tracking-widest font-staatliches text-xs">CRT RADAR CONSOLE</span>
+                </div>
+                
+                {/* System status LEDs */}
+                <div className="flex items-center gap-3 pr-4">
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-[#39ff14] shadow-[0_0_6px_#39ff14]" />
+                    <span>SYS ON</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_6px_#f59e0b] animate-ping" />
+                    <span>DEX SYNC</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="absolute top-[-16px] left-[50%] -translate-x-[50%] bg-trench-sandbag border-2 border-trench-gasmask text-white px-6 py-1 rounded font-staatliches text-sm tracking-widest shadow uppercase z-20">
-                LIVE TERMINAL
+              {/* Interactive Iframe CRT Panel Overlay Container */}
+              <div className="w-full flex-1 relative bg-black overflow-hidden group">
+                
+                {/* 1. Vertical Sweep Radar Overlay */}
+                <div className="radar-sweep-line absolute left-0 right-0 h-[2px] bg-neon-moon/20 shadow-[0_0_10px_#39ff14] z-10 pointer-events-none" />
+
+                {/* 2. Glass Reflection Glare Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none z-10" />
+
+                {/* 3. CRT Scanline Grid Overlay */}
+                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.15)_50%)] bg-[size:100%_4px] opacity-25 z-10" />
+
+                {/* 4. Steel Overlay Inner Shadows */}
+                <div className="absolute inset-0 border border-white/5 pointer-events-none z-10 shadow-[inset_0_0_15px_rgba(0,0,0,0.95)]" />
+
+                {/* Memoized Stable chart iframe. Specifying a unique React Key forces React to reuse 
+                    the existing DOM node instead of rebuilding it on parent wagers state updates,
+                    completely resolving any iframe flashing/flickering! */}
+                <StableDexChart 
+                  key={`dexscreener-${room.id}`}
+                  chainId={room.token.chainId}
+                  pairAddress={room.token.pairAddress || ''}
+                />
               </div>
 
-              {!isChartCollapsed && (
-                <>
-                  {isChartLoading && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-trench-black z-10 animate-pulse">
-                      <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
-                      <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
-                        CONNECTING TO DEXSCREENER TERMINAL...
-                      </span>
-                    </div>
-                  )}
-                  <iframe
-                    className={`w-full h-full mt-4 border-none transition-opacity duration-500 ${isChartLoading ? 'opacity-0' : 'opacity-100'}`}
-                    src={`https://dexscreener.com/${room.token.chainId}/${room.token.pairAddress}?embed=1&theme=dark&info=0&trades=0`}
-                    title="DexScreener Chart"
-                    onLoad={() => setIsChartLoading(false)}
-                  ></iframe>
-                </>
-              )}
+              {/* Steel Console Bottom Panel */}
+              <div className="w-full bg-[#0d140a] border-t border-[#2c3d25] px-3.5 py-1.5 flex items-center justify-between font-mono text-[8px] text-trench-gasmask uppercase font-bold relative select-none">
+                <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                
+                <span className="pl-4">INDEXER ADDR: {room.token.pairAddress ? room.token.pairAddress.substring(0, 16) : 'WAITING'}...</span>
+                <span className="pr-4 text-neon-moon">CHANNEL SECURE</span>
+              </div>
             </div>
           )}
 
-
-
-          {/* Degen Comms Bandwidth (Bicameral Radio Comms) */}
-          <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg shadow-2xl flex flex-col h-[420px] relative scanlines">
-            <div className="absolute top-[-16px] left-[50%] -translate-x-[50%] bg-trench-sandbag border-2 border-trench-gasmask text-white px-6 py-1 rounded font-staatliches text-sm tracking-widest shadow uppercase z-10">
-              RADIO BANDWIDTH
+          {/* 🛡️ TARGET AREA TELEMETRY & COIN INTEL BRIEFING */}
+          <div className="bg-trench-black border-2 border-trench-sandbag p-4 rounded-lg font-mono text-xs shadow-2xl relative space-y-4">
+            <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm font-bold uppercase border-b border-trench-sandbag pb-2">
+              <Terminal className="w-4 h-4 text-yellow-500 animate-pulse" />
+              <span>🛡️ TARGET AREA TELEMETRY & COIN BRIEFING</span>
             </div>
 
-            {/* Radio feed */}
-            <div
-              ref={chatScrollRef}
-              className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-xs select-text scrollbar mt-2"
-            >
-              {activeRoomChats.length > 0 ? (
-                activeRoomChats.map((msg, index) => {
-                  const isHQ = msg.user.includes('HQ') || msg.user.includes('COMMAND');
-                  const bubbleColor = isHQ
-                    ? 'bg-yellow-500/10 border-yellow-500 text-yellow-200'
-                    : msg.side === 'moon'
-                    ? 'bg-neon-moon/5 border-neon-moon/20 text-green-200'
-                    : 'bg-jeet-red/5 border-jeet-red/20 text-red-200';
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
+                <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide">
+                  {room.token.chainId === 'solana' ? 'Solana Mainnet' : room.token.chainId ? `${room.token.chainId} Net` : 'Solana Network'}
+                </span>
+              </div>
 
-                  return (
-                    <div
-                      key={index}
-                      className={`p-2.5 rounded border shadow-inner flex items-start gap-2 ${bubbleColor}`}
-                    >
-                      <div className="w-6 h-6 flex-shrink-0 bg-trench-black border border-trench-sandbag rounded flex items-center justify-center font-staatliches text-[10px] text-white">
-                        {msg.side === 'moon' ? '🐸' : '💀'}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-center mb-1 text-[10px] opacity-75 font-bold">
-                          <span className={isHQ ? 'text-yellow-500 font-bold' : msg.side === 'moon' ? 'text-neon-moon' : 'text-jeet-red'}>
-                            {msg.user}
-                          </span>
-                          <span>
-                            {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                          </span>
-                        </div>
-                        <p className="leading-normal break-words font-bold uppercase text-[11px] font-mono">
-                          {msg.message}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ENTRY PRICE (POOL)</span>
+                <span className="text-yellow-500 font-staatliches text-base block mt-0.5">
+                  ${room.openingPrice !== undefined 
+                    ? room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) 
+                    : '0.00000864'}
+                </span>
+              </div>
+
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">LAST PRICE (REALTIME)</span>
+                <span className="text-neon-moon font-staatliches text-base block mt-0.5 glow-moon animate-pulse">
+                  {livePrice !== null 
+                    ? `$${livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` 
+                    : `$${(room.openingPrice || 0.00000864).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`}
+                </span>
+              </div>
+
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROOM DURATION</span>
+                <span className="text-white font-staatliches text-base block mt-0.5">
+                  {room.duration ? `${Math.floor(room.duration / 60000)} MINS` : '60 MINUTES'}
+                </span>
+              </div>
+            </div>
+
+            {/* Coin Briefing Text */}
+            <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed uppercase border-l-4 border-l-neon-moon">
+              <span className="text-neon-moon font-bold block mb-1">COIN INTEL BRIEF:</span>
+              {room.token.symbol === 'PEPE' ? (
+                <span>🐸 Pepe the frog, standard infantry memecoin. Plunged into the bearish mud after local high listings, currently fighting for bullish recovery inside the SOL arena. Highly volatile.</span>
+              ) : room.token.symbol === 'WIF' ? (
+                <span>🐕 Soldier Dogwifhat, holding the line with a standard-issue wool cap. Defending the bullish support trench with high-morale community reinforcement.</span>
+              ) : room.token.symbol === 'JEET' ? (
+                <span>💀 Breadline Skeleton. Dev rugged early on, leaving the jeets to pick up the pieces. Volatility is critical, expect sudden explosive action.</span>
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center p-4 text-trench-gasmask">
-                  <MessageSquare size={32} className="opacity-40 animate-pulse mb-2" />
-                  <span className="font-staatliches text-lg uppercase tracking-wide">
-                    FREQUENCY QUIET
-                  </span>
-                  <span className="text-[10px] uppercase font-bold block max-w-xs">
-                    No active operations comms intercepted on this link. Transmit to rally!
-                  </span>
-                </div>
+                <span>📊 Operation targeting ${room.token.symbol} (${room.token.name}). Active token index synced in real time via DEXSCREENER. Factions are competing to influence the TWAP before deployment countdown expires.</span>
               )}
             </div>
-
-            {/* Chat Send input */}
-            <form
-              onSubmit={handleSendChat}
-              className="p-3 border-t-2 border-trench-sandbag bg-trench-black flex gap-2 rounded-b-lg"
-            >
-              <input
-                type="text"
-                placeholder={`BROADCAST TO SQUAD...`}
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                className="flex-1 px-3 py-2 bg-trench-mud border border-trench-sandbag text-white text-xs font-mono rounded focus:border-neon-moon focus:outline-none uppercase placeholder-trench-gasmask/50 font-bold"
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 bg-trench-sandbag hover:bg-trench-gasmask text-white rounded transition-colors flex items-center justify-center"
-              >
-                <Send size={14} />
-              </button>
-            </form>
           </div>
 
-        </div>
-
-        {/* Right Column: Loading Ammo Faction Crate (Load Ammo) */}
-        <div className="lg:col-span-4 relative">
-          
-          <div className="sticky top-24 bg-trench-mud border-4 border-trench-sandbag p-6 shadow-2xl relative scanlines rounded-lg" id="bet-panel">
-            {/* Decorative Corner Screws */}
-            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-            <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-            <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+          {/* Split Pool boxes at bottom of Center column */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            <div className="text-center border-b-2 border-trench-sandbag pb-4 mb-5">
-              <PepePortrait src={selectedSide === 'moon' ? PEPE_ASSETS.chadBull : PEPE_ASSETS.jeetSkeleton} size={56} glowColor={selectedSide === 'moon' ? 'moon' : 'jeet'} animated className="rounded-full mx-auto mb-3" />
-              <h3 className="font-staatliches text-3xl text-white tracking-wide uppercase">Deploy Capital</h3>
-              <p className="font-mono text-[9px] text-trench-gasmask font-bold mt-0.5 uppercase tracking-widest">SELECT AMMUNITION YIELD</p>
+            {/* Moon Pool Box */}
+            <div className="bg-trench-mud border-2 border-neon-moon/40 p-4 rounded-xl text-center shadow-glow-moon flex flex-col justify-between">
+              <div>
+                <span className="font-mono text-[9px] text-neon-moon block font-bold uppercase tracking-wider">🚀 MOON POOL</span>
+                <span className="font-staatliches text-2xl sm:text-3xl text-neon-moon block mt-1 leading-none">
+                  {room.moonPool.toFixed(1)} SOL
+                </span>
+              </div>
+              <div className="mt-3 w-full bg-trench-black rounded-full h-2.5 border border-trench-sandbag overflow-hidden">
+                <div style={{ width: `${moonPercentage}%` }} className="bg-neon-moon h-full shadow-[0_0_10px_#39ff14]" />
+              </div>
+              <span className="font-mono text-[8px] text-trench-gasmask block font-bold uppercase mt-2">Bullish on upswing</span>
             </div>
 
-            {isSettled ? (
-              // Concluded / Settled State card
-              <div className="space-y-4 text-center py-4">
-                <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
-                  <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME</span>
-                  <span className={`font-staatliches text-3xl block mt-1 tracking-wider ${
-                    room.winner === 'moon' ? 'text-neon-moon glow-moon' : 'text-jeet-red glow-jeet'
-                  }`}>
-                    {room.winner === 'moon' ? 'MOON ARMY WON' : 'JEET SQUADRON WON'}
-                  </span>
-                </div>
-
-                {/* Tactical Skirmish Receipt / Evidence Card */}
-                <div className="bg-trench-black border border-dashed border-trench-sandbag p-4 rounded text-left font-mono text-[10px] text-trench-gasmask uppercase space-y-2 relative">
-                  <div className="absolute top-3 right-3 flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-neon-moon animate-pulse" />
-                    <span className="text-[7px] text-neon-moon font-bold tracking-wider">VERIFIED ON-CHAIN</span>
-                  </div>
-                  <h4 className="font-staatliches text-xs text-white tracking-widest border-b border-trench-sandbag pb-1.5 mb-2 flex items-center gap-1 font-bold">
-                    🛡️ SKIRMISH RECEIPT & EVIDENCE
-                  </h4>
-                  <div className="flex justify-between items-center mt-1">
-                    <span>SECTOR TARGET:</span>
-                    <span className="text-white font-bold">${room.token.symbol}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>ENTRY PRICE:</span>
-                    <span className="text-white font-bold">
-                      ${room.openingPrice !== undefined ? room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>EXIT PRICE (SPOT):</span>
-                    <span className="text-white font-bold">
-                      ${room.finalPrice !== undefined ? room.finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span>TWAP EXIT (EMA):</span>
-                    <span className="text-moon-gold font-bold">
-                      ${room.twapFinalPrice !== undefined ? room.twapFinalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
-                    </span>
-                  </div>
-                  <div className="border-t border-dashed border-trench-sandbag pt-2 mt-2 flex justify-between items-center text-[7px] text-trench-gasmask/60">
-                    <span>SECTOR KEY:</span>
-                    <span className="select-all font-mono font-bold">{room.id.substring(0, 14)}...</span>
-                  </div>
-                </div>
-
-                {userWon && (
-                  <div className="p-4 bg-trench-black border-2 border-moon-gold rounded text-center relative overflow-hidden">
-                    <Award size={36} className="text-moon-gold mx-auto mb-2 animate-bounce" />
-                    <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed">
-                      YOUR FORCES DECREED VICTORY. WAR BONDS SECURED!
-                    </p>
-                    {hasUnclaimed ? (
-                      <button
-                        onClick={handleClaim}
-                        disabled={isTransactionLoading}
-                        className="w-full mt-4 py-3 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold flex items-center justify-center gap-2"
-                      >
-                        {isTransactionLoading ? (
-                          <>
-                            <Loader2 className="animate-spin text-black shrink-0" size={20} />
-                            <span>CLAIMING BOOTY...</span>
-                          </>
-                        ) : (
-                          <span>CLAIM WAR WINNINGS🏆</span>
-                        )}
-                      </button>
-                    ) : (
-                      <div className="mt-4 p-2 bg-trench-mud border border-trench-sandbag rounded font-mono text-[9px] text-moon-gold uppercase font-bold">
-                        🎉 Winnings Dispatched to Ammo Wallet!
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {userLost && (
-                  <div className="p-4 bg-red-950/40 border border-jeet-red rounded text-center">
-                    <p className="font-mono text-[10px] text-jeet-red font-bold uppercase leading-relaxed animate-pulse">
-                      YOU GOT EXIT LIQUIDITY STAMPED!
-                    </p>
-                    <button
-                      onClick={() => router.push('/rooms')}
-                      className="w-full mt-4 py-2 bg-trench-black hover:bg-trench-sandbag text-white border border-trench-sandbag font-staatliches text-base uppercase rounded font-bold"
-                    >
-                      RETREAT TO FRONTLINES
-                    </button>
-                  </div>
-                )}
-
-                {!userWon && !userLost && (
-                  <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
-                    <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold">
-                      Sector closed. You did not participate in this skirmish.
-                    </p>
-                    <button
-                      onClick={() => router.push('/rooms')}
-                      className="w-full mt-4 py-2 bg-trench-sandbag hover:bg-trench-gasmask text-white font-staatliches text-base uppercase rounded font-bold"
-                    >
-                      CHOOSE NEXT TARGET
-                    </button>
-                  </div>
-                )}
-
+            {/* Jeet Pool Box */}
+            <div className="bg-trench-mud border-2 border-jeet-red/40 p-4 rounded-xl text-center shadow-glow-jeet flex flex-col justify-between">
+              <div>
+                <span className="font-mono text-[9px] text-jeet-red block font-bold uppercase tracking-wider">💀 JEET POOL</span>
+                <span className="font-staatliches text-2xl sm:text-3xl text-jeet-red block mt-1 leading-none">
+                  {room.jeetPool.toFixed(1)} SOL
+                </span>
               </div>
-            ) : room.expiry <= Date.now() ? (
-              // Expired but not settled yet (Pending telemetry resolving)
-              <div className="space-y-4 text-center py-4 animate-pulse">
-                <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
-                  <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME PENDING</span>
-                  <span className="font-staatliches text-2xl block mt-1 tracking-wider text-moon-gold glow-moon uppercase">
-                    TELEMETRY RESOLVING
+              <div className="mt-3 w-full bg-trench-black rounded-full h-2.5 border border-trench-sandbag overflow-hidden">
+                <div style={{ width: `${jeetPercentage}%` }} className="bg-jeet-red h-full shadow-[0_0_10px_#ff535a]" />
+              </div>
+              <span className="font-mono text-[8px] text-trench-gasmask block font-bold uppercase mt-2">Bearish on rug</span>
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* COLUMN 2: STANCE CONFIGURATOR (lg:col-span-3) */}
+        <section className="lg:col-span-3 bg-trench-mud border-4 border-trench-sandbag p-5 shadow-2xl relative scanlines rounded-lg" id="bet-panel">
+          {/* Decorative Corner Screws */}
+          <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+          <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+          <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+          
+          <div className="text-center border-b-2 border-trench-sandbag pb-4 mb-5">
+            <span className="font-staatliches text-sm text-yellow-500 block uppercase tracking-wider text-left mb-2">🛡️ STANCE CONFIGURATOR</span>
+            
+            {/* Displaying requested images (moonJuice for moon and jeetSkeleton for jeet) */}
+            <PepePortrait 
+              src={selectedSide === 'moon' ? PEPE_ASSETS.moonJuice : PEPE_ASSETS.jeetSkeleton} 
+              size={56} 
+              glowColor={selectedSide === 'moon' ? 'moon' : 'jeet'} 
+              animated 
+              className="rounded-full mx-auto mb-3" 
+            />
+            
+            <h3 className="font-staatliches text-2xl text-white tracking-wide uppercase">Deploy Capital</h3>
+            <p className="font-mono text-[9px] text-trench-gasmask font-bold mt-0.5 uppercase tracking-widest">SELECT AMMUNITION YIELD</p>
+          </div>
+
+          {/* Win Streak Indicator inside the Stance Configurator sidebar (Wallet Balance removed) */}
+          <div className="mb-5 text-[9px] font-mono uppercase font-bold text-center">
+            <div className="bg-black/60 border border-[#1d3515] p-2.5 rounded">
+              <div className="text-yellow-500 flex items-center justify-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Win Streak
+              </div>
+              <div className="text-red-500 font-staatliches text-sm sm:text-base mt-0.5">
+                {user?.stats?.winStreak !== undefined ? `${user.stats.winStreak} wins` : '0 wins'}
+              </div>
+            </div>
+          </div>
+
+          {isSettled ? (
+            // Concluded / Settled State card
+            <div className="space-y-4 text-center py-4">
+              <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
+                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME</span>
+                <span className={`font-staatliches text-3xl block mt-1 tracking-wider ${
+                  room.winner === 'moon' ? 'text-neon-moon glow-moon' : 'text-jeet-red glow-jeet'
+                }`}>
+                  {room.winner === 'moon' ? 'MOON ARMY WON' : 'JEET SQUADRON WON'}
+                </span>
+              </div>
+
+              {/* Tactical Skirmish Receipt / Evidence Card */}
+              <div className="bg-trench-black border border-dashed border-trench-sandbag p-4 rounded text-left font-mono text-[10px] text-trench-gasmask uppercase space-y-2 relative">
+                <div className="absolute top-3 right-3 flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-neon-moon animate-pulse" />
+                  <span className="text-[7px] text-neon-moon font-bold tracking-wider">VERIFIED ON-CHAIN</span>
+                </div>
+                <h4 className="font-staatliches text-xs text-white tracking-widest border-b border-trench-sandbag pb-1.5 mb-2 flex items-center gap-1 font-bold">
+                  🛡️ EVIDENCE RECEIPT
+                </h4>
+                <div className="flex justify-between items-center mt-1">
+                  <span>TARGET Symbol:</span>
+                  <span className="text-white font-bold">${room.token.symbol}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>ENTRY PRICE:</span>
+                  <span className="text-white font-bold">
+                    ${room.openingPrice !== undefined ? room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
                   </span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span>EXIT PRICE (SPOT):</span>
+                  <span className="text-white font-bold">
+                    ${room.finalPrice !== undefined ? room.finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span>TWAP EXIT (EMA):</span>
+                  <span className="text-moon-gold font-bold">
+                    ${room.twapFinalPrice !== undefined ? room.twapFinalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
+                  </span>
+                </div>
+              </div>
 
-                {userBetsInRoom.length > 0 ? (
-                  <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
-                    <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed mb-4">
-                      YOU HAVE ACTIVE FORCES IN THIS SECTOR! CHOOSE TO RESOLVE TRENCH VIA DEXSCREENER DATA TO REVEAL THE OUTCOME AND CLAIM BOOTY.
-                    </p>
+              {userWon && (
+                <div className="p-4 bg-trench-black border-2 border-moon-gold rounded text-center relative overflow-hidden">
+                  <Award size={36} className="text-moon-gold mx-auto mb-2 animate-bounce" />
+                  <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed">
+                    YOUR FORCES DECREED VICTORY. WAR BONDS SECURED!
+                  </p>
+                  {hasUnclaimed ? (
                     <button
                       onClick={handleClaim}
                       disabled={isTransactionLoading}
-                      className="w-full py-3 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold flex items-center justify-center gap-2 uppercase tracking-wider transition-all"
+                      className="w-full mt-4 py-3 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold flex items-center justify-center gap-2"
                     >
                       {isTransactionLoading ? (
                         <>
                           <Loader2 className="animate-spin text-black shrink-0" size={20} />
-                          <span>RESOLVING DEXSCREENER & SETTLING...</span>
+                          <span>CLAIMING BOOTY...</span>
                         </>
                       ) : (
-                        <span>RESOLVE & CLAIM🏆</span>
+                        <span>CLAIM WAR WINNINGS🏆</span>
                       )}
                     </button>
-                  </div>
-                ) : (
-                  <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
-                    <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold leading-relaxed mb-4">
-                      Sector concluded. Settle now to process telemetry resolution.
-                    </p>
+                  ) : (
+                    <div className="mt-4 p-2 bg-trench-mud border border-trench-sandbag rounded font-mono text-[9px] text-moon-gold uppercase font-bold">
+                      🎉 Winnings Dispatched to Ammo Wallet!
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {userLost && (
+                <div className="p-4 bg-red-950/40 border border-jeet-red rounded text-center">
+                  <p className="font-mono text-[10px] text-jeet-red font-bold uppercase leading-relaxed animate-pulse">
+                    YOU GOT EXIT LIQUIDITY STAMPED!
+                  </p>
+                  <button
+                    onClick={() => router.push('/rooms')}
+                    className="w-full mt-4 py-2 bg-trench-black hover:bg-trench-sandbag text-white border border-trench-sandbag font-staatliches text-base uppercase rounded font-bold"
+                  >
+                    RETREAT TO FRONTLINES
+                  </button>
+                </div>
+              )}
+
+              {isDrawOrVoid && userBetsInRoom.length > 0 && (
+                <div className="p-4 bg-trench-black border-2 border-yellow-500 rounded text-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-yellow-500/5 animate-pulse" />
+                  <ShieldAlert size={36} className="text-yellow-500 mx-auto mb-2 animate-bounce" />
+                  <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed relative z-10">
+                    {room.moonPool === 0 || room.jeetPool === 0
+                      ? "ONE-SIDED SKIRMISH: NO OPPOSING FORCES ENGAGED. SECURING FULL STAKE REFUND!"
+                      : "BATTLE CONCLUDED IN A DRAW! RECOVERING WAR FUNDS!"}
+                  </p>
+                  {hasUnclaimed ? (
                     <button
                       onClick={handleClaim}
                       disabled={isTransactionLoading}
-                      className="w-full py-3 bg-trench-sandbag hover:bg-trench-gasmask disabled:bg-trench-black disabled:text-trench-gasmask text-white font-staatliches text-base uppercase rounded font-bold flex items-center justify-center gap-2"
+                      className="w-full mt-4 py-3 bg-yellow-500 hover:bg-yellow-400 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-yellow-800 shadow-glow-yellow font-bold flex items-center justify-center gap-2 relative z-10"
                     >
                       {isTransactionLoading ? (
                         <>
-                          <Loader2 className="animate-spin text-white shrink-0" size={16} />
-                          <span>RESOLVING DEXSCREENER DATA...</span>
+                          <Loader2 className="animate-spin text-black shrink-0" size={20} />
+                          <span>RETRIEVING SOL...</span>
                         </>
                       ) : (
-                        <span>RESOLVE TRENCH FOR KEEPER</span>
+                        <span>CLAIM FULL REFUND 💰</span>
                       )}
                     </button>
-                  </div>
-                )}
+                  ) : (
+                    <div className="mt-4 p-2 bg-trench-mud border border-trench-sandbag rounded font-mono text-[9px] text-yellow-500 uppercase font-bold relative z-10">
+                      🎉 Funds Safely Recovered to Ammo Wallet!
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!userWon && !userLost && (!isDrawOrVoid || userBetsInRoom.length === 0) && (
+                <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
+                  <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold">
+                    Sector closed. You did not participate in this skirmish.
+                  </p>
+                  <button
+                    onClick={() => router.push('/rooms')}
+                    className="w-full mt-4 py-2 bg-trench-sandbag hover:bg-trench-gasmask text-white font-staatliches text-base uppercase rounded font-bold"
+                  >
+                    CHOOSE NEXT TARGET
+                  </button>
+                </div>
+              )}
+
+            </div>
+          ) : room.expiry <= Date.now() ? (
+            // Expired but not settled yet (Pending telemetry resolving)
+            <div className="space-y-4 text-center py-4 animate-pulse">
+              <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
+                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME PENDING</span>
+                <span className="font-staatliches text-2xl block mt-1 tracking-wider text-moon-gold glow-moon uppercase">
+                  TELEMETRY RESOLVING
+                </span>
               </div>
-            ) : (
-              // Active Faction Selector + Slider controls
-              <>
-                {/* Faction selector buttons */}
-                <div className="flex gap-3 mb-6">
+
+              {userBetsInRoom.length > 0 ? (
+                <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
+                  <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed mb-4">
+                    YOU HAVE ACTIVE FORCES IN THIS SECTOR! CHOOSE TO RESOLVE TRENCH VIA DEXSCREENER DATA TO REVEAL THE OUTCOME AND CLAIM BOOTY.
+                  </p>
+                  <button
+                    onClick={handleClaim}
+                    disabled={isTransactionLoading}
+                    className="w-full py-3 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold flex items-center justify-center gap-2 uppercase tracking-wider transition-all"
+                  >
+                    {isTransactionLoading ? (
+                      <>
+                        <Loader2 className="animate-spin text-black shrink-0" size={20} />
+                        <span>RESOLVING DEXSCREENER & SETTLING...</span>
+                      </>
+                    ) : (
+                      <span>RESOLVE & CLAIM🏆</span>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
+                  <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold leading-relaxed mb-4">
+                    Sector concluded. Settle now to process telemetry resolution.
+                  </p>
+                  <button
+                    onClick={handleClaim}
+                    disabled={isTransactionLoading}
+                    className="w-full py-3 bg-trench-sandbag hover:bg-trench-gasmask disabled:bg-trench-black disabled:text-trench-gasmask text-white font-staatliches text-base uppercase rounded font-bold flex items-center justify-center gap-2"
+                  >
+                    {isTransactionLoading ? (
+                      <>
+                        <Loader2 className="animate-spin text-white shrink-0" size={16} />
+                        <span>RESOLVING DEXSCREENER DATA...</span>
+                      </>
+                    ) : (
+                      <span>RESOLVE TRENCH FOR KEEPER</span>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Active Faction Selector + Slider controls
+            <>
+              {/* 1. PICK YOUR STANCE */}
+              <div className="mb-4">
+                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-2">1. PICK YOUR STANCE</span>
+                <div className="flex gap-3">
                   <button
                     onClick={() => {
                       setSelectedSide('moon');
                       synthSound('bet');
                     }}
-                    className={`flex-1 py-3 border-2 font-staatliches text-lg uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-2.5 border-2 font-staatliches text-base uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
                       selectedSide === 'moon'
-                        ? 'border-neon-moon bg-neon-moon/10 text-neon-moon shadow-glow-moon font-bold'
+                        ? 'border-neon-moon bg-neon-moon/10 text-neon-moon shadow-glow-moon font-bold animate-pulse'
                         : 'border-trench-sandbag bg-trench-black text-trench-gasmask hover:text-white hover:border-white'
                     }`}
                   >
-                    <span>🚀 MOON</span>
+                    <span>BET MOON 🚀</span>
                   </button>
                   <button
                     onClick={() => {
                       setSelectedSide('jeet');
                       synthSound('bet');
                     }}
-                    className={`flex-1 py-3 border-2 font-staatliches text-lg uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-2.5 border-2 font-staatliches text-base uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
                       selectedSide === 'jeet'
-                        ? 'border-jeet-red bg-jeet-red/10 text-jeet-red shadow-glow-jeet font-bold'
+                        ? 'border-jeet-red bg-jeet-red/10 text-jeet-red shadow-glow-jeet font-bold animate-pulse'
                         : 'border-trench-sandbag bg-trench-black text-trench-gasmask hover:text-white hover:border-white'
                     }`}
                   >
-                    <span>💀 JEET</span>
+                    <span>BET JEET 💀</span>
                   </button>
                 </div>
+              </div>
 
-                {/* Amount selection crate slider */}
-                <div className="mb-6 bg-trench-black p-4 border border-trench-sandbag rounded">
-                  <div className="flex justify-between items-center mb-3">
-                    <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">PAYLOAD WEIGHT</span>
-                    <span className="font-mono text-xs font-bold text-white tracking-wider">{stakeAmount.toFixed(2)} SOL</span>
-                  </div>
+              {/* 2. AMMUNITION (SOL) Preset Selector Slots */}
+              <div className="mb-6 bg-trench-black p-4 border border-trench-sandbag rounded">
+                <div className="flex justify-between items-center mb-3 border-b border-trench-sandbag/40 pb-2">
+                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">2. AMMUNITION (SOL)</span>
+                </div>
 
-                  {/* Radix Slider */}
-                  <Slider.Root
-                    className="relative flex items-center select-none touch-none w-full h-5"
-                    value={[stakeAmount]}
-                    onValueChange={(val) => setStakeAmount(val[0])}
-                    min={0.01}
-                    max={5.0}
-                    step={0.05}
-                  >
-                    <Slider.Track className="bg-trench-mud relative grow rounded-full h-2.5 border border-trench-sandbag overflow-hidden">
-                      <Slider.Range className={`absolute h-full rounded-full ${
-                        selectedSide === 'moon' ? 'bg-neon-moon shadow-glow-moon' : 'bg-jeet-red shadow-glow-jeet'
-                      }`} />
-                    </Slider.Track>
-                    <Slider.Thumb
-                      className="block w-5 h-5 bg-moon-gold border-2 border-trench-black rounded-full hover:scale-110 focus:outline-none transition-transform cursor-pointer shadow-md"
-                      aria-label="Stake amount"
-                    />
-                  </Slider.Root>
-
-                  {/* Quick percentage clicks */}
-                  <div className="flex gap-2 mt-4">
-                    {[0.05, 0.1, 0.5, 1.0, 3.0].map((val) => (
+                {/* Preset slots layout matching mockup */}
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  {[0.05, 0.1, 0.5, 1.0].map((val) => {
+                    const isSelected = stakeAmount === val;
+                    return (
                       <button
                         key={val}
                         onClick={() => {
                           setStakeAmount(val);
                           synthSound('bet');
                         }}
-                        className={`flex-1 py-1 text-center font-mono text-[10px] border rounded transition-all font-bold ${
-                          stakeAmount === val
-                            ? 'bg-moon-gold text-black border-moon-gold font-bold'
+                        className={`py-2 text-center font-mono text-xs border rounded transition-all font-bold ${
+                          isSelected
+                            ? 'bg-yellow-400 text-black border-yellow-500 font-bold shadow-[0_0_8px_rgba(251,191,36,0.6)]'
                             : 'bg-trench-mud text-trench-gasmask border-trench-sandbag hover:text-white'
                         }`}
                       >
-                        {val}
+                        {val} SOL
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
 
-                {/* Pot statistics and multipliers */}
-                <div className="space-y-2 mb-6 font-mono text-xs border-b border-trench-sandbag/40 pb-4">
-                  <div className="flex justify-between text-trench-gasmask uppercase font-bold">
-                    <span>POT MULTIPLIER</span>
-                    <span className="text-white font-bold">{getMultiplier(selectedSide)}x</span>
-                  </div>
-                  <div className="flex justify-between text-trench-gasmask uppercase font-bold">
-                    <span>EXPECTED BOOTY</span>
-                    <span className="text-neon-moon font-bold">+{getPotentialPayout(selectedSide).toFixed(2)} SOL</span>
-                  </div>
-                  <div className="flex justify-between text-trench-gasmask/60 text-[10px] uppercase font-bold">
-                    <span>TRENCH MINE FEE</span>
-                    <span>0.002 SOL</span>
-                  </div>
-                </div>
-
-                {/* Glowing Faction Bet confirming clicker */}
-                <button
-                  onClick={handleCharge}
-                  className={`w-full py-4 text-center font-staatliches text-2xl uppercase tracking-widest text-black rounded border-2 active:translate-y-0.5 transition-all relative overflow-hidden group shadow-lg font-bold ${
-                    selectedSide === 'moon'
-                      ? 'bg-neon-moon border-neon-moon shadow-glow-moon hover:bg-green-500'
-                      : 'bg-jeet-red border-jeet-red shadow-glow-jeet hover:bg-red-500'
-                  }`}
+                {/* Radix Slider */}
+                <Slider.Root
+                  className="relative flex items-center select-none touch-none w-full h-5 cursor-pointer"
+                  value={[stakeAmount]}
+                  onValueChange={(val) => setStakeAmount(val[0])}
+                  min={0.01}
+                  max={5.0}
+                  step={0.05}
                 >
-                  <span className="relative z-10">CONFIRM CHARGE</span>
-                  {/* Shimmer overlay block */}
-                  <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-white/20 skew-x-[-20deg] group-hover:animate-[shimmer_1s_ease-in-out_infinite]"></div>
-                </button>
+                  <Slider.Track className="bg-trench-mud relative grow rounded-full h-2 border border-trench-sandbag overflow-hidden">
+                    <Slider.Range className={`absolute h-full rounded-full ${
+                      selectedSide === 'moon' ? 'bg-neon-moon shadow-glow-moon' : 'bg-jeet-red shadow-glow-jeet'
+                    }`} />
+                  </Slider.Track>
+                  <Slider.Thumb
+                    className="block w-4 h-4 bg-yellow-400 border border-yellow-600 rounded-full hover:scale-110 focus:outline-none transition-transform cursor-pointer shadow-md"
+                    aria-label="Stake amount"
+                  />
+                </Slider.Root>
 
-                <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold">
-                  <ShieldAlert size={16} className="text-jeet-red shrink-0 mt-0.5" />
-                  <p>
-                    Bets are locked. Firing shells takes permanent SOL ammo payload. Settles are finalized immediately when countdown drops!
-                  </p>
+                {/* Range text below slider matching mockup */}
+                <div className="flex justify-between items-center mt-3 font-mono text-[9px] text-trench-gasmask uppercase font-bold">
+                  <span>Min: 0.01 SOL</span>
+                  <span className="text-yellow-400">Amt: {stakeAmount.toFixed(2)} SOL</span>
+                  <span>Max: 5.0 SOL</span>
                 </div>
-              </>
-            )}
+              </div>
 
-            {/* 4. RUBBER STAMP OVERLAYS ON SETTLEMENT */}
-            {isSettled && (
-              <div 
-                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-staatliches text-5xl font-black tracking-widest border-4 uppercase p-3 rotate-[-15deg] backdrop-blur-sm z-40 bg-black/90 pointer-events-none transition-all duration-300 animate-pulse ${
-                  userWon
-                    ? 'border-neon-moon text-neon-moon shadow-glow-moon'
-                    : userLost
-                    ? 'border-jeet-red text-jeet-red shadow-glow-jeet'
-                    : 'border-trench-sandbag text-white'
+              {/* Pot statistics and multipliers */}
+              <div className="space-y-2 mb-6 font-mono text-xs border-b border-trench-sandbag/40 pb-4">
+                <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                  <span>POT MULTIPLIER</span>
+                  <span className="text-white font-bold">{getMultiplier(selectedSide)}x</span>
+                </div>
+                <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                  <span>EXPECTED BOOTY</span>
+                  <span className="text-neon-moon font-bold">+{getPotentialPayout(selectedSide).toFixed(2)} SOL</span>
+                </div>
+                <div className="flex justify-between text-trench-gasmask/60 text-[10px] uppercase font-bold">
+                  <span>TRENCH MINE FEE</span>
+                  <span>0.002 SOL</span>
+                </div>
+              </div>
+
+              {/* Glowing Faction Bet confirming Yellow tactical hatch button matching mockup */}
+              <button
+                onClick={handleCharge}
+                disabled={isTransactionLoading}
+                className="w-full py-4 text-center font-staatliches text-2xl uppercase tracking-widest text-black rounded border-2 border-yellow-300 border-b-4 border-yellow-700 bg-yellow-400 hover:bg-yellow-500 active:translate-y-0.5 transition-all relative overflow-hidden group shadow-lg font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.3)] disabled:bg-trench-sandbag disabled:border-trench-sandbag disabled:text-trench-gasmask hatch-pattern"
+              >
+                {isTransactionLoading ? (
+                  <Loader2 className="animate-spin text-black shrink-0" size={20} />
+                ) : (
+                  <span className="relative z-10 flex items-center gap-1.5 justify-center font-bold">
+                    <Sparkles size={20} className="text-black shrink-0 animate-pulse" />
+                    STAKE ON POT!
+                  </span>
+                )}
+                {/* Shimmer overlay block */}
+                <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-white/20 skew-x-[-20deg] group-hover:animate-[shimmer_1s_ease-in-out_infinite]"></div>
+              </button>
+
+              <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold">
+                <ShieldAlert size={16} className="text-jeet-red shrink-0 mt-0.5" />
+                <p>
+                  Bets are locked. Firing shells takes permanent SOL ammo payload. Finalized on countdown expiry!
+                </p>
+              </div>
+            </>
+          )}
+
+          {/* 4. RUBBER STAMP OVERLAYS ON SETTLEMENT */}
+          {isSettled && (
+            <div 
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-staatliches text-5xl font-black tracking-widest border-4 uppercase p-3 rotate-[-15deg] backdrop-blur-sm z-40 bg-black/90 pointer-events-none transition-all duration-300 animate-pulse ${
+                userWon
+                  ? 'border-neon-moon text-neon-moon shadow-glow-moon'
+                  : userLost
+                  ? 'border-jeet-red text-jeet-red shadow-glow-jeet'
+                  : 'border-trench-sandbag text-white'
+              }`}
+            >
+              {userWon ? 'VICTORY' : userLost ? 'GET REKT' : 'SETTLED'}
+            </div>
+          )}
+
+        </section>
+
+      </main>
+
+      {/* 3. BOTTOM LOGS PANEL (tactical radar feed bars side-by-side) */}
+      <footer className="max-w-none w-full px-2 sm:px-4 md:px-6 py-2 grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10 mb-8 font-mono text-[10px]">
+        
+        {/* Left Bottom Bar: Jeet Communications Radar (Chat and system announcements integrated live) */}
+        <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg p-3 h-52 flex flex-col justify-between relative scanlines">
+          <div className="flex justify-between items-center border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
+            <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm font-bold uppercase">
+              <Radio className="w-4 h-4 text-yellow-500 animate-pulse" />
+              <span>((o)) JEET COMMUNICATIONS RADAR</span>
+            </div>
+            
+            {/* Dialogue faction filter tabs */}
+            <div className="flex gap-2 text-[8px] uppercase">
+              <button 
+                onClick={() => {
+                  setActiveChatTab('moon');
+                  synthSound('bet');
+                }}
+                className={`px-2 py-0.5 rounded border ${
+                  activeChatTab === 'moon' 
+                    ? 'bg-neon-moon border-neon-moon text-black font-bold' 
+                    : 'border-trench-sandbag text-trench-gasmask hover:text-white'
                 }`}
               >
-                {userWon ? 'VICTORY' : userLost ? 'GET REKT' : 'SETTLED'}
-              </div>
-            )}
-
+                Moon side
+              </button>
+              <button 
+                onClick={() => {
+                  setActiveChatTab('jeet');
+                  synthSound('bet');
+                }}
+                className={`px-2 py-0.5 rounded border ${
+                  activeChatTab === 'jeet' 
+                    ? 'bg-jeet-red border-jeet-red text-white font-bold' 
+                    : 'border-trench-sandbag text-trench-gasmask hover:text-white'
+                }`}
+              >
+                Jeet side
+              </button>
+            </div>
           </div>
 
+          <div
+            ref={chatScrollRef}
+            className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px] select-text scrollbar"
+          >
+            {/* Always seed a static system status entry at the top */}
+            <div className="flex gap-1.5 items-start text-neon-moon font-bold uppercase">
+              <span>📡</span>
+              <span>[RADAR LOG] Scanning decentralized sector {room.token.symbol} for combat activities...</span>
+            </div>
+            <div className="flex gap-1.5 items-start text-jeet-red font-bold animate-pulse uppercase">
+              <span>⚠️</span>
+              <span>[GAS WAR] Solana network congested; base fee calculated dynamically.</span>
+            </div>
+
+            {activeRoomChats.length > 0 ? (
+              activeRoomChats.map((msg, index) => {
+                const isHQ = msg.user.includes('HQ') || msg.user.includes('COMMAND');
+                const bubbleColor = isHQ
+                  ? 'text-yellow-500'
+                  : msg.side === 'moon'
+                  ? 'text-[#39FF14]'
+                  : 'text-[#ff535a]';
+
+                return (
+                  <div
+                    key={index}
+                    className="flex gap-1.5 items-start font-bold uppercase leading-tight"
+                  >
+                    <span>📡</span>
+                    <span>
+                      <span className={`${bubbleColor} font-bold mr-1.5`}>[{msg.user}]</span>
+                      <span className="text-gray-300">{msg.message}</span>
+                    </span>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex gap-1.5 items-start text-gray-500 font-bold uppercase">
+                <span>📡</span>
+                <span>[RADAR LOG] Waiting for user chat broadcasts on this channel...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Inline Chat Send Input */}
+          <form
+            onSubmit={handleSendChat}
+            className="mt-2 pt-2 border-t border-trench-sandbag flex gap-2"
+          >
+            <input
+              type="text"
+              placeholder={`SEND BROADCAST MESSAGE TO ${activeChatTab.toUpperCase()} SQUAD...`}
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              className="flex-1 px-3 py-1 bg-trench-black border border-trench-sandbag text-white text-[10px] font-mono rounded focus:border-neon-moon focus:outline-none uppercase placeholder-trench-gasmask/50 font-bold"
+            />
+            <button
+              type="submit"
+              className="px-3 py-1 bg-trench-sandbag hover:bg-trench-gasmask text-white rounded transition-colors flex items-center justify-center"
+            >
+              <Send size={10} />
+            </button>
+          </form>
         </div>
 
-      </div>
+        {/* Right Bottom Bar: Battle Command Intelligence Log (Live feed of actions) */}
+        <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg p-3 h-52 flex flex-col justify-between relative scanlines">
+          <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm border-b border-trench-sandbag pb-1.5 mb-2 font-bold uppercase">
+            <Terminal className="w-4 h-4 text-yellow-500" />
+            <span>&gt;_ BATTLE COMMAND INTELLIGENCE LOG</span>
+          </div>
+
+          <div 
+            ref={battleLogScrollRef}
+            className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px] text-lime-400 select-text leading-tight scrollbar"
+          >
+            {battleLogs.map((log, index) => (
+              <div key={index} className="flex gap-1.5 items-start font-bold uppercase">
+                <span>⚔️</span>
+                <span>{log}</span>
+              </div>
+            ))}
+            
+            {/* Conditional Room Status Logs */}
+            {isSettled ? (
+              <div className="flex gap-1.5 items-start text-yellow-400 font-bold uppercase">
+                <span>⚔️</span>
+                <span>[BATTLE OVER] Arena resolved. Faction {room.winner?.toUpperCase()} emerged victorious!</span>
+              </div>
+            ) : room.expiry <= Date.now() ? (
+              <div className="flex gap-1.5 items-start text-yellow-500 font-bold uppercase animate-pulse">
+                <span>⚔️</span>
+                <span>[EXPIRY REACHED] Arena expired. Resolving block oracle parameters...</span>
+              </div>
+            ) : (
+              <div className="flex gap-1.5 items-start text-gray-500 font-bold uppercase animate-pulse">
+                <span>⚔️</span>
+                <span>[TRENCH ACTIVE] Combatants locked in duel. Awaiting block resolution timers.</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+      </footer>
 
       <div className="my-8 max-w-7xl mx-auto w-full px-4">
         <PixelBarbedWire height={16} />

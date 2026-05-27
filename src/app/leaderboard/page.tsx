@@ -133,7 +133,7 @@ export default function LeaderboardPage() {
               <span className="absolute inset-0 border border-black/40 pointer-events-none" />
               <span className="font-staatliches text-2xl sm:text-4xl text-trench-gasmask font-black">2ND</span>
               <span className="font-mono text-[6px] sm:text-[8px] text-trench-gasmask uppercase font-bold -mt-1">
-                WR: {podium2nd.winRate}%
+                WR: {podium2nd.winRate}% | ELO: {podium2nd.elo || 1200}
               </span>
             </div>
           </div>
@@ -167,7 +167,7 @@ export default function LeaderboardPage() {
               <span className="absolute inset-0 border border-black/40 pointer-events-none" />
               <span className="font-staatliches text-3xl sm:text-5xl text-neon-moon font-black glow-moon">1ST</span>
               <span className="font-mono text-[7px] sm:text-[9px] text-neon-moon uppercase font-bold -mt-1 tracking-wider glow-moon">
-                WR: {podium1st.winRate}%
+                WR: {podium1st.winRate}% | ELO: {podium1st.elo || 1200}
               </span>
             </div>
           </div>
@@ -198,7 +198,7 @@ export default function LeaderboardPage() {
               <span className="absolute inset-0 border border-black/40 pointer-events-none" />
               <span className="font-staatliches text-2xl sm:text-4xl text-trench-gasmask font-black">3RD</span>
               <span className="font-mono text-[6px] sm:text-[8px] text-trench-gasmask uppercase font-bold -mt-1">
-                WR: {podium3rd.winRate}%
+                WR: {podium3rd.winRate}% | ELO: {podium3rd.elo || 1200}
               </span>
             </div>
           </div>
@@ -243,7 +243,7 @@ export default function LeaderboardPage() {
                 <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-right">ELO RATING</th>
                 <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-right">NET PROFIT</th>
                 <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-right">ACCURACY RATIO</th>
-                <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-right">WIN STREAK</th>
+                <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-right">BATTLE RECORD</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-trench-sandbag/40">
@@ -319,7 +319,7 @@ export default function LeaderboardPage() {
                     {/* Win Streak */}
                     <td className="py-4 px-4 text-right">
                       <span className="font-staatliches text-base text-neon-moon glow-moon">
-                        {Math.floor(leader.winRate / 12)} WINS
+                        {leader.wins || 0}W - {leader.losses || 0}L
                       </span>
                     </td>
 

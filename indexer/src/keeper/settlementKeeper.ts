@@ -34,6 +34,7 @@ import { config } from '../config';
 import { logger } from '../logger';
 import { prisma } from '../db';
 import { aggregatePrice, mockAggregatePrice } from '../feeds/priceAggregator';
+import { calculatePythTwap } from '../feeds/pythTwap';
 import { updateEloAfterSettlement } from '../elo';
 import {
   keeperSuccessTotal,
@@ -98,6 +99,7 @@ async function settleRoom(
     openingPrice: bigint;
     priceFeed: string | null;
     switchboardFeed: string | null;
+    expiry: Date;
   }
 ): Promise<string> {
   const roomPubkeyStr = roomRecord.roomPubkey;
@@ -181,6 +183,19 @@ async function settleRoom(
       }
     }
 
+    let twapValue: number | null = null;
+    if (pythFeedId && pythFeedId !== '11111111111111111111111111111111') {
+      try {
+        twapValue = await calculatePythTwap(pythFeedId, roomRecord.expiry.getTime(), 5);
+      } catch (err: any) {
+        logger.error({
+          msg: 'Error calculating Pyth TWAP in settlement keeper',
+          room: roomPubkeyStr,
+          err: err?.message,
+        });
+      }
+    }
+
     logger.info({
       msg: 'Submitting settle_room',
       room: roomPubkeyStr,
@@ -188,7 +203,7 @@ async function settleRoom(
       switchboardFeed: switchboardFeedStr || 'none',
       sources: result.sources,
       priceI64: result.priceI64,
-      twapPrice: result.twapPrice,
+      twapPrice: twapValue !== null ? twapValue : result.twapPrice,
     });
 
     try {
@@ -206,8 +221,20 @@ async function settleRoom(
         systemProgram: SystemProgram.programId,
       };
 
-      const scaledPrice = result.priceI64 * 100;
-      const finalPriceParam = new anchor.BN(scaledPrice);
+      let finalPriceParam: anchor.BN;
+      if (twapValue !== null) {
+        const scaledPrice = Math.round(twapValue * 100_000_000);
+        finalPriceParam = new anchor.BN(scaledPrice);
+        logger.info({
+          msg: 'Using Pyth TWAP price for settlement',
+          room: roomPubkeyStr,
+          twapPrice: twapValue,
+          scaledPrice,
+        });
+      } else {
+        const scaledPrice = result.priceI64 * 100;
+        finalPriceParam = new anchor.BN(scaledPrice);
+      }
 
       const tx = await program.methods
         .settleRoom(finalPriceParam)
@@ -330,6 +357,7 @@ export function startSettlementKeeper(
       openingPrice: bigint;
       priceFeed: string | null;
       switchboardFeed: string | null;
+      expiry: Date;
     }[];
 
     try {
@@ -344,6 +372,7 @@ export function startSettlementKeeper(
           openingPrice: true,
           priceFeed: true,
           switchboardFeed: true,
+          expiry: true,
         },
         take: 10, // Process up to 10 rooms per tick to avoid thundering herd
       });

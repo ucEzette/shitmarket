@@ -37,7 +37,7 @@ async function main() {
     anchor.setProvider(provider);
 
     // 3. Connect to program
-    const programId = new PublicKey("GxkRWMoyKpKkTadmGqqqLvA473YTwvDUeSPK1iS8REim");
+    const programId = new PublicKey("2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ");
     const program = new anchor.Program(idl as anchor.Idl, provider);
 
     // 4. Derive PDA

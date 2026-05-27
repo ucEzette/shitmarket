@@ -48,6 +48,10 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
           referralsCount: 0,
           referralEarnings: '0',
           referralPayouts: [],
+          bets: [],
+          winStreak: 0,
+          longestWinStreak: 0,
+          biggestBet: '0',
         },
       });
     }
@@ -58,11 +62,10 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
         ? Math.round((profile.wins / profile.totalBets) * 100)
         : 0;
 
-    // Fetch recent bet history
-    const bets = await prisma.bet.findMany({
+    // Fetch all user's bets to calculate winStreak, longestWinStreak, and biggestBet accurately
+    const allBetsForCalc = await prisma.bet.findMany({
       where: { userPubkey: wallet },
       orderBy: { createdAt: 'desc' },
-      take: 20,
       include: {
         room: {
           select: {
@@ -75,6 +78,53 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
         },
       },
     });
+
+    let winStreak = 0;
+    let longestWinStreak = 0;
+    let biggestBet = 0n;
+
+    // Calculate longest win streak chronologically
+    const chronologicalBets = [...allBetsForCalc].reverse();
+    let tempStreak = 0;
+    for (const b of chronologicalBets) {
+      if (b.room.status === 'settled') {
+        const won = b.side === b.room.winner;
+        if (won) {
+          tempStreak++;
+          if (tempStreak > longestWinStreak) {
+            longestWinStreak = tempStreak;
+          }
+        } else {
+          tempStreak = 0;
+        }
+      }
+    }
+
+    // Calculate current win streak going backwards chronologically (from most recent bet backwards)
+    for (const b of allBetsForCalc) {
+      if (b.room.status === 'settled') {
+        const won = b.side === b.room.winner;
+        if (won) {
+          winStreak++;
+        } else {
+          break; // broke the streak
+        }
+      }
+    }
+
+    // Calculate biggest bet
+    for (const b of allBetsForCalc) {
+      if (b.amount > biggestBet) {
+        biggestBet = b.amount;
+      }
+    }
+
+    // Fetch recent bet history (limited to 20 for profile display page performance)
+    const bets = allBetsForCalc.slice(0, 20).map((b) => ({
+      ...b,
+      amount: b.amount.toString(),
+      won: b.room.status === 'settled' && b.side === b.room.winner,
+    }));
 
     return res.json({
       success: true,
@@ -89,11 +139,10 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
           betAmount: p.betAmount.toString(),
           rewardAmount: p.rewardAmount.toString(),
         })),
-        bets: bets.map((b) => ({
-          ...b,
-          amount: b.amount.toString(),
-          won: b.room.status === 'settled' && b.side === b.room.winner,
-        })),
+        bets,
+        winStreak,
+        longestWinStreak,
+        biggestBet: biggestBet.toString(),
       },
     });
   } catch (err: any) {

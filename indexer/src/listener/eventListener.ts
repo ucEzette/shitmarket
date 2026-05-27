@@ -219,7 +219,7 @@ async function handleRoomCreated(event: RoomCreatedEvent): Promise<void> {
     const expiry = new Date(event.expiryTimestamp.toNumber() * 1000);
 
     const meta = await fetchTokenMeta(tokenMint);
-    const openingPrice = scalePriceTo1e8(meta.priceUsd, BigInt(event.openingPrice.toString()));
+    const openingPrice = BigInt(event.openingPrice.toString());
 
     await prisma.room.upsert({
       where: { roomPubkey },
@@ -277,7 +277,7 @@ async function handleRoomCreated(event: RoomCreatedEvent): Promise<void> {
   }
 }
 
-async function handleBetPlaced(event: BetPlacedEvent): Promise<void> {
+async function handleBetPlaced(event: BetPlacedEvent, signature?: string): Promise<void> {
   const end = eventProcessingDuration.startTimer({ event_type: 'BetPlaced' });
   try {
     const roomPubkey = event.room.toBase58();
@@ -293,11 +293,11 @@ async function handleBetPlaced(event: BetPlacedEvent): Promise<void> {
     if (existing) {
       await prisma.bet.update({
         where: { id: existing.id },
-        data: { amount: existing.amount + amount },
+        data: { amount: existing.amount + amount, txSig: signature || existing.txSig },
       });
     } else {
       await prisma.bet.create({
-        data: { roomPubkey, userPubkey, side, amount },
+        data: { roomPubkey, userPubkey, side, amount, txSig: signature },
       });
     }
 
@@ -758,7 +758,7 @@ export async function processParsedEvents(events: any[], signature: string): Pro
         await handleRoomCreated(event.data as RoomCreatedEvent);
         break;
       case 'BetPlaced':
-        await handleBetPlaced(event.data as BetPlacedEvent);
+        await handleBetPlaced(event.data as BetPlacedEvent, signature);
         break;
       case 'RoomSettled':
         await handleRoomSettled(event.data as RoomSettledEvent);

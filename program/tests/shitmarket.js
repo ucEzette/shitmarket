@@ -540,6 +540,7 @@ describe("shitmarket", () => {
                 .claimWinnings()
                 .accounts({
                 room: fastRoomPda,
+                config: configPda,
                 escrow: fastEscrowPda,
                 bet: fastMoonBetPda,
                 user: fastMoonBettor.publicKey,
@@ -561,6 +562,7 @@ describe("shitmarket", () => {
                     .claimWinnings()
                     .accounts({
                     room: fastRoomPda,
+                    config: configPda,
                     escrow: fastEscrowPda,
                     bet: fastMoonBetPda,
                     user: fastMoonBettor.publicKey,
@@ -581,6 +583,7 @@ describe("shitmarket", () => {
                     .claimWinnings()
                     .accounts({
                     room: fastRoomPda,
+                    config: configPda,
                     escrow: fastEscrowPda,
                     bet: fastJeetBetPda,
                     user: fastJeetBettor.publicKey,
@@ -762,6 +765,7 @@ describe("shitmarket", () => {
                 .claimWinnings()
                 .accounts({
                 room: edgeRoomPda,
+                config: configPda,
                 escrow: edgeEscrowPda,
                 bet: lonelyBetPda,
                 user: lonelyBettor.publicKey,

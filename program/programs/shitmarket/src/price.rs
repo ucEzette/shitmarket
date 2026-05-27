@@ -359,4 +359,125 @@ mod tests {
     fn test_median_all_same() {
         assert_eq!(median_oracle_price(&[777_000, 777_000, 777_000]), Some(777_000));
     }
+
+    #[test]
+    fn test_fuzz_pool_distribution() {
+        // Run 10,000 randomized iterations to check boundaries
+        let mut rng_seed: u64 = 42;
+        let fee_bps = 125; // 1.25% fee
+
+        for _ in 0..10_000 {
+            // Pseudo-random LCG generator
+            rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let user_bets_count = (rng_seed % 50) + 1; // 1 to 50 users
+
+            let mut winning_bets = Vec::new();
+            let mut losing_bets = Vec::new();
+            let mut total_winning_pool: u64 = 0;
+            let mut total_losing_pool: u64 = 0;
+
+            for _ in 0..user_bets_count {
+                rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let bet_amount = (rng_seed % 100_000_000_000) + 1_000_000; // 0.001 SOL to 100 SOL
+
+                rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                if rng_seed % 2 == 0 {
+                    winning_bets.push(bet_amount);
+                    total_winning_pool += bet_amount;
+                } else {
+                    losing_bets.push(bet_amount);
+                    total_losing_pool += bet_amount;
+                }
+            }
+
+            // Ensure winning pool is not empty
+            if total_winning_pool == 0 {
+                continue;
+            }
+
+            let total_pool = total_winning_pool + total_losing_pool;
+
+            // 1. Fee calculation fuzz check
+            let platform_fee = calc_platform_fee(total_pool, fee_bps).unwrap();
+            let expected_fee_max = ((total_pool as u128) * (fee_bps as u128) / 10_000) as u64;
+            assert!(platform_fee <= expected_fee_max, "Platform fee exceeds expected upper bound!");
+
+            let total_payout_pool = total_pool.checked_sub(platform_fee).unwrap();
+
+            // 2. Proportional payouts fuzz check
+            let mut sum_payouts: u64 = 0;
+            for &user_bet in &winning_bets {
+                let payout = calc_payout(user_bet, total_winning_pool, total_payout_pool).unwrap();
+                sum_payouts += payout;
+
+                // Single user payout must never exceed their proportional share + rounding
+                let expected_payout_max = ((user_bet as u128) * (total_payout_pool as u128) / (total_winning_pool as u128)) as u64;
+                assert!(payout <= expected_payout_max, "Individual payout exceeds proportional bounds!");
+            }
+
+            // 3. Vault solvency fuzz check
+            let total_distributed = platform_fee + sum_payouts;
+            assert!(total_distributed <= total_pool, "Vault insolvent: Distributed lamports exceed total pool!");
+
+            // 4. Maximum rounding loss check: loss should never exceed 1 lamport per winning user
+            let round_loss = total_payout_pool - sum_payouts;
+            assert!(round_loss <= winning_bets.len() as u64, "Rounding loss exceeds expected 1-lamport-per-user boundary!");
+        }
+    }
+
+    #[test]
+    fn test_fuzz_sequential_claims_bug() {
+        let fee_bps = 125; // 1.25% fee
+        let mut rng_seed: u64 = 12345;
+
+        for _ in 0..1_000 {
+            rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+            let bettors_count = (rng_seed % 10) + 2; // 2 to 11 winning bettors
+
+            let mut winning_bets = Vec::new();
+            let mut total_winning_pool: u64 = 0;
+
+            for _ in 0..bettors_count {
+                rng_seed = rng_seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let bet_amount = (rng_seed % 50_000_000_000) + 10_000_000;
+                winning_bets.push(bet_amount);
+                total_winning_pool += bet_amount;
+            }
+
+            let losing_pool = 50_000_000_000;
+            let total_pool = total_winning_pool + losing_pool;
+
+            let platform_fee = calc_platform_fee(total_pool, fee_bps).unwrap();
+            let original_payout_pool = total_pool - platform_fee;
+
+            // --- MODEL A: Buggy Sequential Claims (Dynamic Escrow Balance) ---
+            let mut remaining_escrow_buggy = original_payout_pool;
+            let mut total_distributed_buggy = 0;
+
+            for &user_bet in &winning_bets {
+                // Buggy: uses remaining_escrow_buggy which changes dynamically
+                let payout = calc_payout(user_bet, total_winning_pool, remaining_escrow_buggy).unwrap();
+                total_distributed_buggy += payout;
+                remaining_escrow_buggy = remaining_escrow_buggy.checked_sub(payout).unwrap();
+            }
+
+            // --- MODEL B: Fixed Sequential Claims (Static original_payout_pool) ---
+            let mut total_distributed_fixed = 0;
+            for &user_bet in &winning_bets {
+                // Fixed: uses static original_payout_pool
+                let payout = calc_payout(user_bet, total_winning_pool, original_payout_pool).unwrap();
+                total_distributed_fixed += payout;
+            }
+
+            // In Model B (fixed), the rounding loss is strictly bounded by 1 lamport per user
+            let fixed_rounding_loss = original_payout_pool - total_distributed_fixed;
+            assert!(fixed_rounding_loss <= winning_bets.len() as u64);
+
+            // In Model A (buggy), sequential payouts result in significant undelivered funds remaining stuck in escrow
+            let buggy_rounding_loss = original_payout_pool - total_distributed_buggy;
+            if winning_bets.len() > 1 {
+                assert!(buggy_rounding_loss > fixed_rounding_loss, "Buggy model did not trap excess funds as expected!");
+            }
+        }
+    }
 }

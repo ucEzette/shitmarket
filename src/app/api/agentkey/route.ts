@@ -307,14 +307,16 @@ export async function GET() {
 
     // Helper: prepare and execute a discovered endpoint
     async function prepareAndExecute(candidate: string | null, fallbackWrapper: string, fallbackParams: any) {
+      const activeApiKey = apiKey as string;
       if (!candidate) {
         try {
-          return await executeTool(apiKey, fallbackWrapper, fallbackParams);
+          return await executeTool(activeApiKey, fallbackWrapper, fallbackParams);
         } catch (e) {
           return null;
         }
       }
-      const desc = await describeTool(apiKey, candidate);
+      const activeCandidate = candidate as string;
+      const desc = await describeTool(activeApiKey, activeCandidate);
       let wrapperName = fallbackWrapper;
       let paramsForExec = fallbackParams;
       try {
@@ -324,18 +326,18 @@ export async function GET() {
             wrapperName = execAs.name;
             paramsForExec = execAs.params || execAs.params_template || fallbackParams;
           } else {
-            if (/twitter|social/i.test(candidate)) {
+            if (/twitter|social/i.test(activeCandidate)) {
               wrapperName = 'agentkey_social';
-              paramsForExec = { path: candidate, params: {} };
-            } else if (/crypto|token|market|price|ticker/i.test(candidate)) {
+              paramsForExec = { path: activeCandidate, params: {} };
+            } else if (/crypto|token|market|price|ticker/i.test(activeCandidate)) {
               wrapperName = 'agentkey_crypto';
-              paramsForExec = { path: candidate, params: {} };
-            } else if (candidate.startsWith('agentkey_')) {
-              wrapperName = candidate;
+              paramsForExec = { path: activeCandidate, params: {} };
+            } else if (activeCandidate.startsWith('agentkey_')) {
+              wrapperName = activeCandidate;
               paramsForExec = fallbackParams;
             } else {
               wrapperName = 'agentkey_search';
-              paramsForExec = { query: candidate, type: 'news', num: 5 };
+              paramsForExec = { query: activeCandidate, type: 'news', num: 5 };
             }
           }
         }
@@ -344,15 +346,15 @@ export async function GET() {
       }
 
       if (wrapperName === 'agentkey_social' && (!paramsForExec || typeof paramsForExec !== 'object' || !paramsForExec.path)) {
-        paramsForExec = { path: candidate, params: {} };
+        paramsForExec = { path: activeCandidate, params: {} };
       }
 
       try {
-        const execRes = await executeTool(apiKey, wrapperName, paramsForExec);
+        const execRes = await executeTool(activeApiKey, wrapperName, paramsForExec);
         return execRes;
       } catch (e) {
         try {
-          const execRes2 = await executeTool(apiKey, candidate, fallbackParams);
+          const execRes2 = await executeTool(activeApiKey, activeCandidate, fallbackParams);
           return execRes2;
         } catch (e2) {
           return null;

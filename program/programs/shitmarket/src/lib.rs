@@ -9,7 +9,7 @@ use error::ShitMarketError;
 use price::{calc_payout, calc_platform_fee, moon_wins, compute_ema};
 use pyth::load_price_feed_price;
 
-declare_id!("GxkRWMoyKpKkTadmGqqqLvA473YTwvDUeSPK1iS8REim");
+declare_id!("2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ");
 
 // ─────────────────────────────────────────────
 //  CONSTANTS
@@ -325,6 +325,15 @@ pub struct WinningsClaimed {
     pub amount: u64,
 }
 
+/// Emitted when a room is voided (one-sided — no opposing bets).
+/// All participants receive full refunds, no platform fee taken.
+#[event]
+pub struct RoomVoided {
+    pub room: Pubkey,
+    pub total_refund_pool: u64,
+    pub reason: String,
+}
+
 #[event]
 pub struct PlatformPaused {
     pub paused: bool,
@@ -496,6 +505,12 @@ pub struct ClaimWinnings<'info> {
         constraint = room.status == RoomStatus::Settled @ ShitMarketError::RoomNotSettled
     )]
     pub room: Account<'info, Room>,
+
+    #[account(
+        seeds = [b"platform_config"],
+        bump
+    )]
+    pub config: Account<'info, PlatformConfig>,
 
     /// CHECK: Escrow PDA; validated by seeds.
     #[account(
@@ -877,6 +892,29 @@ pub mod shitmarket {
             ShitMarketError::InsufficientLiquidity
         );
 
+        // ── ONE-SIDED ROOM VOID: if nobody bet the opposing side, void the room.
+        //    All bettors get full refunds — no price oracle needed, no platform fee.
+        let is_one_sided = room.moon_pool == 0 || room.jeet_pool == 0;
+        if is_one_sided {
+            room.status = RoomStatus::Settled;
+            room.winner = None; // Draw path → each bettor claims full stake via claim_winnings
+            room.final_price = room.opening_price; // unchanged — no actual contest
+            room.twap_final_price = room.opening_price;
+
+            emit!(RoomVoided {
+                room: room_key,
+                total_refund_pool: total_pool,
+                reason: "One-sided room: no opposing bets placed. Full refund.".to_string(),
+            });
+
+            msg!(
+                "Room VOIDED (one-sided): moon_pool={} jeet_pool={}. Full refunds available.",
+                room.moon_pool,
+                room.jeet_pool
+            );
+            return Ok(());
+        }
+
         // Phase 3.1: Multi-oracle — validate Pyth feed
         require!(ctx.accounts.price_feed.key() == room.price_feed, ShitMarketError::InvalidPythFeed);
 
@@ -973,8 +1011,18 @@ pub mod shitmarket {
     pub fn claim_winnings(ctx: Context<ClaimWinnings>) -> Result<()> {
         let room = &ctx.accounts.room;
         let bet = &mut ctx.accounts.bet;
+        let config = &ctx.accounts.config;
 
         require!(room.status == RoomStatus::Settled, ShitMarketError::RoomNotSettled);
+
+        let total_pool = room.total_pool()?;
+        let is_one_sided = room.moon_pool == 0 || room.jeet_pool == 0;
+        let platform_fee = if is_one_sided {
+            0
+        } else {
+            calc_platform_fee(total_pool, config.platform_fee_bps)?
+        };
+        let total_payout_pool = total_pool.checked_sub(platform_fee).ok_or(ShitMarketError::Underflow)?;
 
         let payout = if let Some(winner) = room.winner {
             require!(bet.side == winner, ShitMarketError::NotAWinner);
@@ -983,13 +1031,10 @@ pub mod shitmarket {
             } else {
                 room.jeet_pool
             };
-            let escrow_balance = ctx.accounts.escrow.lamports();
-            calc_payout(bet.amount, winning_pool, escrow_balance)?
+            calc_payout(bet.amount, winning_pool, total_payout_pool)?
         } else {
             // It's a draw! Both sides claim proportionally from the remaining escrow
-            let total_pool = room.total_pool()?;
-            let escrow_balance = ctx.accounts.escrow.lamports();
-            calc_payout(bet.amount, total_pool, escrow_balance)?
+            calc_payout(bet.amount, total_pool, total_payout_pool)?
         };
 
         // ── REENTRANCY GUARD: set claimed BEFORE transfer ──────────────

@@ -246,7 +246,7 @@ async function main(): Promise<void> {
     runTwapCron().catch(err => logger.error({ msg: 'twapCron failed', error: err }));
   }, 60000);
 
-  // 10. Self-Healing Backfiller failsafe (Startup run + 15-second interval)
+  // 10. Self-Healing Backfiller failsafe (Startup run + 60-second interval)
   runBackfiller(connection, program, eventParser).catch(err =>
     logger.error({ msg: 'Startup self-healing backfiller failed', error: err })
   );
@@ -254,7 +254,7 @@ async function main(): Promise<void> {
     runBackfiller(connection, program, eventParser).catch(err =>
       logger.error({ msg: 'Interval self-healing backfiller failed', error: err })
     );
-  }, 15000);
+  }, 60000);
 
   // Graceful shutdown handlers
   process.on('SIGTERM', () => shutdown(circuitBreaker));

@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ShitMarket.lol - Coming Soon</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Anybody:ital,wght@0,100..900;1,100..900&amp;family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&amp;family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&amp;family=Syne:wght@400..800&amp;family=Staatliches&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-secondary-container": "#5b000e",
+                        "error-container": "#93000a",
+                        "inverse-surface": "#dae6d0",
+                        "inverse-primary": "#106e00",
+                        "gas-mask-grey": "#8B8B7A",
+                        "trench-black": "#0D0D0A",
+                        "on-tertiary-fixed-variant": "#544600",
+                        "mud-brown": "#2A241A",
+                        "outline": "#85967c",
+                        "secondary-fixed": "#ffdad8",
+                        "secondary": "#ffb3b1",
+                        "sandbag": "#5C5244",
+                        "inverse-on-surface": "#293324",
+                        "surface-container": "#182214",
+                        "surface-tint": "#2ae500",
+                        "on-secondary-fixed": "#410007",
+                        "secondary-container": "#ff535a",
+                        "on-tertiary-fixed": "#221b00",
+                        "tertiary": "#fff9f0",
+                        "primary-fixed-dim": "#2ae500",
+                        "surface-variant": "#2d3828",
+                        "on-tertiary": "#3a3000",
+                        "surface-dim": "#0c1609",
+                        "surface-container-low": "#141e11",
+                        "on-error": "#690005",
+                        "primary-container": "#39ff14",
+                        "on-error-container": "#ffdad6",
+                        "wood-shadow": "#3A2512",
+                        "on-tertiary-container": "#736000",
+                        "on-secondary": "#680011",
+                        "surface-container-lowest": "#071105",
+                        "secondary-fixed-dim": "#ffb3b1",
+                        "on-background": "#dae6d0",
+                        "on-primary": "#053900",
+                        "on-surface-variant": "#baccb0",
+                        "surface": "#0c1609",
+                        "surface-container-highest": "#2d3828",
+                        "outline-variant": "#3c4b35",
+                        "tertiary-fixed": "#ffe16d",
+                        "surface-container-high": "#222d1e",
+                        "tertiary-fixed-dim": "#e9c400",
+                        "on-secondary-fixed-variant": "#92001c",
+                        "on-primary-container": "#107100",
+                        "background": "#0c1609",
+                        "on-primary-fixed": "#022100",
+                        "on-surface": "#dae6d0",
+                        "surface-bright": "#323c2d",
+                        "primary": "#efffe3",
+                        "error": "#ffb4ab",
+                        "wood-plank": "#5C3A21",
+                        "on-primary-fixed-variant": "#095300",
+                        "tertiary-container": "#ffdb40",
+                        "primary-fixed": "#79ff5b",
+                        "moon-gold": "#FFD700",
+                        "jeet-red": "#FF073A",
+                        "neon-moon": "#39FF14"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    spacing: {
+                        "sm": "8px",
+                        "margin-desktop": "32px",
+                        "xl": "40px",
+                        "md": "16px",
+                        "lg": "24px",
+                        "margin-mobile": "12px",
+                        "unit": "4px",
+                        "xs": "4px",
+                        "gutter": "16px"
+                    },
+                    fontFamily: {
+                        "headline-md": ["Staatliches", "Anybody"],
+                        "body-md": ["JetBrains Mono"],
+                        "headline-lg": ["Staatliches", "Anybody"],
+                        "meme-quote": ["Syne"],
+                        "body-lg": ["JetBrains Mono"],
+                        "label-md": ["Space Mono"],
+                        "headline-xl": ["Staatliches", "Anybody"]
+                    },
+                    fontSize: {
+                        "headline-md": ["24px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "letterSpacing": "0.05em", "fontWeight": "400" }],
+                        "meme-quote": ["20px", { "lineHeight": "1.2", "fontWeight": "800" }],
+                        "body-lg": ["18px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "headline-xl": ["64px", { "lineHeight": "1.1", "letterSpacing": "0.05em", "fontWeight": "400" }]
+                    },
+                    animation: {
+                        'crt-flicker': 'flicker 0.15s infinite',
+                        'scanline': 'scanline 8s linear infinite',
+                        'shake': 'shake 0.5s cubic-bezier(.36,.07,.19,.97) both',
+                        'pulse-glow': 'pulseGlow 2s infinite',
+                        'float-up': 'floatUp 4s ease-in-out infinite'
+                    },
+                    keyframes: {
+                        flicker: {
+                            '0%': { opacity: '0.95' },
+                            '100%': { opacity: '1' },
+                        },
+                        scanline: {
+                            '0%': { transform: 'translateY(-100%)' },
+                            '100%': { transform: 'translateY(100vh)' }
+                        },
+                        shake: {
+                            '10%, 90%': { transform: 'translate3d(-5px, 0, 0)' },
+                            '20%, 80%': { transform: 'translate3d(5px, 0, 0)' },
+                            '30%, 50%, 70%': { transform: 'translate3d(-10px, 0, 0)' },
+                            '40%, 60%': { transform: 'translate3d(10px, 0, 0)' }
+                        },
+                        pulseGlow: {
+                            '0%, 100%': { boxShadow: '0 0 10px #39FF14, 0 0 20px #39FF14' },
+                            '50%': { boxShadow: '0 0 20px #39FF14, 0 0 30px #39FF14' }
+                        },
+                        floatUp: {
+                            '0%': { transform: 'translateY(0) scale(1)', opacity: '0' },
+                            '50%': { opacity: '1' },
+                            '100%': { transform: 'translateY(-100px) scale(1.5)', opacity: '0' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .crt-overlay {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+        .vignette {
+            box-shadow: inset 0 0 150px rgba(0,0,0,0.9);
+            pointer-events: none;
+        }
+        .btn-moon {
+            background-color: theme('colors.neon-moon');
+            color: black;
+            box-shadow: 0 0 15px theme('colors.neon-moon');
+            transition: all 0.2s ease;
+        }
+        .btn-moon:hover {
+            box-shadow: 0 0 25px theme('colors.neon-moon');
+            transform: scale(1.05);
+        }
+        .hide-scroll::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scroll {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .glass-panel {
+            background: rgba(42, 36, 26, 0.8);
+            backdrop-filter: blur(10px);
+            border: 2px solid theme('colors.sandbag');
+        }
+        .parallax-bg {
+            background-attachment: fixed;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: cover;
+        }
+    </style>
+</head>
+<body class="bg-trench-black text-on-surface font-body-md h-screen w-screen overflow-hidden flex flex-col items-center justify-center relative select-none">
+<!-- Global Effects -->
+<div class="absolute inset-0 z-50 crt-overlay mix-blend-overlay"></div>
+<div class="absolute inset-0 z-40 vignette"></div>
+<div class="absolute inset-0 w-full h-[10px] bg-white/10 opacity-20 z-40 animate-scanline pointer-events-none"></div>
+<!-- Atmospheric Background (Layered No Man's Land) -->
+<div class="absolute inset-0 z-0 bg-[url('https://lh3.googleusercontent.com/aida/ADBb0ui98Lj2wNcEPbHkJnIiVsPerSVmy1sykUUYRl3_TMpY600tQ20TRpQD5dMrwjwZMa2R-61WL3W0xSGzacAbKHsZBUbqs5qTalu0RTmP87t3X76KmBNxPckkFnzW4GljmIWuJPYWkw1pOP-G84l7hLOJWatVUtKMA9agCgj0r4hi-F628t7CW-i_fXkTnvX7jb7wArfd2uabjgP5dlsaWOOJIrnHURkMCWCFMO0xq_sqfpo9XEwnl5AOlUw')] parallax-bg opacity-30 mix-blend-screen filter grayscale-0"></div>
+<div class="absolute inset-0 z-0 bg-[url('https://lh3.googleusercontent.com/aida/ADBb0ujm_bfJMjSYaaGsyUlH3go_mvr0cMZ1j11Wbg8EUwALgE4V3c43ixcWzpUDxhuuawWi_03GW4o9Zgxeml35xeYeimZ2MTDOmG28qUV1-11JONXY56FANXM4RU86YdLiEVQ4SEvIXkmO5CP5nAEzNxStC7RN-jhMMCDQL_dP4VNwJmCd3yUAY_KDQrPz0vY5wh5keMY_tjj8iGzVUds4xaE6NcIC1taL5jD_Pl_mtWsRXICF17vuL8pSDMn2')] parallax-bg opacity-40 mix-blend-multiply animate-[pulse_10s_ease-in-out_infinite]"></div>
+<div class="absolute inset-0 z-0 bg-trench-black/60"></div>
+<!-- Gamified Floating Elements -->
+<div class="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+<span class="absolute top-1/4 left-1/4 text-4xl animate-float-up text-moon-gold drop-shadow-[0_0_10px_#FFD700]" style="animation-delay: 0s;">🪙</span>
+<span class="absolute top-1/3 right-1/4 text-3xl animate-float-up text-neon-moon drop-shadow-[0_0_10px_#39FF14]" style="animation-delay: 1.5s;">🟩</span>
+<span class="absolute bottom-1/4 left-1/3 text-4xl animate-float-up text-jeet-red drop-shadow-[0_0_10px_#FF073A]" style="animation-delay: 0.8s;">🟥</span>
+<span class="absolute bottom-1/3 right-1/3 text-2xl animate-float-up text-moon-gold drop-shadow-[0_0_10px_#FFD700]" style="animation-delay: 2.2s;">🪙</span>
+<!-- Mortar Smoke FX approximation -->
+<div class="absolute bottom-0 left-10 w-32 h-32 bg-gray-500 rounded-full mix-blend-screen filter blur-3xl opacity-20 animate-pulse"></div>
+<div class="absolute bottom-10 right-20 w-40 h-40 bg-gray-600 rounded-full mix-blend-screen filter blur-3xl opacity-20 animate-pulse" style="animation-delay: 1s;"></div>
+</div>
+<!-- Main Content Container (Military Monitor) -->
+<main class="relative z-20 w-full max-w-5xl mx-auto p-4 md:p-8 flex flex-col items-center h-full max-h-[900px]">
+<!-- Top App Bar -->
+<header class="w-full flex justify-between items-center mb-6 glass-panel p-4 rounded-lg shadow-lg">
+<div class="flex items-center gap-4">
+<img alt="ShitMarket.lol Logo" class="h-16 w-auto object-contain drop-shadow-[0_0_8px_#39FF14]" src="https://lh3.googleusercontent.com/aida/ADBb0uiW2SvDxYpVSv0cQNEYFR6BiAC2wOC4bGAST1WMLVPLCMMjn4Z_YOyIC2i79CvRMDsLZL-JjakgRQmp8dgDCdNhYZxvIh4NVFETD4f9WPiER0wgh-AUIpLbPnyesmkfLDO7gh4WjBCaaAAd8_uTtbS4WOq3yja01JLR3c63IbZ4vrn4VK455avJefnZcLeAXTWzyGAITpeobkU_7LdcFHnQqQtKxOGGoDxh8GBfYEaxFi32DnEDkPD_QDb7"/>
+<h1 class="font-headline-md text-headline-md text-neon-moon tracking-widest uppercase drop-shadow-[0_0_5px_#39FF14] hidden sm:block">SHITMARKET.LOL</h1>
+</div>
+<div class="flex items-center gap-4">
+<button id="btn-record-promo" class="flex items-center gap-2 border-2 border-jeet-red text-jeet-red bg-jeet-red/10 hover:bg-jeet-red hover:text-white px-3 py-1.5 rounded font-label-md text-label-md uppercase tracking-wider transition-all duration-200 shadow-[0_0_10px_rgba(255,7,58,0.2)] hover:shadow-[0_0_15px_rgba(255,7,58,0.5)]">
+<span class="w-2.5 h-2.5 bg-jeet-red rounded-full animate-ping"></span>
+[REC PROMO]
+</button>
+<div class="hidden md:flex items-center gap-4">
+<span class="font-label-md text-label-md text-neon-moon uppercase tracking-widest drop-shadow-[0_0_5px_#39FF14]">Operator Standby</span>
+<span class="material-symbols-outlined text-neon-moon animate-pulse drop-shadow-[0_0_5px_#39FF14]">radar</span>
+</div>
+</div>
+</header>
+<!-- Video Player / Stage -->
+<div class="w-full flex-grow relative bg-mud-brown border-4 border-sandbag rounded-xl shadow-[inset_0_0_50px_rgba(0,0,0,0.9)] overflow-hidden flex flex-col items-center justify-center p-8 transition-all duration-300" id="video-stage">
+<!-- Tactical Bunker Background -->
+<div class="absolute inset-0 z-0 bg-[url('https://lh3.googleusercontent.com/aida/ADBb0ugUd-xTeKI3GcPG_30G8m61Phh2fOyIB_QqO5hr1jr3fnc9TzUtbGdVVCVK38ggenhyJijtZgBq3BjazY1CKGcSGw2_84_dpsGc-TEqwRInwEU6w3MKeKvql1l6pixxj_RahSlbo2XBRypf9CF2BYO2peft3Fnoi8rNEjfpzwfisSF1o8CHfEnshAstxzU7LLiZXOjXslRyRtdeaQu2sNvgUR-XlYHaoiFb5xOoCtv95gFEcII9ZeE7vtAB')] bg-cover bg-center opacity-30 mix-blend-luminosity"></div>
+<!-- Corner Supply Drops -->
+<img alt="Supply Drop" class="absolute top-4 left-4 w-12 h-12 opacity-80 rounded-md border border-sandbag shadow-md z-10" src="https://lh3.googleusercontent.com/aida/ADBb0ujzNWLpw-kIZ0b1RI3DDgRO6twX7Xbql4d_-vClDz3n_nw6Ti5IaDBNUkzG8-qZbbEYr89MSLHiCrNk54KqYBcce0YyG_zYb81RJfewMpDvUKpGfqDiobr6lT7TXfy4kjKiK4e7h2aNOU2Dp-XJm7FIrApkbwAWPiTJQWHcDs94opQ4dxaO_aym_H9kw7F_bdRKQRUQlfG1rHmQ92Z0KfaMLPHgAja0fq-NJCRWQAjtuQ1Xo4IW1maG8aw0"/>
+<img alt="Supply Drop" class="absolute top-4 right-4 w-12 h-12 opacity-80 rounded-md border border-sandbag shadow-md z-10" src="https://lh3.googleusercontent.com/aida/ADBb0ujzNWLpw-kIZ0b1RI3DDgRO6twX7Xbql4d_-vClDz3n_nw6Ti5IaDBNUkzG8-qZbbEYr89MSLHiCrNk54KqYBcce0YyG_zYb81RJfewMpDvUKpGfqDiobr6lT7TXfy4kjKiK4e7h2aNOU2Dp-XJm7FIrApkbwAWPiTJQWHcDs94opQ4dxaO_aym_H9kw7F_bdRKQRUQlfG1rHmQ92Z0KfaMLPHgAja0fq-NJCRWQAjtuQ1Xo4IW1maG8aw0"/>
+<img alt="Supply Drop" class="absolute bottom-4 left-4 w-12 h-12 opacity-80 rounded-md border border-sandbag shadow-md z-10" src="https://lh3.googleusercontent.com/aida/ADBb0ujzNWLpw-kIZ0b1RI3DDgRO6twX7Xbql4d_-vClDz3n_nw6Ti5IaDBNUkzG8-qZbbEYr89MSLHiCrNk54KqYBcce0YyG_zYb81RJfewMpDvUKpGfqDiobr6lT7TXfy4kjKiK4e7h2aNOU2Dp-XJm7FIrApkbwAWPiTJQWHcDs94opQ4dxaO_aym_H9kw7F_bdRKQRUQlfG1rHmQ92Z0KfaMLPHgAja0fq-NJCRWQAjtuQ1Xo4IW1maG8aw0"/>
+<img alt="Supply Drop" class="absolute bottom-4 right-4 w-12 h-12 opacity-80 rounded-md border border-sandbag shadow-md z-10" src="https://lh3.googleusercontent.com/aida/ADBb0ujzNWLpw-kIZ0b1RI3DDgRO6twX7Xbql4d_-vClDz3n_nw6Ti5IaDBNUkzG8-qZbbEYr89MSLHiCrNk54KqYBcce0YyG_zYb81RJfewMpDvUKpGfqDiobr6lT7TXfy4kjKiK4e7h2aNOU2Dp-XJm7FIrApkbwAWPiTJQWHcDs94opQ4dxaO_aym_H9kw7F_bdRKQRUQlfG1rHmQ92Z0KfaMLPHgAja0fq-NJCRWQAjtuQ1Xo4IW1maG8aw0"/>
+<!-- Sequence 1: Idle / Call to Action -->
+<div class="absolute inset-0 flex flex-col items-center justify-center text-center p-8 z-20 transition-opacity duration-500" id="seq-idle">
+<h2 class="font-headline-xl text-headline-xl text-neon-moon mb-6 tracking-widest uppercase drop-shadow-[0_4px_4px_rgba(0,0,0,0.8)]">The Trenches Are Calling</h2>
+<div class="flex flex-col md:flex-row items-center justify-center gap-6 mb-10 w-full max-w-3xl">
+<img alt="Jeet Skeleton" class="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-jeet-red shadow-[0_0_15px_#FF073A] animate-[pulse_3s_infinite]" src="https://lh3.googleusercontent.com/aida/ADBb0ujmmp01vB-ik8vXkK5BJIWZ9XM9_shZSC_SrMtLH_jLTy4cTgACtyiJZ-IMBuXch-cTeeU3COrEljiITK3-WuePYH9_ufb7Ff3bycmpAko58VNOtsROy9itRBvbkONCslXyKrVNz1Fg8j29_Vvg3Zi2hq3Nr5YDkhNQXr4XfIFUKcg1bZT5nkGtG1ryNhvi-Jpjx02MhznZRS7cbrDY4atWVjCHnlFReBYzMzRVMxbp-T1Z0X3NPoqnTzwk"/>
+<p class="font-body-lg text-body-lg text-on-surface max-w-sm mx-auto bg-trench-black/60 p-4 rounded-lg border border-sandbag/50 backdrop-blur-sm">
+        Predict the direction of any meme coin <span class="text-neon-moon font-bold">WITHOUT</span> holding it. PvP betting for the true degens.
+    </p>
+<img alt="Chad Bull" class="w-24 h-24 md:w-32 md:h-32 rounded-full border-4 border-neon-moon shadow-[0_0_15px_#39FF14] animate-[pulse_3s_infinite_0.5s]" src="https://lh3.googleusercontent.com/aida/ADBb0uhHYVTJsVURv92M-ppCb8tRDLJhZzH7-AticvMm91T86UJi-HeIWAaqd_a1VVu8JbPm3n4Xr5LCBqM8DtASoEyxdE4BuwdZcAdt9CuduC6ZznQLr98MxjiI55LAWSR1bCRixKEqhZhFAJdkDmX8t9kDuJRziuA7ZbP9XoVwfo0PjTkQlRh9DAH0IG9nREAqYWNBMNq9ypqDAEA8Fo6g9C3wUc-Na5T8cGaC0flcOho9VZ0YVMm6cUtmIziM"/>
+</div>
+<div class="flex flex-col md:flex-row items-center justify-center gap-6 mt-4">
+<img alt="Moon General Ape" class="w-20 h-20 rounded-xl border-2 border-moon-gold transform -rotate-6 shadow-lg hidden md:block" src="https://lh3.googleusercontent.com/aida/ADBb0uirQKxs9UaHPI7zRF3Lf8g3IkggtbGrDaGKtNUrTBJ1xpw46QR-oDy0tBYPY-dV4qQGm1Ybl6XtPjZ4Xe7R5wtbD5tYjeT6droyoGpWh-rgJQY7FRt57l8QPT3UWMJ97ce_4vFDIlAmp-wpQ4menAl2ncRFELIHrrFbH6F_Nrn3ZUBXRBYPj0fwCfqcjzM9Hs5r-fShNhiPpV6OuP1vxsK56mLchx9H-xtjFU7MhwpvNVvwL7iDPmFfIwYa"/>
+<button class="btn-moon font-headline-md text-headline-md uppercase px-10 py-5 rounded-lg flex items-center gap-3 tracking-widest relative overflow-hidden group border-2 border-white/20" id="btn-deploy">
+<span class="absolute inset-0 w-full h-full bg-white/20 -translate-x-full group-hover:animate-[scanline_1s_ease-in-out]"></span>
+        Join The Front Line
+        <span class="material-symbols-outlined text-3xl">rocket_launch</span>
+</button>
+<img alt="Diamond Hand Ape" class="w-20 h-20 rounded-xl border-2 border-moon-gold transform rotate-6 shadow-lg hidden md:block" src="https://lh3.googleusercontent.com/aida/ADBb0uifwaj3kt7FkVQs2f1HIYdCrAmjlDYRi6v3p1EJ0yfnhxFv8PhivA046LZvmHysYoOeS02KZc7omfaW3XBukt5LbNLrTpbKkZ3bBeoXz72wnaBIVhGNXJ4Scfl3bIPuLJIn3GalS74xQu5L8gFKPFQfqquCPeThZuxc_-IhznbOdr8wICEpDWukkqQarD2L2Y-1ZOoo2r6bsDu4sNoP3CzsD9sgNcxT-Ez9006_o_d9yLOaJdAcv0MHGOoP"/>
+</div>
+</div>
+<!-- Sequence 2: Action / Hype (Hidden initially) -->
+<div class="absolute inset-0 flex-col items-center justify-center z-30 opacity-0 pointer-events-none transition-opacity duration-500 bg-trench-black/90 backdrop-blur-sm" id="seq-action">
+<!-- Dynamic Text Overlays -->
+<div class="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+<h3 class="font-headline-xl text-[80px] leading-none text-neon-moon uppercase tracking-widest transform scale-0 transition-transform duration-300 drop-shadow-[0_0_20px_#39FF14] text-center w-full absolute" id="hype-text-1">NO BAGS.<br/>JUST BETS.</h3>
+<h3 class="font-headline-xl text-[80px] leading-none text-jeet-red uppercase tracking-widest transform scale-0 transition-transform duration-300 drop-shadow-[0_0_20px_#FF073A] text-center w-full absolute hidden" id="hype-text-2">MOON OR JEET?</h3>
+</div>
+</div>
+</div>
+<!-- Footer Info -->
+<footer class="w-full text-center mt-6 p-4 border-t-2 border-dashed border-sandbag/50 bg-trench-black/40 rounded-b-lg">
+<p class="font-label-md text-label-md text-gas-mask-grey uppercase tracking-widest animate-pulse">Incoming Transmission... Prepare for Deployment</p>
+</footer>
+</main>
+
+<!-- Tactical Recorder Modal -->
+<div id="recorder-modal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-trench-black/90 backdrop-blur-md opacity-0 pointer-events-none transition-all duration-300">
+    <div class="glass-panel w-full max-w-md p-6 rounded-xl shadow-2xl relative flex flex-col gap-4 border-2 border-jeet-red/50 shadow-[0_0_30px_rgba(255,7,58,0.15)]">
+        <!-- CRT effects inside modal too -->
+        <div class="absolute inset-0 z-10 crt-overlay mix-blend-overlay rounded-xl overflow-hidden pointer-events-none"></div>
+        
+        <div class="flex justify-between items-center border-b border-sandbag/50 pb-3">
+            <h3 class="font-headline-md text-headline-md text-jeet-red uppercase tracking-wider flex items-center gap-2">
+                <span class="material-symbols-outlined text-jeet-red animate-pulse">videocam</span>
+                Tactical Recorder
+            </h3>
+            <button id="btn-close-recorder" class="text-gas-mask-grey hover:text-white font-bold font-body-md">✕</button>
+        </div>
+        
+        <div class="font-body-md text-body-md text-on-surface/90 flex flex-col gap-3">
+            <p>This utility captures the dynamic promotional sequence, including the screen-shake effects, custom floating emojis, and synthesized Web Audio, exporting a high-fidelity video file.</p>
+            
+            <div class="bg-surface-container-low border border-sandbag/30 p-3 rounded text-xs leading-relaxed">
+                <strong class="text-neon-moon uppercase font-label-md block mb-1">How to record:</strong>
+                1. Click <span class="text-neon-moon font-semibold">Start Capture</span>.<br>
+                2. Select <span class="text-neon-moon font-semibold">"This Tab"</span> in the browser prompt.<br>
+                3. Make sure to check the box for <span class="text-neon-moon font-semibold">"Share tab audio"</span> so the soundtrack is recorded.<br>
+                4. The script will automatically count down, run the high-hype sequence, stop, and download the video as <code class="text-moon-gold font-mono bg-trench-black px-1 py-0.5 rounded">shitmarket_promo.webm</code>!
+            </div>
+        </div>
+        
+        <div class="flex gap-3 justify-end mt-2">
+            <button id="btn-cancel-record" class="border-2 border-sandbag px-4 py-2 text-gas-mask-grey uppercase hover:bg-white/5 transition-all text-xs font-label-md rounded">Cancel</button>
+            <button id="btn-start-record" class="bg-jeet-red border-2 border-jeet-red text-white hover:bg-red-600 hover:border-red-600 px-5 py-2 uppercase transition-all text-xs font-label-md font-bold rounded shadow-[0_0_15px_rgba(255,7,58,0.4)]">Start Capture</button>
+        </div>
+    </div>
+</div>
+
+<!-- Recorder HUD Overlay -->
+<div id="recorder-hud" class="fixed inset-0 z-[90] flex flex-col items-center justify-between p-8 bg-transparent pointer-events-none opacity-0 transition-opacity duration-300">
+    <div class="w-full flex justify-between items-start">
+        <div class="flex items-center gap-3 bg-trench-black/80 border border-jeet-red/40 px-4 py-2 rounded shadow-lg backdrop-blur-sm">
+            <span class="w-3 h-3 bg-jeet-red rounded-full animate-ping"></span>
+            <span class="font-label-md text-label-md text-jeet-red uppercase tracking-widest font-bold">REC STATUS: ACTIVE</span>
+        </div>
+        <div id="hud-timer" class="font-body-md text-body-md text-moon-gold bg-trench-black/80 border border-sandbag/40 px-4 py-2 rounded shadow-lg backdrop-blur-sm">
+            T-MINUS: 00:03
+        </div>
+    </div>
+    
+    <!-- Large Center Countdown -->
+    <div id="hud-countdown" class="font-headline-xl text-[120px] text-neon-moon drop-shadow-[0_0_30px_#39FF14] animate-pulse select-none hidden">
+        3
+    </div>
+    
+    <div class="w-full flex justify-center">
+        <div class="bg-trench-black/80 border border-sandbag/40 px-6 py-3 rounded shadow-lg backdrop-blur-sm text-center max-w-md">
+            <p id="hud-instruction" class="font-label-md text-label-md text-gas-mask-grey uppercase tracking-widest">System Calibrating... Do not interact.</p>
+        </div>
+    </div>
+</div>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const btnDeploy = document.getElementById('btn-deploy');
+            const seqIdle = document.getElementById('seq-idle');
+            const seqAction = document.getElementById('seq-action');
+            const videoStage = document.getElementById('video-stage');
+            const hypeText1 = document.getElementById('hype-text-1');
+            const hypeText2 = document.getElementById('hype-text-2');
+
+            // Recorder elements
+            const btnRecordPromo = document.getElementById('btn-record-promo');
+            const recorderModal = document.getElementById('recorder-modal');
+            const btnCloseRecorder = document.getElementById('btn-close-recorder');
+            const btnCancelRecord = document.getElementById('btn-cancel-record');
+            const btnStartRecord = document.getElementById('btn-start-record');
+
+            // Audio Context Setup for recording
+            let audioCtx = null;
+            let recordingDestination = null;
+
+            const getAudioContext = () => {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                return audioCtx;
+            };
+
+            const routeNode = (node) => {
+                const ctx = getAudioContext();
+                node.connect(ctx.destination);
+                if (recordingDestination) {
+                    node.connect(recordingDestination);
+                }
+            };
+
+            const playDrum = () => {
+                try {
+                    const ctx = getAudioContext();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    routeNode(gain);
+                    osc.frequency.setValueAtTime(100, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                    gain.gain.setValueAtTime(1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.5);
+                } catch(e) {}
+            };
+
+            const playBeep = () => {
+                try {
+                    const ctx = getAudioContext();
+                    const osc = ctx.createOscillator();
+                    routeNode(osc);
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(440, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                } catch(e) {}
+            };
+
+            const playSweep = () => {
+                try {
+                    const ctx = getAudioContext();
+                    const osc = ctx.createOscillator();
+                    routeNode(osc);
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(150, ctx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.3);
+                } catch(e) {}
+            };
+
+            btnDeploy.addEventListener('click', () => {
+                // Screen Shake and mortar audio
+                document.body.classList.add('animate-shake');
+                playDrum();
+                setTimeout(() => document.body.classList.remove('animate-shake'), 500);
+
+                // Play simple beep sound (browser native if possible, or just visual)
+                playBeep();
+
+                // Transition Scenes
+                seqIdle.classList.add('opacity-0');
+                setTimeout(() => {
+                    seqIdle.classList.add('hidden');
+                    seqAction.classList.remove('opacity-0');
+                    seqAction.classList.add('flex');
+                    
+                    // Trigger Hype Sequence
+                    runHypeSequence();
+                }, 500);
+            });
+
+            function runHypeSequence() {
+                // Flash 1
+                setTimeout(() => {
+                    playDrum();
+                    document.body.classList.add('animate-shake');
+                    setTimeout(() => document.body.classList.remove('animate-shake'), 500);
+                    hypeText1.classList.remove('scale-0');
+                    hypeText1.classList.add('scale-110');
+                    videoStage.style.borderColor = '#39FF14';
+                    videoStage.style.boxShadow = 'inset 0 0 150px rgba(57, 255, 20, 0.4)';
+                }, 100);
+
+                // Hide 1, Flash 2
+                setTimeout(() => {
+                    playDrum();
+                    document.body.classList.add('animate-shake');
+                    setTimeout(() => document.body.classList.remove('animate-shake'), 500);
+                    hypeText1.classList.add('scale-0', 'hidden');
+                    hypeText2.classList.remove('hidden', 'scale-0');
+                    hypeText2.classList.add('scale-110');
+                    videoStage.style.borderColor = '#FF073A';
+                    videoStage.style.boxShadow = 'inset 0 0 150px rgba(255, 7, 58, 0.4)';
+                    
+                    playSweep();
+                }, 2000);
+
+                // Reset / Loop back to idle for demo purposes
+                setTimeout(() => {
+                    hypeText2.classList.add('scale-0', 'hidden');
+                    hypeText1.classList.remove('hidden'); // reset for next time
+                    seqAction.classList.add('opacity-0');
+                    setTimeout(() => {
+                        seqAction.classList.remove('flex');
+                        seqAction.classList.add('hidden');
+                        seqIdle.classList.remove('hidden', 'opacity-0');
+                        videoStage.style.borderColor = 'theme("colors.sandbag")';
+                        videoStage.style.boxShadow = 'inset 0 0 50px rgba(0,0,0,0.9)';
+                    }, 500);
+                }, 4000);
+            }
+
+            // Recorder event listeners
+            const openModal = () => {
+                recorderModal.classList.remove('opacity-0', 'pointer-events-none');
+                recorderModal.classList.add('opacity-100');
+            };
+            
+            const closeModal = () => {
+                recorderModal.classList.add('opacity-0', 'pointer-events-none');
+                recorderModal.classList.remove('opacity-100');
+            };
+
+            btnRecordPromo.addEventListener('click', openModal);
+            btnCloseRecorder.addEventListener('click', closeModal);
+            btnCancelRecord.addEventListener('click', closeModal);
+
+            // Audio & Video Capturing Engine
+            let mediaRecorder = null;
+            let recordedChunks = [];
+            let recordStream = null;
+
+            btnStartRecord.addEventListener('click', async () => {
+                try {
+                    const ctx = getAudioContext();
+                    recordingDestination = ctx.createMediaStreamDestination();
+                    
+                    // Request Screen Capture
+                    recordStream = await navigator.mediaDevices.getDisplayMedia({
+                        video: {
+                            displaySurface: "browser",
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                            frameRate: { ideal: 60 }
+                        },
+                        audio: false // We will supply the crisp Web Audio stream manually!
+                    });
+                    
+                    // Close the Modal
+                    closeModal();
+                    
+                    // Show HUD Overlay
+                    const hud = document.getElementById('recorder-hud');
+                    hud.classList.remove('opacity-0');
+                    hud.classList.add('opacity-100');
+                    
+                    const countdownEl = document.getElementById('hud-countdown');
+                    const instructionEl = document.getElementById('hud-instruction');
+                    const timerEl = document.getElementById('hud-timer');
+                    
+                    countdownEl.classList.remove('hidden');
+                    timerEl.textContent = "T-MINUS: 00:03";
+                    instructionEl.textContent = "Calibrating systems... Do not interact.";
+                    instructionEl.classList.remove('text-neon-moon');
+                    instructionEl.classList.add('text-gas-mask-grey');
+                    
+                    const tracks = [
+                        ...recordStream.getVideoTracks(),
+                        ...recordingDestination.stream.getAudioTracks()
+                    ];
+                    
+                    const combinedStream = new MediaStream(tracks);
+                    
+                    let options = { mimeType: 'video/webm;codecs=vp9,opus' };
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        options = { mimeType: 'video/webm;codecs=vp8,opus' };
+                    }
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        options = { mimeType: 'video/webm' };
+                    }
+                    
+                    recordedChunks = [];
+                    mediaRecorder = new MediaRecorder(combinedStream, options);
+                    
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data && e.data.size > 0) {
+                            recordedChunks.push(e.data);
+                        }
+                    };
+                    
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = 'shitmarket_promo.webm';
+                        document.body.appendChild(a);
+                        a.click();
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                            window.URL.revokeObjectURL(url);
+                        }, 100);
+                        
+                        // Clean up
+                        recordStream.getTracks().forEach(track => track.stop());
+                        recordingDestination = null;
+                        
+                        instructionEl.textContent = "PROMO VIDEO DOWNLOADED SUCCESSFULLY!";
+                        instructionEl.classList.remove('text-gas-mask-grey');
+                        instructionEl.classList.add('text-neon-moon');
+                        
+                        setTimeout(() => {
+                            hud.classList.remove('opacity-100');
+                            hud.classList.add('opacity-0');
+                        }, 3000);
+                    };
+                    
+                    // 3s countdown before running
+                    let countdownSec = 3;
+                    countdownEl.textContent = countdownSec;
+                    playBeep();
+                    
+                    const countdownInterval = setInterval(() => {
+                        countdownSec--;
+                        if (countdownSec > 0) {
+                            countdownEl.textContent = countdownSec;
+                            playBeep();
+                            timerEl.textContent = `T-MINUS: 00:0${countdownSec}`;
+                        } else {
+                            clearInterval(countdownInterval);
+                            countdownEl.classList.add('hidden');
+                            
+                            // Start Recording
+                            mediaRecorder.start();
+                            instructionEl.textContent = "RECORDING RUNNING SEQUENCE...";
+                            timerEl.textContent = "REC: 00:00";
+                            
+                            btnDeploy.click();
+                            
+                            let duration = 0;
+                            const timerInterval = setInterval(() => {
+                                duration++;
+                                const minutes = String(Math.floor(duration / 60)).padStart(2, '0');
+                                const seconds = String(duration % 60).padStart(2, '0');
+                                timerEl.textContent = `REC: ${minutes}:${seconds}`;
+                                
+                                // Hype sequence takes roughly 4.5 seconds to complete. Record for 5.
+                                if (duration >= 5) {
+                                    clearInterval(timerInterval);
+                                    mediaRecorder.stop();
+                                }
+                            }, 1000);
+                        }
+                    }, 1000);
+                    
+                } catch (err) {
+                    console.error("Recording failed", err);
+                    alert("Failed to initialize tactical recording: " + err.message);
+                    closeModal();
+                }
+            });
+        });
+    </script>
+</body></html>

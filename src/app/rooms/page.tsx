@@ -194,7 +194,7 @@ export default function RoomsPage() {
         {/* Jeet Alerts Stub Button with Custom Tooltip */}
         <div className="relative group shrink-0">
           <button className="px-4 py-2 bg-trench-black border border-trench-sandbag text-trench-gasmask hover:text-jeet-red hover:border-jeet-red rounded font-staatliches text-xs tracking-wider uppercase transition-all flex items-center gap-1.5 active:translate-y-0.5">
-            <span className="w-2 h-2 rounded-full bg-jeet-red animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff535a]" />
             <span>ENABLE JEET ALERTS</span>
           </button>
           
@@ -293,7 +293,7 @@ export default function RoomsPage() {
                 {/* Timer Bomb Clock Header */}
                 <div className="flex justify-between items-center mb-2 md:mb-4">
                   <div className="flex items-center gap-1 bg-trench-black border border-trench-sandbag/80 rounded px-2 md:px-2.5 py-0.5 md:py-1">
-                    <Bomb size={10} className={isSettled ? 'text-moon-gold' : 'text-jeet-red animate-pulse'} />
+                    <Bomb size={10} className={isSettled ? 'text-moon-gold' : 'text-jeet-red'} />
                     <span className={`font-mono text-[10px] md:text-xs font-bold ${isSettled ? 'text-moon-gold' : 'text-white'}`}>
                       {timeText}
                     </span>
@@ -394,8 +394,8 @@ export default function RoomsPage() {
                 )}
 
                 {/* Room Detail Entry Overlay Chevron */}
-                <div className="absolute bottom-2 right-2 md:bottom-2.5 md:right-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none text-white">
-                  <ArrowRight size={10} className="animate-ping" />
+                <div className="absolute bottom-2 right-2 md:bottom-2.5 md:right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-1 pointer-events-none text-white">
+                  <ArrowRight size={10} />
                 </div>
               </div>
             );

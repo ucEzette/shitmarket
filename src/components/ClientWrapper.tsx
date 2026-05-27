@@ -196,10 +196,16 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
   const fetchLeaderboard = useAppState((s) => s.fetchLeaderboard);
 
   const pathname = usePathname();
+  const isRoomPage = pathname?.startsWith('/room/');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [konamiProgress, setKonamiProgress] = useState<string[]>([]);
   const [showDegenBanner, setShowDegenBanner] = useState(false);
   const prevSettledCount = useRef<number>(0);
+
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
 
   // Connection and synchronization state references
   const wsRef = useRef<WebSocket | null>(null);
@@ -645,7 +651,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       )}
 
       {/* Main Header */}
-      <Header />
+      <Header isRoomPage={isRoomPage} onMenuToggle={() => setDrawerOpen(!drawerOpen)} />
 
       {isPaused && (
         <div className="w-full bg-red-900 text-white font-staatliches text-2xl tracking-widest uppercase py-3 text-center border-b-4 border-black flex items-center justify-center gap-4 z-40 shadow-[0_0_20px_rgba(255,0,0,0.5)]">
@@ -656,8 +662,24 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       )}
 
       <div className="flex-1 flex min-h-0 w-full relative">
-        {/* Sidebar Nav (Desktop) */}
-        <aside className="hidden lg:flex flex-col w-64 bg-trench-mud border-r-4 border-trench-sandbag shadow-[inset_-4px_0_8px_rgba(0,0,0,0.5)] shrink-0 pt-4 relative scanlines justify-between pb-8 z-30">
+        {/* Backdrop overlay when the drawer is open on room pages (Mobile only) */}
+        {isRoomPage && drawerOpen && (
+          <div 
+            onClick={() => setDrawerOpen(false)} 
+            className="fixed inset-0 bg-black/70 z-45 transition-opacity duration-300 cursor-pointer pointer-events-auto lg:hidden"
+          />
+        )}
+
+        {/* Sidebar Nav (Desktop / Drawer inside Room) */}
+        <aside className={`${
+          isRoomPage
+            ? `fixed lg:static inset-y-0 left-0 z-50 lg:z-30 transform lg:transform-none ${
+                drawerOpen 
+                  ? 'translate-x-0 lg:w-64 lg:border-r-4 lg:opacity-100' 
+                  : '-translate-x-full lg:w-0 lg:overflow-hidden lg:border-r-0 lg:opacity-0 lg:pointer-events-none'
+              } transition-all duration-300 ease-in-out`
+            : 'hidden lg:flex flex-col w-64'
+        } flex flex-col bg-trench-mud border-r-4 border-trench-sandbag shadow-[inset_-4px_0_8px_rgba(0,0,0,0.5)] shrink-0 pt-4 relative scanlines justify-between pb-8`}>
           <div>
             <div className="p-6 border-b-2 border-trench-sandbag mb-4 bg-trench-black/20">
               <div className="flex items-center gap-3 mb-2">
@@ -740,7 +762,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
         </aside>
 
         {/* Main Page Content shifted on desktop */}
-        <main className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-0">
+        <main className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-0 transition-all duration-300 ease-in-out">
           <div className="flex-1 flex flex-col">
             {children}
           </div>

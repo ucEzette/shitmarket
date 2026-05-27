@@ -44,7 +44,14 @@ export const DEGEN_QUOTES = [
   { text: "THIS IS THE WAY.", author: "Mandalorian Degen", mood: 'moon' },
   { text: "MOON OR RAMEN, THERE IS NO MIDDLE CLASS.", author: "Anon Soldier", mood: 'neutral' },
   { text: "DEV DID RUG, BUT THE MEME LIVES ON.", author: "Ghost of Rugpullia", mood: 'jeet' },
-  { text: "1 ETH = 1 ETH. EVERYTHING ELSE IS NOISE.", author: "Zen Degen", mood: 'neutral' },
+  { text: "1 SOL = 1 SOL. EVERYTHING ELSE IS NOISE.", author: "Zen Degen", mood: 'neutral' },
+  { text: "DEV IN DUBAI WITH COCKTAILS. USER RUGGED.", author: "Ghost Dev in Dubai", mood: 'jeet' },
+  { text: "JEET REAPER IS SWEEPING; YOUR SLIPPAGE IS NOT HIGH ENOUGH.", author: "Slippage Sovereign", mood: 'jeet' },
+  { text: "MY WIFE LEFT ME FOR A SOLANA VALIDATOR NODE.", author: "Staking Martyr Anon", mood: 'jeet' },
+  { text: "APE IN WITH THE RENT MONEY, THE LANDLORD IS IN GIGA CHAD SQUAD ANYWAY.", author: "Evicted Degen", mood: 'moon' },
+  { text: "I HAVEN'T SLEPT SINCE 2024. THE 5-MINUTE CANDLES GO FAST.", author: "Candle Whisperer", mood: 'neutral' },
+  { text: "SQUEAKY WET FARTS SOUND HIGHER QUALITY THAN DEV'S PROMISES.", author: "Farting Telemetry Operator", mood: 'jeet' },
+  { text: "GIGA CHAD NEVER SELLS. GIGA CHAD HODLS MOCK CREDITS TO THE GRAVE.", author: "Konami Controller", mood: 'moon' },
 ] as const;
 
 export const getRandomQuote = () => DEGEN_QUOTES[Math.floor(Math.random() * DEGEN_QUOTES.length)];

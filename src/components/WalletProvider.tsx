@@ -7,6 +7,13 @@ import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { clusterApiUrl } from '@solana/web3.js';
 
+import {
+  SolanaMobileWalletAdapter,
+  createDefaultAuthorizationResultCache,
+  createDefaultAddressSelector,
+  createDefaultWalletNotFoundHandler,
+} from '@solana-mobile/wallet-adapter-mobile';
+
 // Default styles for the wallet modal
 import '@solana/wallet-adapter-react-ui/styles.css';
 
@@ -18,7 +25,22 @@ export const SolanaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 
   const wallets = useMemo(
-    () => [],
+    () => {
+      if (typeof window === 'undefined') return [];
+      return [
+        new SolanaMobileWalletAdapter({
+          addressSelector: createDefaultAddressSelector(),
+          appIdentity: {
+            name: 'ShitMarket',
+            uri: 'https://shitmarket.lol',
+            icon: 'favicon.ico',
+          },
+          authorizationResultCache: createDefaultAuthorizationResultCache(),
+          cluster: network,
+          onWalletNotFound: createDefaultWalletNotFoundHandler(),
+        }),
+      ];
+    },
     [network]
   );
 

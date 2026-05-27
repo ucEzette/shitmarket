@@ -1,5 +1,5 @@
 {
-  "address": "GxkRWMoyKpKkTadmGqqqLvA473YTwvDUeSPK1iS8REim",
+  "address": "2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ",
   "metadata": {
     "name": "shitmarket",
     "version": "0.1.0",
@@ -235,6 +235,9 @@
       "accounts": [
         {
           "name": "room"
+        },
+        {
+          "name": "config"
         },
         {
           "name": "escrow",

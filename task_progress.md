@@ -20,4 +20,15 @@
   - [ ] Add reputation scoring logic
   - [ ] Add betting capacity limits
   - [ ] Update indexer for reputation tracking
+- [x] Run E2E localnet verification to confirm that one-sided expired prediction arenas correctly refund 100% of bet stakes (0% fee extraction)
+- [x] Verify Next.js frontend and indexer components are ready for deployment
+
+## Gamified Cinematic Intro Screen
+
+- [x] Create `src/components/SoundSynth.ts` client-side formant filter and Web Audio speech speech synthesizer
+- [x] Integrate `src/components/IntroScreen.tsx` with all 5 interactive scenes (Pepe tears, Chad bull pump, PvP prediction countdown, poop confetti, virtual gamepad Konami code)
+- [x] Append scrolling diagonal green neon grid, scanlines, and CRT animations in `src/app/globals.css`
+- [x] Securely link Konami gamepad success code to Zustand store's `setFullDegenMode(true)`
+- [x] Validate Next.js compile and TypeScript build status
+
 - [ ] Verify TypeScript compilation

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { PublicKey, SystemProgram } from '@solana/web3.js';
+import { PublicKey, SystemProgram, ComputeBudgetProgram } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import {
   getAnchorProgram,
@@ -20,6 +20,7 @@ export interface Bet {
   amount: number; // SOL
   claimed: boolean;
   timestamp: number;
+  txSig?: string | null;
 }
 
 export interface Activity {
@@ -97,6 +98,11 @@ interface LeaderboardEntry {
   profit: number;
   winRate: number;
   elo?: number;
+  wins?: number;
+  losses?: number;
+  totalBets?: number;
+  trenchScore?: string;
+  alignment?: 'moon' | 'jeet';
 }
 
 export interface AppState {
@@ -468,14 +474,20 @@ export const useAppState = create<AppState>((set, get) => ({
       if (json.success && json.data) {
         const mapped = json.data.map((u: any) => ({
           address: u.userPubkey,
-          name: `CMD_${u.userPubkey.slice(0, 4).toUpperCase()}`,
-          profit: Number(u.profit) / 1e9,
-          winRate: u.winRate,
+          name: u.username || `CMD_${u.userPubkey.slice(0, 4).toUpperCase()}`,
+          profit: Number(u.profit || 0) / 1e9,
+          winRate: u.winRate || 0,
+          elo: u.elo || 1200,
+          wins: u.wins || 0,
+          losses: u.losses || 0,
+          totalBets: u.totalBets || 0,
+          trenchScore: u.trenchScore || 'D',
+          alignment: u.alignment || 'moon',
         }));
         
-        // Deterministically split top users into Moon and Jeet tabs for front-end visual compatibility
-        const moon = mapped.filter((_: any, idx: number) => idx % 2 === 0);
-        const jeet = mapped.filter((_: any, idx: number) => idx % 2 === 1);
+        // Split top users into Moon and Jeet tabs based on their database-computed dominant bet side
+        const moon = mapped.filter((u: any) => u.alignment === 'moon');
+        const jeet = mapped.filter((u: any) => u.alignment === 'jeet');
         
         set({
           leaderboard: { moon, jeet }
@@ -650,20 +662,29 @@ export const useAppState = create<AppState>((set, get) => ({
           config: configPda,
           systemProgram: SystemProgram.programId,
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
+        ])
         .rpc();
         
       console.log("Room created successfully on-chain! Tx:", tx);
       
       let onChainExpiry = room.expiry;
       let onChainCreatedAt = room.createdAt;
+      let onChainOpeningPrice = room.openingPrice;
       try {
         const onChain = await (program.account as any).room.fetch(roomPda);
         if (onChain) {
           onChainExpiry = onChain.expiryTimestamp.toNumber() * 1000;
           onChainCreatedAt = onChain.openingTimestamp.toNumber() * 1000;
+          onChainOpeningPrice = onChain.openingPrice.toNumber() / 1e8;
         }
       } catch (fetchErr) {
         console.warn("Failed to fetch on-chain room right after creation for precise countdown:", fetchErr);
+        if (livePriceUsd) {
+          onChainOpeningPrice = parseFloat(livePriceUsd);
+        }
       }
 
       // Optimistically inject the new room into local state to prevent 'TRENCH RUGGED' 404s before indexer syncs
@@ -671,7 +692,8 @@ export const useAppState = create<AppState>((set, get) => ({
         ...room, 
         id: roomPda.toBase58(),
         expiry: onChainExpiry,
-        createdAt: onChainCreatedAt
+        createdAt: onChainCreatedAt,
+        openingPrice: onChainOpeningPrice
       };
       set((state) => ({ rooms: [optimisticRoom, ...state.rooms] }));
       
@@ -728,6 +750,10 @@ export const useAppState = create<AppState>((set, get) => ({
           config: configPda,
           systemProgram: SystemProgram.programId,
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 150_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
+        ])
         .rpc();
         
       console.log("Bet placed successfully on-chain! Tx:", tx);
@@ -790,6 +816,11 @@ export const useAppState = create<AppState>((set, get) => ({
       const roomPda = new PublicKey(roomId);
       const escrowPda = getEscrowPda(roomPda);
       
+      const [configPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from('platform_config')],
+        program.programId
+      );
+      
       const winningSide = room?.winner === 'moon' ? 'moon' : 'jeet';
       const betPda = getBetPda(roomPda, wallet.publicKey, winningSide);
       
@@ -797,12 +828,17 @@ export const useAppState = create<AppState>((set, get) => ({
         .claimWinnings()
         .accounts({
           room: roomPda,
+          config: configPda,
           escrow: escrowPda,
           bet: betPda,
           user: wallet.publicKey,
           payer: wallet.publicKey,
           systemProgram: SystemProgram.programId,
         })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
+        ])
         .rpc();
         
       console.log("Winnings claimed successfully! Tx:", tx);
@@ -893,9 +929,9 @@ export const useAppState = create<AppState>((set, get) => ({
             wins: json.data.wins || 0,
             losses: json.data.losses || 0,
             profit: Number(json.data.profit || 0) / 1e9,
-            winStreak: 0,
-            longestWinStreak: 0,
-            biggestBet: 0,
+            winStreak: json.data.winStreak || 0,
+            longestWinStreak: json.data.longestWinStreak || 0,
+            biggestBet: Number(json.data.biggestBet || 0) / 1e9,
           };
           bets = (json.data.bets || []).map((b: any) => ({
             id: b.id,
@@ -905,6 +941,7 @@ export const useAppState = create<AppState>((set, get) => ({
             amount: Number(b.amount) / 1e9,
             claimed: b.claimedAt ? true : false,
             timestamp: new Date(b.createdAt).getTime(),
+            txSig: b.txSig || null,
           }));
         }
       } catch (err) {

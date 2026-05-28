@@ -667,12 +667,17 @@ export default function ProfilePage() {
                         : 'UNKNOWN_RECRUIT';
                       const betSol = ((Number(p.betAmount) || 0) / 1e9).toFixed(2);
                       const rewardSol = ((Number(p.rewardAmount) || 0) / 1e9).toFixed(4);
-                      const formattedDate = new Date(p.createdAt).toLocaleString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      });
+                      const formattedDate = (() => {
+                        if (!p.createdAt) return 'TBD';
+                        const d = new Date(p.createdAt);
+                        if (isNaN(d.getTime())) return 'TBD';
+                        return d.toLocaleString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+                      })();
                       const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
                       const txUrl = p.txSig 
                         ? isLocal 

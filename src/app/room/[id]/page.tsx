@@ -414,7 +414,7 @@ export default function RoomDetailPage() {
   const hasUnclaimed = isSettled && (userWon || (isDrawOrVoid && userBetsInRoom.length > 0)) && userBetsInRoom.some((b) => !b.claimed);
 
   return (
-    <div className={`w-full flex-1 flex flex-col select-none relative transition-transform duration-100 bg-[#060a04] min-h-screen text-white font-mono ${
+    <div className={`w-full flex-1 flex flex-col select-none relative transition-transform duration-100 bg-muddy-map min-h-screen text-white font-mono ${
       localShake || (userLost && isSettled) ? 'heavy-shake' : ''
     }`}>
       
@@ -705,32 +705,7 @@ export default function RoomDetailPage() {
         
         {/* COLUMN 1: ACTIVE COIN COMBAT (lg:col-span-9) */}
         <section className="lg:col-span-9 flex flex-col gap-6">
-          
-          {/* Header Panel with countdown bomb, back to war room, and mission briefing buttons */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-trench-mud border-2 border-trench-sandbag p-3.5 rounded gap-4">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <Link href="/rooms">
-                <button className="px-3 py-1.5 bg-trench-black hover:bg-trench-sandbag text-trench-gasmask hover:text-white border border-trench-sandbag rounded font-staatliches text-xs sm:text-sm tracking-wider uppercase transition-colors shrink-0 font-bold">
-                  ← WAR ROOM
-                </button>
-              </Link>
-              <Link href="/?play_intro=true">
-                <button className="px-3 py-1.5 bg-trench-black hover:bg-trench-sandbag text-trench-gasmask hover:text-white border border-trench-sandbag rounded font-staatliches text-xs sm:text-sm tracking-wider uppercase transition-colors shrink-0 font-bold">
-                  📜 MISSION BRIEFING
-                </button>
-              </Link>
-              <div className="flex flex-col ml-1 sm:ml-2">
-                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">ACTIVE COIN COMBAT</span>
-                <h1 className="font-staatliches text-xl sm:text-2xl text-neon-moon tracking-wider uppercase leading-none mt-0.5">
-                  {room.token.name} (${room.token.symbol})
-                </h1>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              <div className="flex items-center gap-2 bg-red-950/80 border border-red-500/50 text-red-400 px-3 py-1.5 rounded-lg shadow">
-                <span className="font-mono text-[9px] text-red-500 font-bold uppercase tracking-wider hidden sm:inline">ARENA CLOSING</span>
-                <Bomb size={14} className="animate-pulse text-red-500" />
-                <span className="font-staatliches text-sm tracking-widest text-red-400 bg-red-900/60 px-2 py-0.5 rounded border border-red-700">{countdownText}</span>
+           <HeaderPanel backHref="/rooms" missionHref="/?play_intro=true" title="WAR ROOM" countdown={countdownText} />
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@ import { Staatliches, JetBrains_Mono, Permanent_Marker } from 'next/font/google'
 import "./globals.css";
 import { ClientWrapper } from '@/components/ClientWrapper';
 import { SolanaWalletProvider } from '@/components/WalletProvider';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const fontStaatliches = Staatliches({
   weight: '400',
@@ -65,11 +66,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${fontStaatliches.variable} ${fontJetBrainsMono.variable} ${fontPermanentMarker.variable}`}>
       <body className="antialiased selection:bg-neon-moon selection:text-black bg-muddy-map text-white">
-        <SolanaWalletProvider>
-          <ClientWrapper>
-            {children}
-          </ClientWrapper>
-        </SolanaWalletProvider>
+        <ErrorBoundary>
+          <SolanaWalletProvider>
+            <ClientWrapper>
+              {children}
+            </ClientWrapper>
+          </SolanaWalletProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

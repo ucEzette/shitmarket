@@ -325,7 +325,17 @@ export default function RoomsPage() {
                       <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded" />
                     ) : (
                       <PepePortrait
-                        src={isMoonLeading ? MOON_PEPES[parseInt(room.id) % MOON_PEPES.length] : JEET_PEPES[parseInt(room.id) % JEET_PEPES.length]}
+                        src={(() => {
+                          const id = room.id || '';
+                          let hash = 0;
+                          for (let i = 0; i < id.length; i++) {
+                            hash = id.charCodeAt(i) + ((hash << 5) - hash);
+                          }
+                          const index = Math.abs(hash);
+                          return isMoonLeading 
+                            ? MOON_PEPES[index % MOON_PEPES.length] 
+                            : JEET_PEPES[index % JEET_PEPES.length];
+                        })()}
                         size={32}
                         glowColor={isMoonLeading ? 'moon' : 'jeet'}
                         className="rounded"
@@ -360,7 +370,12 @@ export default function RoomsPage() {
                       </span>
                     </div>
                     <span className="font-mono text-[7px] md:text-[8px] text-trench-gasmask block mt-1 uppercase font-bold">
-                      ⚔️ LISTED: {new Date(room.createdAt).toISOString().replace('T', ' ').substring(0, 19)} UTC
+                      ⚔️ LISTED: {(() => {
+                        if (!room.createdAt) return 'TBD';
+                        const d = new Date(room.createdAt);
+                        if (isNaN(d.getTime())) return 'TBD';
+                        return d.toISOString().replace('T', ' ').substring(0, 19);
+                      })()} UTC
                     </span>
                   </div>
                 </div>

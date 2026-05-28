@@ -16,7 +16,7 @@ const config: Config = {
           gasmask: "#94A3B8",
         },
         neon: {
-          moon: "#00FF66", // Slightly sleeker neon green
+          moon: "#16A34A", // Darker toxic green matching the logo
         },
         jeet: {
           red: "#FF2A4D", // More vibrant, less harsh red

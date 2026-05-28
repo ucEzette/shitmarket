@@ -377,7 +377,7 @@ export default function ParlaysPage() {
       {/* Success Modal Overlay */}
       {showSuccessModal && dispatchedTicket && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-trench-black border-4 border-neon-moon p-6 rounded-lg max-w-lg w-full relative scanlines shadow-[0_0_30px_#39FF14]">
+          <div className="bg-trench-black border-4 border-neon-moon p-6 rounded-lg max-w-lg w-full relative scanlines shadow-[0_0_30px_#16A34A]">
             <div className="flex items-center gap-3 border-b-2 border-neon-moon pb-3 mb-4">
               <PepePortrait src={PEPE_ASSETS.chadBull} size={48} glowColor="moon" className="rounded-lg" />
               <div>

@@ -155,7 +155,7 @@ export default function LeaderboardPage() {
             </div>
 
             {/* Visual character token */}
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-trench-black border-4 border-neon-moon rounded-full flex items-center justify-center relative mb-2 shadow-[0_0_20px_#39FF14] scale-110 overflow-hidden">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-trench-black border-4 border-neon-moon rounded-full flex items-center justify-center relative mb-2 shadow-[0_0_20px_#16A34A] scale-110 overflow-hidden">
               <PepePortrait src={PEPE_ASSETS.chadBull} className="w-full h-full rounded-full border-0" />
               <span className="absolute -top-2.5 -right-2 bg-moon-gold text-black font-staatliches text-[8px] sm:text-[10px] px-1 sm:px-1.5 py-0.5 rounded border border-black z-10 font-bold uppercase shadow-glow-gold animate-pulse">
                 SUPREME

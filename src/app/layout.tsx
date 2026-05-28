@@ -65,7 +65,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${fontStaatliches.variable} ${fontJetBrainsMono.variable} ${fontPermanentMarker.variable}`}>
-      <body className="antialiased selection:bg-neon-moon selection:text-black bg-muddy-map text-white">
+      <body className="antialiased selection:bg-neon-moon selection:text-black bg-[#071105] text-white">
         <ErrorBoundary>
           <SolanaWalletProvider>
             <ClientWrapper>

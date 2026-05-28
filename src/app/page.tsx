@@ -102,7 +102,7 @@ function HomeContent() {
               initial={{ x: -80, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ type: 'spring', duration: 1.2 }}
-              className="flex flex-col items-center text-center p-3 sm:p-6 glass-panel rounded-2xl max-w-[145px] sm:max-w-[200px] md:max-w-[240px] shrink-0"
+              className="flex flex-col items-center text-center p-3 sm:p-6 retro-panel rounded-2xl max-w-[145px] sm:max-w-[200px] md:max-w-[240px] shrink-0"
             >
               <div className="relative mb-4">
                 <div className="absolute -inset-2 rounded-full bg-neon-moon/20 blur-xl animate-pulse" />
@@ -161,7 +161,7 @@ function HomeContent() {
               {/* Enter Trenches CTA Button */}
               <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center w-full">
                 <Link href="/rooms" className="w-full sm:w-auto">
-                  <button className="w-full sm:w-72 px-8 py-3.5 sm:py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-wider btn-wood-green">
+                  <button className="w-full sm:w-72 px-8 py-3.5 sm:py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-wider retro-btn retro-btn-moon text-black">
                     ENTER THE TRENCHES 💣
                   </button>
                 </Link>
@@ -171,7 +171,7 @@ function HomeContent() {
                   </button>
                 ) : (
                   <Link href="/create-room" className="w-full sm:w-auto">
-                    <button className="w-full sm:w-72 px-8 py-3.5 sm:py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-wider btn-wood">
+                    <button className="w-full sm:w-72 px-8 py-3.5 sm:py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-wider retro-btn retro-btn-neutral text-black">
                       DIG A TRENCH (CREATE) ⛏️
                     </button>
                   </Link>
@@ -184,7 +184,7 @@ function HomeContent() {
               initial={{ x: 80, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ type: 'spring', duration: 1.2 }}
-              className="flex flex-col items-center text-center p-3 sm:p-6 glass-panel rounded-2xl max-w-[145px] sm:max-w-[200px] md:max-w-[240px] shrink-0"
+              className="flex flex-col items-center text-center p-3 sm:p-6 retro-panel rounded-2xl max-w-[145px] sm:max-w-[200px] md:max-w-[240px] shrink-0"
             >
               <div className="relative mb-4">
                 <div className="absolute -inset-2 rounded-full bg-jeet-red/20 blur-xl animate-pulse" />
@@ -244,7 +244,7 @@ function HomeContent() {
 
       {/* 3. MASCOT PARADE / CHARACTER LINEUP */}
       <section className="mx-auto max-w-7xl w-full px-4 py-12">
-        <div className="glass-panel p-8 rounded-2xl relative shadow-2xl">
+        <div className="retro-panel p-8 rounded-2xl relative shadow-2xl">
           <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-1 rounded-full font-staatliches text-sm tracking-widest shadow-lg uppercase">
             ⚔️ THE TRENCH COMMANDERS ⚔️
           </div>
@@ -259,7 +259,7 @@ function HomeContent() {
       <section className="mx-auto max-w-7xl w-full px-4 py-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
 
         {/* Left Column: Blueprint Guide */}
-        <div className="glass-panel p-8 rounded-2xl shadow-2xl relative">
+        <div className="retro-panel p-8 rounded-2xl shadow-2xl relative">
           {/* Clipboard binder clip */}
           <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-1 rounded-full font-staatliches text-sm tracking-widest shadow-lg uppercase">
             OPERATIONAL PROTOCOLS
@@ -319,7 +319,7 @@ function HomeContent() {
         </div>
 
         {/* Right Column: Top Winners Leaderboard */}
-        <div className="glass-panel p-8 rounded-2xl shadow-2xl relative">
+        <div className="retro-panel p-8 rounded-2xl shadow-2xl relative">
           {/* Clip */}
           <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-1 rounded-full font-staatliches text-sm tracking-widest shadow-lg uppercase">
             FRONT-LINE DECORATIONS
@@ -381,7 +381,7 @@ function HomeContent() {
 
       {/* 5. WAR PROPAGANDA GALLERY */}
       <section className="mx-auto max-w-7xl w-full px-4 py-12">
-        <div className="glass-panel p-8 rounded-2xl relative shadow-2xl">
+        <div className="retro-panel p-8 rounded-2xl relative shadow-2xl">
           <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-1 rounded-full font-staatliches text-sm tracking-widest shadow-lg uppercase">
             🎖️ WAR PROPAGANDA 🎖️
           </div>

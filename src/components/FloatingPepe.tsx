@@ -169,7 +169,7 @@ export const FloatingPepe: React.FC = () => {
 
               <button
                 onClick={() => setMoraleBoost(null)}
-                className="w-full py-2 bg-neon-moon hover:bg-green-500 font-staatliches text-sm text-black rounded font-bold shadow-[0_0_10px_#39FF14] transition-all uppercase tracking-widest active:translate-y-0.5"
+                className="w-full py-2 bg-neon-moon hover:bg-green-500 font-staatliches text-sm text-black rounded font-bold shadow-[0_0_10px_#16A34A] transition-all uppercase tracking-widest active:translate-y-0.5"
               >
                 CHARGE THE FRONT!
               </button>

@@ -29,7 +29,7 @@ export const Header: React.FC<{
   }, [disconnect, mockDisconnect]);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b-4 border-trench-sandbag bg-trench-black/90 px-3 py-2.5 sm:p-4 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b-4 border-trench-sandbag bg-black px-3 py-2.5 sm:p-4 retro-panel rounded-none border-t-0 border-l-0 border-r-0">
       <div className="mx-auto flex max-w-7xl flex-row items-center justify-between gap-2">
         {/* Left Aligned branding section */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
@@ -37,7 +37,7 @@ export const Header: React.FC<{
           {isRoomPage && (
             <button
               onClick={onMenuToggle}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-trench-black hover:bg-trench-sandbag text-neon-moon border border-trench-sandbag rounded font-staatliches text-xs tracking-wider uppercase transition-colors shrink-0 font-bold"
+              className="flex items-center gap-1.5 px-3 py-1.5 retro-btn text-neon-moon border-2 border-trench-sandbag rounded bg-black hover:border-neon-moon font-staatliches text-xs tracking-wider uppercase transition-colors shrink-0 font-bold"
             >
               <Menu size={14} className="text-neon-moon" />
               <span>MENU</span>
@@ -54,7 +54,7 @@ export const Header: React.FC<{
               loading="eager"
               decoding="sync"
             />
-            <p className="hidden sm:block font-mono text-[9px] text-trench-gasmask uppercase tracking-widest mt-1 font-bold pl-2">
+            <p className="hidden sm:block font-mono text-[9px] text-trench-gasmask uppercase tracking-widest mt-1 font-bold pl-2 stencil-shadow">
               PvP Meme Trenches • 1.25% Settle Fee
             </p>
           </div>
@@ -64,13 +64,13 @@ export const Header: React.FC<{
         {/* Wallet Connection / Ammo Status */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           <Link href="/?play_intro=true">
-            <button className="px-2.5 py-1.5 bg-trench-mud hover:bg-trench-sandbag text-moon-gold hover:text-white border border-trench-sandbag rounded font-staatliches text-[10px] sm:text-xs tracking-wider uppercase transition-colors shrink-0 font-bold flex items-center gap-1">
+            <button className="px-2.5 py-1.5 retro-btn retro-btn-neutral border border-trench-sandbag rounded font-staatliches text-[10px] sm:text-xs tracking-wider uppercase transition-colors shrink-0 font-bold flex items-center gap-1">
               📜 BRIEFING
             </button>
           </Link>
           
           {user && user.wallet ? (
-            <div className="flex items-center gap-1 sm:gap-2 bg-trench-black border-2 border-trench-sandbag rounded p-0.5 sm:p-1">
+            <div className="flex items-center gap-1 sm:gap-2 bg-black border-2 border-trench-sandbag rounded p-0.5 sm:p-1">
               {/* Notification Bell */}
               <NotificationBell />
 
@@ -85,7 +85,7 @@ export const Header: React.FC<{
               {/* User Address with Gas Mask Indicator */}
               <Link
                 href="/profile"
-                className="flex items-center gap-1 px-1.5 py-0.5 sm:px-3 sm:py-1 bg-trench-sandbag hover:bg-trench-gasmask transition-all rounded-sm text-white"
+                className="flex items-center gap-1 px-1.5 py-0.5 sm:px-3 sm:py-1 bg-trench-sandbag hover:bg-trench-gasmask transition-all rounded-sm text-white retro-btn"
               >
                 <PepePortrait src={user.avatarUrl || PEPE_ASSETS.fewUnderstand} size={16} loading="eager" className="rounded-full sm:size-[20px]" />
                 <span className="font-mono text-[10px] sm:text-xs font-bold pl-0.5 max-w-[80px] sm:max-w-[120px] truncate block">
@@ -97,7 +97,7 @@ export const Header: React.FC<{
               <button
                 onClick={handleDisconnect}
                 title="RESERVE FORCES (DISCONNECT)"
-                className="p-1 text-jeet-red hover:bg-jeet-red hover:text-white transition-all rounded"
+                className="p-1 text-white hover:bg-red-500 transition-all rounded retro-btn retro-btn-jeet"
               >
                 <LogOut size={14} className="sm:size-[16px]" />
               </button>
@@ -106,7 +106,7 @@ export const Header: React.FC<{
             <button
               onClick={handleConnect}
               disabled={connecting}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 sm:px-6 sm:py-2.5 font-staatliches text-xs sm:text-lg tracking-wider uppercase bg-jeet-red text-white hover:bg-red-700 active:translate-y-1 transition-all rounded shadow-glow-jeet border-b-4 border-red-950 font-bold"
+              className="relative flex items-center gap-1.5 px-3 py-1.5 sm:px-6 sm:py-2.5 font-staatliches text-xs sm:text-lg tracking-wider uppercase text-black active:translate-y-1 transition-all rounded font-bold retro-btn retro-btn-moon"
             >
               {connecting ? (
                 <>
@@ -126,3 +126,4 @@ export const Header: React.FC<{
     </header>
   );
 };
+

@@ -791,7 +791,7 @@ export default function ProfilePage() {
                       transition={{ duration: 1.5, ease: 'easeInOut' }}
                       d="M 0 80 Q 25 75, 50 60 T 75 50 T 100 15"
                       fill="none"
-                      stroke="#39FF14"
+                      stroke="#16A34A"
                       strokeWidth="3.5"
                       className="shadow-glow-moon-strong"
                     />

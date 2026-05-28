@@ -380,7 +380,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
               onClick={toggleMute}
               className="p-1 px-2.5 bg-black hover:bg-gray-950 text-yellow-400 rounded border border-trench-sandbag flex items-center gap-1 font-mono text-xs transition-colors"
             >
-              {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-lime-400" />}
+              {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5 text-green-500" />}
               {isMuted ? "Mut" : "Sound"}
             </button>
             <button 
@@ -432,7 +432,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                   <div className={`mt-3 p-3 rounded-lg border-2 transition-all duration-300 ${
                     tearsWiped < 5 
                       ? 'border-yellow-400 animate-pulse shadow-[0_0_15px_rgba(234,179,8,0.6)] bg-yellow-950/20' 
-                      : 'border-lime-500 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-lime-950/20'
+                      : 'border-green-600 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-green-950/20'
                   }`}>
                     <div className="text-[10px] font-mono text-cyan-400 uppercase font-bold tracking-wider mb-2 flex items-center justify-between">
                       <span>🎯 TASK: Wipe Pepe's tears ({tearsWiped}/5 wipes)</span>
@@ -456,7 +456,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                         📞 CALL DEV
                       </button>
                     </div>
-                    {tearsWiped >= 5 && <div className="text-lime-400 text-[10px] font-bold mt-2 font-mono text-center">✅ PEPE CALMED (TEMPORARILY)</div>}
+                    {tearsWiped >= 5 && <div className="text-green-500 text-[10px] font-bold mt-2 font-mono text-center">✅ PEPE CALMED (TEMPORARILY)</div>}
                   </div>
                 </div>
 
@@ -509,9 +509,9 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 initial={{ scale: 0.9, y: 50, opacity: 0 }}
                 animate={{ scale: 1, y: 0, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
-                className="w-full max-w-2xl bg-trench-mud border-4 border-lime-500 rounded-xl p-6 text-center shadow-2xl relative"
+                className="w-full max-w-2xl bg-trench-mud border-4 border-green-600 rounded-xl p-6 text-center shadow-2xl relative"
               >
-                <div className="absolute top-4 right-4 bg-lime-500 text-black font-staatliches text-xs px-3 py-1 font-bold animate-bounce tracking-widest rounded shadow-[0_0_15px_#39FF14]">
+                <div className="absolute top-4 right-4 bg-green-600 text-black font-staatliches text-xs px-3 py-1 font-bold animate-bounce tracking-widest rounded shadow-[0_0_15px_#16A34A]">
                   1000x FORCE MULTIPLIER
                 </div>
 
@@ -522,10 +522,10 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     <img 
                       src="/crude_2d_animation_style_hand_drawn_meme_characters_mixed_with_pixel_art/chadbull.png" 
                       alt="Giga Chad" 
-                      className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full object-contain border-8 border-lime-400 shadow-[0_0_30px_rgba(57,255,20,0.5)] ${chadPumps > 0 ? 'animate-bounce' : ''}`}
+                      className={`w-24 h-24 sm:w-32 sm:h-32 rounded-full object-contain border-8 border-green-500 shadow-[0_0_30px_rgba(57,255,20,0.5)] ${chadPumps > 0 ? 'animate-bounce' : ''}`}
                       style={{ transform: `scale(${1 + chadPumps * 0.05})` }}
                     />
-                    <span className="font-staatliches text-sm text-lime-400 mt-2">GIGA CHAD</span>
+                    <span className="font-staatliches text-sm text-green-500 mt-2">GIGA CHAD</span>
                   </div>
 
                   {/* Skeleton Wojak Image */}
@@ -539,7 +539,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                   </div>
                 </div>
 
-                <h2 className="font-staatliches text-3xl sm:text-4xl text-lime-400 tracking-wider mt-4 uppercase">
+                <h2 className="font-staatliches text-3xl sm:text-4xl text-green-500 tracking-wider mt-4 uppercase">
                   Giga-Chad Descends!
                 </h2>
                 <p className="font-mono text-xs text-gray-300 max-w-md mx-auto mt-2">
@@ -550,9 +550,9 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 <div className={`mt-4 p-4 rounded-lg border-2 max-w-md mx-auto transition-all duration-300 ${
                   chadPumps < 4 
                     ? 'border-yellow-400 animate-pulse shadow-[0_0_15px_rgba(234,179,8,0.6)] bg-yellow-950/20' 
-                    : 'border-lime-500 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-lime-950/20'
+                    : 'border-green-600 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-green-950/20'
                 }`}>
-                  <div className="text-[10px] font-mono text-lime-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-between">
+                  <div className="text-[10px] font-mono text-green-500 uppercase font-bold tracking-widest mb-1 flex items-center justify-between">
                     <span>🎯 TASK: Pump Chad's Parachute Candle ({chadPumps}/4 pumps)</span>
                     {chadPumps < 4 && (
                       <span className="bg-yellow-500 text-black px-1.5 py-0.5 rounded font-black text-[8px] animate-bounce">
@@ -562,7 +562,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                   </div>
                   <button 
                     onClick={handlePumpChad}
-                    className="px-6 py-2 bg-lime-500 hover:bg-lime-400 text-black font-staatliches uppercase font-extrabold text-sm rounded shadow-[0_0_10px_#39FF14] transition-transform active:scale-95 mt-1"
+                    className="px-6 py-2 bg-green-600 hover:bg-green-500 text-black font-staatliches uppercase font-extrabold text-sm rounded shadow-[0_0_10px_#16A34A] transition-transform active:scale-95 mt-1"
                   >
                     PUMP CROWD FORCE
                   </button>
@@ -594,7 +594,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                       <span className="font-mono text-xl font-bold text-red-400">0:0{scene3Timer}</span>
                     </div>
                   ) : (
-                    <span className="text-lime-400 font-mono text-xs font-bold bg-lime-950/60 px-2 py-1 rounded">
+                    <span className="text-green-500 font-mono text-xs font-bold bg-green-950/60 px-2 py-1 rounded">
                       ★ SIMULATION IDLE
                     </span>
                   )}
@@ -607,7 +607,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     alt="MOON vs JEET No Man's Land Battlefield"
                     className="w-full h-28 sm:h-36 object-cover opacity-85 transition-opacity hover:opacity-100"
                   />
-                  <div className="absolute top-2 left-2 bg-black/80 px-2 py-0.5 border border-[#39FF14] text-[#39FF14] font-mono text-[8px] uppercase tracking-wider rounded">
+                  <div className="absolute top-2 left-2 bg-black/80 px-2 py-0.5 border border-[#16A34A] text-[#16A34A] font-mono text-[8px] uppercase tracking-wider rounded">
                     map: pvp_trenches_countdown.tga
                   </div>
                 </div>
@@ -616,7 +616,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 my-2 relative p-3 rounded-xl border-2 transition-all duration-300 ${
                   !scatFired 
                     ? 'border-yellow-400 animate-pulse shadow-[0_0_15px_rgba(234,179,8,0.6)] bg-yellow-950/10' 
-                    : 'border-lime-500 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-lime-950/10'
+                    : 'border-green-600 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-green-950/10'
                 }`}>
                   {!scatFired && (
                     <div className="absolute -top-3 left-4 bg-yellow-500 text-black px-2 py-0.5 font-bold font-mono text-[9px] rounded uppercase animate-bounce z-30">
@@ -626,16 +626,16 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                   
                   {/* Moon side */}
                   <div className={`p-4 rounded-xl border-2 transition-all text-center ${
-                    scene3Choice === "MOON" ? "bg-lime-950/20 border-lime-400" : "bg-black/40 border-gray-800"
+                    scene3Choice === "MOON" ? "bg-green-950/20 border-green-500" : "bg-black/40 border-gray-800"
                   }`}>
-                    <h3 className="font-staatliches text-xl text-lime-400 flex items-center justify-center gap-2 uppercase">
+                    <h3 className="font-staatliches text-xl text-green-500 flex items-center justify-center gap-2 uppercase">
                       MOON SIDE (BULLS)
                     </h3>
                     <div className="text-gray-400 text-md font-mono my-3 font-bold">Pot: 4.88 SOL</div>
                     <button 
                       onClick={() => startPredictionBattle("MOON")}
                       disabled={scene3Ticking || scatFired}
-                      className="w-full py-2 bg-lime-500 hover:bg-lime-400 disabled:opacity-40 text-black font-staatliches font-extrabold text-sm uppercase rounded transition-all"
+                      className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-black font-staatliches font-extrabold text-sm uppercase rounded transition-all"
                     >
                       BET MOON 0.05 SOL
                     </button>
@@ -684,7 +684,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                       💡 Click one of the buttons to trigger the PvP Prediction Countdown!
                     </div>
                   ) : (
-                    <div className="text-lime-400 text-xs font-bold font-mono">
+                    <div className="text-green-500 text-xs font-bold font-mono">
                       ✅ BATTLE DETONATED! Pepe is rekt, but we have completed prediction analytics.
                     </div>
                   )}
@@ -711,7 +711,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                         style={{
                           top: `${Math.random() * 80}%`,
                           left: `${Math.random() * 90}%`,
-                          color: Math.random() < 0.5 ? '#39FF14' : '#FFD700'
+                          color: Math.random() < 0.5 ? '#16A34A' : '#FFD700'
                         }}
                       >
                         {Math.random() < 0.5 ? '💩' : '💵'}
@@ -727,7 +727,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                   className="w-full max-w-[220px] max-h-24 mx-auto rounded-lg object-contain border-4 border-yellow-500 shadow-2xl animate-pulse my-1"
                 />
 
-                <h1 className="font-staatliches text-2xl sm:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-lime-400 via-yellow-400 to-red-600 mt-1 uppercase tracking-tighter">
+                <h1 className="font-staatliches text-2xl sm:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-green-500 via-yellow-400 to-red-600 mt-1 uppercase tracking-tighter">
                   SHITMARKET.LOL
                 </h1>
                 <p className="font-mono text-[10px] text-gray-300 max-w-lg mx-auto mt-1 leading-relaxed">
@@ -738,7 +738,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 <div className={`mt-2 max-w-md mx-auto p-2.5 rounded-lg border-2 transition-all duration-300 ${
                   !scatConfetti 
                     ? 'border-yellow-400 animate-pulse shadow-[0_0_15px_rgba(234,179,8,0.6)] bg-yellow-950/20' 
-                    : 'border-lime-500 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-lime-950/20'
+                    : 'border-green-600 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-green-950/20'
                 }`}>
                   <div className="text-[9px] font-mono text-yellow-400 uppercase font-bold tracking-widest mb-1 flex items-center justify-between">
                     <span>🎯 TASK: Launch Platform Celebration</span>
@@ -758,7 +758,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     💩 BLAST POOH FIREWORKS!
                   </button>
                   {scatConfetti && (
-                    <div className="font-mono text-lime-400 text-[9px] font-bold mt-1.5 animate-pulse">
+                    <div className="font-mono text-green-500 text-[9px] font-bold mt-1.5 animate-pulse">
                       🟢 Platform ready. 1.25% system fees locked. Parlay engine calibrated.
                     </div>
                   )}
@@ -775,19 +775,19 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 exit={{ scale: 0.95, opacity: 0 }}
                 className="w-full max-w-2xl bg-[#0D0D0A] border-4 border-red-950 rounded-xl p-6 text-center shadow-2xl relative"
               >
-                <div className="font-mono text-lime-400 text-sm mb-4 border-b border-gray-800 pb-2 flex items-center justify-center gap-2">
+                <div className="font-mono text-green-500 text-sm mb-4 border-b border-gray-800 pb-2 flex items-center justify-center gap-2">
                   <Zap className="w-4 h-4 text-yellow-400 animate-pulse" />
                   <span>TERMINAL CHEAT DECODER DETECTED</span>
                 </div>
 
                 {/* Matrix rain background overlay */}
-                <div className="p-3 bg-black border border-gray-800 rounded min-h-32 text-left font-mono text-xs text-lime-500 tracking-widest">
+                <div className="p-3 bg-black border border-gray-800 rounded min-h-32 text-left font-mono text-xs text-green-600 tracking-widest">
                   <span className="text-gray-500">&gt;</span> awaiting_konami_code_input:
                   <div className="text-center font-bold text-lg text-yellow-400 my-4 animate-pulse">
                     {konamiEntered.length > 0 ? konamiEntered.join(" → ") : "[ PRESS GAMEPAD KEYS BELOW ]"}
                   </div>
                   {konamiSuccess && (
-                    <div className="text-lime-400 font-extrabold bg-lime-950/20 p-2 my-2 text-center rounded border border-lime-400 uppercase animate-bounce text-sm">
+                    <div className="text-green-500 font-extrabold bg-green-950/20 p-2 my-2 text-center rounded border border-green-500 uppercase animate-bounce text-sm">
                       🔓 GOD DEGEN MODE SIGNED! UNLIMITED MOCK SOL CREDITS GRANTED.
                     </div>
                   )}
@@ -797,7 +797,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 <div className={`mt-6 p-4 rounded-xl border-2 transition-all duration-300 max-w-md mx-auto ${
                   !konamiSuccess 
                     ? 'border-yellow-400 animate-pulse shadow-[0_0_15px_rgba(234,179,8,0.6)] bg-yellow-950/20' 
-                    : 'border-lime-500 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-lime-950/20'
+                    : 'border-green-600 shadow-[0_0_10px_rgba(34,197,94,0.4)] bg-green-950/20'
                 }`}>
                   {!konamiSuccess && (
                     <div className="bg-yellow-500 text-black font-bold font-mono text-[9px] px-2 py-0.5 rounded uppercase mb-3 animate-bounce inline-block">
@@ -809,27 +809,27 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     <div className="flex flex-col items-center">
                       <button 
                         onClick={() => handleKonamiTap("U")}
-                        className="w-10 h-10 bg-gray-800 border-2 border-gray-700 active:bg-lime-400 transform active:scale-95 flex items-center justify-center text-white font-extrabold rounded text-md"
+                        className="w-10 h-10 bg-gray-800 border-2 border-gray-700 active:bg-green-500 transform active:scale-95 flex items-center justify-center text-white font-extrabold rounded text-md"
                       >
                         ↑
                       </button>
                       <div className="flex gap-10 mt-1">
                         <button 
                           onClick={() => handleKonamiTap("L")}
-                          className="w-10 h-10 bg-gray-800 border-2 border-gray-700 active:bg-lime-400 transform active:scale-95 flex items-center justify-center text-white font-extrabold rounded text-md"
+                          className="w-10 h-10 bg-gray-800 border-2 border-gray-700 active:bg-green-500 transform active:scale-95 flex items-center justify-center text-white font-extrabold rounded text-md"
                         >
                           ←
                         </button>
                         <button 
                           onClick={() => handleKonamiTap("R")}
-                          className="w-10 h-10 bg-gray-800 border-2 border-gray-700 active:bg-lime-400 transform active:scale-95 flex items-center justify-center text-white font-extrabold rounded text-md"
+                          className="w-10 h-10 bg-gray-800 border-2 border-gray-700 active:bg-green-500 transform active:scale-95 flex items-center justify-center text-white font-extrabold rounded text-md"
                         >
                           →
                         </button>
                       </div>
                       <button 
                         onClick={() => handleKonamiTap("D")}
-                        className="w-10 h-10 bg-gray-800 border-2 border-gray-700 active:bg-lime-400 transform active:scale-95 flex items-center justify-center text-white font-extrabold rounded text-md mt-1"
+                        className="w-10 h-10 bg-gray-800 border-2 border-gray-700 active:bg-green-500 transform active:scale-95 flex items-center justify-center text-white font-extrabold rounded text-md mt-1"
                       >
                         ↓
                       </button>
@@ -875,7 +875,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                   📜 DEGEN IMMORTALITY CERTIFICATE
                 </h1>
                 
-                <p className="font-mono text-xs text-lime-400 uppercase font-bold tracking-widest mb-4">
+                <p className="font-mono text-xs text-green-500 uppercase font-bold tracking-widest mb-4">
                   Granted to: Anon the Trench Survivor
                 </p>
 
@@ -885,9 +885,9 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     <img 
                       src="/crude_2d_animation_style_hand_drawn_meme_characters_mixed_with_pixel_art/moonvsjeet.png" 
                       alt="Trench Combat Grid"
-                      className="w-full h-28 sm:h-36 object-cover rounded-lg border border-lime-500/50 shadow-md hover:scale-102 transition-transform duration-200"
+                      className="w-full h-28 sm:h-36 object-cover rounded-lg border border-green-600/50 shadow-md hover:scale-102 transition-transform duration-200"
                     />
-                    <span className="font-mono text-[9px] text-lime-400 font-bold uppercase">Fig 1. Real-time Trench Combat Matrix</span>
+                    <span className="font-mono text-[9px] text-green-500 font-bold uppercase">Fig 1. Real-time Trench Combat Matrix</span>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <img 
@@ -906,9 +906,9 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     ★ HOLY IMMUNITY PROTOCOLS ACTIVATED ★
                   </div>
                   <ul className="space-y-1.5 list-disc pl-4 text-gray-300">
-                    <li><strong className="text-lime-400">RUG IMMUNITY:</strong> Enforced by Giga-Chad Bull. Any developer attempting to transfer liquidity to Dubai is immediately teleported to the breadline.</li>
-                    <li><strong className="text-lime-400">ANTI-PANIC SLEEP FILTER:</strong> Prevents jeetting at 3:00 AM on 5% minor dips.</li>
-                    <li><strong className="text-lime-400">FINANCIAL PROTECTION:</strong> Guaranteed protection from buying local high, selling local low, and listening to "influencer" calls on X.</li>
+                    <li><strong className="text-green-500">RUG IMMUNITY:</strong> Enforced by Giga-Chad Bull. Any developer attempting to transfer liquidity to Dubai is immediately teleported to the breadline.</li>
+                    <li><strong className="text-green-500">ANTI-PANIC SLEEP FILTER:</strong> Prevents jeetting at 3:00 AM on 5% minor dips.</li>
+                    <li><strong className="text-green-500">FINANCIAL PROTECTION:</strong> Guaranteed protection from buying local high, selling local low, and listening to "influencer" calls on X.</li>
                     <li><strong className="text-yellow-400">PORTFOLIO BALANCES:</strong> 1,000,000,000 artificial mock SOL credited. Standard use: flexing on social media. (Value: $0.00, Ego value: priceless).</li>
                   </ul>
                 </div>
@@ -928,7 +928,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 key={idx} 
                 className={`h-2.5 rounded-full transition-all ${
                   idx === currentScene 
-                    ? "w-6 bg-lime-400 shadow-[0_0_8px_#39FF14]" 
+                    ? "w-6 bg-green-500 shadow-[0_0_8px_#16A34A]" 
                     : idx < currentScene 
                       ? "w-2.5 bg-lime-800" 
                       : "w-2.5 bg-gray-700"
@@ -953,7 +953,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
             className={`px-6 py-3.5 font-staatliches font-black text-lg tracking-wider uppercase rounded-md border transition-all flex items-center gap-1.5 active:translate-y-1 active:shadow-none min-w-[140px] ${
               currentDialogIdx === (sceneDialogs[currentScene]?.length || 1) - 1 && !isSceneChallengeSatisfied()
                 ? "bg-amber-500 hover:bg-amber-400 text-black border-amber-300 shadow-[0_4px_0_#9a6200] animate-pulse animate-bounce"
-                : "bg-lime-500 hover:bg-lime-400 text-black border-lime-300 shadow-[0_4px_0_#107100]"
+                : "bg-green-600 hover:bg-green-500 text-black border-lime-300 shadow-[0_4px_0_#107100]"
             }`}
           >
             {currentDialogIdx === (sceneDialogs[currentScene]?.length || 1) - 1 ? (

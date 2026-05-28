@@ -297,7 +297,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               particleCount: 150,
               spread: 80,
               origin: { y: 0.6 },
-              colors: ['#FFD700', '#39FF14', '#ffffff']
+              colors: ['#FFD700', '#16A34A', '#ffffff']
             });
             if (audioEnabled) {
               setTimeout(() => synthSound('victory'), 300);
@@ -463,7 +463,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
                       particleCount: 150,
                       spread: 80,
                       origin: { y: 0.6 },
-                      colors: ['#FFD700', '#39FF14', '#ffffff']
+                      colors: ['#FFD700', '#16A34A', '#ffffff']
                     });
                     if (audioEnabledRef.current) {
                       setTimeout(() => synthSound('victory'), 300);
@@ -576,14 +576,14 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
             spread: 120,
             angle: 60,
             origin: { x: 0 },
-            colors: ['#FF073A', '#39FF14', '#FFD700', '#00FFFF', '#FF00FF']
+            colors: ['#FF073A', '#16A34A', '#FFD700', '#00FFFF', '#FF00FF']
           });
           confetti({
             particleCount: 200,
             spread: 120,
             angle: 120,
             origin: { x: 1 },
-            colors: ['#FF073A', '#39FF14', '#FFD700', '#00FFFF', '#FF00FF']
+            colors: ['#FF073A', '#16A34A', '#FFD700', '#00FFFF', '#FF00FF']
           });
 
           setTimeout(() => setShowDegenBanner(false), 5000);

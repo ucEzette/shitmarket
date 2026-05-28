@@ -20,7 +20,7 @@ export const PixelPepe: React.FC<{ className?: string; size?: number }> = ({ cla
     <rect x="20" y="8" width="1" height="4" fill="#3A2512" />
 
     {/* Pepe Green Face */}
-    <rect x="9" y="8" width="14" height="10" fill="#39FF14" />
+    <rect x="9" y="8" width="14" height="10" fill="#16A34A" />
     <rect x="7" y="10" width="18" height="6" fill="#2EBE10" />
     
     {/* Smug Eyes */}
@@ -72,8 +72,8 @@ export const PixelChadBull: React.FC<{ className?: string; size?: number }> = ({
     <rect x="12" y="24" width="8" height="2" fill="#FFD700" /> {/* Glowing gold Chad highlight */}
     
     {/* Glowing Neon Green Eyes */}
-    <rect x="9" y="14" width="4" height="2" fill="#39FF14" />
-    <rect x="19" y="14" width="4" height="2" fill="#39FF14" />
+    <rect x="9" y="14" width="4" height="2" fill="#16A34A" />
+    <rect x="19" y="14" width="4" height="2" fill="#16A34A" />
     <rect x="10" y="15" width="2" height="1" fill="#FFFFFF" />
 
     {/* Nostrils blowing steam */}
@@ -176,7 +176,7 @@ export const MedalMoonMillionaire: React.FC<{ className?: string; size?: number;
     className={`${className} image-render-pixel`}
   >
     {/* Ribbon - Gold and Green stripe */}
-    <rect x="10" y="2" width="12" height="10" fill={locked ? '#4B5563' : '#39FF14'} />
+    <rect x="10" y="2" width="12" height="10" fill={locked ? '#4B5563' : '#16A34A'} />
     <rect x="13" y="2" width="6" height="10" fill={locked ? '#374151' : '#FFD700'} />
 
     {/* Large Shiny Gold Medal (Sleek gold coin) */}
@@ -278,8 +278,8 @@ export const PixelGasMask: React.FC<{ className?: string; size?: number }> = ({ 
     {/* Large Glass Eyepieces */}
     <rect x="7" y="7" width="4" height="4" fill="#5C5244" />
     <rect x="13" y="7" width="4" height="4" fill="#5C5244" />
-    <rect x="8" y="8" width="2" height="2" fill="#39FF14" opacity="0.8" /> {/* Green reflection */}
-    <rect x="14" y="8" width="2" height="2" fill="#39FF14" opacity="0.8" />
+    <rect x="8" y="8" width="2" height="2" fill="#16A34A" opacity="0.8" /> {/* Green reflection */}
+    <rect x="14" y="8" width="2" height="2" fill="#16A34A" opacity="0.8" />
 
     {/* Snout / Filter connection */}
     <rect x="10" y="11" width="4" height="4" fill="#5C5244" />

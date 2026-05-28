@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAppState, Room, ChatMessage } from '@/store/useAppState';
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
+import { HeaderPanel } from '@/components/ui/HeaderPanel';
 import { synthSound as originalSynthSound } from '@/components/ClientWrapper';
 import { 
   Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, 
@@ -264,7 +265,7 @@ export default function RoomDetailPage() {
         <p className="font-mono text-sm text-trench-gasmask mt-2 uppercase max-w-xs font-bold leading-relaxed mb-6">
           This trench sector does not exist or has been collapsed by artillery fire.
         </p>
-        <button onClick={() => router.push('/rooms')} className="btn-wood px-6 py-2 rounded">
+        <button onClick={() => router.push('/rooms')} className="retro-btn retro-btn-neutral px-6 py-2 rounded">
           RETREAT TO FRONTLINES
         </button>
       </div>
@@ -379,7 +380,7 @@ export default function RoomDetailPage() {
       particleCount: 150,
       spread: 70,
       origin: { y: 0.8 },
-      colors: ['#FFD700', '#39FF14']
+      colors: ['#FFD700', '#16A34A']
     });
     setBattleLogs((prev) => [...prev, `[BOOTY DISPATCHED] User claimed on-chain winnings/refund!`]);
   };
@@ -414,8 +415,8 @@ export default function RoomDetailPage() {
   const hasUnclaimed = isSettled && (userWon || (isDrawOrVoid && userBetsInRoom.length > 0)) && userBetsInRoom.some((b) => !b.claimed);
 
   return (
-    <div className={`w-full flex-1 flex flex-col select-none relative transition-transform duration-100 bg-muddy-map min-h-screen text-white font-mono ${
-      localShake || (userLost && isSettled) ? 'heavy-shake' : ''
+    <div className={`w-full flex-1 flex flex-col select-none relative transition-transform duration-100 bg-transparent min-h-screen text-white font-mono ${
+      localShake ? 'animate-[shake_0.5s_ease-in-out]' : ''
     }`}>
       
       {/* Dynamic inline style sheets */}
@@ -481,8 +482,8 @@ export default function RoomDetailPage() {
         }
 
         .mortar-moon {
-            background-color: #39ff14;
-            box-shadow: 0 0 10px #39ff14, 0 0 20px #39ff14, -10px 10px 20px rgba(57, 255, 20, 0.5);
+            background-color: #16a34a;
+            box-shadow: 0 0 10px #16a34a, 0 0 20px #16a34a, -10px 10px 20px rgba(57, 255, 20, 0.5);
         }
 
         .mortar-jeet {
@@ -546,6 +547,34 @@ export default function RoomDetailPage() {
             animation: radar-sweep 6s linear infinite;
         }
       ` }} />
+
+      {/* 1. AUTO-SCROLLING HORIZONTAL TREND SLIDER */}
+      <div className="w-full bg-[#050803] border-b border-[#193012] py-2.5 overflow-hidden font-mono relative z-20 shadow-inner">
+        <div className="flex animate-marquee whitespace-nowrap gap-8 min-w-full">
+          {Array.from({ length: 2 }).map((_, loopIdx) => (
+            <div key={loopIdx} className="flex gap-8 items-center shrink-0">
+              {top10Tokens.map((tok, idx) => {
+                const isPositive = tok.change.startsWith('+');
+                const badgeColor = isPositive ? 'text-[#16a34a] glow-moon' : 'text-[#ff535a] glow-jeet';
+                const arrow = isPositive ? '↗' : '↘';
+                return (
+                  <div key={`${loopIdx}-${idx}`} className="flex items-center gap-2.5 bg-black/50 border border-[#172c12] px-3.5 py-1.5 rounded-md text-xs select-none">
+                    <span className="font-staatliches tracking-wider text-white uppercase">{tok.name}</span>
+                    <span className="text-[10px] text-trench-gasmask font-bold">(${tok.symbol})</span>
+                    <span className="text-yellow-500 font-bold ml-1">{tok.price}</span>
+                    <span className={`font-extrabold ml-1.5 ${badgeColor}`}>{arrow} {tok.change}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Top Navigation Bar */}
+      <div className="w-full px-2 sm:px-4 md:px-6 pt-4 pb-2 z-20 relative bg-[#020501]">
+        <HeaderPanel backHref="/rooms" missionHref="/?play_intro=true" title="WAR ROOM" countdown={countdownText} />
+      </div>
 
       {/* 2. THE SPLIT-SCREEN TRENCH HEADER (Full-Bleed Across Screen) */}
       <section className="relative w-full h-[24vh] sm:h-[30vh] md:h-[38vh] overflow-hidden border-b-4 border-trench-sandbag flex z-10 scanlines bg-[#020501]" id="battlefield">
@@ -672,43 +701,16 @@ export default function RoomDetailPage() {
 
         {/* Dynamic Double-Bar VS Progress Indicator Overlay */}
         <div className="absolute bottom-0 left-0 w-full h-3 flex">
-          <div style={{ width: `${moonPercentage}%` }} className="bg-neon-moon h-full shadow-[inset_0_-2px_10px_#39ff14]" />
+          <div style={{ width: `${moonPercentage}%` }} className="bg-neon-moon h-full shadow-[inset_0_-2px_10px_#16a34a]" />
           <div style={{ width: `${jeetPercentage}%` }} className="bg-jeet-red h-full shadow-[inset_0_-2px_10px_#ff535a]" />
         </div>
       </section>
-
-      {/* 1. AUTO-SCROLLING HORIZONTAL TREND SLIDER (At the absolute top of the page - duplicate header writeup removed!) */}
-      <div className="w-full bg-[#050803] border-b border-[#193012] py-2.5 overflow-hidden font-mono relative z-20 shadow-inner">
-        <div className="flex animate-marquee whitespace-nowrap gap-8 min-w-full">
-          {Array.from({ length: 2 }).map((_, loopIdx) => (
-            <div key={loopIdx} className="flex gap-8 items-center shrink-0">
-              {top10Tokens.map((tok, idx) => {
-                const isPositive = tok.change.startsWith('+');
-                const badgeColor = isPositive ? 'text-[#39ff14] glow-moon' : 'text-[#ff535a] glow-jeet';
-                const arrow = isPositive ? '↗' : '↘';
-                return (
-                  <div key={`${loopIdx}-${idx}`} className="flex items-center gap-2.5 bg-black/50 border border-[#172c12] px-3.5 py-1.5 rounded-md text-xs select-none">
-                    <span className="font-staatliches tracking-wider text-white uppercase">{tok.name}</span>
-                    <span className="text-[10px] text-trench-gasmask font-bold">(${tok.symbol})</span>
-                    <span className="text-yellow-500 font-bold ml-1">{tok.price}</span>
-                    <span className={`font-extrabold ml-1.5 ${badgeColor}`}>{arrow} {tok.change}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* 2. MAIN GRID WRAPPER (2-column layout - Active Combat lg:col-span-9, Stance Configurator lg:col-span-3) */}
       <main className="max-w-none w-full px-2 sm:px-4 md:px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative z-10 flex-1">
         
         {/* COLUMN 1: ACTIVE COIN COMBAT (lg:col-span-9) */}
         <section className="lg:col-span-9 flex flex-col gap-6">
-           <HeaderPanel backHref="/rooms" missionHref="/?play_intro=true" title="WAR ROOM" countdown={countdownText} />
-              </div>
-            </div>
-          </div>
 
           {/* Toggle buttons for Chart view */}
           <div className="flex justify-end gap-2 font-mono text-[10px]">
@@ -731,14 +733,14 @@ export default function RoomDetailPage() {
                 <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
                 
                 <div className="flex items-center gap-2 pl-4">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#39ff14] shadow-[0_0_8px_#39ff14]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
                   <span className="text-white tracking-widest font-staatliches text-xs">CRT RADAR CONSOLE</span>
                 </div>
                 
                 {/* System status LEDs */}
                 <div className="flex items-center gap-3 pr-4">
                   <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-[#39ff14] shadow-[0_0_6px_#39ff14]" />
+                    <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_6px_#16a34a]" />
                     <span>SYS ON</span>
                   </div>
                   <div className="flex items-center gap-1">
@@ -752,7 +754,7 @@ export default function RoomDetailPage() {
               <div className="w-full flex-1 relative bg-black overflow-hidden group">
                 
                 {/* 1. Vertical Sweep Radar Overlay */}
-                <div className="radar-sweep-line absolute left-0 right-0 h-[2px] bg-neon-moon/20 shadow-[0_0_10px_#39ff14] z-10 pointer-events-none" />
+                <div className="radar-sweep-line absolute left-0 right-0 h-[2px] bg-neon-moon/20 shadow-[0_0_10px_#16a34a] z-10 pointer-events-none" />
 
                 {/* 2. Glass Reflection Glare Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none z-10" />
@@ -852,7 +854,7 @@ export default function RoomDetailPage() {
                 </span>
               </div>
               <div className="mt-3 w-full bg-trench-black rounded-full h-2.5 border border-trench-sandbag overflow-hidden">
-                <div style={{ width: `${moonPercentage}%` }} className="bg-neon-moon h-full shadow-[0_0_10px_#39ff14]" />
+                <div style={{ width: `${moonPercentage}%` }} className="bg-neon-moon h-full shadow-[0_0_10px_#16a34a]" />
               </div>
               <span className="font-mono text-[8px] text-trench-gasmask block font-bold uppercase mt-2">Bullish on upswing</span>
             </div>
@@ -876,7 +878,7 @@ export default function RoomDetailPage() {
         </section>
 
         {/* COLUMN 2: STANCE CONFIGURATOR (lg:col-span-3) */}
-        <section className="lg:col-span-3 bg-trench-mud border-4 border-trench-sandbag p-5 shadow-2xl relative scanlines rounded-lg" id="bet-panel">
+        <section className="lg:col-span-3 retro-panel p-5 shadow-2xl relative scanlines rounded-xl" id="bet-panel">
           {/* Decorative Corner Screws */}
           <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
           <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
@@ -1110,10 +1112,10 @@ export default function RoomDetailPage() {
                       setSelectedSide('moon');
                       synthSound('bet');
                     }}
-                    className={`flex-1 py-2.5 border-2 font-staatliches text-base uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-3 font-staatliches text-xl uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
                       selectedSide === 'moon'
-                        ? 'border-neon-moon bg-neon-moon/10 text-neon-moon shadow-glow-moon font-bold animate-pulse'
-                        : 'border-trench-sandbag bg-trench-black text-trench-gasmask hover:text-white hover:border-white'
+                        ? 'retro-btn retro-btn-moon text-black shadow-glow-moon font-bold animate-pulse'
+                        : 'retro-btn bg-black border border-trench-sandbag text-trench-gasmask opacity-70 hover:opacity-100 hover:text-white'
                     }`}
                   >
                     <span>BET MOON 🚀</span>
@@ -1123,10 +1125,10 @@ export default function RoomDetailPage() {
                       setSelectedSide('jeet');
                       synthSound('bet');
                     }}
-                    className={`flex-1 py-2.5 border-2 font-staatliches text-base uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 py-3 font-staatliches text-xl uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
                       selectedSide === 'jeet'
-                        ? 'border-jeet-red bg-jeet-red/10 text-jeet-red shadow-glow-jeet font-bold animate-pulse'
-                        : 'border-trench-sandbag bg-trench-black text-trench-gasmask hover:text-white hover:border-white'
+                        ? 'retro-btn retro-btn-jeet text-white shadow-glow-jeet font-bold animate-pulse'
+                        : 'retro-btn bg-black border border-trench-sandbag text-trench-gasmask opacity-70 hover:opacity-100 hover:text-white'
                     }`}
                   >
                     <span>BET JEET 💀</span>
@@ -1257,7 +1259,7 @@ export default function RoomDetailPage() {
       <footer className="max-w-none w-full px-2 sm:px-4 md:px-6 py-2 grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10 mb-8 font-mono text-[10px]">
         
         {/* Left Bottom Bar: Jeet Communications Radar (Chat and system announcements integrated live) */}
-        <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg p-3 h-52 flex flex-col justify-between relative scanlines">
+        <div className="retro-panel p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl">
           <div className="flex justify-between items-center border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
             <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm font-bold uppercase">
               <Radio className="w-4 h-4 text-yellow-500 animate-pulse" />
@@ -1315,7 +1317,7 @@ export default function RoomDetailPage() {
                 const bubbleColor = isHQ
                   ? 'text-yellow-500'
                   : msg.side === 'moon'
-                  ? 'text-[#39FF14]'
+                  ? 'text-[#16A34A]'
                   : 'text-[#ff535a]';
 
                 return (
@@ -1361,7 +1363,7 @@ export default function RoomDetailPage() {
         </div>
 
         {/* Right Bottom Bar: Battle Command Intelligence Log (Live feed of actions) */}
-        <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg p-3 h-52 flex flex-col justify-between relative scanlines">
+        <div className="retro-panel p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl">
           <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm border-b border-trench-sandbag pb-1.5 mb-2 font-bold uppercase">
             <Terminal className="w-4 h-4 text-yellow-500" />
             <span>&gt;_ BATTLE COMMAND INTELLIGENCE LOG</span>

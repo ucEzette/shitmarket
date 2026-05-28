@@ -160,15 +160,15 @@ export default function RoomsPage() {
       </div>
 
       {/* Filter and Search Panel */}
-      <div className="bg-trench-mud p-4 border-2 border-trench-sandbag rounded-md shadow-md mb-8 flex flex-col lg:flex-row justify-between gap-4 items-center">
+      <div className="retro-panel p-4 rounded-xl mb-8 flex flex-col lg:flex-row justify-between gap-4 items-center">
         
         {/* Tactical filter radio tabs */}
-        <div className="flex flex-wrap gap-1 bg-trench-black p-1 border border-trench-sandbag rounded">
+        <div className="flex flex-wrap gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner">
           <button
             onClick={() => setFilter('ending')}
             className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
               filter === 'ending'
-                ? 'bg-trench-sandbag text-neon-moon font-bold'
+                ? 'bg-trench-sandbag text-neon-moon font-bold shadow-glow-moon'
                 : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
             }`}
           >
@@ -178,7 +178,7 @@ export default function RoomsPage() {
             onClick={() => setFilter('biggest')}
             className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
               filter === 'biggest'
-                ? 'bg-trench-sandbag text-moon-gold font-bold'
+                ? 'bg-trench-sandbag text-moon-gold font-bold shadow-glow-gold'
                 : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
             }`}
           >
@@ -188,7 +188,7 @@ export default function RoomsPage() {
             onClick={() => setFilter('active-bets')}
             className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
               filter === 'active-bets'
-                ? 'bg-trench-sandbag text-jeet-red font-bold'
+                ? 'bg-trench-sandbag text-jeet-red font-bold shadow-glow-jeet'
                 : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
             }`}
           >
@@ -198,7 +198,7 @@ export default function RoomsPage() {
             onClick={() => setFilter('expired')}
             className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
               filter === 'expired'
-                ? 'bg-trench-sandbag text-moon-gold font-bold'
+                ? 'bg-trench-sandbag text-moon-gold font-bold shadow-glow-gold'
                 : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
             }`}
           >
@@ -208,7 +208,7 @@ export default function RoomsPage() {
 
         {/* Jeet Alerts Stub Button with Custom Tooltip */}
         <div className="relative group shrink-0">
-          <button className="px-4 py-2 bg-trench-black border border-trench-sandbag text-trench-gasmask hover:text-jeet-red hover:border-jeet-red rounded font-staatliches text-xs tracking-wider uppercase transition-all flex items-center gap-1.5 active:translate-y-0.5">
+          <button className="px-4 py-2 retro-btn retro-btn-neutral text-black hover:text-black border border-trench-sandbag rounded font-staatliches text-xs tracking-wider uppercase transition-all flex items-center gap-1.5 active:translate-y-0.5">
             <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff535a]" />
             <span>ENABLE JEET ALERTS</span>
           </button>
@@ -223,7 +223,7 @@ export default function RoomsPage() {
 
         {/* Contract/Name Search Input */}
         <div className="relative w-full lg:max-w-md shrink-0">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-trench-gasmask">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neon-moon">
             <Search size={16} />
           </div>
           <input
@@ -231,7 +231,7 @@ export default function RoomsPage() {
             placeholder="PASTE CONTRACT ADDRESS OR TOKEN SYMBOL..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-trench-black border-2 border-trench-sandbag text-white font-mono text-xs placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none tracking-widest uppercase font-bold"
+            className="w-full pl-9 pr-4 py-2 bg-trench-black/80 border border-trench-sandbag text-white font-mono text-xs placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none tracking-widest uppercase font-bold shadow-inner"
           />
           {search && (
             <button
@@ -249,28 +249,28 @@ export default function RoomsPage() {
       {showSkeleton && activeFiltered.length === 0 ? (
         <div className="flex flex-col md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 animate-pulse">
           {[1, 2, 3, 4, 5, 6].map((n) => (
-            <div key={n} className="bg-trench-mud border-2 md:border-4 border-trench-sandbag rounded-lg p-3 md:p-5 flex flex-col justify-between shadow-lg scanlines">
+            <div key={n} className="retro-panel p-3 md:p-5 flex flex-col justify-between relative group select-none scanlines rounded-xl">
               <div className="flex justify-between items-center mb-2 md:mb-4">
-                <div className="h-5 w-24 bg-trench-sandbag/40 rounded" />
-                <div className="h-4 w-16 bg-trench-sandbag/40 rounded" />
+                <div className="h-5 w-24 bg-trench-sandbag/40 rounded shadow-inner" />
+                <div className="h-4 w-16 bg-trench-sandbag/40 rounded shadow-inner" />
               </div>
               <div className="flex items-center gap-2 md:gap-3.5 mb-2 md:mb-4 border-b border-trench-sandbag/40 pb-2 md:pb-3">
-                <div className="w-[36px] h-[36px] md:w-[48px] md:h-[48px] bg-trench-sandbag/40 rounded" />
+                <div className="w-[36px] h-[36px] md:w-[48px] md:h-[48px] bg-trench-sandbag/40 rounded shadow-inner" />
                 <div className="flex-1 space-y-1.5">
-                  <div className="h-5 w-36 bg-trench-sandbag/40 rounded" />
-                  <div className="h-3 w-20 bg-trench-sandbag/30 rounded" />
+                  <div className="h-5 w-36 bg-trench-sandbag/40 rounded shadow-inner" />
+                  <div className="h-3 w-20 bg-trench-sandbag/30 rounded shadow-inner" />
                 </div>
               </div>
               <div className="space-y-1.5 md:space-y-2 mb-3 md:mb-5">
                 <div className="flex justify-between">
-                  <div className="h-3 w-20 bg-trench-sandbag/40 rounded" />
-                  <div className="h-3 w-20 bg-trench-sandbag/40 rounded" />
+                  <div className="h-3 w-20 bg-trench-sandbag/40 rounded shadow-inner" />
+                  <div className="h-3 w-20 bg-trench-sandbag/40 rounded shadow-inner" />
                 </div>
-                <div className="h-2 md:h-3 bg-trench-sandbag/30 rounded" />
+                <div className="h-2 md:h-3 bg-trench-sandbag/30 rounded shadow-inner" />
               </div>
               <div className="grid grid-cols-2 gap-1.5 md:gap-2">
-                <div className="h-8 md:h-10 bg-trench-sandbag/30 rounded" />
-                <div className="h-8 md:h-10 bg-trench-sandbag/30 rounded" />
+                <div className="h-8 md:h-10 bg-trench-sandbag/30 rounded shadow-inner" />
+                <div className="h-8 md:h-10 bg-trench-sandbag/30 rounded shadow-inner" />
               </div>
               <div className="mt-3 flex items-center justify-center gap-2">
                 <div className="w-3 h-3 rounded-full bg-neon-moon/40 animate-ping" />
@@ -303,7 +303,7 @@ export default function RoomsPage() {
               <div
                 key={room.id}
                 onClick={() => router.push(`/room/${room.id}`)}
-                className={`bg-trench-mud border-2 md:border-4 border-trench-sandbag rounded-lg md:rounded-lg p-3 md:p-5 cursor-pointer flex flex-col justify-between shadow-lg relative group transition-all duration-200 hover:-translate-y-1 select-none scanlines ${hoverGlow}`}
+                className={`retro-panel p-3 md:p-5 cursor-pointer flex flex-col justify-between relative group transition-all duration-200 hover:-translate-y-1 select-none scanlines rounded-xl ${hoverGlow}`}
               >
                 {/* Timer Bomb Clock Header */}
                 <div className="flex justify-between items-center mb-2 md:mb-4">
@@ -414,13 +414,13 @@ export default function RoomsPage() {
                   <div className="grid grid-cols-2 gap-1.5 md:gap-2 mt-1 md:mt-2">
                     <button
                       onClick={(e) => handleQuickBet(e, room.id, 'moon', 0.01)}
-                      className="btn-wood-green py-1 md:py-1.5 px-1 md:px-2.5 rounded font-staatliches text-[10px] md:text-sm tracking-wider uppercase text-center active:translate-y-0.5 md:active:translate-y-1 transition-transform"
+                      className="retro-btn retro-btn-moon py-1 md:py-1.5 px-1 md:px-2.5 rounded font-staatliches text-[10px] md:text-sm tracking-wider uppercase text-center active:translate-y-0.5 md:active:translate-y-1 transition-transform"
                     >
                       MOON 0.01
                     </button>
                     <button
                       onClick={(e) => handleQuickBet(e, room.id, 'jeet', 0.05)}
-                      className="btn-wood-red py-1 md:py-1.5 px-1 md:px-2.5 rounded font-staatliches text-[10px] md:text-sm tracking-wider uppercase text-center active:translate-y-0.5 md:active:translate-y-1 transition-transform"
+                      className="retro-btn retro-btn-jeet py-1 md:py-1.5 px-1 md:px-2.5 rounded font-staatliches text-[10px] md:text-sm tracking-wider uppercase text-center active:translate-y-0.5 md:active:translate-y-1 transition-transform"
                     >
                       JEET 0.05
                     </button>
@@ -447,7 +447,7 @@ export default function RoomsPage() {
 
       ) : (
         /* Empty State */
-        <div className="flex flex-col items-center justify-center py-20 bg-trench-mud border-4 border-dashed border-trench-sandbag rounded-lg shadow-inner text-center p-6 scanlines">
+        <div className="flex flex-col items-center justify-center py-20 retro-panel rounded-xl text-center p-6 scanlines">
           <div className="relative mb-6">
             <div className="absolute inset-0 bg-jeet-red/10 rounded-full blur-xl animate-pulse" />
             <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={120} glowColor="gold" animated className="rounded-xl relative z-10" />

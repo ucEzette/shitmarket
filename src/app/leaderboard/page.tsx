@@ -132,8 +132,8 @@ export default function LeaderboardPage() {
             <div className="w-full h-16 sm:h-24 bg-trench-mud border-4 border-trench-sandbag flex flex-col justify-center items-center rounded-t shadow-2xl relative">
               <span className="absolute inset-0 border border-black/40 pointer-events-none" />
               <span className="font-staatliches text-2xl sm:text-4xl text-trench-gasmask font-black">2ND</span>
-              <span className="font-mono text-[6px] sm:text-[8px] text-trench-gasmask uppercase font-bold -mt-1">
-                WR: {podium2nd.winRate}% | ELO: {podium2nd.elo || 1200}
+              <span className="font-mono text-[6px] sm:text-[8px] text-trench-gasmask uppercase font-bold -mt-1 text-center px-0.5">
+                WR: {podium2nd.winRate}%<span className="hidden sm:inline"> | ELO: {podium2nd.elo || 1200}</span>
               </span>
             </div>
           </div>
@@ -166,8 +166,8 @@ export default function LeaderboardPage() {
             <div className="w-full h-24 sm:h-32 bg-trench-mud border-4 border-neon-moon/70 flex flex-col justify-center items-center rounded-t shadow-2xl relative">
               <span className="absolute inset-0 border border-black/40 pointer-events-none" />
               <span className="font-staatliches text-3xl sm:text-5xl text-neon-moon font-black glow-moon">1ST</span>
-              <span className="font-mono text-[7px] sm:text-[9px] text-neon-moon uppercase font-bold -mt-1 tracking-wider glow-moon">
-                WR: {podium1st.winRate}% | ELO: {podium1st.elo || 1200}
+              <span className="font-mono text-[7px] sm:text-[9px] text-neon-moon uppercase font-bold -mt-1 tracking-wider glow-moon text-center px-0.5">
+                WR: {podium1st.winRate}%<span className="hidden sm:inline"> | ELO: {podium1st.elo || 1200}</span>
               </span>
             </div>
           </div>
@@ -197,8 +197,8 @@ export default function LeaderboardPage() {
             <div className="w-full h-12 sm:h-18 bg-trench-mud border-4 border-trench-sandbag flex flex-col justify-center items-center rounded-t shadow-2xl relative">
               <span className="absolute inset-0 border border-black/40 pointer-events-none" />
               <span className="font-staatliches text-2xl sm:text-4xl text-trench-gasmask font-black">3RD</span>
-              <span className="font-mono text-[6px] sm:text-[8px] text-trench-gasmask uppercase font-bold -mt-1">
-                WR: {podium3rd.winRate}% | ELO: {podium3rd.elo || 1200}
+              <span className="font-mono text-[6px] sm:text-[8px] text-trench-gasmask uppercase font-bold -mt-1 text-center px-0.5">
+                WR: {podium3rd.winRate}%<span className="hidden sm:inline"> | ELO: {podium3rd.elo || 1200}</span>
               </span>
             </div>
           </div>

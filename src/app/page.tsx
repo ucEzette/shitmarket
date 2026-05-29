@@ -95,29 +95,29 @@ function HomeContent() {
         <div className="mx-auto max-w-7xl px-4 flex flex-col items-center justify-between gap-12 relative z-10 w-full">
 
           {/* Main Battlefield Statue Visuals */}
-          <div className="w-full flex items-center justify-around gap-4 flex-wrap md:flex-nowrap">
+          <div className="w-full flex flex-col md:flex-row items-center justify-around gap-8 md:gap-4">
 
-            {/* Chad Bull Statue (Moon Army) */}
+            {/* Desktop Chad Bull Statue (Moon Army) - Hidden on Mobile */}
             <motion.div
               initial={{ x: -80, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ type: 'spring', duration: 1.2 }}
-              className="flex flex-col items-center text-center p-3 sm:p-6 retro-panel rounded-2xl max-w-[145px] sm:max-w-[200px] md:max-w-[240px] shrink-0"
+              className="hidden md:flex flex-col items-center text-center p-3 sm:p-6 retro-panel rounded-2xl max-w-[240px] shrink-0"
             >
               <div className="relative mb-4">
                 <div className="absolute -inset-2 rounded-full bg-neon-moon/20 blur-xl animate-pulse" />
-                <PepePortrait src={PEPE_ASSETS.chadBull} glowColor="moon" animated className="w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full border-0" />
+                <PepePortrait src={PEPE_ASSETS.chadBull} glowColor="moon" animated className="w-28 h-28 rounded-full border-0" />
               </div>
-              <span className="font-staatliches text-xs sm:text-base md:text-xl text-neon-moon tracking-wider uppercase glow-moon leading-tight">
+              <span className="font-staatliches text-xl text-neon-moon tracking-wider uppercase glow-moon leading-tight">
                 CHAD BULL GENERAL
               </span>
-              <p className="font-mono text-[8px] sm:text-[10px] text-trench-gasmask mt-1 uppercase font-bold leading-normal">
+              <p className="font-mono text-[10px] text-trench-gasmask mt-1 uppercase font-bold leading-normal">
                 Commander of the MOON Forces. Stake SOL on the PUMP.
               </p>
             </motion.div>
 
-            {/* Middle Combat Information Banner */}
-            <div className="flex flex-col items-center text-center max-w-2xl px-4 flex-1 min-w-[280px]">
+            {/* Middle Combat Information Banner - Always Center & Top on Mobile */}
+            <div className="flex flex-col items-center text-center max-w-2xl px-4 flex-1 min-w-[280px] w-full">
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -149,9 +149,6 @@ function HomeContent() {
                 Pick a side.<br />
                 <span className="text-neon-moon glow-moon">Bet the trench.</span><br />
                 <span className="text-jeet-red glow-jeet text-base sm:text-lg md:text-2xl leading-none">It's not a rug if you never own the coin, big brain.</span>
-
-
-
               </motion.h2>
 
               <p className="font-mono text-[11px] sm:text-sm text-trench-gasmask mt-4 sm:mt-6 max-w-lg uppercase font-bold leading-relaxed">
@@ -179,21 +176,60 @@ function HomeContent() {
               </div>
             </div>
 
-            {/* Skeleton Jeet Statue (Jeet Army) */}
+            {/* Mobile-Only Statues Side-by-Side Grid */}
+            <div className="flex md:hidden w-full flex-row justify-center gap-3 mt-6">
+              {/* Chad Bull Statue Mobile */}
+              <motion.div
+                initial={{ x: -40, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="flex-1 flex flex-col items-center text-center p-2.5 retro-panel rounded-xl max-w-[145px]"
+              >
+                <div className="relative mb-2 shrink-0">
+                  <div className="absolute -inset-1 rounded-full bg-neon-moon/20 blur-lg animate-pulse" />
+                  <PepePortrait src={PEPE_ASSETS.chadBull} glowColor="moon" animated className="w-12 h-12 rounded-full border-0" />
+                </div>
+                <span className="font-staatliches text-[11px] text-neon-moon tracking-wide uppercase glow-moon leading-tight block">
+                  CHAD BULL
+                </span>
+                <p className="font-mono text-[7px] text-trench-gasmask mt-0.5 uppercase font-bold leading-normal block">
+                  Commander Moon. SOL Pump.
+                </p>
+              </motion.div>
+
+              {/* Skeleton Jeet Statue Mobile */}
+              <motion.div
+                initial={{ x: 40, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                className="flex-1 flex flex-col items-center text-center p-2.5 retro-panel rounded-xl max-w-[145px]"
+              >
+                <div className="relative mb-2 shrink-0">
+                  <div className="absolute -inset-1 rounded-full bg-jeet-red/20 blur-lg animate-pulse" />
+                  <PepePortrait src={PEPE_ASSETS.jeetSkeleton} glowColor="jeet" animated className="w-12 h-12 rounded-full border-0" />
+                </div>
+                <span className="font-staatliches text-[11px] text-jeet-red tracking-wide uppercase glow-jeet leading-tight block">
+                  JEET REAPER
+                </span>
+                <p className="font-mono text-[7px] text-trench-gasmask mt-0.5 uppercase font-bold leading-normal block">
+                  Commander Jeet. SOL Dump.
+                </p>
+              </motion.div>
+            </div>
+
+            {/* Desktop Skeleton Jeet Statue (Jeet Army) - Hidden on Mobile */}
             <motion.div
               initial={{ x: 80, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ type: 'spring', duration: 1.2 }}
-              className="flex flex-col items-center text-center p-3 sm:p-6 retro-panel rounded-2xl max-w-[145px] sm:max-w-[200px] md:max-w-[240px] shrink-0"
+              className="hidden md:flex flex-col items-center text-center p-3 sm:p-6 retro-panel rounded-2xl max-w-[240px] shrink-0"
             >
               <div className="relative mb-4">
                 <div className="absolute -inset-2 rounded-full bg-jeet-red/20 blur-xl animate-pulse" />
-                <PepePortrait src={PEPE_ASSETS.jeetSkeleton} glowColor="jeet" animated className="w-16 h-16 sm:w-24 sm:h-24 md:w-28 md:h-28 rounded-full border-0" />
+                <PepePortrait src={PEPE_ASSETS.jeetSkeleton} glowColor="jeet" animated className="w-28 h-28 rounded-full border-0" />
               </div>
-              <span className="font-staatliches text-xs sm:text-base md:text-xl text-jeet-red tracking-wider uppercase glow-jeet leading-tight">
+              <span className="font-staatliches text-xl text-jeet-red tracking-wider uppercase glow-jeet leading-tight">
                 SKELETON JEET REAPER
               </span>
-              <p className="font-mono text-[8px] sm:text-[10px] text-trench-gasmask mt-1 uppercase font-bold leading-normal">
+              <p className="font-mono text-[10px] text-trench-gasmask mt-1 uppercase font-bold leading-normal">
                 Commander of the JEET Forces. Stake SOL on the DUMP.
               </p>
             </motion.div>

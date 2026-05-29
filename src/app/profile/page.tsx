@@ -236,13 +236,13 @@ export default function ProfilePage() {
 
                 {/* Passport Card details */}
                 <div className="flex flex-col gap-4">
-                  <div className="flex gap-4 items-start">
+                  <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start text-center sm:text-left">
                     <div className={`w-28 h-28 bg-gradient-to-br ${getAvatarBg()} border-4 border-trench-sandbag rounded flex items-center justify-center relative shadow-inner overflow-hidden shrink-0 group`}>
                       <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.35)_50%)] bg-[size:100%_4px] pointer-events-none z-10" />
                       <img src={isEditing ? (editAvatar || PEPE_ASSETS.fewUnderstand) : (user.avatarUrl || PEPE_ASSETS.chadBull)} alt="Commander Avatar" className="w-full h-full object-cover relative z-0 group-hover:scale-110 transition-transform duration-300" />
                     </div>
 
-                    <div className="space-y-2 flex-1 min-w-0">
+                    <div className="space-y-2 flex-1 min-w-0 w-full flex flex-col items-center sm:items-start">
                       <span className="font-mono text-[9px] text-neon-moon font-bold bg-neon-moon/10 px-2 py-0.5 border border-neon-moon/30 rounded uppercase tracking-wider inline-block">
                         COMMAND SQUAD ACTIVE
                       </span>
@@ -253,17 +253,17 @@ export default function ProfilePage() {
                           onChange={(e) => setEditUsername(e.target.value)}
                           maxLength={30}
                           placeholder="ENTER CALLSIGN"
-                          className="w-full bg-trench-black border border-trench-sandbag text-white font-staatliches text-xl px-2 py-1 outline-none focus:border-neon-moon mt-1"
+                          className="w-full bg-trench-black border border-trench-sandbag text-white font-staatliches text-xl px-2 py-1 outline-none focus:border-neon-moon mt-1 text-center sm:text-left"
                         />
                       ) : (
-                        <h4 className="font-staatliches text-2xl text-white tracking-wide truncate leading-none mt-1" title={user.username || `COMMANDER_${user.wallet!.substring(0, 6)}`}>
+                        <h4 className="font-staatliches text-2xl text-white tracking-wide truncate leading-none mt-1 w-full text-center sm:text-left" title={user.username || `COMMANDER_${user.wallet!.substring(0, 6)}`}>
                           {user.username || `COMMANDER_${user.wallet!.substring(0, 6)}`}
                         </h4>
                       )}
-                      <p className="font-mono text-[10px] text-trench-gasmask truncate uppercase leading-tight font-bold">
+                      <p className="font-mono text-[10px] text-trench-gasmask truncate uppercase leading-tight font-bold w-full text-center sm:text-left">
                         {user.wallet}
                       </p>
-                      <p className="font-mono text-xs text-moon-gold font-bold">
+                      <p className="font-mono text-xs text-moon-gold font-bold w-full text-center sm:text-left">
                         Balance: {user.balance.toFixed(2)} Ammo SOL
                       </p>
                     </div>

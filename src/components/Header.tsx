@@ -62,15 +62,15 @@ export const Header: React.FC<{
       </div>
 
         {/* Wallet Connection / Ammo Status */}
-        <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          <Link href="/?play_intro=true">
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <Link href="/?play_intro=true" className="hidden sm:block">
             <button className="px-2.5 py-1.5 retro-btn retro-btn-neutral border border-trench-sandbag rounded font-staatliches text-[10px] sm:text-xs tracking-wider uppercase transition-colors shrink-0 font-bold flex items-center gap-1">
               📜 BRIEFING
             </button>
           </Link>
           
           {user && user.wallet ? (
-            <div className="flex items-center gap-1 sm:gap-2 bg-black border-2 border-trench-sandbag rounded p-0.5 sm:p-1">
+            <div className="flex items-center gap-1 bg-black border-2 border-trench-sandbag rounded p-0.5 sm:p-1">
               {/* Notification Bell */}
               <NotificationBell />
 
@@ -78,17 +78,17 @@ export const Header: React.FC<{
               <div className="flex items-center gap-1 px-1.5 py-0.5 sm:px-3 sm:py-1 bg-trench-mud border border-trench-sandbag rounded-sm">
                 <Coins size={12} className="text-moon-gold sm:size-[14px]" />
                 <span className="font-mono text-[10px] sm:text-xs font-bold text-moon-gold">
-                  AMMO: <span className="glow-gold font-bold">{user.balance.toFixed(2)} SOL</span>
+                  <span className="hidden sm:inline">AMMO: </span><span className="glow-gold font-bold">{user.balance.toFixed(2)} SOL</span>
                 </span>
               </div>
 
               {/* User Address with Gas Mask Indicator */}
               <Link
                 href="/profile"
-                className="flex items-center gap-1 px-1.5 py-0.5 sm:px-3 sm:py-1 bg-trench-sandbag hover:bg-trench-gasmask transition-all rounded-sm text-white retro-btn"
+                className="flex items-center gap-1 px-1 py-0.5 sm:px-3 sm:py-1 bg-trench-sandbag hover:bg-trench-gasmask transition-all rounded-sm text-white retro-btn"
               >
                 <PepePortrait src={user.avatarUrl || PEPE_ASSETS.fewUnderstand} size={16} loading="eager" className="rounded-full sm:size-[20px]" />
-                <span className="font-mono text-[10px] sm:text-xs font-bold pl-0.5 max-w-[80px] sm:max-w-[120px] truncate block">
+                <span className="font-mono text-[10px] sm:text-xs font-bold pl-0.5 max-w-[45px] sm:max-w-[120px] truncate block">
                   {user.username || `${user.wallet.substring(0, 4)}...${user.wallet.substring(user.wallet.length - 4)}`}
                 </span>
               </Link>

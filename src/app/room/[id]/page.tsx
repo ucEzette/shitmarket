@@ -739,7 +739,7 @@ export default function RoomDetailPage() {
 
           {/* Stable and Static DexScreener Chart Terminal with Militarized Console Shell Frame (Permanently Flicker-Free) */}
           {room.token.chainId && (
-            <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[410px] flex flex-col justify-between z-10 scanlines">
+            <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[320px] sm:h-[410px] flex flex-col justify-between z-10 scanlines">
               
               {/* Steel Console Top Header Bar */}
               <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex items-center justify-between font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">

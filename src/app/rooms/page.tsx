@@ -160,10 +160,10 @@ export default function RoomsPage() {
       </div>
 
       {/* Filter and Search Panel */}
-      <div className="retro-panel p-4 rounded-xl mb-8 flex flex-col lg:flex-row justify-between gap-4 items-center">
+      <div className="retro-panel p-4 rounded-xl mb-8 flex flex-col lg:flex-row justify-between gap-4 items-stretch lg:items-center">
         
         {/* Tactical filter radio tabs */}
-        <div className="flex flex-wrap gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner">
+        <div className="flex flex-wrap justify-center lg:justify-start gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner w-full lg:w-auto">
           <button
             onClick={() => setFilter('ending')}
             className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
@@ -207,8 +207,8 @@ export default function RoomsPage() {
         </div>
 
         {/* Jeet Alerts Stub Button with Custom Tooltip */}
-        <div className="relative group shrink-0">
-          <button className="px-4 py-2 retro-btn retro-btn-neutral text-black hover:text-black border border-trench-sandbag rounded font-staatliches text-xs tracking-wider uppercase transition-all flex items-center gap-1.5 active:translate-y-0.5">
+        <div className="relative group shrink-0 w-full lg:w-auto">
+          <button className="px-4 py-2 retro-btn retro-btn-neutral text-black hover:text-black border border-trench-sandbag rounded font-staatliches text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 active:translate-y-0.5 w-full lg:w-auto">
             <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff535a]" />
             <span>ENABLE JEET ALERTS</span>
           </button>

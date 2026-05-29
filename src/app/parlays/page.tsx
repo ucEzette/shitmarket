@@ -317,7 +317,7 @@ export default function ParlaysPage() {
         </div>
 
         {/* Right Column: Dynamic Aggregation Console (5 cols) */}
-        <div className="lg:col-span-4 bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 relative shadow-lg scanlines flex flex-col justify-between h-[390px] lg:h-[430px]">
+        <div className="lg:col-span-4 bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 relative shadow-lg scanlines flex flex-col justify-between min-h-[340px] lg:h-[430px]">
           <div>
             <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 flex items-center gap-2 uppercase border-b border-trench-sandbag/40 pb-2">
               <PepePortrait src={PEPE_ASSETS.apeGeneral} size={24} className="rounded-full" />

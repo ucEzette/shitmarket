@@ -16,7 +16,7 @@ declare_id!("2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ");
 // ─────────────────────────────────────────────
 
 const MAX_FEE_BPS: u16 = 1_000; // 10% absolute maximum
-const SECONDS_PER_MINUTE: i64 = 1;
+const SECONDS_PER_MINUTE: i64 = 60;
 const TOKEN_NAME_LEN: usize = 32;
 const MINIMUM_LIQUIDITY_SOL: u64 = 100_000_000; // 0.1 SOL minimum pool requirement
 const MAX_TWAP_SAMPLES: usize = 5; // number of price samples to store for TWAP

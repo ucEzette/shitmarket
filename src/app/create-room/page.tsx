@@ -41,6 +41,7 @@ export default function CreateRoomPage() {
     rawFdv?: number;
     chainId?: string;
     pairAddress?: string;
+    rawPriceUsd?: number;
   } | null>(null);
 
   const handleScan = async () => {
@@ -115,7 +116,8 @@ export default function CreateRoomPage() {
           rawLiquidity: pair.liquidity?.usd,
           rawFdv: pair.fdv,
           chainId: pair.chainId,
-          pairAddress: pair.pairAddress
+          pairAddress: pair.pairAddress,
+          rawPriceUsd: pair.priceUsd ? parseFloat(pair.priceUsd) : 0
         });
         
         synthSound('victory');
@@ -185,7 +187,8 @@ export default function CreateRoomPage() {
       expiry: Date.now() + duration * 60000,
       status: 'active',
       createdAt: Date.now(),
-      duration: duration
+      duration: duration,
+      openingPrice: tokenInfo.rawPriceUsd
     };
 
     try {

@@ -521,7 +521,7 @@ export const useAppState = create<AppState>((set, get) => ({
     try {
       const tokenMintStr = room.token.address;
       let onChainPubkeyStr = tokenMintStr;
-      let livePriceUsd: string | undefined = undefined;
+      let livePriceUsd: string | undefined = room.openingPrice ? String(room.openingPrice) : undefined;
       
       // Phase 3.4: Validate minimum liquidity & age via indexer
       const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';

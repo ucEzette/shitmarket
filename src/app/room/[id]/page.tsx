@@ -91,6 +91,15 @@ interface ExplosionParticles {
   y: number;
 }
 
+const formatDuration = (mins: number) => {
+  if (mins >= 525600) return `${Math.round(mins / 525600)} YEAR${Math.round(mins / 525600) > 1 ? 'S' : ''}`;
+  if (mins >= 43200) return `${Math.round(mins / 43200)} MONTH${Math.round(mins / 43200) > 1 ? 'S' : ''}`;
+  if (mins >= 10080) return `${Math.round(mins / 10080)} WEEK${Math.round(mins / 10080) > 1 ? 'S' : ''}`;
+  if (mins >= 1440) return `${Math.round(mins / 1440)} DAY${Math.round(mins / 1440) > 1 ? 'S' : ''}`;
+  if (mins >= 60) return `${Math.round(mins / 60)} HOUR${Math.round(mins / 60) > 1 ? 'S' : ''}`;
+  return `${mins} MINS`;
+};
+
 export default function RoomDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -822,14 +831,34 @@ export default function RoomDetailPage() {
               <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
                 <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROOM DURATION</span>
                 <span className="text-white font-staatliches text-base block mt-0.5">
-                  {room.duration ? `${Math.floor(room.duration / 60000)} MINS` : '60 MINUTES'}
+                  {room.duration 
+                    ? (room.duration >= 60 
+                        ? `${room.duration.toLocaleString()} MINS (${formatDuration(room.duration)})` 
+                        : `${room.duration} MINS`) 
+                    : '60 MINS'}
                 </span>
               </div>
             </div>
 
             {/* Coin Briefing Text */}
             <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed uppercase border-l-4 border-l-neon-moon">
-              <span className="text-neon-moon font-bold block mb-1">COIN INTEL BRIEF:</span>
+              <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
+                <span className="text-neon-moon font-bold">COIN INTEL BRIEF:</span>
+                <span className="text-trench-gasmask">MINT ADDR:</span>
+                <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all">
+                  {room.token.address}
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(room.token.address);
+                      alert("CONTRACT ADDRESS COPIED TO CLIPBOARD!");
+                    }}
+                    className="text-neon-moon hover:text-white ml-1 font-bold font-staatliches text-[10px] tracking-wider uppercase bg-trench-black border border-neon-moon/40 px-1 rounded active:scale-95 transition-transform"
+                  >
+                    [COPY]
+                  </button>
+                </span>
+              </div>
               {room.token.symbol === 'PEPE' ? (
                 <span>🐸 Pepe the frog, standard infantry memecoin. Plunged into the bearish mud after local high listings, currently fighting for bullish recovery inside the SOL arena. Highly volatile.</span>
               ) : room.token.symbol === 'WIF' ? (

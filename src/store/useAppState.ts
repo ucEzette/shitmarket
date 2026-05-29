@@ -334,123 +334,121 @@ export const useAppState = create<AppState>((set, get) => ({
   },
 
   fetchSingleRoom: async (roomId: string) => {
-    try {
-      let room: Room | null = null;
-
+    // Run indexer API fetch and on-chain fetch in parallel to prevent sequential blocking lag!
+    const indexerFetch = (async () => {
       try {
         const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
         const res = await fetchWithTimeout(`${indexerApi}/api/rooms/${roomId}`, {}, 3000);
         const json = await res.json();
         if (json.success && json.data) {
-          room = mapApiRoom(json.data);
-          // Fast-Path: render indexing results immediately!
+          const roomObj = mapApiRoom(json.data);
           set((state) => {
             const exists = state.rooms.some((r) => r.id === roomId);
             const newRooms = exists
-              ? state.rooms.map((r) => (r.id === roomId ? room! : r))
-              : [room!, ...state.rooms];
+              ? state.rooms.map((r) => (r.id === roomId ? roomObj : r))
+              : [roomObj, ...state.rooms];
             return { rooms: newRooms };
           });
+          return roomObj;
         }
       } catch (err) {
         console.warn(`Failed to fetch room ${roomId} from indexer API:`, err);
       }
+      return null;
+    })();
 
-      // Safe Fallback & Background Hydration: Fetch from on-chain room account directly
-      (async () => {
-        try {
-          const program = getAnchorProgram(null as any);
-          const onChain = await withTimeout(
-            (program.account as any).room.fetch(new PublicKey(roomId)),
-            3000,
-            'On-chain room fetch timed out'
-          ) as any;
+    const onChainFetch = (async () => {
+      try {
+        const program = getAnchorProgram(null as any);
+        const onChain = await withTimeout(
+          (program.account as any).room.fetch(new PublicKey(roomId)),
+          3000,
+          'On-chain room fetch timed out'
+        ) as any;
 
-          if (onChain) {
-            const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
-            let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
-            if (onChain.winner) {
-              const wKey = Object.keys(onChain.winner)[0].toLowerCase();
-              if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
-                winnerStr = wKey;
-              }
+        if (onChain) {
+          const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
+          let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
+          if (onChain.winner) {
+            const wKey = Object.keys(onChain.winner)[0].toLowerCase();
+            if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
+              winnerStr = wKey;
             }
-
-            const current = get().rooms.find((r) => r.id === roomId) || room;
-            
-            // Decode token name bytes safely
-            let decodedName = current?.token?.name || 'Unknown Token';
-            if (!current) {
-              const rawNameBytes = onChain.tokenName as number[] | Uint8Array;
-              if (rawNameBytes) {
-                const buffer = Buffer.from(rawNameBytes);
-                const nullIndex = buffer.indexOf(0);
-                decodedName = buffer.toString('utf8', 0, nullIndex === -1 ? buffer.length : nullIndex).trim();
-              }
-            }
-
-            const updatedRoom: Room = {
-              id: roomId,
-              token: {
-                address: current?.token?.address || onChain.tokenMint.toBase58(),
-                name: decodedName,
-                symbol: current?.token?.symbol || decodedName.substring(0, 10).toUpperCase(),
-                icon: current?.token?.icon || '💰',
-                chainId: current?.token?.chainId || 'solana',
-                pairAddress: current?.token?.pairAddress || '',
-              },
-              creator: onChain.creator.toBase58(),
-              moonPool: onChain.moonPool.toNumber() / 1e9,
-              jeetPool: onChain.jeetPool.toNumber() / 1e9,
-              expiry: onChain.expiryTimestamp.toNumber() * 1000,
-              status: statusStr,
-              winner: winnerStr,
-              createdAt: onChain.openingTimestamp.toNumber() * 1000,
-              duration: onChain.durationMinutes as any,
-              openingPrice: onChain.openingPrice.toNumber() / 1e8,
-              finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e8 : undefined,
-              twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e8 : undefined,
-            };
-
-            if (!updatedRoom.token.icon || !updatedRoom.token.icon.startsWith('http')) {
-              try {
-                const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${updatedRoom.token.address}`;
-                const dsRes = await fetch(dsUrl);
-                if (dsRes.ok) {
-                  const dsJson = await dsRes.json();
-                  const pairs = dsJson?.pairs || [];
-                  if (pairs.length > 0) {
-                    const bestPair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
-                    const imageUrl = bestPair.info?.imageUrl;
-                    if (imageUrl) {
-                      updatedRoom.token.icon = imageUrl;
-                      if (bestPair.baseToken?.name) updatedRoom.token.name = bestPair.baseToken.name;
-                      if (bestPair.baseToken?.symbol) updatedRoom.token.symbol = bestPair.baseToken.symbol;
-                      if (bestPair.chainId) updatedRoom.token.chainId = bestPair.chainId;
-                      if (bestPair.pairAddress) updatedRoom.token.pairAddress = bestPair.pairAddress;
-                    }
-                  }
-                }
-              } catch (err) {
-                console.warn('Failed to fetch fallback token image from DexScreener:', err);
-              }
-            }
-
-            set((state) => {
-              const exists = state.rooms.some((r) => r.id === roomId);
-              const newRooms = exists
-                ? state.rooms.map((r) => (r.id === roomId ? updatedRoom : r))
-                : [updatedRoom, ...state.rooms];
-              return { rooms: newRooms };
-            });
           }
-        } catch (e) {
-          console.warn('Could not fetch or hydrate single on-chain room state in background:', e);
+
+          const current = get().rooms.find((r) => r.id === roomId);
+          
+          let decodedName = current?.token?.name || 'Unknown Token';
+          if (!current) {
+            const rawNameBytes = onChain.tokenName as number[] | Uint8Array;
+            if (rawNameBytes) {
+              const buffer = Buffer.from(rawNameBytes);
+              const nullIndex = buffer.indexOf(0);
+              decodedName = buffer.toString('utf8', 0, nullIndex === -1 ? buffer.length : nullIndex).trim();
+            }
+          }
+
+          const updatedRoom: Room = {
+            id: roomId,
+            token: {
+              address: current?.token?.address || onChain.tokenMint.toBase58(),
+              name: decodedName,
+              symbol: current?.token?.symbol || decodedName.substring(0, 10).toUpperCase(),
+              icon: current?.token?.icon || '💰',
+              chainId: current?.token?.chainId || 'solana',
+              pairAddress: current?.token?.pairAddress || '',
+            },
+            creator: onChain.creator.toBase58(),
+            moonPool: onChain.moonPool.toNumber() / 1e9,
+            jeetPool: onChain.jeetPool.toNumber() / 1e9,
+            expiry: onChain.expiryTimestamp.toNumber() * 1000,
+            status: statusStr,
+            winner: winnerStr,
+            createdAt: onChain.openingTimestamp.toNumber() * 1000,
+            duration: onChain.durationMinutes as any,
+            openingPrice: onChain.openingPrice.toNumber() / 1e8,
+            finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e8 : undefined,
+            twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e8 : undefined,
+          };
+
+          if (!updatedRoom.token.icon || !updatedRoom.token.icon.startsWith('http') || !updatedRoom.token.pairAddress || updatedRoom.token.pairAddress === '') {
+            try {
+              const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${updatedRoom.token.address}`;
+              const dsRes = await fetch(dsUrl);
+              if (dsRes.ok) {
+                const dsJson = await dsRes.json();
+                const pairs = dsJson?.pairs || [];
+                if (pairs.length > 0) {
+                  const bestPair = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+                  const imageUrl = bestPair.info?.imageUrl;
+                  if (imageUrl) {
+                    updatedRoom.token.icon = imageUrl;
+                  }
+                  if (bestPair.baseToken?.name) updatedRoom.token.name = bestPair.baseToken.name;
+                  if (bestPair.baseToken?.symbol) updatedRoom.token.symbol = bestPair.baseToken.symbol;
+                  if (bestPair.chainId) updatedRoom.token.chainId = bestPair.chainId;
+                  if (bestPair.pairAddress) updatedRoom.token.pairAddress = bestPair.pairAddress;
+                }
+              }
+            } catch (err) {
+              console.warn('Failed to fetch fallback token image from DexScreener:', err);
+            }
+          }
+
+          set((state) => {
+            const exists = state.rooms.some((r) => r.id === roomId);
+            const newRooms = exists
+              ? state.rooms.map((r) => (r.id === roomId ? updatedRoom : r))
+              : [updatedRoom, ...state.rooms];
+            return { rooms: newRooms };
+          });
         }
-      })();
-    } catch (err) {
-      console.error(`Failed to fetch single room ${roomId}:`, err);
-    }
+      } catch (e) {
+        console.warn('Could not fetch or hydrate single on-chain room state in background:', e);
+      }
+    })();
+
+    await Promise.all([indexerFetch, onChainFetch]);
   },
 
   fetchLeaderboard: async () => {

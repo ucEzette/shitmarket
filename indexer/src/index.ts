@@ -27,6 +27,7 @@ import { startWsServer } from './websocket/wsServer';
 import { startEventListener, stopEventListener } from './listener/eventListener';
 import { runBackfiller } from './listener/backfiller';
 import { startSettlementKeeper } from './keeper/settlementKeeper';
+import { startLimitOrderKeeper } from './keeper/limitOrderKeeper';
 import { runTwapCron } from './keeper/twapCron';
 import { RpcCircuitBreaker } from './solana/rpcCircuitBreaker';
 
@@ -248,6 +249,9 @@ async function main(): Promise<void> {
 
   // 8. Settlement keeper
   startSettlementKeeper(connection, program);
+
+  // 8.5. Limit Order Relayer keeper
+  startLimitOrderKeeper(connection, program);
 
   // 9. TWAP Cron
   setInterval(() => {

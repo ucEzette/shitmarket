@@ -71,4 +71,14 @@ pub enum ShitMarketError {
     Underflow,
     #[msg("Division by zero")]
     DivisionByZero,
+
+    // Phase 4: Limit Orders
+    #[msg("Limit order is not in a pending state")]
+    OrderNotPending,
+    #[msg("Provided room does not match the limit order target")]
+    InvalidRoom,
+    #[msg("Limit target price condition is not met yet")]
+    TriggerConditionNotMet,
+    #[msg("Max slippage limit exceeded")]
+    SlippageExceeded,
 }

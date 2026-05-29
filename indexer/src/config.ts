@@ -18,6 +18,7 @@ export const config = {
     wsUrl: optional('SOLANA_WS_URL', 'wss://api.devnet.solana.com'),
     programId: required('PROGRAM_ID'),
     keeperPrivateKey: required('KEEPER_PRIVATE_KEY'),
+    relayerPrivateKey: optional('RELAYER_PRIVATE_KEY', optional('KEEPER_PRIVATE_KEY', '')),
   },
   db: {
     url: required('DATABASE_URL'),

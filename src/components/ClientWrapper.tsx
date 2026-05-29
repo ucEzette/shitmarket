@@ -230,6 +230,20 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     audioEnabledRef.current = audioEnabled;
+    if (typeof window !== 'undefined') {
+      (window as any).playDAppSound = (type: any) => {
+        if (audioEnabled) {
+          synthSound(type);
+        }
+      };
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        try {
+          delete (window as any).playDAppSound;
+        } catch {}
+      }
+    };
   }, [audioEnabled]);
 
   const navItems = [

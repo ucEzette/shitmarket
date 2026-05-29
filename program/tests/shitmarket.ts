@@ -51,10 +51,12 @@ function deriveRoom(
 function deriveBet(
   room: PublicKey,
   user: PublicKey,
+  side: "moon" | "jeet",
   programId: PublicKey
 ): [PublicKey, number] {
+  const sideByte = side === "moon" ? 0 : 1;
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("bet"), room.toBuffer(), user.toBuffer()],
+    [Buffer.from("bet"), room.toBuffer(), user.toBuffer(), Buffer.from([sideByte])],
     programId
   );
 }
@@ -72,6 +74,18 @@ function deriveReputation(
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [Buffer.from("reputation"), user.toBuffer()],
+    programId
+  );
+}
+
+function deriveLimitOrder(
+  user: PublicKey,
+  room: PublicKey,
+  nonce: number,
+  programId: PublicKey
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("limit_order"), user.toBuffer(), room.toBuffer(), Buffer.from([nonce])],
     programId
   );
 }
@@ -146,10 +160,10 @@ describe("shitmarket", () => {
     [configPda] = deriveConfig(programId);
     [roomPda] = deriveRoom(MOCK_TOKEN_MINT, creator.publicKey, programId);
     [escrowPda] = deriveEscrow(roomPda, programId);
-    [moonBetPda] = deriveBet(roomPda, moonBettor.publicKey, programId);
-    [jeetBetPda] = deriveBet(roomPda, jeetBettor.publicKey, programId);
-    [secondMoonBetPda] = deriveBet(roomPda, secondMoonBettor.publicKey, programId);
-    [whaleBetPda] = deriveBet(roomPda, whaleBettor.publicKey, programId);
+    [moonBetPda] = deriveBet(roomPda, moonBettor.publicKey, "moon", programId);
+    [jeetBetPda] = deriveBet(roomPda, jeetBettor.publicKey, "jeet", programId);
+    [secondMoonBetPda] = deriveBet(roomPda, secondMoonBettor.publicKey, "moon", programId);
+    [whaleBetPda] = deriveBet(roomPda, whaleBettor.publicKey, "moon", programId);
     [whaleRepPda] = deriveReputation(whaleBettor.publicKey, programId);
   });
 
@@ -540,8 +554,8 @@ describe("shitmarket", () => {
 
       [fastRoomPda] = deriveRoom(fastMint, fastCreator.publicKey, programId);
       [fastEscrowPda] = deriveEscrow(fastRoomPda, programId);
-      [fastMoonBetPda] = deriveBet(fastRoomPda, fastMoonBettor.publicKey, programId);
-      [fastJeetBetPda] = deriveBet(fastRoomPda, fastJeetBettor.publicKey, programId);
+      [fastMoonBetPda] = deriveBet(fastRoomPda, fastMoonBettor.publicKey, "moon", programId);
+      [fastJeetBetPda] = deriveBet(fastRoomPda, fastJeetBettor.publicKey, "jeet", programId);
     });
 
     it("creates a fast room (10-min — expires quickly in localnet warp)", async () => {
@@ -832,7 +846,7 @@ describe("shitmarket", () => {
       ]);
       [edgeRoomPda] = deriveRoom(edgeMint, edgeCreator.publicKey, programId);
       [edgeEscrowPda] = deriveEscrow(edgeRoomPda, programId);
-      [lonelyBetPda] = deriveBet(edgeRoomPda, lonelyBettor.publicKey, programId);
+      [lonelyBetPda] = deriveBet(edgeRoomPda, lonelyBettor.publicKey, "moon", programId);
     });
 
     it("room with bets only on one side settles correctly", async function () {
@@ -913,6 +927,164 @@ describe("shitmarket", () => {
       const bet = await program.account.bet.fetch(lonelyBetPda);
       assert.isTrue(bet.claimed);
       console.log("  Lonely winner claimed successfully — full pot minus fee.");
+    });
+  });
+
+  describe("limit orders", () => {
+    const limitMint = Keypair.generate().publicKey;
+    const limitCreator = Keypair.generate();
+    const bettor = Keypair.generate();
+    const relayer = Keypair.generate();
+    
+    let limitRoomPda: PublicKey;
+    let limitEscrowPda: PublicKey;
+    let orderPda0: PublicKey;
+    let orderPda1: PublicKey;
+    let betPda: PublicKey;
+
+    before(async () => {
+      await Promise.all([
+        airdrop(provider, limitCreator.publicKey, 5),
+        airdrop(provider, bettor.publicKey, 10),
+        airdrop(provider, relayer.publicKey, 2),
+      ]);
+
+      [limitRoomPda] = deriveRoom(limitMint, limitCreator.publicKey, programId);
+      [limitEscrowPda] = deriveEscrow(limitRoomPda, programId);
+      [orderPda0] = deriveLimitOrder(bettor.publicKey, limitRoomPda, 0, programId);
+      [orderPda1] = deriveLimitOrder(bettor.publicKey, limitRoomPda, 1, programId);
+      [betPda] = deriveBet(limitRoomPda, bettor.publicKey, "moon", programId);
+    });
+
+    it("creates a room for limit order betting", async () => {
+      await program.methods
+        .createRoom(limitMint, "LIMITOK", 30, null, null, 0)
+        .accounts({
+          room: limitRoomPda,
+          escrow: limitEscrowPda,
+          creator: limitCreator.publicKey,
+          priceFeed: MOCK_PRICE_FEED.publicKey,
+          switchboardFeed: PublicKey.default,
+          config: configPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([limitCreator])
+        .rpc();
+      
+      const r = await program.account.room.fetch(limitRoomPda);
+      assert.deepEqual(r.status, { active: {} });
+    });
+
+    it("queues and funds a secure escrow-based limit order", async () => {
+      const orderAmount = new BN(1.5 * LAMPORTS_PER_SOL);
+      const limitPrice = new BN(160_000_000); // Trigger when <= $160.00
+      
+      await program.methods
+        .createLimitOrder(
+          { moon: {} },
+          orderAmount,
+          limitPrice,
+          0, // trigger_direction: 0 (below)
+          0, // nonce
+          50 // max_slippage_bps
+        )
+        .accounts({
+          limitOrder: orderPda0,
+          room: limitRoomPda,
+          user: bettor.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([bettor])
+        .rpc();
+
+      const order = await program.account.limitOrder.fetch(orderPda0);
+      assert.equal(order.user.toBase58(), bettor.publicKey.toBase58());
+      assert.equal(order.room.toBase58(), limitRoomPda.toBase58());
+      assert.deepEqual(order.side, { moon: {} });
+      assert.isTrue(order.amount.eq(orderAmount));
+      assert.isTrue(order.limitPrice.eq(limitPrice));
+      assert.equal(order.triggerDirection, 0);
+      assert.equal(order.nonce, 0);
+      assert.equal(order.status, 0); // Pending
+
+      // Verify the limit order PDA is funded
+      const orderBal = await provider.connection.getBalance(orderPda0);
+      assert.isAtLeast(orderBal, orderAmount.toNumber());
+    });
+
+    it("cancels a limit order and refunds 100% of escrowed SOL", async () => {
+      const orderAmount = new BN(1 * LAMPORTS_PER_SOL);
+      const limitPrice = new BN(160_000_000);
+      
+      // 1. Create order 1
+      await program.methods
+        .createLimitOrder(
+          { moon: {} },
+          orderAmount,
+          limitPrice,
+          0,
+          1, // nonce: 1
+          50
+        )
+        .accounts({
+          limitOrder: orderPda1,
+          room: limitRoomPda,
+          user: bettor.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([bettor])
+        .rpc();
+
+      const userBefore = await provider.connection.getBalance(bettor.publicKey);
+
+      // 2. Cancel order 1
+      await program.methods
+        .cancelLimitOrder()
+        .accounts({
+          limitOrder: orderPda1,
+          room: limitRoomPda,
+          user: bettor.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([bettor])
+        .rpc();
+
+      const order = await program.account.limitOrder.fetch(orderPda1);
+      assert.equal(order.status, 2); // Cancelled
+
+      const userAfter = await provider.connection.getBalance(bettor.publicKey);
+      // User got refunded, so balance should be back minus a tiny gas fee
+      assert.isAbove(userAfter - userBefore, 0.99 * LAMPORTS_PER_SOL);
+    });
+
+    it("executes a limit order autonomously signed by a relayer", async () => {
+      // Current Pyth feed mock price is $150.00, which is <= $160.00 (trigger condition met!)
+      const roomBefore = await program.account.room.fetch(limitRoomPda);
+      assert.isTrue(roomBefore.moonPool.eq(new BN(0)));
+
+      await program.methods
+        .executeLimitOrder()
+        .accounts({
+          limitOrder: orderPda0,
+          room: limitRoomPda,
+          escrow: limitEscrowPda,
+          bet: betPda,
+          priceFeed: MOCK_PRICE_FEED.publicKey,
+          relayer: relayer.publicKey,
+          config: configPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([relayer])
+        .rpc();
+
+      const order = await program.account.limitOrder.fetch(orderPda0);
+      assert.equal(order.status, 1); // Executed
+
+      const roomAfter = await program.account.room.fetch(limitRoomPda);
+      assert.isTrue(roomAfter.moonPool.eq(order.amount));
+
+      const bet = await program.account.bet.fetch(betPda);
+      assert.isTrue(bet.amount.eq(order.amount));
     });
   });
 });

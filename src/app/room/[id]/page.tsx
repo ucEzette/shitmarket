@@ -108,8 +108,11 @@ export default function RoomDetailPage() {
   const { 
     rooms, user, chatMessages, placeBet, claimWinnings, 
     addMessage, connectWallet, isTransactionLoading, 
-    fetchSingleRoom, fetchRoomChats, sendRoomChat 
+    fetchSingleRoom, fetchRoomChats, sendRoomChat,
+    placeLimitOrder, cancelLimitOrder, checkLimitOrders, limitOrders
   } = useAppState();
+
+  const room = rooms.find((r) => r.id === roomId);
 
   const [selectedSide, setSelectedSide] = useState<'moon' | 'jeet'>('moon');
   const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
@@ -121,6 +124,15 @@ export default function RoomDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
+  const [limitPrice, setLimitPrice] = useState<number>(0);
+
+  // Initialize limit price dynamically to live/opening price
+  useEffect(() => {
+    if (limitPrice === 0 && (livePrice || room?.openingPrice)) {
+      setLimitPrice(livePrice || room?.openingPrice || 0);
+    }
+  }, [livePrice, room?.openingPrice, limitPrice]);
 
   const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
     if (!isMuted) {
@@ -133,8 +145,6 @@ export default function RoomDetailPage() {
   const [explosions, setExplosions] = useState<ExplosionParticles[]>([]);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const battleLogScrollRef = useRef<HTMLDivElement>(null);
-
-  const room = rooms.find((r) => r.id === roomId);
 
   // Top 10 Trending Meme Tokens Data for continuous marquee tape
   const top10Tokens = [
@@ -203,6 +213,7 @@ export default function RoomDetailPage() {
             const price = parseFloat(bestPair.priceUsd);
             if (isFinite(price) && price > 0) {
               setLivePrice(price);
+              checkLimitOrders(room.id, price);
             }
           }
         }
@@ -214,7 +225,7 @@ export default function RoomDetailPage() {
     fetchLivePrice();
     const priceInterval = setInterval(fetchLivePrice, 5000);
     return () => clearInterval(priceInterval);
-  }, [room?.token?.address, room?.token?.pairAddress, room?.token?.chainId, room?.status]);
+  }, [room?.token?.address, room?.token?.pairAddress, room?.token?.chainId, room?.status, checkLimitOrders, room?.id]);
 
   // Auto scroll chat list to bottom
   useEffect(() => {
@@ -329,6 +340,20 @@ export default function RoomDetailPage() {
 
     if (user.balance < stakeAmount) {
       alert('INSUFFICIENT AMMO SOL IN WALLET!');
+      return;
+    }
+
+    if (orderType === 'limit') {
+      if (limitPrice <= 0) {
+        alert('ENTER A VALID TARGET LIMIT PRICE!');
+        return;
+      }
+      placeLimitOrder(room.id, selectedSide, stakeAmount, limitPrice);
+      synthSound('bet');
+      setBattleLogs((prev) => [
+        ...prev,
+        `[LIMIT ORDER QUEUED] Queued ${stakeAmount.toFixed(2)} SOL limit order on ${selectedSide.toUpperCase()} at $${limitPrice.toFixed(6)}!`
+      ]);
       return;
     }
 
@@ -1171,10 +1196,95 @@ export default function RoomDetailPage() {
                 </div>
               </div>
 
-              {/* 2. AMMUNITION (SOL) Preset Selector Slots */}
+              {/* 2. ORDER TYPE SELECTOR */}
+              <div className="mb-4">
+                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-2">2. ORDER TYPE</span>
+                <div className="grid grid-cols-2 gap-2 bg-trench-black p-1 border border-trench-sandbag rounded">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderType('market');
+                      synthSound('bet');
+                    }}
+                    className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
+                      orderType === 'market'
+                        ? 'bg-[#16A34A] text-white font-bold shadow-glow-moon'
+                        : 'text-trench-gasmask hover:text-white'
+                    }`}
+                  >
+                    Market ⚡
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOrderType('limit');
+                      synthSound('bet');
+                    }}
+                    className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
+                      orderType === 'limit'
+                        ? 'bg-moon-gold text-black font-bold shadow-glow-gold'
+                        : 'text-trench-gasmask hover:text-white'
+                    }`}
+                  >
+                    Limit 🎯
+                  </button>
+                </div>
+              </div>
+
+              {orderType === 'limit' && (
+                <div className="mb-4 bg-trench-black p-3 border border-trench-sandbag rounded space-y-2">
+                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block">
+                    🎯 TARGET LIMIT PRICE (USD)
+                  </span>
+                  <div className="relative flex items-center bg-trench-black border border-trench-sandbag rounded focus-within:border-neon-moon transition-all">
+                    <input
+                      type="number"
+                      step="0.000001"
+                      required
+                      placeholder="Limit Price (USD)"
+                      value={limitPrice || ''}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setLimitPrice(isNaN(val) ? 0 : val);
+                      }}
+                      className="w-full bg-transparent px-3 py-2 text-white font-mono text-xs focus:outline-none"
+                    />
+                    <span className="absolute right-3 font-mono text-[8px] text-trench-gasmask font-bold tracking-wider uppercase">
+                      USD
+                    </span>
+                  </div>
+
+                  {/* Percentage Offsets */}
+                  <div className="grid grid-cols-4 gap-1">
+                    {[-10, -5, 5, 10].map((pct) => {
+                      const currentSpotPrice = livePrice || room?.openingPrice || 0;
+                      const computedOffset = currentSpotPrice * (1 + pct / 100);
+                      const sign = pct > 0 ? '+' : '';
+                      return (
+                        <button
+                          key={pct}
+                          type="button"
+                          onClick={() => {
+                            setLimitPrice(Number(computedOffset.toFixed(8)));
+                            synthSound('bet');
+                          }}
+                          className="py-1 text-center font-mono text-[8px] font-bold border border-trench-sandbag/60 bg-trench-mud rounded text-trench-gasmask hover:text-white hover:border-gray-500 transition-colors"
+                        >
+                          {sign}{pct}%
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold leading-tight block">
+                    *TACTICAL bet WILL DETONATE WHEN spot PRICE CROSSES YOUR TARGET.
+                  </span>
+                </div>
+              )}
+
+              {/* 3. AMMUNITION (SOL) Preset Selector Slots */}
               <div className="mb-6 bg-trench-black p-4 border border-trench-sandbag rounded">
                 <div className="flex justify-between items-center mb-3 border-b border-trench-sandbag/40 pb-2">
-                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">2. AMMUNITION (SOL)</span>
+                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">3. AMMUNITION (SOL)</span>
                 </div>
 
                 {/* Preset slots layout matching mockup */}
@@ -1255,7 +1365,7 @@ export default function RoomDetailPage() {
                 ) : (
                   <span className="relative z-10 flex items-center gap-1.5 justify-center font-bold">
                     <Sparkles size={20} className="text-black shrink-0 animate-pulse" />
-                    STAKE ON POT!
+                    {orderType === 'limit' ? 'QUEUE TACTICAL LIMIT ORDER 🎯' : 'STAKE ON POT!'}
                   </span>
                 )}
                 {/* Shimmer overlay block */}
@@ -1265,7 +1375,9 @@ export default function RoomDetailPage() {
               <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold">
                 <ShieldAlert size={16} className="text-jeet-red shrink-0 mt-0.5" />
                 <p>
-                  Bets are locked. Firing shells takes permanent SOL ammo payload. Finalized on countdown expiry!
+                  {orderType === 'limit'
+                    ? 'Limit orders will queue locally and detonate immediately on-chain when the live price criteria matches.'
+                    : 'Bets are locked. Firing shells takes permanent SOL ammo payload. Finalized on countdown expiry!'}
                 </p>
               </div>
             </>
@@ -1287,6 +1399,88 @@ export default function RoomDetailPage() {
           )}
 
         </section>
+
+        {/* ACTIVE TACTICAL LIMIT ORDERS */}
+        <div className="lg:col-span-12 bg-[#050803] border-4 border-trench-sandbag p-5 rounded-lg shadow-2xl relative scanlines">
+          {/* Decorative Corner Screws */}
+          <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+          <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+          <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
+
+          <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-lg font-bold uppercase border-b border-trench-sandbag/40 pb-2 mb-4">
+            <Terminal className="w-5 h-5 text-yellow-500 animate-pulse" />
+            <span>🎯 ACTIVE TACTICAL LIMIT ORDERS BOOK ({(limitOrders || []).filter(o => o.roomId === room.id && o.status === 'pending').length})</span>
+          </div>
+
+          {(limitOrders || []).filter(o => o.roomId === room.id && o.status === 'pending').length > 0 ? (
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left font-mono text-xs uppercase">
+                <thead>
+                  <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[10px] font-bold">
+                    <th className="py-2.5 px-3">SIDE</th>
+                    <th className="py-2.5 px-3">AMOUNT (SOL)</th>
+                    <th className="py-2.5 px-3">LIMIT TARGET (USD)</th>
+                    <th className="py-2.5 px-3">CURRENT SPOT (USD)</th>
+                    <th className="py-2.5 px-3">TRIGGER CONDITION</th>
+                    <th className="py-2.5 px-3 text-center">ACTION</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(limitOrders || [])
+                    .filter(o => o.roomId === room.id && o.status === 'pending')
+                    .map((order) => {
+                      const triggerText = order.triggerDirection === 'below' 
+                        ? `SPOT <= $${order.limitPrice.toFixed(6)}` 
+                        : `SPOT >= $${order.limitPrice.toFixed(6)}`;
+                      const currentSpotPrice = livePrice || room?.openingPrice || 0;
+                      return (
+                        <tr key={order.id} className="border-b border-trench-sandbag/20 hover:bg-trench-mud/30 transition-colors">
+                          <td className="py-3 px-3 font-bold">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-staatliches ${
+                              order.side === 'moon' 
+                                ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/30 shadow-glow-moon' 
+                                : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/30 shadow-glow-jeet'
+                            }`}>
+                              {order.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-white font-bold">{order.amount.toFixed(2)} SOL</td>
+                          <td className="py-3 px-3 text-moon-gold font-bold">${order.limitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td>
+                          <td className="py-3 px-3 text-gray-300 font-bold">
+                            ${currentSpotPrice ? currentSpotPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : 'N/A'}
+                          </td>
+                          <td className="py-3 px-3 text-trench-gasmask font-bold font-mono text-[10px]">{triggerText}</td>
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={() => {
+                                cancelLimitOrder(order.id);
+                                synthSound('bet');
+                                setBattleLogs((prev) => [
+                                  ...prev,
+                                  `[ORDER ABORTED] limit order of ${order.amount} SOL at $${order.limitPrice.toFixed(6)} successfully cancelled.`
+                                ]);
+                              }}
+                              className="px-2.5 py-1 bg-red-950/60 hover:bg-red-800 text-jeet-red hover:text-white border border-jeet-red/40 rounded font-staatliches text-[11px] uppercase tracking-wider font-bold transition-all active:scale-95"
+                            >
+                              [ABORT ORDER]
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-trench-gasmask font-mono text-xs font-bold uppercase leading-relaxed">
+              📢 NO ACTIVE TACTICAL LIMIT ORDERS QUEUED IN THIS TRENCH SECTOR.
+              <p className="text-[10px] font-normal text-trench-gasmask/60 mt-1">
+                Use the Stance Configurator to deploy conditional orders to buy dips or spikes.
+              </p>
+            </div>
+          )}
+        </div>
 
       </main>
 

@@ -19,13 +19,15 @@ const MOCK_TOKENS = [
 
 export default function CreateRoomPage() {
   const router = useRouter();
-  const { createRoom, user, connectWallet, placeBet, isTransactionLoading, wallet } = useAppState();
+  const { createRoom, user, connectWallet, placeBet, placeLimitOrder, isTransactionLoading, wallet } = useAppState();
 
   // Form State
   const [contractAddress, setContractAddress] = useState('');
   const [duration, setDuration] = useState<number>(30);
   const [seedSide, setSeedSide] = useState<'moon' | 'jeet'>('moon');
   const [seedAmount, setSeedAmount] = useState<number>(0.1);
+  const [seedOrderType, setSeedOrderType] = useState<'market' | 'limit'>('market');
+  const [seedLimitPrice, setSeedLimitPrice] = useState<number>(0);
 
   // Scanner Loading and Results
   const [scanning, setScanning] = useState(false);
@@ -105,6 +107,7 @@ export default function CreateRoomPage() {
           console.warn("Could not reach validation server, proceeding with caution...", valErr);
         }
 
+        const rawPrice = pair.priceUsd ? parseFloat(pair.priceUsd) : 0;
         setTokenInfo({
           name: pair.baseToken.name,
           symbol: pair.baseToken.symbol,
@@ -117,8 +120,9 @@ export default function CreateRoomPage() {
           rawFdv: pair.fdv,
           chainId: pair.chainId,
           pairAddress: pair.pairAddress,
-          rawPriceUsd: pair.priceUsd ? parseFloat(pair.priceUsd) : 0
+          rawPriceUsd: rawPrice
         });
+        setSeedLimitPrice(rawPrice);
         
         synthSound('victory');
       } else {
@@ -200,12 +204,16 @@ export default function CreateRoomPage() {
       // First create the room on-chain (or sync if it already exists)
       const res = await createRoom(newRoom);
       
-      // If they seeded and it's a brand new room, place the bet
+      // If they seeded and it's a brand new room, place the bet or limit order
       if (res && !res.alreadyExists) {
         try {
-          await placeBet(res.roomPda, seedSide as any, seedAmount);
+          if (seedOrderType === 'limit') {
+            await placeLimitOrder(res.roomPda, seedSide, seedAmount, seedLimitPrice);
+          } else {
+            await placeBet(res.roomPda, seedSide as any, seedAmount);
+          }
         } catch (betErr) {
-          console.error("Initial seeding bet failed, but room was created:", betErr);
+          console.error("Initial seeding bet/order failed, but room was created:", betErr);
         }
       }
       
@@ -504,6 +512,67 @@ export default function CreateRoomPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Seeding Order Type Selector */}
+            <div className="space-y-2 pt-2 border-t border-trench-sandbag/40">
+              <label className="block font-mono text-xs font-bold text-white uppercase tracking-wider">
+                Seeding Order Type:
+              </label>
+              <div className="grid grid-cols-2 gap-2 bg-trench-black p-1 border border-trench-sandbag rounded">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeedOrderType('market');
+                    synthSound('bet');
+                  }}
+                  className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
+                    seedOrderType === 'market' ? 'bg-neon-moon text-black font-bold shadow-glow-moon' : 'text-trench-gasmask hover:text-white'
+                  }`}
+                >
+                  Market Order ⚡
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSeedOrderType('limit');
+                    synthSound('bet');
+                  }}
+                  className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
+                    seedOrderType === 'limit' ? 'bg-moon-gold text-black font-bold shadow-glow-gold' : 'text-trench-gasmask hover:text-white'
+                  }`}
+                >
+                  Limit Order 🎯
+                </button>
+              </div>
+
+              {seedOrderType === 'limit' && (
+                <div className="space-y-2 pt-2 animate-fadeIn">
+                  <span className="font-mono text-[10px] text-moon-gold font-bold uppercase tracking-wider block">
+                    🎯 TARGET LIMIT PRICE (USD):
+                  </span>
+                  <div className="relative flex items-center bg-trench-black border-2 border-trench-sandbag rounded focus-within:border-moon-gold transition-all">
+                    <input
+                      type="number"
+                      step="0.000001"
+                      required
+                      placeholder="Limit Price (USD)"
+                      value={seedLimitPrice || ''}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setSeedLimitPrice(isNaN(val) ? 0 : val);
+                      }}
+                      className="w-full bg-transparent px-3 py-2 text-white font-mono text-xs focus:outline-none"
+                    />
+                    <span className="absolute right-3 font-mono text-[10px] text-trench-gasmask font-bold tracking-wider uppercase">
+                      USD LIMIT
+                    </span>
+                  </div>
+                  <p className="font-mono text-[9px] text-trench-gasmask uppercase font-bold leading-tight">
+                    *Seeding bet will be queued and automatically executed on-chain when the live price crosses this threshold.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 

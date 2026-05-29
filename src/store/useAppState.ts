@@ -745,6 +745,21 @@ export const useAppState = create<AppState>((set, get) => ({
         
       console.log("Bet placed successfully on-chain! Tx:", tx);
       
+      // Optimistically add to personal user bets to immediately update UI alliances
+      const currentUser = get().user;
+      if (currentUser && wallet.publicKey) {
+        get().addUserBet({
+          id: 'opt-' + Date.now() + Math.random(),
+          roomId: roomId,
+          user: wallet.publicKey.toBase58(),
+          side: side,
+          amount: amount,
+          claimed: false,
+          timestamp: Date.now(),
+          txSig: tx
+        });
+      }
+      
       // Broadcast handled via WebSocket (ClientWrapper) from the indexer
       // Add to personal activity log
       get().addActivity({

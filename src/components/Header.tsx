@@ -29,7 +29,7 @@ export const Header: React.FC<{
   }, [disconnect, mockDisconnect]);
 
   return (
-    <header className="sticky top-0 z-[100] w-full border-b-4 border-trench-sandbag bg-black px-3 py-2.5 sm:p-4 retro-panel rounded-none border-t-0 border-l-0 border-r-0">
+    <header className="sticky top-0 z-[100] w-full border-b-4 border-trench-sandbag bg-black px-3 py-2.5 sm:p-4 retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0" style={{ overflow: 'visible' }}>
       <div className="mx-auto flex max-w-7xl flex-row items-center justify-between gap-2">
         {/* Left Aligned branding section */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">

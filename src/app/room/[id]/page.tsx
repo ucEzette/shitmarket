@@ -186,11 +186,17 @@ export default function RoomDetailPage() {
 
     const fetchLivePrice = async () => {
       try {
-        const dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${room.token.address}`;
+        let dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${room.token.address}`;
+        if (room.token.pairAddress && room.token.chainId) {
+          dsUrl = `https://api.dexscreener.com/latest/dex/pairs/${room.token.chainId}/${room.token.pairAddress}`;
+        }
         const res = await fetch(dsUrl);
         if (res.ok) {
           const json = await res.json();
-          const pairs = json?.pairs || [];
+          let pairs = json?.pairs || [];
+          if (json?.pair) {
+            pairs = [json.pair];
+          }
           if (pairs.length > 0) {
             const sorted = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
             const bestPair = sorted[0];
@@ -208,7 +214,7 @@ export default function RoomDetailPage() {
     fetchLivePrice();
     const priceInterval = setInterval(fetchLivePrice, 5000);
     return () => clearInterval(priceInterval);
-  }, [room?.token?.address, room?.status]);
+  }, [room?.token?.address, room?.token?.pairAddress, room?.token?.chainId, room?.status]);
 
   // Auto scroll chat list to bottom
   useEffect(() => {
@@ -675,20 +681,20 @@ export default function RoomDetailPage() {
             {userTotalBet > 0 ? (
               <span className={`font-staatliches text-[10px] sm:text-sm md:text-lg block tracking-wider ${
                 hasBetOnMoon && hasBetOnJeet
-                  ? 'text-moon-gold font-bold'
+                  ? 'text-moon-gold font-bold glow-gold animate-pulse'
                   : hasBetOnMoon
                   ? 'text-neon-moon font-bold glow-moon'
                   : 'text-jeet-red font-bold glow-jeet'
               }`}>
                 {hasBetOnMoon && hasBetOnJeet
-                  ? 'BOTH SIDES'
+                  ? 'HEDGE LORD 👑'
                   : hasBetOnMoon
-                  ? 'MOON ARMY'
-                  : 'JEET SQUAD'}
+                  ? 'MOON ARMY 🚀'
+                  : 'JEET SQUAD 💀'}
               </span>
             ) : (
               <span className="font-staatliches text-[10px] sm:text-sm md:text-lg text-trench-gasmask font-bold block uppercase tracking-wider">
-                OBSERVER
+                OBSERVER 🕵️
               </span>
             )}
           </div>

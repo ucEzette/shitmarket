@@ -164,6 +164,11 @@ export default function CreateRoomPage() {
       }
     }
 
+    if (duration < 1 || duration > 525600) {
+      alert('BATTLE DURATION MUST BE BETWEEN 1 MINUTE AND 525,600 MINUTES (1 YEAR)!');
+      return;
+    }
+
     // Build the room
     const generatedId = String(Date.now());
     const moonSeed = seedSide === 'moon' ? seedAmount : 0;
@@ -403,7 +408,14 @@ export default function CreateRoomPage() {
                   min="5"
                   max="525600"
                   value={duration}
-                  onChange={(e) => setDuration(Math.max(1, parseInt(e.target.value) || 1))}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (isNaN(val)) {
+                      setDuration(1);
+                    } else {
+                      setDuration(Math.min(525600, Math.max(1, val)));
+                    }
+                  }}
                   className="w-full bg-trench-black/50 border border-trench-sandbag rounded px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-neon-moon"
                   placeholder="Minutes"
                 />

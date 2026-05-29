@@ -43,7 +43,7 @@ export const NotificationBell: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-trench-black border-4 border-trench-sandbag rounded shadow-2xl z-50">
+        <div className="absolute right-0 mt-2 w-80 bg-trench-black border-4 border-trench-sandbag rounded shadow-2xl z-[9999]">
           <div className="bg-trench-mud border-b-2 border-trench-sandbag p-2 flex justify-between items-center">
             <span className="font-staatliches tracking-wider text-moon-gold text-lg">ACTIVITY LOG</span>
             <Check size={16} className="text-trench-gasmask" />

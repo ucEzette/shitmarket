@@ -392,7 +392,7 @@ export const useAppState = create<AppState>((set, get) => ({
             const updatedRoom: Room = {
               id: roomId,
               token: {
-                address: onChain.tokenMint.toBase58(),
+                address: current?.token?.address || onChain.tokenMint.toBase58(),
                 name: decodedName,
                 symbol: current?.token?.symbol || decodedName.substring(0, 10).toUpperCase(),
                 icon: current?.token?.icon || '💰',

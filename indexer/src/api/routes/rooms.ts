@@ -97,7 +97,8 @@ async function syncRoomFromChain(pubkeyStr: string): Promise<any> {
     const expiry = new Date(roomData.expiryTimestamp.toNumber() * 1000);
     
     // Parse status enum
-    const statusStr = Object.keys(roomData.status)[0].toLowerCase(); // 'active' or 'settled'
+    const statusStr = Object.keys(roomData.status)[0].toLowerCase(); // 'active', 'settled', or 'pending'
+    const creatorStr = roomData.creator.toBase58();
     
     // Parse winner
     let winnerStr: string | null = null;
@@ -129,14 +130,16 @@ async function syncRoomFromChain(pubkeyStr: string): Promise<any> {
         duration,
         openingPrice,
         expiry,
-        status: statusStr === 'settled' ? 'settled' : 'active',
+        status: statusStr,
+        creator: creatorStr,
         winner: winnerStr,
         finalPrice: statusStr === 'settled' ? finalPrice : null,
         twapFinalPrice: statusStr === 'settled' ? twapFinalPrice : null,
         totalPool,
       },
       update: {
-        status: statusStr === 'settled' ? 'settled' : 'active',
+        status: statusStr,
+        creator: creatorStr,
         winner: winnerStr,
         finalPrice: statusStr === 'settled' ? finalPrice : null,
         twapFinalPrice: statusStr === 'settled' ? twapFinalPrice : null,
@@ -146,7 +149,7 @@ async function syncRoomFromChain(pubkeyStr: string): Promise<any> {
     
     // Cache in Redis
     const redisCacheData: Record<string, string> = {
-      status: statusStr === 'settled' ? 'settled' : 'active',
+      status: statusStr,
       tokenMint: tokenMintStr,
       tokenName: meta.name ?? decodedName,
       tokenSymbol: meta.symbol ?? '',
@@ -176,10 +179,11 @@ async function syncRoomFromChain(pubkeyStr: string): Promise<any> {
 
 roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
   try {
-    const { filter, status, limit } = req.query as unknown as {
+    const { filter, status, limit, creator } = req.query as unknown as {
       filter: string;
       status: string;
       limit: number;
+      creator?: string;
     };
 
     let orderBy: any = {};
@@ -191,8 +195,14 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
       orderBy = { createdAt: 'desc' };
     }
 
-    // Handle 'all' status – don't filter by status
-    const whereClause = status === 'all' ? {} : { status };
+    // Handle 'all' status – only show active/settled public rooms
+    const whereClause: any = status === 'all' 
+      ? { status: { in: ['active', 'settled'] } } 
+      : { status };
+
+    if (creator) {
+      whereClause.creator = creator;
+    }
 
     const rooms = await prismaRead.room.findMany({
       where: whereClause,
@@ -214,6 +224,7 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
         createdAt: true,
         chainId: true,
         originalAddress: true,
+        creator: true,
       },
     });
 
@@ -226,6 +237,7 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
           openingPrice: room.openingPrice.toString(),
           totalPool: room.totalPool.toString(),
           priceFeed: room.priceFeed,
+          creator: room.creator,
           moonPool: cached?.moonPool ?? null,
           jeetPool: cached?.jeetPool ?? null,
         };

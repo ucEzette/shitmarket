@@ -53,8 +53,9 @@ export function validate(schema: ZodSchema, source: RequestPart = 'query') {
 
 export const roomsQuerySchema = z.object({
   filter: z.enum(['ending', 'biggest', 'newest']).optional().default('ending'),
-  status: z.enum(['active', 'settled', 'all']).optional().default('active'),
+  status: z.enum(['active', 'settled', 'pending', 'all']).optional().default('active'),
   limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+  creator: z.string().min(32).max(48).optional(),
 });
 
 export const roomPubkeyParamSchema = z.object({

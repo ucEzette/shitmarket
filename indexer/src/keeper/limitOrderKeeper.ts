@@ -123,7 +123,7 @@ async function processLimitOrder(
       },
     });
 
-    if (!roomRecord || roomRecord.status !== 'active') {
+    if (!roomRecord || (roomRecord.status !== 'active' && roomRecord.status !== 'pending')) {
       logger.info(`Limit order targets inactive or missing room: ${roomPubkeyStr}`);
       return;
     }
@@ -170,6 +170,7 @@ async function processLimitOrder(
         priceFeed: priceFeedPubkey,
         relayer: relayer.publicKey,
         config: configPda,
+        user: order.user,
         systemProgram: SystemProgram.programId,
       })
       .transaction();

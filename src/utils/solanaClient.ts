@@ -2,9 +2,10 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import idlJson from './idl.json';
 
-// Consistently target Devnet matching the indexer backend setup
+// Automatically target local validator in development, fallback to Devnet or environment overrides
 export const PROGRAM_ID = new PublicKey(idlJson.address);
-export const RPC_ENDPOINT = 'https://api.devnet.solana.com';
+export const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 
+  (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8899' : 'https://api.devnet.solana.com');
 
 export const connection = new Connection(RPC_ENDPOINT, 'confirmed');
 
@@ -46,13 +47,6 @@ export const getBetPda = (room: PublicKey, user: PublicKey, side: 'moon' | 'jeet
   return pda;
 };
 
-export const getReputationPda = (user: PublicKey): PublicKey => {
-  const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from('reputation'), user.toBuffer()],
-    PROGRAM_ID
-  );
-  return pda;
-};
 
 /**
  * Constructs an Anchor Program instance using a standard Solana Wallet Adapter interface.

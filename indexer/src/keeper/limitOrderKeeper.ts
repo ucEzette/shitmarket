@@ -70,7 +70,7 @@ async function fetchLiveTokenPrice(mint: string): Promise<number | null> {
     const url = `https://api.dexscreener.com/latest/dex/tokens/${mint}`;
     const res = await fetch(url);
     if (res.ok) {
-      const json = await res.json();
+      const json = await res.json() as any;
       const pairs = json?.pairs || [];
       if (pairs.length > 0) {
         const sorted = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));

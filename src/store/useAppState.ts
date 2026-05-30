@@ -677,7 +677,7 @@ export const useAppState = create<AppState>((set, get) => ({
         }
       }
 
-      const tx = await (program.methods as any)
+      const txReq = await (program.methods as any)
         .createRoom(
           tokenMintPubkey,
           room.token.name || 'Unknown Token',
@@ -700,7 +700,13 @@ export const useAppState = create<AppState>((set, get) => ({
           ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }),
           ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
         ])
-        .rpc();
+        .transaction();
+        
+      const latestBlockhash = await connection.getLatestBlockhash('finalized');
+      txReq.recentBlockhash = latestBlockhash.blockhash;
+      txReq.feePayer = wallet.publicKey;
+
+      const tx = await wallet.sendTransaction(txReq, connection);
         
       console.log("Room created successfully on-chain! Tx:", tx);
       
@@ -766,7 +772,7 @@ export const useAppState = create<AppState>((set, get) => ({
       const betPda = getBetPda(roomPda, wallet.publicKey, side);
       const configPda = getPlatformConfigPda();
       
-      const tx = await (program.methods as any)
+      const txReq = await (program.methods as any)
         .placeBet(
           side === 'moon' ? { moon: {} } : { jeet: {} },
           new BN(amount * 1e9) // convert SOL to lamports
@@ -783,7 +789,13 @@ export const useAppState = create<AppState>((set, get) => ({
           ComputeBudgetProgram.setComputeUnitLimit({ units: 150_000 }),
           ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
         ])
-        .rpc();
+        .transaction();
+        
+      const latestBlockhash = await connection.getLatestBlockhash('finalized');
+      txReq.recentBlockhash = latestBlockhash.blockhash;
+      txReq.feePayer = wallet.publicKey;
+
+      const tx = await wallet.sendTransaction(txReq, connection);
         
       console.log("Bet placed successfully on-chain! Tx:", tx);
       
@@ -868,7 +880,7 @@ export const useAppState = create<AppState>((set, get) => ({
       const winningSide = room?.winner === 'moon' ? 'moon' : 'jeet';
       const betPda = getBetPda(roomPda, wallet.publicKey, winningSide);
       
-      const tx = await (program.methods as any)
+      const txReq = await (program.methods as any)
         .claimWinnings()
         .accounts({
           room: roomPda,
@@ -883,7 +895,13 @@ export const useAppState = create<AppState>((set, get) => ({
           ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
           ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
         ])
-        .rpc();
+        .transaction();
+        
+      const latestBlockhash = await connection.getLatestBlockhash('finalized');
+      txReq.recentBlockhash = latestBlockhash.blockhash;
+      txReq.feePayer = wallet.publicKey;
+
+      const tx = await wallet.sendTransaction(txReq, connection);
         
       console.log("Winnings claimed successfully! Tx:", tx);
       

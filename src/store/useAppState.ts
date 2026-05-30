@@ -677,7 +677,7 @@ export const useAppState = create<AppState>((set, get) => ({
         }
       }
 
-      const txReq = await (program.methods as any)
+      const tx = await (program.methods as any)
         .createRoom(
           tokenMintPubkey,
           room.token.name || 'Unknown Token',
@@ -766,7 +766,7 @@ export const useAppState = create<AppState>((set, get) => ({
       const betPda = getBetPda(roomPda, wallet.publicKey, side);
       const configPda = getPlatformConfigPda();
       
-      const txReq = await (program.methods as any)
+      const tx = await (program.methods as any)
         .placeBet(
           side === 'moon' ? { moon: {} } : { jeet: {} },
           new BN(amount * 1e9) // convert SOL to lamports
@@ -868,7 +868,7 @@ export const useAppState = create<AppState>((set, get) => ({
       const winningSide = room?.winner === 'moon' ? 'moon' : 'jeet';
       const betPda = getBetPda(roomPda, wallet.publicKey, winningSide);
       
-      const txReq = await (program.methods as any)
+      const tx = await (program.methods as any)
         .claimWinnings()
         .accounts({
           room: roomPda,

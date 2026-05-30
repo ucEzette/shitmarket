@@ -20,17 +20,6 @@ const SECONDS_PER_MINUTE: i64 = 60;
 const TOKEN_NAME_LEN: usize = 32;
 const MINIMUM_LIQUIDITY_SOL: u64 = 100_000_000; // 0.1 SOL minimum pool requirement
 const MAX_TWAP_SAMPLES: usize = 5; // number of price samples to store for TWAP
-const REPUTATION_TIER_COUNT: u8 = 5; // S, A, B, C, D tiers
-
-// Bet limits per reputation tier (in lamports)
-// Tier 0 (D): 1 SOL, Tier 1 (C): 5 SOL, Tier 2 (B): 25 SOL, Tier 3 (A): 100 SOL, Tier 4 (S): unlimited
-const BET_LIMITS: [u64; 5] = [
-    LAMPORTS_PER_SOL,           // D: 1 SOL
-    LAMPORTS_PER_SOL * 5,       // C: 5 SOL
-    LAMPORTS_PER_SOL * 25,      // B: 25 SOL
-    LAMPORTS_PER_SOL * 100,     // A: 100 SOL
-    u64::MAX,                   // S: unlimited
-];
 const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
 
 // ─────────────────────────────────────────────
@@ -47,44 +36,10 @@ pub enum Side {
 pub enum RoomStatus {
     Active,
     Settled,
+    Pending,
 }
 
-/// Reputation tier determines max bet amount.
-/// Higher tier = higher betting capacity.
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ReputationTier {
-    D, // tier 0 — default for new wallets
-    C, // tier 1
-    B, // tier 2
-    A, // tier 3
-    S, // tier 4 — highest
-}
-
-impl ReputationTier {
-    pub fn to_index(&self) -> u8 {
-        match self {
-            ReputationTier::D => 0,
-            ReputationTier::C => 1,
-            ReputationTier::B => 2,
-            ReputationTier::A => 3,
-            ReputationTier::S => 4,
-        }
-    }
-
-    pub fn from_index(idx: u8) -> Self {
-        match idx {
-            0 => ReputationTier::D,
-            1 => ReputationTier::C,
-            2 => ReputationTier::B,
-            3 => ReputationTier::A,
-            _ => ReputationTier::S,
-        }
-    }
-
-    pub fn max_bet_amount(&self) -> u64 {
-        BET_LIMITS[self.to_index() as usize]
-    }
-}
+// Reputation enum scrapped
 
 // ─────────────────────────────────────────────
 //  STATE ACCOUNTS
@@ -260,55 +215,7 @@ impl LimitOrder {
 }
 
 
-/// Phase 3.5: Wallet reputation account — keeps track of user stats.
-/// Initialized on first bet or first win.
-#[account]
-pub struct Reputation {
-    /// The wallet this reputation belongs to.
-    pub user: Pubkey,
-    /// Current tier.
-    pub tier: ReputationTier,
-    /// Total number of bets placed.
-    pub total_bets: u64,
-    /// Total number of wins.
-    pub total_wins: u64,
-    /// Total volume bet (lamports).
-    pub total_volume: u64,
-    /// Total profit (lamports). Can be negative.
-    pub total_profit: i64,
-    /// Last time the tier was evaluated.
-    pub last_evaluated: i64,
-    pub bump: u8,
-}
-
-impl Reputation {
-    // 8 + 32 + 1 + 8 + 8 + 8 + 8 + 8 + 1 = 82
-    pub const LEN: usize = 8 + 32 + 1 + 8 + 8 + 8 + 8 + 8 + 1;
-
-    /// Evaluate and potentially upgrade the tier based on stats.
-    pub fn evaluate_tier(&mut self, now: i64) {
-        // Tier thresholds:
-        // D: < 5 bets OR < 2 wins
-        // C: >= 5 bets AND >= 2 wins AND >= 10 SOL volume
-        // B: >= 25 bets AND >= 10 wins AND >= 50 SOL volume
-        // A: >= 100 bets AND >= 40 wins AND >= 200 SOL volume
-        // S: >= 500 bets AND >= 200 wins AND >= 1000 SOL volume
-
-        if self.total_bets >= 500 && self.total_wins >= 200 && self.total_volume >= 1_000 * LAMPORTS_PER_SOL {
-            self.tier = ReputationTier::S;
-        } else if self.total_bets >= 100 && self.total_wins >= 40 && self.total_volume >= 200 * LAMPORTS_PER_SOL {
-            self.tier = ReputationTier::A;
-        } else if self.total_bets >= 25 && self.total_wins >= 10 && self.total_volume >= 50 * LAMPORTS_PER_SOL {
-            self.tier = ReputationTier::B;
-        } else if self.total_bets >= 5 && self.total_wins >= 2 && self.total_volume >= 10 * LAMPORTS_PER_SOL {
-            self.tier = ReputationTier::C;
-        } else {
-            self.tier = ReputationTier::D;
-        }
-
-        self.last_evaluated = now;
-    }
-}
+// Reputation struct scrapped
 
 // ─────────────────────────────────────────────
 //  EVENTS
@@ -323,6 +230,13 @@ pub struct RoomCreated {
     pub price_feed: Pubkey,
     pub opening_price: i64,
     pub duration_minutes: u32,
+    pub expiry_timestamp: i64,
+}
+
+#[event]
+pub struct RoomActivated {
+    pub room: Pubkey,
+    pub opening_price: i64,
     pub expiry_timestamp: i64,
 }
 
@@ -368,13 +282,7 @@ pub struct PlatformPaused {
     pub paused: bool,
 }
 
-#[event]
-pub struct ReputationUpdated {
-    pub user: Pubkey,
-    pub tier: u8,
-    pub total_bets: u64,
-    pub total_wins: u64,
-}
+// ReputationUpdated event scrapped
 
 // ─────────────────────────────────────────────
 //  INSTRUCTION ACCOUNTS
@@ -407,7 +315,8 @@ pub struct Initialize<'info> {
     duration_minutes: u32,
     switchboard_feed: Option<Pubkey>,
     opening_price_param: Option<i64>,
-    nonce: u8
+    nonce: u8,
+    as_pending: bool
 )]
 pub struct CreateRoom<'info> {
     #[account(
@@ -478,8 +387,7 @@ pub struct PlaceBet<'info> {
     #[account(mut)]
     pub user: Signer<'info>,
 
-    /// Optional: Reputation account. If not provided, defaults to tier D limits.
-    pub reputation: Option<Account<'info, Reputation>>,
+
 
     #[account(seeds = [b"platform_config"], bump)]
     pub config: Account<'info, PlatformConfig>,
@@ -625,37 +533,7 @@ pub struct PausePlatform<'info> {
     pub admin: Signer<'info>,
 }
 
-/// Phase 3.5: Initialize a reputation account for a user.
-#[derive(Accounts)]
-pub struct InitializeReputation<'info> {
-    #[account(
-        init,
-        payer = user,
-        space = Reputation::LEN,
-        seeds = [b"reputation", user.key().as_ref()],
-        bump
-    )]
-    pub reputation: Account<'info, Reputation>,
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-/// Phase 3.5: Update (re-evaluate) reputation tier.
-#[derive(Accounts)]
-pub struct UpdateReputation<'info> {
-    #[account(
-        mut,
-        seeds = [b"reputation", user.key().as_ref()],
-        bump = reputation.bump,
-        constraint = reputation.user == user.key() @ ShitMarketError::Unauthorized
-    )]
-    pub reputation: Account<'info, Reputation>,
-
-    pub user: Signer<'info>,
-}
+// Reputation instructions scrapped
 
 #[derive(Accounts)]
 #[instruction(side: Side, amount: u64, limit_price: i64, trigger_direction: u8, nonce: u8, max_slippage_bps: u16)]
@@ -669,7 +547,7 @@ pub struct CreateLimitOrder<'info> {
     )]
     pub limit_order: Account<'info, LimitOrder>,
 
-    #[account(constraint = room.status == RoomStatus::Active @ ShitMarketError::RoomNotActive)]
+    #[account(constraint = room.status == RoomStatus::Active || room.status == RoomStatus::Pending @ ShitMarketError::RoomNotActive)]
     pub room: Account<'info, Room>,
 
     #[account(mut)]
@@ -682,6 +560,7 @@ pub struct CreateLimitOrder<'info> {
 pub struct ExecuteLimitOrder<'info> {
     #[account(
         mut,
+        close = user,
         seeds = [b"limit_order", limit_order.user.as_ref(), room.key().as_ref(), &[limit_order.nonce]],
         bump = limit_order.bump,
         constraint = limit_order.status == 0 @ ShitMarketError::OrderNotPending
@@ -691,7 +570,7 @@ pub struct ExecuteLimitOrder<'info> {
     #[account(
         mut,
         constraint = room.key() == limit_order.room @ ShitMarketError::InvalidRoom,
-        constraint = room.status == RoomStatus::Active @ ShitMarketError::RoomNotActive
+        constraint = room.status == RoomStatus::Active || room.status == RoomStatus::Pending @ ShitMarketError::RoomNotActive
     )]
     pub room: Account<'info, Room>,
 
@@ -722,6 +601,10 @@ pub struct ExecuteLimitOrder<'info> {
     #[account(seeds = [b"platform_config"], bump)]
     pub config: Account<'info, PlatformConfig>,
 
+    /// CHECK: Recipient of the limit order rent refund.
+    #[account(mut, constraint = user.key() == limit_order.user)]
+    pub user: UncheckedAccount<'info>,
+
     pub system_program: Program<'info, System>,
 }
 
@@ -729,6 +612,7 @@ pub struct ExecuteLimitOrder<'info> {
 pub struct CancelLimitOrder<'info> {
     #[account(
         mut,
+        close = user,
         seeds = [b"limit_order", user.key().as_ref(), room.key().as_ref(), &[limit_order.nonce]],
         bump = limit_order.bump,
         constraint = limit_order.user == user.key() @ ShitMarketError::Unauthorized,
@@ -796,13 +680,14 @@ pub mod shitmarket {
         switchboard_feed: Option<Pubkey>,
         opening_price_param: Option<i64>,
         nonce: u8,
+        as_pending: bool,
     ) -> Result<()> {
         // Circuit breaker: platform must not be paused
         require!(!ctx.accounts.config.paused, ShitMarketError::Paused);
 
         // Validate duration: between 1 and 525,600 minutes (1 year)
         require!(
-            duration_minutes >= 1 && duration_minutes <= 525600,
+            duration_minutes <= 525600,
             ShitMarketError::InvalidDuration
         );
 
@@ -840,10 +725,8 @@ pub mod shitmarket {
         room.opening_price = opening_price;
         room.opening_timestamp = now;
         room.duration_minutes = duration_minutes;
-        room.expiry_timestamp = expiry;
         room.moon_pool = 0;
         room.jeet_pool = 0;
-        room.status = RoomStatus::Active;
         room.winner = None;
         room.final_price = 0;
         room.creator = ctx.accounts.creator.key();
@@ -853,6 +736,14 @@ pub mod shitmarket {
         room.twap_final_price = 0;
         room.bump = ctx.bumps.room;
 
+        if as_pending {
+            room.status = RoomStatus::Pending;
+            room.expiry_timestamp = 0; // indicates countdown hasn't started
+        } else {
+            room.status = RoomStatus::Active;
+            room.expiry_timestamp = expiry;
+        }
+
         emit!(RoomCreated {
             room: room_key,
             creator: creator_key,
@@ -861,10 +752,10 @@ pub mod shitmarket {
             price_feed: price_feed_key,
             opening_price,
             duration_minutes,
-            expiry_timestamp: expiry,
+            expiry_timestamp: room.expiry_timestamp,
         });
 
-        msg!("Room created: {} ({}) expires at {}", room.token_name_str(), room.token_mint, expiry);
+        msg!("Room created: {} ({}) as_pending={}", room.token_name_str(), room.token_mint, as_pending);
         Ok(())
     }
 
@@ -886,17 +777,10 @@ pub mod shitmarket {
         let room_key = ctx.accounts.room.key();
         let room = &mut ctx.accounts.room;
         let now = Clock::get()?.unix_timestamp;
-        require!(!room.is_expired(now), ShitMarketError::RoomExpired);
+        require!(!room.is_expired(now) || room.duration_minutes == 0, ShitMarketError::RoomExpired);
         require!(room.status == RoomStatus::Active, ShitMarketError::RoomNotActive);
 
-        // Phase 3.5: Reputation-based bet limit enforcement
-        if let Some(reputation) = &ctx.accounts.reputation {
-            let max_bet = reputation.tier.max_bet_amount();
-            require!(amount <= max_bet, ShitMarketError::BetAmountExceedsLimit);
-        } else {
-            // No reputation account — default to D tier limit (1 SOL)
-            require!(amount <= BET_LIMITS[0], ShitMarketError::BetAmountExceedsLimit);
-        }
+
 
         // Transfer SOL from user → escrow via system_program CPI
         let cpi_ctx = CpiContext::new(
@@ -1251,49 +1135,7 @@ pub mod shitmarket {
         Ok(())
     }
 
-    // ── initialize_reputation ───────────────────────────────────────────
 
-    /// Initialize a reputation account for the user.
-    /// Starts at tier D with zero stats.
-    pub fn initialize_reputation(ctx: Context<InitializeReputation>) -> Result<()> {
-        let reputation = &mut ctx.accounts.reputation;
-        reputation.user = ctx.accounts.user.key();
-        reputation.tier = ReputationTier::D;
-        reputation.total_bets = 0;
-        reputation.total_wins = 0;
-        reputation.total_volume = 0;
-        reputation.total_profit = 0;
-        reputation.last_evaluated = Clock::get()?.unix_timestamp;
-        reputation.bump = ctx.bumps.reputation;
-
-        msg!("Reputation initialized for user {}", reputation.user);
-        Ok(())
-    }
-
-    /// Re-evaluate and potentially upgrade the user's reputation tier.
-    /// Anyone can call this for any user.
-    pub fn update_reputation(ctx: Context<UpdateReputation>) -> Result<()> {
-        let reputation = &mut ctx.accounts.reputation;
-        let now = Clock::get()?.unix_timestamp;
-
-        reputation.evaluate_tier(now);
-
-        emit!(ReputationUpdated {
-            user: reputation.user,
-            tier: reputation.tier.to_index(),
-            total_bets: reputation.total_bets,
-            total_wins: reputation.total_wins,
-        });
-
-        msg!(
-            "Reputation updated for {}: tier={:?} bets={} wins={}",
-            reputation.user,
-            reputation.tier,
-            reputation.total_bets,
-            reputation.total_wins
-        );
-        Ok(())
-    }
 
     // ── create_limit_order ──────────────────────────────────────────────
 
@@ -1308,8 +1150,12 @@ pub mod shitmarket {
         max_slippage_bps: u16,
     ) -> Result<()> {
         let now = Clock::get()?.unix_timestamp;
-        require!(!ctx.accounts.room.is_expired(now), ShitMarketError::RoomExpired);
-        require!(ctx.accounts.room.status == RoomStatus::Active, ShitMarketError::RoomNotActive);
+        let room = &ctx.accounts.room;
+        if room.status == RoomStatus::Active {
+            require!(!room.is_expired(now), ShitMarketError::RoomExpired);
+        } else {
+            require!(room.status == RoomStatus::Pending, ShitMarketError::RoomNotActive);
+        }
         require!(amount > 0, ShitMarketError::ZeroBetAmount);
 
         // CPI transfer SOL from user → limit_order PDA account
@@ -1356,8 +1202,15 @@ pub mod shitmarket {
         let limit_order = &mut ctx.accounts.limit_order;
         let now = Clock::get()?.unix_timestamp;
 
-        require!(room.status == RoomStatus::Active, ShitMarketError::RoomNotActive);
-        require!(!room.is_expired(now), ShitMarketError::RoomExpired);
+        require!(
+            room.status == RoomStatus::Active || room.status == RoomStatus::Pending,
+            ShitMarketError::RoomNotActive
+        );
+        
+        if room.status == RoomStatus::Active {
+            require!(!room.is_expired(now), ShitMarketError::RoomExpired);
+        }
+        
         require!(limit_order.status == 0, ShitMarketError::OrderNotPending);
 
         // Validate Pyth price feed on-chain
@@ -1381,6 +1234,26 @@ pub mod shitmarket {
         };
 
         require!(is_triggered, ShitMarketError::TriggerConditionNotMet);
+
+        // If the room was pending execution, activate it now!
+        if room.status == RoomStatus::Pending {
+            room.status = RoomStatus::Active;
+            room.opening_price = current_price;
+            room.opening_timestamp = now;
+            room.expiry_timestamp = now
+                .checked_add((room.duration_minutes as i64).checked_mul(SECONDS_PER_MINUTE).ok_or(ShitMarketError::Overflow)?)
+                .ok_or(ShitMarketError::Overflow)?;
+            msg!(
+                "Limit order activated Pending room: new_opening_price={} expiry_timestamp={}",
+                room.opening_price,
+                room.expiry_timestamp
+            );
+            emit!(RoomActivated {
+                room: room.key(),
+                opening_price: room.opening_price,
+                expiry_timestamp: room.expiry_timestamp,
+            });
+        }
 
         // Lock in execution status before transfer (reentrancy guard)
         limit_order.status = 1; // Executed

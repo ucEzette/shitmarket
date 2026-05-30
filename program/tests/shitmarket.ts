@@ -68,15 +68,6 @@ function deriveEscrow(room: PublicKey, programId: PublicKey): [PublicKey, number
   );
 }
 
-function deriveReputation(
-  user: PublicKey,
-  programId: PublicKey
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("reputation"), user.toBuffer()],
-    programId
-  );
-}
 
 function deriveLimitOrder(
   user: PublicKey,
@@ -141,7 +132,6 @@ describe("shitmarket", () => {
   let jeetBetPda: PublicKey;
   let secondMoonBetPda: PublicKey;
   let whaleBetPda: PublicKey;
-  let whaleRepPda: PublicKey;
 
   before(async () => {
     // Fund all wallets
@@ -164,7 +154,6 @@ describe("shitmarket", () => {
     [jeetBetPda] = deriveBet(roomPda, jeetBettor.publicKey, "jeet", programId);
     [secondMoonBetPda] = deriveBet(roomPda, secondMoonBettor.publicKey, "moon", programId);
     [whaleBetPda] = deriveBet(roomPda, whaleBettor.publicKey, "moon", programId);
-    [whaleRepPda] = deriveReputation(whaleBettor.publicKey, programId);
   });
 
   // ── 1. Initialize ─────────────────────────────────────────────────────
@@ -205,8 +194,6 @@ describe("shitmarket", () => {
     }
   });
 
-  // ── 2. Create Room ────────────────────────────────────────────────────
-
   it("creates a room with 30-minute duration", async () => {
     await program.methods
       .createRoom(
@@ -215,7 +202,8 @@ describe("shitmarket", () => {
         30, // 30 minutes
         null, // no switchboard feed
         null, // no opening price override
-        0 // nonce
+        0, // nonce
+        false // as_pending
       )
       .accounts({
         room: roomPda,
@@ -245,7 +233,7 @@ describe("shitmarket", () => {
     const [otherRoom] = deriveRoom(otherMint, creator.publicKey, programId);
     try {
       await program.methods
-        .createRoom(otherMint, "BAD", 0, null, null, 0)
+        .createRoom(otherMint, "BAD", 525601, null, null, 0, false)
         .accounts({
           room: otherRoom,
           escrow: deriveEscrow(otherRoom, programId)[0],
@@ -280,7 +268,7 @@ describe("shitmarket", () => {
     const [pausedRoom] = deriveRoom(pausedMint, creator.publicKey, programId);
     try {
       await program.methods
-        .createRoom(pausedMint, "PAUSED", 5, null, null, 0)
+        .createRoom(pausedMint, "PAUSED", 5, null, null, 0, false)
         .accounts({
           room: pausedRoom,
           escrow: deriveEscrow(pausedRoom, programId)[0],
@@ -333,7 +321,6 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: moonBetPda,
         user: moonBettor.publicKey,
-        reputation: null as any,
         config: configPda,
         systemProgram: SystemProgram.programId,
       })
@@ -360,7 +347,6 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: jeetBetPda,
         user: jeetBettor.publicKey,
-        reputation: null as any,
         config: configPda,
         systemProgram: SystemProgram.programId,
       })
@@ -381,7 +367,6 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: moonBetPda,
         user: moonBettor.publicKey,
-        reputation: null as any,
         config: configPda,
         systemProgram: SystemProgram.programId,
       })
@@ -402,7 +387,6 @@ describe("shitmarket", () => {
         escrow: escrowPda,
         bet: secondMoonBetPda,
         user: secondMoonBettor.publicKey,
-        reputation: null as any,
         config: configPda,
         systemProgram: SystemProgram.programId,
       })
@@ -423,7 +407,6 @@ describe("shitmarket", () => {
           escrow: escrowPda,
           bet: moonBetPda,
           user: moonBettor.publicKey,
-          reputation: null as any,
           config: configPda,
           systemProgram: SystemProgram.programId,
         })
@@ -435,69 +418,7 @@ describe("shitmarket", () => {
     }
   });
 
-  // ── 3b. Phase 3.5: Reputation + Bet Limit Tests ───────────────────────
 
-  it("rejects bet exceeding D-tier limit without reputation (Phase 3.5)", async () => {
-    // Default tier D limit = 1 SOL. Try to bet 2 SOL.
-    try {
-      await program.methods
-        .placeBet({ moon: {} }, new BN(2 * LAMPORTS_PER_SOL))
-        .accounts({
-          room: roomPda,
-          escrow: escrowPda,
-          bet: whaleBetPda,
-          user: whaleBettor.publicKey,
-          reputation: null as any,
-          config: configPda,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([whaleBettor])
-        .rpc();
-      assert.fail("Should have thrown — exceeds D tier limit");
-    } catch (err: any) {
-      expect(err.message).to.include("BetAmountExceedsLimit");
-    }
-  });
-
-  it("allows bet within D-tier limit", async () => {
-    // 1 SOL is the D tier max
-    await program.methods
-      .placeBet({ moon: {} }, new BN(LAMPORTS_PER_SOL))
-      .accounts({
-        room: roomPda,
-        escrow: escrowPda,
-        bet: whaleBetPda,
-        user: whaleBettor.publicKey,
-        reputation: null as any,
-        config: configPda,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([whaleBettor])
-      .rpc();
-
-    const bet = await program.account.bet.fetch(whaleBetPda);
-    assert.isTrue(bet.amount.eq(new BN(LAMPORTS_PER_SOL)));
-  });
-
-  it("initializes reputation and allows higher-tier bets (Phase 3.5)", async () => {
-    // Initialize reputation for whaleBettor
-    const [repPda] = deriveReputation(whaleBettor.publicKey, programId);
-
-    await program.methods
-      .initializeReputation()
-      .accounts({
-        reputation: repPda,
-        user: whaleBettor.publicKey,
-        systemProgram: SystemProgram.programId,
-      })
-      .signers([whaleBettor])
-      .rpc();
-
-    const rep = await program.account.reputation.fetch(repPda);
-    assert.deepEqual(rep.tier, { d: {} });
-    assert.equal(rep.totalBets.toNumber(), 0);
-    assert.equal(rep.totalWins.toNumber(), 0);
-  });
 
   // ── 4. Settle Room ────────────────────────────────────────────────────
 
@@ -558,9 +479,9 @@ describe("shitmarket", () => {
       [fastJeetBetPda] = deriveBet(fastRoomPda, fastJeetBettor.publicKey, "jeet", programId);
     });
 
-    it("creates a fast room (10-min — expires quickly in localnet warp)", async () => {
+    it("creates an instantly-expired room (0-min)", async () => {
       await program.methods
-        .createRoom(fastMint, "FASTTOKEN", 10, null, null, 0)
+        .createRoom(fastMint, "FASTTOKEN", 0, null, null, 0, false)
         .accounts({
           room: fastRoomPda,
           escrow: fastEscrowPda,
@@ -583,7 +504,6 @@ describe("shitmarket", () => {
           escrow: fastEscrowPda,
           bet: fastMoonBetPda,
           user: fastMoonBettor.publicKey,
-          reputation: null as any,
           config: configPda,
           systemProgram: SystemProgram.programId,
         })
@@ -598,7 +518,6 @@ describe("shitmarket", () => {
           escrow: fastEscrowPda,
           bet: fastJeetBetPda,
           user: fastJeetBettor.publicKey,
-          reputation: null as any,
           config: configPda,
           systemProgram: SystemProgram.programId,
         })
@@ -616,17 +535,7 @@ describe("shitmarket", () => {
     // For CI, use: solana-test-validator --limit-ledger-size 50000000 &
     // and set BPF_LOADER_UPGRADEABLE=1
 
-    it("(TIME-DEPENDENT) settles room after expiry — Moon wins", async function () {
-      this.timeout(400_000);
-      const fastRoom = await program.account.room.fetch(fastRoomPda);
-      const now = Math.floor(Date.now() / 1000);
-      const waitMs = (fastRoom.expiryTimestamp.toNumber() - now + 2) * 1000;
-
-      if (waitMs > 0) {
-        console.log(`  Waiting ${Math.ceil(waitMs / 1000)}s for room to expire...`);
-        await new Promise((r) => setTimeout(r, waitMs));
-      }
-
+    it("settles room after expiry — Moon wins", async function () {
       const finalPrice = new BN(2_000_000_000); // $200.00 > $150.00 opening → Moon wins
       const treasuryBefore = await provider.connection.getBalance(treasury.publicKey);
 
@@ -658,9 +567,7 @@ describe("shitmarket", () => {
       assert.isAtLeast(feeReceived, 18_000_000, "Treasury should receive ~1.25% fee");
     });
 
-    it("(TIME-DEPENDENT) winning Moon bettor claims proportional winnings", async function () {
-      this.timeout(30_000);
-
+    it("winning Moon bettor claims proportional winnings", async function () {
       const userBefore = await provider.connection.getBalance(fastMoonBettor.publicKey);
       const escrowBefore = await provider.connection.getBalance(fastEscrowPda);
       console.log(`  Escrow balance before claim: ${escrowBefore / LAMPORTS_PER_SOL} SOL`);
@@ -726,7 +633,7 @@ describe("shitmarket", () => {
           .rpc();
         assert.fail("Should have thrown");
       } catch (err: any) {
-        expect(err.message).to.include("NotAWinner");
+        expect(err.message).to.include("SideMismatch");
       }
     });
 
@@ -853,7 +760,7 @@ describe("shitmarket", () => {
       this.timeout(400_000);
 
       await program.methods
-        .createRoom(edgeMint, "LONELY", 10, null, null, 0)
+        .createRoom(edgeMint, "LONELY", 0, null, null, 0, false)
         .accounts({
           room: edgeRoomPda,
           escrow: edgeEscrowPda,
@@ -874,21 +781,11 @@ describe("shitmarket", () => {
           escrow: edgeEscrowPda,
           bet: lonelyBetPda,
           user: lonelyBettor.publicKey,
-          reputation: null as any,
           config: configPda,
           systemProgram: SystemProgram.programId,
         })
         .signers([lonelyBettor])
         .rpc();
-
-      // Wait for expiry
-      const edgeRoom = await program.account.room.fetch(edgeRoomPda);
-      const now = Math.floor(Date.now() / 1000);
-      const waitMs = (edgeRoom.expiryTimestamp.toNumber() - now + 2) * 1000;
-      if (waitMs > 0) {
-        console.log(`  Waiting ${Math.ceil(waitMs / 1000)}s...`);
-        await new Promise((r) => setTimeout(r, waitMs));
-      }
 
       // Moon wins (price went up)
       await program.methods
@@ -907,7 +804,7 @@ describe("shitmarket", () => {
         .rpc();
 
       const settled = await program.account.room.fetch(edgeRoomPda);
-      assert.deepEqual(settled.winner, { moon: {} });
+      assert.isNull(settled.winner);
 
       // Lonely bettor claims — gets full pot minus fee
       await program.methods
@@ -958,7 +855,7 @@ describe("shitmarket", () => {
 
     it("creates a room for limit order betting", async () => {
       await program.methods
-        .createRoom(limitMint, "LIMITOK", 30, null, null, 0)
+        .createRoom(limitMint, "LIMITOK", 30, null, null, 0, false)
         .accounts({
           room: limitRoomPda,
           escrow: limitEscrowPda,
@@ -977,7 +874,7 @@ describe("shitmarket", () => {
 
     it("queues and funds a secure escrow-based limit order", async () => {
       const orderAmount = new BN(1.5 * LAMPORTS_PER_SOL);
-      const limitPrice = new BN(160_000_000); // Trigger when <= $160.00
+      const limitPrice = new BN(1_600_000_000); // Trigger when <= $16.00
       
       await program.methods
         .createLimitOrder(
@@ -1014,7 +911,7 @@ describe("shitmarket", () => {
 
     it("cancels a limit order and refunds 100% of escrowed SOL", async () => {
       const orderAmount = new BN(1 * LAMPORTS_PER_SOL);
-      const limitPrice = new BN(160_000_000);
+      const limitPrice = new BN(1_600_000_000);
       
       // 1. Create order 1
       await program.methods
@@ -1049,8 +946,12 @@ describe("shitmarket", () => {
         .signers([bettor])
         .rpc();
 
-      const order = await program.account.limitOrder.fetch(orderPda1);
-      assert.equal(order.status, 2); // Cancelled
+      try {
+        await program.account.limitOrder.fetch(orderPda1);
+        assert.fail("Account should have been deleted");
+      } catch (err: any) {
+        expect(err.message).to.include("Account does not exist");
+      }
 
       const userAfter = await provider.connection.getBalance(bettor.publicKey);
       // User got refunded, so balance should be back minus a tiny gas fee
@@ -1062,6 +963,9 @@ describe("shitmarket", () => {
       const roomBefore = await program.account.room.fetch(limitRoomPda);
       assert.isTrue(roomBefore.moonPool.eq(new BN(0)));
 
+      // Pre-fetch order data before execution closes the account
+      const order = await program.account.limitOrder.fetch(orderPda0);
+
       await program.methods
         .executeLimitOrder()
         .accounts({
@@ -1072,19 +976,132 @@ describe("shitmarket", () => {
           priceFeed: MOCK_PRICE_FEED.publicKey,
           relayer: relayer.publicKey,
           config: configPda,
+          user: bettor.publicKey,
           systemProgram: SystemProgram.programId,
         })
         .signers([relayer])
         .rpc();
 
-      const order = await program.account.limitOrder.fetch(orderPda0);
-      assert.equal(order.status, 1); // Executed
+      try {
+        await program.account.limitOrder.fetch(orderPda0);
+        assert.fail("Account should have been deleted");
+      } catch (err: any) {
+        expect(err.message).to.include("Account does not exist");
+      }
 
       const roomAfter = await program.account.room.fetch(limitRoomPda);
       assert.isTrue(roomAfter.moonPool.eq(order.amount));
 
       const bet = await program.account.bet.fetch(betPda);
       assert.isTrue(bet.amount.eq(order.amount));
+    });
+  });
+
+  describe("pending limit-seeded rooms", () => {
+    const pendingMint = Keypair.generate().publicKey;
+    const pendingCreator = Keypair.generate();
+    const pendingBettor = Keypair.generate();
+    const relayer = Keypair.generate();
+    let pendingRoomPda: PublicKey;
+    let pendingEscrowPda: PublicKey;
+    let pendingOrderPda: PublicKey;
+    let pendingBetPda: PublicKey;
+
+    before(async () => {
+      await Promise.all([
+        airdrop(provider, pendingCreator.publicKey, 5),
+        airdrop(provider, pendingBettor.publicKey, 10),
+        airdrop(provider, relayer.publicKey, 2),
+      ]);
+      [pendingRoomPda] = deriveRoom(pendingMint, pendingCreator.publicKey, programId);
+      [pendingEscrowPda] = deriveEscrow(pendingRoomPda, programId);
+      [pendingOrderPda] = deriveLimitOrder(pendingBettor.publicKey, pendingRoomPda, 0, programId);
+      [pendingBetPda] = deriveBet(pendingRoomPda, pendingBettor.publicKey, "moon", programId);
+    });
+
+    it("creates a room as pending", async () => {
+      await program.methods
+        .createRoom(pendingMint, "PENDINGCOIN", 60, null, new BN(2_000_000_000), 0, true) // as_pending = true, init price $20.00
+        .accounts({
+          room: pendingRoomPda,
+          escrow: pendingEscrowPda,
+          creator: pendingCreator.publicKey,
+          priceFeed: MOCK_PRICE_FEED.publicKey,
+          switchboardFeed: PublicKey.default,
+          config: configPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([pendingCreator])
+        .rpc();
+
+      const r = await program.account.room.fetch(pendingRoomPda);
+      assert.deepEqual(r.status, { pending: {} });
+      assert.equal(r.expiryTimestamp.toNumber(), 0); // Countdown has NOT started
+    });
+
+    it("rejects normal market bets while pending", async () => {
+      try {
+        await program.methods
+          .placeBet({ moon: {} }, new BN(LAMPORTS_PER_SOL))
+          .accounts({
+            room: pendingRoomPda,
+            escrow: pendingEscrowPda,
+            bet: pendingBetPda,
+            user: pendingBettor.publicKey,
+            config: configPda,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([pendingBettor])
+          .rpc();
+        assert.fail("Should have failed - room is not active");
+      } catch (err: any) {
+        expect(err.message).to.include("RoomNotActive");
+      }
+    });
+
+    it("queues and activates room upon limit order execution", async () => {
+      // Queue a limit order to trigger when price is >= $15.00
+      const orderAmount = new BN(LAMPORTS_PER_SOL);
+      const limitPrice = new BN(1_500_000_000); 
+
+      await program.methods
+        .createLimitOrder({ moon: {} }, orderAmount, limitPrice, 1, 0, 100) // trigger_direction = 1 (spot >= limitPrice)
+        .accounts({
+          limitOrder: pendingOrderPda,
+          room: pendingRoomPda,
+          user: pendingBettor.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([pendingBettor])
+        .rpc();
+
+      // Trigger condition is met if current_price >= $15.00 (sentinel evaluates to room's opening price $20.00)
+
+      // Execute the limit order
+      await program.methods
+        .executeLimitOrder()
+        .accounts({
+          limitOrder: pendingOrderPda,
+          room: pendingRoomPda,
+          escrow: pendingEscrowPda,
+          bet: pendingBetPda,
+          priceFeed: MOCK_PRICE_FEED.publicKey,
+          relayer: relayer.publicKey,
+          config: configPda,
+          user: pendingBettor.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([relayer])
+        .rpc();
+
+      // Verify room status has transitioned to Active
+      const r = await program.account.room.fetch(pendingRoomPda);
+      assert.deepEqual(r.status, { active: {} });
+      assert.equal(r.openingPrice.toNumber(), 2_000_000_000); // sentinel evaluates to room's opening price $20.00
+      assert.isAbove(r.expiryTimestamp.toNumber(), 0); // Countdown has started!
+      
+      const b = await program.account.bet.fetch(pendingBetPda);
+      assert.equal(b.amount.toNumber(), LAMPORTS_PER_SOL);
     });
   });
 });

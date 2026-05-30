@@ -58,11 +58,7 @@ pub enum ShitMarketError {
     #[msg("Room does not meet the minimum liquidity requirement")]
     InsufficientLiquidity,
 
-    // Phase 3: Reputation / anti-sybil
-    #[msg("Bet amount exceeds maximum allowed for this reputation tier")]
-    BetAmountExceedsLimit,
-    #[msg("Reputation account already initialized")]
-    ReputationAlreadyInitialized,
+
 
     // Arithmetic
     #[msg("Arithmetic overflow")]

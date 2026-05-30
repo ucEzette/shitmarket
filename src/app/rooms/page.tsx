@@ -71,11 +71,13 @@ export default function RoomsPage() {
     let list = [...rooms];
     const now = Date.now();
 
-    // Separate active and expired rooms
-    if (filter !== 'expired') {
+    // Separate active, pending, and expired rooms
+    if (filter === 'pending-orders') {
+      list = list.filter((r) => r.status === 'pending');
+    } else if (filter !== 'expired') {
       list = list.filter((r) => r.status === 'active' && r.expiry > now);
     } else {
-      list = list.filter((r) => r.status !== 'active' || r.expiry <= now);
+      list = list.filter((r) => r.status === 'settled' || (r.status === 'active' && r.expiry <= now));
     }
 
     // Filter by search query
@@ -193,6 +195,16 @@ export default function RoomsPage() {
             }`}
           >
             🎖️ My Active Bets
+          </button>
+          <button
+            onClick={() => setFilter('pending-orders')}
+            className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
+              filter === 'pending-orders'
+                ? 'bg-trench-sandbag text-yellow-500 font-bold shadow-glow-gold'
+                : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
+            }`}
+          >
+            🎯 My Orders
           </button>
           <button
             onClick={() => setFilter('expired')}

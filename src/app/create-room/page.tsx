@@ -27,7 +27,7 @@ export default function CreateRoomPage() {
   const [seedSide, setSeedSide] = useState<'moon' | 'jeet'>('moon');
   const [seedAmount, setSeedAmount] = useState<number>(0.1);
   const [seedOrderType, setSeedOrderType] = useState<'market' | 'limit'>('market');
-  const [seedLimitPrice, setSeedLimitPrice] = useState<number>(0);
+  const [seedLimitPrice, setSeedLimitPrice] = useState<string>('');
 
   // Scanner Loading and Results
   const [scanning, setScanning] = useState(false);
@@ -122,7 +122,7 @@ export default function CreateRoomPage() {
           pairAddress: pair.pairAddress,
           rawPriceUsd: rawPrice
         });
-        setSeedLimitPrice(rawPrice);
+        setSeedLimitPrice(rawPrice.toString());
         
         synthSound('victory');
       } else {
@@ -202,13 +202,13 @@ export default function CreateRoomPage() {
 
     try {
       // First create the room on-chain (or sync if it already exists)
-      const res = await createRoom(newRoom);
+      const res = await createRoom(newRoom, seedOrderType === 'limit');
       
       // If they seeded and it's a brand new room, place the bet or limit order
       if (res && !res.alreadyExists) {
         try {
           if (seedOrderType === 'limit') {
-            await placeLimitOrder(res.roomPda, seedSide, seedAmount, seedLimitPrice);
+            await placeLimitOrder(res.roomPda, seedSide, seedAmount, parseFloat(seedLimitPrice) || 0);
           } else {
             await placeBet(res.roomPda, seedSide as any, seedAmount);
           }
@@ -554,13 +554,12 @@ export default function CreateRoomPage() {
                   <div className="relative flex items-center bg-trench-black border-2 border-trench-sandbag rounded focus-within:border-moon-gold transition-all">
                     <input
                       type="number"
-                      step="0.000001"
+                      step="any"
                       required
                       placeholder="Limit Price (USD)"
-                      value={seedLimitPrice || ''}
+                      value={seedLimitPrice}
                       onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setSeedLimitPrice(isNaN(val) ? 0 : val);
+                        setSeedLimitPrice(e.target.value);
                       }}
                       className="w-full bg-transparent px-3 py-2 text-white font-mono text-xs focus:outline-none"
                     />

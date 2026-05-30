@@ -125,12 +125,13 @@ export default function RoomDetailPage() {
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
-  const [limitPrice, setLimitPrice] = useState<number>(0);
+  const [limitPrice, setLimitPrice] = useState<string>('');
 
   // Initialize limit price dynamically to live/opening price
   useEffect(() => {
-    if (limitPrice === 0 && (livePrice || room?.openingPrice)) {
-      setLimitPrice(livePrice || room?.openingPrice || 0);
+    if (limitPrice === '' && (livePrice || room?.openingPrice)) {
+      const price = livePrice || room?.openingPrice || 0;
+      setLimitPrice(price.toString());
     }
   }, [livePrice, room?.openingPrice, limitPrice]);
 
@@ -245,6 +246,11 @@ export default function RoomDetailPage() {
   useEffect(() => {
     if (!room) return;
 
+    if (room.status === 'pending') {
+      setCountdownText('PENDING TRIGGER');
+      return;
+    }
+
     const timer = setInterval(() => {
       const now = Date.now();
       if (room.status !== 'active') {
@@ -344,15 +350,16 @@ export default function RoomDetailPage() {
     }
 
     if (orderType === 'limit') {
-      if (limitPrice <= 0) {
+      const limitPriceNum = parseFloat(limitPrice) || 0;
+      if (limitPriceNum <= 0) {
         alert('ENTER A VALID TARGET LIMIT PRICE!');
         return;
       }
-      placeLimitOrder(room.id, selectedSide, stakeAmount, limitPrice);
+      placeLimitOrder(room.id, selectedSide, stakeAmount, limitPriceNum);
       synthSound('bet');
       setBattleLogs((prev) => [
         ...prev,
-        `[LIMIT ORDER QUEUED] Queued ${stakeAmount.toFixed(2)} SOL limit order on ${selectedSide.toUpperCase()} at $${limitPrice.toFixed(6)}!`
+        `[LIMIT ORDER QUEUED] Queued ${stakeAmount.toFixed(2)} SOL limit order on ${selectedSide.toUpperCase()} at $${limitPriceNum.toFixed(6)}!`
       ]);
       return;
     }
@@ -844,9 +851,11 @@ export default function RoomDetailPage() {
               <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
                 <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ENTRY PRICE (POOL)</span>
                 <span className="text-yellow-500 font-staatliches text-base block mt-0.5">
-                  ${room.openingPrice !== undefined 
-                    ? room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) 
-                    : '0.00000864'}
+                  {room.status === 'pending' 
+                    ? 'PENDING TRIGGER' 
+                    : room.openingPrice !== undefined 
+                      ? `$${room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` 
+                      : '0.00000864'}
                 </span>
               </div>
 
@@ -1160,6 +1169,24 @@ export default function RoomDetailPage() {
                 </div>
               )}
             </div>
+          ) : room.status === 'pending' ? (
+            // Pending Limit seeded Room state
+            <div className="space-y-4 text-center py-4">
+              <div className="bg-trench-black border-2 border-yellow-500 rounded p-4 text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-yellow-500/5 animate-pulse" />
+                <ShieldAlert size={36} className="text-yellow-500 mx-auto mb-2 animate-bounce" />
+                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">ARENA SECTOR LOCKED</span>
+                <span className="font-staatliches text-2xl block mt-1 tracking-wider text-yellow-500 glow-moon uppercase">
+                  WAITING FOR TRIGGER
+                </span>
+                <p className="font-mono text-[10px] text-white/80 uppercase leading-relaxed mt-3">
+                  This skirmish arena is seeded with a limit order. Standard market bets are disabled until the spot price reaches the limit trigger threshold.
+                </p>
+                <div className="mt-4 p-2 bg-trench-mud border border-trench-sandbag rounded font-mono text-[9px] text-yellow-500 uppercase font-bold relative z-10">
+                  📢 Standing by for automated Keeper detonation...
+                </div>
+              </div>
+            </div>
           ) : (
             // Active Faction Selector + Slider controls
             <>
@@ -1239,13 +1266,12 @@ export default function RoomDetailPage() {
                   <div className="relative flex items-center bg-trench-black border border-trench-sandbag rounded focus-within:border-neon-moon transition-all">
                     <input
                       type="number"
-                      step="0.000001"
+                      step="any"
                       required
                       placeholder="Limit Price (USD)"
-                      value={limitPrice || ''}
+                      value={limitPrice}
                       onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setLimitPrice(isNaN(val) ? 0 : val);
+                        setLimitPrice(e.target.value);
                       }}
                       className="w-full bg-transparent px-3 py-2 text-white font-mono text-xs focus:outline-none"
                     />
@@ -1265,7 +1291,7 @@ export default function RoomDetailPage() {
                           key={pct}
                           type="button"
                           onClick={() => {
-                            setLimitPrice(Number(computedOffset.toFixed(8)));
+                            setLimitPrice(computedOffset.toFixed(8));
                             synthSound('bet');
                           }}
                           className="py-1 text-center font-mono text-[8px] font-bold border border-trench-sandbag/60 bg-trench-mud rounded text-trench-gasmask hover:text-white hover:border-gray-500 transition-colors"

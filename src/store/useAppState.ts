@@ -8,7 +8,6 @@ import {
   getEscrowPda,
   getBetPda,
   getPlatformConfigPda,
-  getReputationPda,
 } from '@/utils/solanaClient';
 import pythFeedMap from '@/utils/pythFeedMap.json';
 
@@ -62,7 +61,7 @@ export interface Room {
   moonPool: number;
   jeetPool: number;
   expiry: number; // unix timestamp in ms
-  status: 'active' | 'settled' | 'cancelled';
+  status: 'active' | 'settled' | 'cancelled' | 'pending';
   winner?: 'moon' | 'jeet' | 'draw';
   createdAt: number;
   duration: number; // minutes
@@ -136,7 +135,7 @@ export interface AppState {
   transactionError: string | null;
 
   // actions
-  createRoom: (room: Room) => Promise<any>;
+  createRoom: (room: Room, asPending?: boolean) => Promise<any>;
   placeBet: (roomId: string, side: 'moon' | 'jeet', amount: number) => Promise<any>;
   claimWinnings: (roomId: string) => Promise<any>;
   connectWallet: () => void;
@@ -219,11 +218,11 @@ export const mapApiRoom = (apiRoom: any): Room => {
       chainId: apiRoom.chainId || 'solana',
       pairAddress: apiRoom.pairAddress || '',
     },
-    creator: 'Unknown',
+    creator: apiRoom.creator || 'Unknown',
     moonPool: Number(apiRoom.moonPool || 0) / 1e9,
     jeetPool: Number(apiRoom.jeetPool || 0) / 1e9,
     expiry: new Date(apiRoom.expiry).getTime(),
-    status: apiRoom.status as 'active' | 'settled' | 'cancelled',
+    status: apiRoom.status as 'active' | 'settled' | 'cancelled' | 'pending',
     winner: apiRoom.winner || undefined,
     createdAt: new Date(apiRoom.createdAt).getTime(),
     duration: Number(apiRoom.duration || 30),
@@ -328,6 +327,36 @@ export const useAppState = create<AppState>((set, get) => ({
             console.warn('Could not hydrate on-chain room state in background', e);
           }
         })();
+        
+        // Fetch connected user's pending rooms in background
+        const walletState = get().wallet;
+        if (walletState && walletState.publicKey) {
+          const creatorPubkey = walletState.publicKey.toBase58();
+          (async () => {
+            try {
+              const pendingRes = await fetchWithTimeout(`${indexerApi}/api/rooms?status=pending&creator=${creatorPubkey}&limit=50`, {}, 3000);
+              if (pendingRes.ok) {
+                const pendingJson = await pendingRes.json();
+                if (pendingJson && pendingJson.success && Array.isArray(pendingJson.data)) {
+                  const pendingMapped = pendingJson.data.map(mapApiRoom);
+                  const currentRooms = get().rooms;
+                  const merged = [...currentRooms];
+                  for (const pr of pendingMapped) {
+                    const idx = merged.findIndex(r => r.id === pr.id);
+                    if (idx === -1) {
+                      merged.unshift(pr);
+                    } else {
+                      merged[idx] = pr;
+                    }
+                  }
+                  set({ rooms: merged });
+                }
+              }
+            } catch (pendingErr) {
+              console.warn("Failed to fetch user's pending rooms in background:", pendingErr);
+            }
+          })();
+        }
       }
 
       // Fetch PlatformConfig to see if paused
@@ -525,7 +554,7 @@ export const useAppState = create<AppState>((set, get) => ({
     }
   },
 
-  createRoom: async (room: Room) => {
+  createRoom: async (room: Room, asPending = false) => {
     const { wallet, setTransactionLoading, setTransactionError } = get();
     if (!wallet || !wallet.publicKey) {
       alert("PLEASE ENLIST YOUR WALLET TO THE PLATFORM CONFIG!");
@@ -655,7 +684,8 @@ export const useAppState = create<AppState>((set, get) => ({
           room.duration,
           null, // switchboardFeed Option<Pubkey>
           openingPriceParam, // openingPriceParam Option<i64>
-          chosenNonce // new nonce parameter
+          chosenNonce, // new nonce parameter
+          asPending
         )
         .accounts({
           room: roomPda,
@@ -697,7 +727,8 @@ export const useAppState = create<AppState>((set, get) => ({
         id: roomPda.toBase58(),
         expiry: onChainExpiry,
         createdAt: onChainCreatedAt,
-        openingPrice: onChainOpeningPrice
+        openingPrice: onChainOpeningPrice,
+        status: asPending ? 'pending' as const : 'active' as const,
       };
       set((state) => ({ rooms: [optimisticRoom, ...state.rooms] }));
       
@@ -735,11 +766,6 @@ export const useAppState = create<AppState>((set, get) => ({
       const betPda = getBetPda(roomPda, wallet.publicKey, side);
       const configPda = getPlatformConfigPda();
       
-      // Optional account resolution for reputation Pda:
-      const reputationPda = getReputationPda(wallet.publicKey);
-      const repAccountInfo = await connection.getAccountInfo(reputationPda);
-      const reputationAccount = repAccountInfo ? reputationPda : program.programId;
-      
       const tx = await (program.methods as any)
         .placeBet(
           side === 'moon' ? { moon: {} } : { jeet: {} },
@@ -750,7 +776,6 @@ export const useAppState = create<AppState>((set, get) => ({
           escrow: escrowPda,
           bet: betPda,
           user: wallet.publicKey,
-          reputation: reputationAccount,
           config: configPda,
           systemProgram: SystemProgram.programId,
         })

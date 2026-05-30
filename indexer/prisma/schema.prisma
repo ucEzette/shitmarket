@@ -31,6 +31,7 @@ model Room {
   twapFinalPrice  BigInt?  @map("twap_final_price")
   totalPool       BigInt   @default(0) @map("total_pool")
   platformFee     BigInt   @default(0) @map("platform_fee")
+  creator         String?  @map("creator") @db.VarChar(44)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
   bets            Bet[]

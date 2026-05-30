@@ -700,13 +700,7 @@ export const useAppState = create<AppState>((set, get) => ({
           ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }),
           ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
         ])
-        .transaction();
-        
-      const latestBlockhash = await connection.getLatestBlockhash('finalized');
-      txReq.recentBlockhash = latestBlockhash.blockhash;
-      txReq.feePayer = wallet.publicKey;
-
-      const tx = await wallet.sendTransaction(txReq, connection);
+        .rpc({ skipPreflight: true });
         
       console.log("Room created successfully on-chain! Tx:", tx);
       
@@ -789,13 +783,7 @@ export const useAppState = create<AppState>((set, get) => ({
           ComputeBudgetProgram.setComputeUnitLimit({ units: 150_000 }),
           ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
         ])
-        .transaction();
-        
-      const latestBlockhash = await connection.getLatestBlockhash('finalized');
-      txReq.recentBlockhash = latestBlockhash.blockhash;
-      txReq.feePayer = wallet.publicKey;
-
-      const tx = await wallet.sendTransaction(txReq, connection);
+        .rpc({ skipPreflight: true });
         
       console.log("Bet placed successfully on-chain! Tx:", tx);
       
@@ -895,13 +883,7 @@ export const useAppState = create<AppState>((set, get) => ({
           ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
           ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
         ])
-        .transaction();
-        
-      const latestBlockhash = await connection.getLatestBlockhash('finalized');
-      txReq.recentBlockhash = latestBlockhash.blockhash;
-      txReq.feePayer = wallet.publicKey;
-
-      const tx = await wallet.sendTransaction(txReq, connection);
+        .rpc({ skipPreflight: true });
         
       console.log("Winnings claimed successfully! Tx:", tx);
       

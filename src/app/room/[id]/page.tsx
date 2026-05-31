@@ -624,7 +624,7 @@ export default function RoomDetailPage() {
       </div>
 
       {/* 2. THE SPLIT-SCREEN TRENCH HEADER (Full-Bleed Across Screen) */}
-      <section className="relative w-full h-[24vh] sm:h-[30vh] md:h-[38vh] overflow-hidden border-b-4 border-trench-sandbag flex z-10 scanlines bg-[#020501]" id="battlefield">
+      <section className="relative w-full min-h-[220px] sm:min-h-[280px] h-[30vh] sm:h-[35vh] md:h-[38vh] overflow-hidden border-b-4 border-trench-sandbag flex z-10 scanlines bg-[#020501]" id="battlefield">
         
         {/* Real-time Mortar Container Overlay */}
         <div className="mortar-container" id="mortar-container">
@@ -741,7 +741,7 @@ export default function RoomDetailPage() {
               synthSound('bet');
             }
           }}
-          className="absolute top-2 right-2 md:top-4 md:right-4 z-40 bg-trench-black/85 hover:bg-trench-sandbag border border-trench-sandbag text-[8px] sm:text-[10px] uppercase px-2 py-0.5 sm:px-2.5 sm:py-1 rounded font-mono font-bold tracking-widest transition-colors flex items-center gap-1 text-white shadow-lg pointer-events-auto"
+          className="absolute top-2 left-1/2 -translate-x-1/2 z-40 bg-trench-black/85 hover:bg-trench-sandbag border border-trench-sandbag text-[8px] sm:text-[10px] uppercase px-2 py-0.5 sm:px-2.5 sm:py-1 rounded font-mono font-bold tracking-widest transition-colors flex items-center gap-1 text-white shadow-lg pointer-events-auto whitespace-nowrap"
         >
           <span>{isMuted ? '🔇 SOUNDS MUTED' : '🔊 SOUNDS PLAYING'}</span>
         </button>
@@ -774,7 +774,7 @@ export default function RoomDetailPage() {
             <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[320px] sm:h-[410px] flex flex-col justify-between z-10 scanlines">
               
               {/* Steel Console Top Header Bar */}
-              <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex items-center justify-between font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">
+              <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">
                 {/* corner rivets */}
                 <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
                 <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
@@ -823,7 +823,7 @@ export default function RoomDetailPage() {
               </div>
 
               {/* Steel Console Bottom Panel */}
-              <div className="w-full bg-[#0d140a] border-t border-[#2c3d25] px-3.5 py-1.5 flex items-center justify-between font-mono text-[8px] text-trench-gasmask uppercase font-bold relative select-none">
+              <div className="w-full bg-[#0d140a] border-t border-[#2c3d25] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-1 font-mono text-[8px] text-trench-gasmask uppercase font-bold relative select-none">
                 <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
                 <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
                 

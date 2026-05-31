@@ -1227,7 +1227,9 @@ pub mod shitmarket {
         };
 
         // Check trigger condition: 0 = below, 1 = above
-        let is_triggered = if limit_order.trigger_direction == 0 {
+        let is_triggered = if is_sentinel {
+            true // Trust the keeper for devnet mock/sentinel feeds
+        } else if limit_order.trigger_direction == 0 {
             current_price <= limit_order.limit_price
         } else {
             current_price >= limit_order.limit_price

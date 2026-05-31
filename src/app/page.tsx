@@ -144,11 +144,11 @@ function HomeContent() {
                 initial={{ y: -20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.6 }}
-                className="font-staatliches text-3xl sm:text-5xl md:text-7xl leading-none text-white tracking-wide stencil-shadow"
+                className="font-staatliches text-2xl sm:text-5xl md:text-7xl leading-none text-white tracking-wide stencil-shadow"
               >
                 Pick a side.<br />
                 <span className="text-neon-moon glow-moon">Bet the trench.</span><br />
-                <span className="text-jeet-red glow-jeet text-base sm:text-lg md:text-2xl leading-none">It's not a rug if you never own the coin, big brain.</span>
+                <span className="text-jeet-red glow-jeet text-sm sm:text-lg md:text-2xl leading-none">It's not a rug if you never own the coin, big brain.</span>
               </motion.h2>
 
               <p className="font-mono text-[11px] sm:text-sm text-trench-gasmask mt-4 sm:mt-6 max-w-lg uppercase font-bold leading-relaxed">

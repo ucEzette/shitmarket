@@ -20,6 +20,7 @@ import { config } from '../config';
 import { logger } from '../logger';
 import { prisma } from '../db';
 import { acquireRoomLock, releaseLock } from './keeperLock';
+import { aggregatePrice } from '../feeds/priceAggregator';
 
 // ─── Relayer wallet loader ──────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ async function processLimitOrder(
         tokenMint: true,
         priceFeed: true,
         status: true,
+        openingPrice: true,
       },
     });
 
@@ -128,8 +130,26 @@ async function processLimitOrder(
       return;
     }
 
-    // 2. Fetch live price of the target mint
-    const currentPrice = await fetchLiveTokenPrice(roomRecord.tokenMint);
+    // 2. Fetch live price of the target mint using off-chain price aggregator
+    let currentPrice: number | null = null;
+    const pythFeedId = roomRecord.priceFeed || '11111111111111111111111111111111';
+
+    const aggResult = await aggregatePrice(roomRecord.tokenMint, pythFeedId);
+    if (aggResult) {
+      currentPrice = parseFloat(aggResult.priceUsd);
+    } else if (config.nodeEnv === 'development') {
+      // In development, fall back to simulated price around openingPrice if real feeds fail
+      const openingPriceNum = Number(roomRecord.openingPrice || 0n) / 1e8;
+      const swing = (Math.random() - 0.5) * 0.1; // ±5% swing
+      currentPrice = openingPriceNum * (1 + swing);
+      logger.debug({
+        msg: 'Live price aggregation failed in development mode. Simulating limit order price.',
+        room: roomPubkeyStr,
+        simulatedPrice: currentPrice,
+        openingPrice: openingPriceNum,
+      });
+    }
+
     if (currentPrice === null) return;
 
     // 3. Evaluate trigger condition

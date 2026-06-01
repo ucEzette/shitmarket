@@ -493,7 +493,7 @@ export default function CreateRoomPage() {
               </div>
 
               {/* Default Presets (Selections) */}
-              <div className="flex gap-2">
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 {[0.01, 0.05, 0.1, 0.5, 1.0, 2.0].map((v) => (
                   <button
                     key={v}
@@ -502,7 +502,7 @@ export default function CreateRoomPage() {
                       setSeedAmount(v);
                       synthSound('bet');
                     }}
-                    className={`flex-1 py-1 text-center font-mono text-xs rounded border transition-all ${
+                    className={`py-1 text-center font-mono text-xs rounded border transition-all ${
                       seedAmount === v
                         ? 'bg-moon-gold text-black border-moon-gold font-bold shadow'
                         : 'bg-trench-black text-trench-gasmask border-trench-sandbag hover:text-white hover:border-trench-gasmask'

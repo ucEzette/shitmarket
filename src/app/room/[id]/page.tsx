@@ -462,7 +462,7 @@ export default function RoomDetailPage() {
   const hasUnclaimed = isSettled && (userWon || (isDrawOrVoid && userBetsInRoom.length > 0)) && userBetsInRoom.some((b) => !b.claimed);
 
   return (
-    <div className={`w-full flex-1 flex flex-col select-none relative transition-transform duration-100 bg-transparent min-h-screen text-white font-mono ${
+    <div className={`w-full flex-1 flex flex-col select-none relative overflow-x-hidden transition-transform duration-100 bg-transparent min-h-screen text-white font-mono ${
       localShake ? 'animate-[shake_0.5s_ease-in-out]' : ''
     }`}>
       
@@ -841,9 +841,9 @@ export default function RoomDetailPage() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
                 <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
-                <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide">
+                <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate">
                   {room.token.chainId === 'solana' ? 'Solana Mainnet' : room.token.chainId ? `${room.token.chainId} Net` : 'Solana Network'}
                 </span>
               </div>
@@ -885,8 +885,8 @@ export default function RoomDetailPage() {
               <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
                 <span className="text-neon-moon font-bold">COIN INTEL BRIEF:</span>
                 <span className="text-trench-gasmask">MINT ADDR:</span>
-                <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all">
-                  {room.token.address}
+                <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full">
+                  <span className="truncate">{room.token.address}</span>
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -1281,7 +1281,7 @@ export default function RoomDetailPage() {
                   </div>
 
                   {/* Percentage Offsets */}
-                  <div className="grid grid-cols-4 gap-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2">
                     {[-10, -5, 5, 10].map((pct) => {
                       const currentSpotPrice = livePrice || room?.openingPrice || 0;
                       const computedOffset = currentSpotPrice * (1 + pct / 100);
@@ -1314,7 +1314,7 @@ export default function RoomDetailPage() {
                 </div>
 
                 {/* Preset slots layout matching mockup */}
-                <div className="grid grid-cols-4 gap-2 mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                   {[0.05, 0.1, 0.5, 1.0].map((val) => {
                     const isSelected = stakeAmount === val;
                     return (
@@ -1412,7 +1412,7 @@ export default function RoomDetailPage() {
           {/* 4. RUBBER STAMP OVERLAYS ON SETTLEMENT */}
           {isSettled && (
             <div 
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-staatliches text-5xl font-black tracking-widest border-4 uppercase p-3 rotate-[-15deg] backdrop-blur-sm z-40 bg-black/90 pointer-events-none transition-all duration-300 animate-pulse ${
+              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-staatliches text-3xl sm:text-5xl font-black tracking-widest border-2 sm:border-4 uppercase p-2 sm:p-3 rotate-[-15deg] backdrop-blur-sm z-40 bg-black/90 pointer-events-none transition-all duration-300 animate-pulse whitespace-nowrap ${
                 userWon
                   ? 'border-neon-moon text-neon-moon shadow-glow-moon'
                   : userLost
@@ -1511,43 +1511,43 @@ export default function RoomDetailPage() {
       </main>
 
       {/* 3. BOTTOM LOGS PANEL (tactical radar feed bars side-by-side) */}
-      <footer className="max-w-none w-full px-2 sm:px-4 md:px-6 py-2 grid grid-cols-1 lg:grid-cols-2 gap-6 relative z-10 mb-8 font-mono text-[10px]">
+      <footer className="max-w-none w-full px-2 sm:px-4 md:px-6 py-2 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 relative z-10 mb-8 font-mono text-[10px]">
         
         {/* Left Bottom Bar: Jeet Communications Radar (Chat and system announcements integrated live) */}
-        <div className="retro-panel p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl">
-          <div className="flex justify-between items-center border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
-            <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm font-bold uppercase">
-              <Radio className="w-4 h-4 text-yellow-500 animate-pulse" />
-              <span>((o)) JEET COMMUNICATIONS RADAR</span>
+        <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 sm:gap-0 border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
+            <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-xs sm:text-sm font-bold uppercase">
+              <Radio className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 animate-pulse shrink-0" />
+              <span className="truncate">((o)) COMMS RADAR</span>
             </div>
             
             {/* Dialogue faction filter tabs */}
-            <div className="flex gap-2 text-[8px] uppercase">
+            <div className="flex gap-1.5 sm:gap-2 text-[8px] uppercase shrink-0">
               <button 
                 onClick={() => {
                   setActiveChatTab('moon');
                   synthSound('bet');
                 }}
-                className={`px-2 py-0.5 rounded border ${
+                className={`px-1.5 sm:px-2 py-0.5 rounded border ${
                   activeChatTab === 'moon' 
                     ? 'bg-neon-moon border-neon-moon text-black font-bold' 
                     : 'border-trench-sandbag text-trench-gasmask hover:text-white'
                 }`}
               >
-                Moon side
+                Moon
               </button>
               <button 
                 onClick={() => {
                   setActiveChatTab('jeet');
                   synthSound('bet');
                 }}
-                className={`px-2 py-0.5 rounded border ${
+                className={`px-1.5 sm:px-2 py-0.5 rounded border ${
                   activeChatTab === 'jeet' 
                     ? 'bg-jeet-red border-jeet-red text-white font-bold' 
                     : 'border-trench-sandbag text-trench-gasmask hover:text-white'
                 }`}
               >
-                Jeet side
+                Jeet
               </button>
             </div>
           </div>
@@ -1618,7 +1618,7 @@ export default function RoomDetailPage() {
         </div>
 
         {/* Right Bottom Bar: Battle Command Intelligence Log (Live feed of actions) */}
-        <div className="retro-panel p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl">
+        <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl">
           <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm border-b border-trench-sandbag pb-1.5 mb-2 font-bold uppercase">
             <Terminal className="w-4 h-4 text-yellow-500" />
             <span>&gt;_ BATTLE COMMAND INTELLIGENCE LOG</span>

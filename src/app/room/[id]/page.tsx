@@ -114,6 +114,19 @@ export default function RoomDetailPage() {
 
   const room = rooms.find((r) => r.id === roomId);
 
+  // Bulletproof safety parsers for all numeric room fields
+  const moonPoolSafe = typeof room?.moonPool === 'number' ? room.moonPool : parseFloat(room?.moonPool as any) || 0;
+  const jeetPoolSafe = typeof room?.jeetPool === 'number' ? room.jeetPool : parseFloat(room?.jeetPool as any) || 0;
+  const totalPotSafe = moonPoolSafe + jeetPoolSafe;
+  const moonPercentageSafe = totalPotSafe > 0 ? (moonPoolSafe / totalPotSafe) * 100 : 50;
+  const jeetPercentageSafe = totalPotSafe > 0 ? (jeetPoolSafe / totalPotSafe) * 100 : 50;
+
+  const openingPriceSafe = typeof room?.openingPrice === 'number' ? room.openingPrice : room?.openingPrice ? parseFloat(room.openingPrice as any) || 0 : undefined;
+  const finalPriceSafe = typeof room?.finalPrice === 'number' ? room.finalPrice : room?.finalPrice ? parseFloat(room.finalPrice as any) || 0 : undefined;
+  const twapFinalPriceSafe = typeof room?.twapFinalPrice === 'number' ? room.twapFinalPrice : room?.twapFinalPrice ? parseFloat(room.twapFinalPrice as any) || 0 : undefined;
+  const durationSafe = typeof room?.duration === 'number' ? room.duration : room?.duration ? parseFloat(room.duration as any) || 0 : undefined;
+  const expirySafe = typeof room?.expiry === 'number' ? room.expiry : room?.expiry ? parseFloat(room.expiry as any) || 0 : 0;
+
   const [selectedSide, setSelectedSide] = useState<'moon' | 'jeet'>('moon');
   const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
   const [stakeAmount, setStakeAmount] = useState<number>(0.1);
@@ -129,11 +142,11 @@ export default function RoomDetailPage() {
 
   // Initialize limit price dynamically to live/opening price
   useEffect(() => {
-    if (limitPrice === '' && (livePrice || room?.openingPrice)) {
-      const price = livePrice || room?.openingPrice || 0;
+    if (limitPrice === '' && (livePrice || openingPriceSafe)) {
+      const price = livePrice || openingPriceSafe || 0;
       setLimitPrice(price.toString());
     }
-  }, [livePrice, room?.openingPrice, limitPrice]);
+  }, [livePrice, openingPriceSafe, limitPrice]);
 
   const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
     if (!isMuted) {
@@ -259,8 +272,8 @@ export default function RoomDetailPage() {
         return;
       }
 
-      const delta = room.expiry - now;
-      if (delta <= 0) {
+      const delta = expirySafe - now;
+      if (isNaN(delta) || delta <= 0) {
         setCountdownText('SETTLED');
         setIsRoomSettling(true);
         clearInterval(timer);
@@ -304,16 +317,13 @@ export default function RoomDetailPage() {
     );
   }
 
-  // Calculate percentages
-  const totalPot = room.moonPool + room.jeetPool;
-  const moonPercentage = totalPot > 0 ? (room.moonPool / totalPot) * 100 : 50;
-  const jeetPercentage = totalPot > 0 ? (room.jeetPool / totalPot) * 100 : 50;
+
 
   // Potential payout calculation (plat fee is 1.25%)
   const getPotentialPayout = (side: 'moon' | 'jeet') => {
     const isMoon = side === 'moon';
-    const futureWinningPool = (isMoon ? room.moonPool : room.jeetPool) + stakeAmount;
-    const futureLosingPool = isMoon ? room.jeetPool : room.moonPool;
+    const futureWinningPool = (isMoon ? moonPoolSafe : jeetPoolSafe) + stakeAmount;
+    const futureLosingPool = isMoon ? jeetPoolSafe : moonPoolSafe;
     const futureTotalPot = futureWinningPool + futureLosingPool;
     const netPot = futureTotalPot * 0.98;
     const shareRatio = stakeAmount / futureWinningPool;
@@ -322,8 +332,8 @@ export default function RoomDetailPage() {
   };
 
   const getMultiplier = (side: 'moon' | 'jeet') => {
-    const pool = side === 'moon' ? room.moonPool : room.jeetPool;
-    const oppPool = side === 'moon' ? room.jeetPool : room.moonPool;
+    const pool = side === 'moon' ? moonPoolSafe : jeetPoolSafe;
+    const oppPool = side === 'moon' ? jeetPoolSafe : moonPoolSafe;
     if (pool === 0) return 2.0;
     const mult = (pool + oppPool) / pool;
     return isNaN(mult) ? 1.0 : Number(mult.toFixed(2));
@@ -674,7 +684,7 @@ export default function RoomDetailPage() {
 
           <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 bg-trench-black/90 border border-neon-moon/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] z-10">
             <span className="font-mono text-[7px] sm:text-[9px] text-neon-moon block font-bold uppercase tracking-wider">MOON POT</span>
-            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{room.moonPool.toFixed(2)} SOL</span>
+            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{moonPoolSafe.toFixed(2)} SOL</span>
           </div>
         </div>
 
@@ -698,7 +708,7 @@ export default function RoomDetailPage() {
 
           <div className="absolute top-2 right-2 md:top-4 md:right-4 bg-trench-black/90 border border-jeet-red/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] text-right z-10">
             <span className="font-mono text-[7px] sm:text-[9px] text-jeet-red block font-bold uppercase tracking-wider">JEET POT</span>
-            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{room.jeetPool.toFixed(2)} SOL</span>
+            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{jeetPoolSafe.toFixed(2)} SOL</span>
           </div>
         </div>
 
@@ -748,8 +758,8 @@ export default function RoomDetailPage() {
 
         {/* Dynamic Double-Bar VS Progress Indicator Overlay */}
         <div className="absolute bottom-0 left-0 w-full h-3 flex">
-          <div style={{ width: `${moonPercentage}%` }} className="bg-neon-moon h-full shadow-[inset_0_-2px_10px_#16a34a]" />
-          <div style={{ width: `${jeetPercentage}%` }} className="bg-jeet-red h-full shadow-[inset_0_-2px_10px_#ff535a]" />
+          <div style={{ width: `${moonPercentageSafe}%` }} className="bg-neon-moon h-full shadow-[inset_0_-2px_10px_#16a34a]" />
+          <div style={{ width: `${jeetPercentageSafe}%` }} className="bg-jeet-red h-full shadow-[inset_0_-2px_10px_#ff535a]" />
         </div>
       </section>
 
@@ -853,9 +863,9 @@ export default function RoomDetailPage() {
                 <span className="text-yellow-500 font-staatliches text-base block mt-0.5">
                   {room.status === 'pending' 
                     ? 'PENDING TRIGGER' 
-                    : room.openingPrice !== undefined 
-                      ? `$${room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` 
-                      : '0.00000864'}
+                    : openingPriceSafe !== undefined 
+                      ? `$${openingPriceSafe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` 
+                      : 'N/A'}
                 </span>
               </div>
 
@@ -864,17 +874,19 @@ export default function RoomDetailPage() {
                 <span className="text-neon-moon font-staatliches text-base block mt-0.5 glow-moon animate-pulse">
                   {livePrice !== null 
                     ? `$${livePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}` 
-                    : `$${(room.openingPrice || 0.00000864).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`}
+                    : openingPriceSafe !== undefined 
+                      ? `$${openingPriceSafe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`
+                      : 'N/A'}
                 </span>
               </div>
 
               <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
                 <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROOM DURATION</span>
                 <span className="text-white font-staatliches text-base block mt-0.5">
-                  {room.duration 
-                    ? (room.duration >= 60 
-                        ? `${room.duration.toLocaleString()} MINS (${formatDuration(room.duration)})` 
-                        : `${room.duration} MINS`) 
+                  {durationSafe 
+                    ? (durationSafe >= 60 
+                        ? `${durationSafe.toLocaleString()} MINS (${formatDuration(durationSafe)})` 
+                        : `${durationSafe} MINS`) 
                     : '60 MINS'}
                 </span>
               </div>
@@ -919,11 +931,11 @@ export default function RoomDetailPage() {
               <div>
                 <span className="font-mono text-[9px] text-neon-moon block font-bold uppercase tracking-wider">🚀 MOON POOL</span>
                 <span className="font-staatliches text-2xl sm:text-3xl text-neon-moon block mt-1 leading-none">
-                  {room.moonPool.toFixed(1)} SOL
+                  {moonPoolSafe.toFixed(1)} SOL
                 </span>
               </div>
               <div className="mt-3 w-full bg-trench-black rounded-full h-2.5 border border-trench-sandbag overflow-hidden">
-                <div style={{ width: `${moonPercentage}%` }} className="bg-neon-moon h-full shadow-[0_0_10px_#16a34a]" />
+                <div style={{ width: `${moonPercentageSafe}%` }} className="bg-neon-moon h-full shadow-[0_0_10px_#16a34a]" />
               </div>
               <span className="font-mono text-[8px] text-trench-gasmask block font-bold uppercase mt-2">Bullish on upswing</span>
             </div>
@@ -933,11 +945,11 @@ export default function RoomDetailPage() {
               <div>
                 <span className="font-mono text-[9px] text-jeet-red block font-bold uppercase tracking-wider">💀 JEET POOL</span>
                 <span className="font-staatliches text-2xl sm:text-3xl text-jeet-red block mt-1 leading-none">
-                  {room.jeetPool.toFixed(1)} SOL
+                  {jeetPoolSafe.toFixed(1)} SOL
                 </span>
               </div>
               <div className="mt-3 w-full bg-trench-black rounded-full h-2.5 border border-trench-sandbag overflow-hidden">
-                <div style={{ width: `${jeetPercentage}%` }} className="bg-jeet-red h-full shadow-[0_0_10px_#ff535a]" />
+                <div style={{ width: `${jeetPercentageSafe}%` }} className="bg-jeet-red h-full shadow-[0_0_10px_#ff535a]" />
               </div>
               <span className="font-mono text-[8px] text-trench-gasmask block font-bold uppercase mt-2">Bearish on rug</span>
             </div>
@@ -1010,19 +1022,19 @@ export default function RoomDetailPage() {
                 <div className="flex justify-between items-center">
                   <span>ENTRY PRICE:</span>
                   <span className="text-white font-bold">
-                    ${room.openingPrice !== undefined ? room.openingPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
+                    ${openingPriceSafe !== undefined ? openingPriceSafe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>EXIT PRICE (SPOT):</span>
                   <span className="text-white font-bold">
-                    ${room.finalPrice !== undefined ? room.finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
+                    ${finalPriceSafe !== undefined ? finalPriceSafe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>TWAP EXIT (EMA):</span>
                   <span className="text-moon-gold font-bold">
-                    ${room.twapFinalPrice !== undefined ? room.twapFinalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
+                    ${twapFinalPriceSafe !== undefined ? twapFinalPriceSafe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 }) : 'N/A'}
                   </span>
                 </div>
               </div>
@@ -1436,10 +1448,10 @@ export default function RoomDetailPage() {
 
           <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-lg font-bold uppercase border-b border-trench-sandbag/40 pb-2 mb-4">
             <Terminal className="w-5 h-5 text-yellow-500 animate-pulse" />
-            <span>🎯 ACTIVE TACTICAL LIMIT ORDERS BOOK ({(limitOrders || []).filter(o => o.roomId === room.id && o.status === 'pending').length})</span>
+            <span>🎯 ACTIVE TACTICAL LIMIT ORDERS BOOK ({(Array.isArray(limitOrders) ? limitOrders : []).filter(o => o.roomId === room.id && o.status === 'pending').length})</span>
           </div>
 
-          {(limitOrders || []).filter(o => o.roomId === room.id && o.status === 'pending').length > 0 ? (
+          {(Array.isArray(limitOrders) ? limitOrders : []).filter(o => o.roomId === room.id && o.status === 'pending').length > 0 ? (
             <div className="overflow-x-auto w-full">
               <table className="w-full text-left font-mono text-xs uppercase">
                 <thead>
@@ -1453,13 +1465,16 @@ export default function RoomDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(limitOrders || [])
+                  {Array.isArray(limitOrders) && limitOrders
                     .filter(o => o.roomId === room.id && o.status === 'pending')
                     .map((order) => {
+                      const limitPriceSafe = typeof order.limitPrice === 'number' ? order.limitPrice : parseFloat(order.limitPrice as any) || 0;
+                      const amountSafe = typeof order.amount === 'number' ? order.amount : parseFloat(order.amount as any) || 0;
+                      const currentSpotPrice = livePrice || openingPriceSafe || 0;
+                      const currentSpotPriceSafe = typeof currentSpotPrice === 'number' ? currentSpotPrice : parseFloat(currentSpotPrice as any) || 0;
                       const triggerText = order.triggerDirection === 'below' 
-                        ? `SPOT <= $${order.limitPrice.toFixed(6)}` 
-                        : `SPOT >= $${order.limitPrice.toFixed(6)}`;
-                      const currentSpotPrice = livePrice || room?.openingPrice || 0;
+                        ? `SPOT <= $${limitPriceSafe.toFixed(6)}` 
+                        : `SPOT >= $${limitPriceSafe.toFixed(6)}`;
                       return (
                         <tr key={order.id} className="border-b border-trench-sandbag/20 hover:bg-trench-mud/30 transition-colors">
                           <td className="py-3 px-3 font-bold">
@@ -1471,10 +1486,10 @@ export default function RoomDetailPage() {
                               {order.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
                             </span>
                           </td>
-                          <td className="py-3 px-3 text-white font-bold">{order.amount.toFixed(2)} SOL</td>
-                          <td className="py-3 px-3 text-moon-gold font-bold">${order.limitPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td>
+                          <td className="py-3 px-3 text-white font-bold">{amountSafe.toFixed(2)} SOL</td>
+                          <td className="py-3 px-3 text-moon-gold font-bold">${limitPriceSafe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}</td>
                           <td className="py-3 px-3 text-gray-300 font-bold">
-                            ${currentSpotPrice ? currentSpotPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : 'N/A'}
+                            ${currentSpotPriceSafe ? currentSpotPriceSafe.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 }) : 'N/A'}
                           </td>
                           <td className="py-3 px-3 text-trench-gasmask font-bold font-mono text-[10px]">{triggerText}</td>
                           <td className="py-3 px-3 text-center">
@@ -1484,7 +1499,7 @@ export default function RoomDetailPage() {
                                 synthSound('bet');
                                 setBattleLogs((prev) => [
                                   ...prev,
-                                  `[ORDER ABORTED] limit order of ${order.amount} SOL at $${order.limitPrice.toFixed(6)} successfully cancelled.`
+                                  `[ORDER ABORTED] limit order of ${amountSafe.toFixed(2)} SOL at $${limitPriceSafe.toFixed(6)} successfully cancelled.`
                                 ]);
                               }}
                               className="px-2.5 py-1 bg-red-950/60 hover:bg-red-800 text-jeet-red hover:text-white border border-jeet-red/40 rounded font-staatliches text-[11px] uppercase tracking-wider font-bold transition-all active:scale-95"

@@ -20,7 +20,7 @@ export default function RoomsPage() {
 
   const router = useRouter();
   const { rooms, roomsLoaded, user, placeBet, connectWallet } = useAppState();
-  const [filter, setFilter] = useState<'ending' | 'biggest' | 'active-bets' | 'expired'>('ending');
+  const [filter, setFilter] = useState<'ending' | 'biggest' | 'active-bets' | 'expired' | 'pending-orders'>('ending');
   const [search, setSearch] = useState('');
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
   const [showSkeleton, setShowSkeleton] = useState(true);

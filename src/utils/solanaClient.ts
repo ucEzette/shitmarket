@@ -48,14 +48,21 @@ export const getBetPda = (room: PublicKey, user: PublicKey, side: 'moon' | 'jeet
 };
 
 
-/**
- * Constructs an Anchor Program instance using a standard Solana Wallet Adapter interface.
- */
 export const getAnchorProgram = (walletAdapter: any): anchor.Program<any> => {
+  // Construct a fallback read-only wallet if walletAdapter is null or lacks publicKey
+  let wallet = walletAdapter;
+  if (!wallet || !wallet.publicKey) {
+    wallet = {
+      publicKey: PublicKey.default,
+      signTransaction: async (tx: any) => tx,
+      signAllTransactions: async (txs: any[]) => txs,
+    };
+  }
+
   // Construct Anchor provider adaptor matching v0.30/v0.32 specification
   const provider = new anchor.AnchorProvider(
     connection,
-    walletAdapter,
+    wallet,
     {
       preflightCommitment: 'confirmed',
       commitment: 'confirmed',
@@ -64,4 +71,5 @@ export const getAnchorProgram = (walletAdapter: any): anchor.Program<any> => {
   
   return new anchor.Program(idlJson as any, provider);
 };
+
 

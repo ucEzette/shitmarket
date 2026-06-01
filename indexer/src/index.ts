@@ -30,6 +30,8 @@ import { startSettlementKeeper } from './keeper/settlementKeeper';
 import { startLimitOrderKeeper } from './keeper/limitOrderKeeper';
 import { runTwapCron } from './keeper/twapCron';
 import { RpcCircuitBreaker } from './solana/rpcCircuitBreaker';
+import cron from 'node-cron';
+import { runPruner } from './utils/dbPruner';
 
 function computeInstructionDiscriminator(name: string): number[] {
   // Convert camelCase to snake_case (e.g., createRoom -> create_room)
@@ -275,6 +277,12 @@ async function main(): Promise<void> {
       logger.error({ msg: 'Interval self-healing backfiller failed', error: err })
     );
   }, 60000);
+
+  // 11. Scheduled DB space pruner and chat radar backup (every night at midnight)
+  cron.schedule('0 0 * * *', () => {
+    logger.info('Executing scheduled daily DB space pruner and chat backup...');
+    runPruner().catch(err => logger.error({ msg: 'Scheduled DB pruner failed', error: err }));
+  });
 
   // Graceful shutdown handlers
   process.on('SIGTERM', () => shutdown(circuitBreaker));

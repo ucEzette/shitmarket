@@ -14,14 +14,19 @@ function getEscrowPda(programId, room) {
     return PublicKey.findProgramAddressSync([Buffer.from("escrow"), room.toBuffer()], programId)[0];
 }
 function getBetPda(programId, room, user, side) {
-    return PublicKey.findProgramAddressSync([Buffer.from("bet"), room.toBuffer(), user.toBuffer(), Buffer.from(side)], programId)[0];
+    return PublicKey.findProgramAddressSync([
+        Buffer.from("bet"), 
+        room.toBuffer(), 
+        user.toBuffer(), 
+        Buffer.from([side === "moon" ? 0 : 1])
+    ], programId)[0];
 }
 
 async function run() {
     console.log("🚀 STARTING FULL E2E TRENCH BATTLE TEST");
     const connection = new Connection("http://127.0.0.1:8899", "confirmed");
     const idl = JSON.parse(fs.readFileSync("../program/target/idl/shitmarket.json", "utf8"));
-    const programId = new PublicKey(idl.metadata.address);
+    const programId = new PublicKey(idl.address || idl.metadata.address);
     const deployerKeypair = Keypair.fromSecretKey(
         Buffer.from(JSON.parse(fs.readFileSync(process.env.HOME + "/.config/solana/id.json", "utf8")))
     );
@@ -52,9 +57,13 @@ async function run() {
 
     console.log("[2] Launching Prediction Arena...");
     await program.methods.createRoom(
-        new anchor.BN(1), // 1 minute
-        new anchor.BN(150000000), 
-        chosenNonce
+        tokenMint,
+        "Solana Token",
+        1, // duration
+        null, // switchboardFeed
+        new anchor.BN(150000000), // opening price
+        chosenNonce,
+        false // asPending
     ).accounts({
         room: roomPda,
         escrow: escrowPda,

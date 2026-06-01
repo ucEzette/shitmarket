@@ -484,10 +484,26 @@ export const useAppState = create<AppState>((set, get) => ({
           }
 
           set((state) => {
+            const existingRoom = state.rooms.find((r) => r.id === roomId);
+            
+            // Merge safely: preserve the indexer-provided original EVM address and chain details!
+            const mergedRoom: Room = {
+              ...updatedRoom,
+              token: {
+                ...updatedRoom.token,
+                address: existingRoom?.token?.address || updatedRoom.token.address,
+                chainId: existingRoom?.token?.chainId || updatedRoom.token.chainId,
+                name: existingRoom?.token?.name || updatedRoom.token.name,
+                symbol: existingRoom?.token?.symbol || updatedRoom.token.symbol,
+                icon: existingRoom?.token?.icon || updatedRoom.token.icon,
+                pairAddress: existingRoom?.token?.pairAddress || updatedRoom.token.pairAddress,
+              }
+            };
+
             const exists = state.rooms.some((r) => r.id === roomId);
             const newRooms = exists
-              ? state.rooms.map((r) => (r.id === roomId ? updatedRoom : r))
-              : [updatedRoom, ...state.rooms];
+              ? state.rooms.map((r) => (r.id === roomId ? mergedRoom : r))
+              : [mergedRoom, ...state.rooms];
             return { rooms: newRooms };
           });
         }

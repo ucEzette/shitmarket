@@ -137,7 +137,7 @@ async function processLimitOrder(
     const aggResult = await aggregatePrice(roomRecord.tokenMint, pythFeedId);
     if (aggResult) {
       currentPrice = parseFloat(aggResult.priceUsd);
-    } else if (config.nodeEnv === 'development') {
+    } else if (config.nodeEnv === 'development' || config.solana.rpcUrl.includes('devnet')) {
       // In development, fall back to simulated price around openingPrice if real feeds fail
       const openingPriceNum = Number(roomRecord.openingPrice || 0n) / 1e8;
       const swing = (Math.random() - 0.5) * 0.1; // ±5% swing

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:mobile": "node test-mobile-responsiveness.js"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
@@ -21,6 +22,8 @@
     "@solana/wallet-adapter-wallets": "^0.19.38",
     "@solana/web3.js": "^1.98.4",
     "canvas-confetti": "^1.9.4",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "framer-motion": "^12.39.0",
     "lucide-react": "^1.16.0",
     "next": "14.2.35",

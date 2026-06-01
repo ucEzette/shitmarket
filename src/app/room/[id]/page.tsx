@@ -767,7 +767,7 @@ export default function RoomDetailPage() {
       <main className="max-w-none w-full px-2 sm:px-4 md:px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative z-10 flex-1">
         
         {/* COLUMN 1: ACTIVE COIN COMBAT (lg:col-span-9) */}
-        <section className="lg:col-span-9 flex flex-col gap-6">
+        <section className="lg:col-span-9 flex flex-col gap-6 min-w-0 w-full overflow-hidden">
 
           {/* Toggle buttons for Chart view */}
           <div className="flex justify-end gap-2 font-mono text-[10px]">
@@ -850,7 +850,7 @@ export default function RoomDetailPage() {
               <span>🛡️ TARGET AREA TELEMETRY & COIN BRIEFING</span>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
                 <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
                 <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate">
@@ -897,8 +897,8 @@ export default function RoomDetailPage() {
               <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
                 <span className="text-neon-moon font-bold">COIN INTEL BRIEF:</span>
                 <span className="text-trench-gasmask">MINT ADDR:</span>
-                <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full">
-                  <span className="truncate">{room.token.address}</span>
+                <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full min-w-0">
+                  <span className="truncate min-w-0">{room.token.address}</span>
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -959,7 +959,7 @@ export default function RoomDetailPage() {
         </section>
 
         {/* COLUMN 2: STANCE CONFIGURATOR (lg:col-span-3) */}
-        <section className="lg:col-span-3 retro-panel p-5 shadow-2xl relative scanlines rounded-xl" id="bet-panel">
+        <section className="lg:col-span-3 retro-panel p-5 shadow-2xl relative scanlines rounded-xl min-w-0 w-full overflow-hidden" id="bet-panel">
           {/* Decorative Corner Screws */}
           <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
           <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
@@ -1439,7 +1439,7 @@ export default function RoomDetailPage() {
         </section>
 
         {/* ACTIVE TACTICAL LIMIT ORDERS */}
-        <div className="lg:col-span-12 bg-[#050803] border-4 border-trench-sandbag p-5 rounded-lg shadow-2xl relative scanlines">
+        <div className="lg:col-span-12 bg-[#050803] border-4 border-trench-sandbag p-5 rounded-lg shadow-2xl relative scanlines min-w-0 w-full overflow-hidden">
           {/* Decorative Corner Screws */}
           <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
           <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
@@ -1529,7 +1529,7 @@ export default function RoomDetailPage() {
       <footer className="max-w-none w-full px-2 sm:px-4 md:px-6 py-2 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 relative z-10 mb-8 font-mono text-[10px]">
         
         {/* Left Bottom Bar: Jeet Communications Radar (Chat and system announcements integrated live) */}
-        <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl">
+        <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 sm:gap-0 border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
             <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-xs sm:text-sm font-bold uppercase">
               <Radio className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 animate-pulse shrink-0" />
@@ -1621,7 +1621,7 @@ export default function RoomDetailPage() {
               placeholder={`SEND BROADCAST MESSAGE TO ${activeChatTab.toUpperCase()} SQUAD...`}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
-              className="flex-1 px-3 py-1 bg-trench-black border border-trench-sandbag text-white text-[10px] font-mono rounded focus:border-neon-moon focus:outline-none uppercase placeholder-trench-gasmask/50 font-bold"
+              className="flex-1 min-w-0 px-3 py-1 bg-trench-black border border-trench-sandbag text-white text-[10px] font-mono rounded focus:border-neon-moon focus:outline-none uppercase placeholder-trench-gasmask/50 font-bold"
             />
             <button
               type="submit"
@@ -1633,7 +1633,7 @@ export default function RoomDetailPage() {
         </div>
 
         {/* Right Bottom Bar: Battle Command Intelligence Log (Live feed of actions) */}
-        <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl">
+        <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
           <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm border-b border-trench-sandbag pb-1.5 mb-2 font-bold uppercase">
             <Terminal className="w-4 h-4 text-yellow-500" />
             <span>&gt;_ BATTLE COMMAND INTELLIGENCE LOG</span>

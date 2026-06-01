@@ -687,13 +687,13 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
         {/* Sidebar Nav (Desktop / Drawer inside Room) */}
         <aside className={`${
           isRoomPage
-            ? `fixed lg:static inset-y-0 left-0 z-50 lg:z-30 transform lg:transform-none ${
+            ? `${
                 drawerOpen 
-                  ? 'translate-x-0 lg:w-64 lg:border-r-4 lg:opacity-100' 
-                  : '-translate-x-full lg:w-0 lg:overflow-hidden lg:border-r-0 lg:opacity-0 lg:pointer-events-none'
-              } transition-all duration-300 ease-in-out`
-            : 'hidden lg:flex flex-col w-64'
-        } flex flex-col bg-trench-mud border-r-4 border-trench-sandbag shadow-[inset_-4px_0_8px_rgba(0,0,0,0.5)] shrink-0 pt-4 relative scanlines justify-between pb-8`}>
+                  ? 'fixed lg:static translate-x-0 lg:w-64 lg:border-r-4 lg:opacity-100 flex' 
+                  : 'hidden lg:flex lg:static -translate-x-full lg:w-0 lg:overflow-hidden lg:border-r-0 lg:opacity-0 lg:pointer-events-none'
+              } inset-y-0 left-0 z-50 lg:z-30 transform lg:transform-none transition-all duration-300 ease-in-out`
+            : 'hidden lg:flex w-64 relative'
+        } flex-col bg-trench-mud border-r-4 border-trench-sandbag shadow-[inset_-4px_0_8px_rgba(0,0,0,0.5)] shrink-0 pt-4 scanlines justify-between pb-8`}>
           <div>
             <div className="p-6 border-b-2 border-trench-sandbag mb-4 bg-trench-black/20">
               <div className="flex items-center gap-3 mb-2">

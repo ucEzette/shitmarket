@@ -893,8 +893,30 @@ export const useAppState = create<AppState>((set, get) => ({
         program.programId
       );
       
-      const winningSide = room?.winner === 'moon' ? 'moon' : 'jeet';
-      const betPda = getBetPda(roomPda, wallet.publicKey, winningSide);
+      let claimSide = room?.winner === 'moon' ? 'moon' : 'jeet';
+      
+      const userBet = get().user?.bets.find((b) => b.roomId === roomId && !b.claimed);
+      if (userBet) {
+        claimSide = userBet.side;
+      } else {
+        try {
+          const moonBetPda = getBetPda(roomPda, wallet.publicKey, 'moon');
+          const moonInfo = await connection.getAccountInfo(moonBetPda);
+          if (moonInfo) {
+            claimSide = 'moon';
+          } else {
+            const jeetBetPda = getBetPda(roomPda, wallet.publicKey, 'jeet');
+            const jeetInfo = await connection.getAccountInfo(jeetBetPda);
+            if (jeetInfo) {
+              claimSide = 'jeet';
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to check bet PDAs on-chain, falling back to default side derivation", e);
+        }
+      }
+
+      const betPda = getBetPda(roomPda, wallet.publicKey, claimSide);
       
       const tx = await (program.methods as any)
         .claimWinnings()

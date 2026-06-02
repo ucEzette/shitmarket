@@ -166,44 +166,73 @@ async function settleRoom(
       timestamp: Math.floor(s.createdAt.getTime() / 1000),
     }));
 
-    let result = await aggregatePrice(roomRecord.tokenMint, pythFeedId, historicalSamples);
-    if (!result) {
-      if (process.env.NODE_ENV === 'development') {
-        logger.info({
-          msg: 'Price aggregation failed in development mode. Falling back to mockAggregatePrice.',
-          room: roomPubkeyStr,
-        });
-        const openingPriceNum = Number(roomRecord.openingPrice);
-        result = await mockAggregatePrice(roomRecord.tokenMint, openingPriceNum);
-      } else {
-        logger.error({ msg: 'Price aggregation failed — skipping room', room: roomPubkeyStr });
-        keeperFailureTotal.inc();
-        await release();
-        throw new Error('Price aggregation failed for token settlement');
-      }
+    // Fetch room account from blockchain to check pools
+    let roomAccount: any;
+    try {
+      roomAccount = await (program.account as any).room.fetch(roomPubkey);
+    } catch (err: any) {
+      logger.error({ msg: 'Failed to fetch room account from blockchain', room: roomPubkeyStr, err: err?.message });
+      await release();
+      throw err;
     }
 
+    const isOneSided = roomAccount.moonPool.isZero() || roomAccount.jeetPool.isZero();
+    let finalPriceParam: anchor.BN | null = null;
+    let result: any = null;
     let twapValue: number | null = null;
-    if (pythFeedId && pythFeedId !== '11111111111111111111111111111111') {
-      try {
-        twapValue = await calculatePythTwap(pythFeedId, roomRecord.expiry.getTime(), 5);
-      } catch (err: any) {
-        logger.error({
-          msg: 'Error calculating Pyth TWAP in settlement keeper',
-          room: roomPubkeyStr,
-          err: err?.message,
-        });
+
+    if (isOneSided) {
+      logger.info({
+        msg: 'Room is one-sided (void path). Bypassing price aggregation.',
+        room: roomPubkeyStr,
+        moonPool: roomAccount.moonPool.toString(),
+        jeetPool: roomAccount.jeetPool.toString(),
+      });
+    } else {
+      result = await aggregatePrice(roomRecord.tokenMint, pythFeedId, historicalSamples);
+      if (!result) {
+        const isDevOrTest =
+          config.nodeEnv === 'development' ||
+          config.solana.rpcUrl.includes('devnet') ||
+          config.solana.rpcUrl.includes('localhost') ||
+          config.solana.rpcUrl.includes('127.0.0.1');
+
+        if (isDevOrTest) {
+          logger.info({
+            msg: 'Price aggregation failed in test/development mode. Falling back to mockAggregatePrice.',
+            room: roomPubkeyStr,
+          });
+          const openingPriceNum = Number(roomRecord.openingPrice);
+          result = await mockAggregatePrice(roomRecord.tokenMint, openingPriceNum);
+        } else {
+          logger.error({ msg: 'Price aggregation failed — skipping room', room: roomPubkeyStr });
+          keeperFailureTotal.inc();
+          await release();
+          throw new Error('Price aggregation failed for token settlement');
+        }
+      }
+
+      if (pythFeedId && pythFeedId !== '11111111111111111111111111111111') {
+        try {
+          twapValue = await calculatePythTwap(pythFeedId, roomRecord.expiry.getTime(), 5);
+        } catch (err: any) {
+          logger.error({
+            msg: 'Error calculating Pyth TWAP in settlement keeper',
+            room: roomPubkeyStr,
+            err: err?.message,
+          });
+        }
       }
     }
 
     logger.info({
-      msg: 'Submitting settle_room',
+      msg: isOneSided ? 'Submitting settle_room (void path)' : 'Submitting settle_room',
       room: roomPubkeyStr,
       priceFeed: pythFeedId,
       switchboardFeed: switchboardFeedStr || 'none',
-      sources: result.sources,
-      priceI64: result.priceI64,
-      twapPrice: twapValue !== null ? twapValue : result.twapPrice,
+      sources: result ? result.sources : ['void'],
+      priceI64: result ? result.priceI64 : 0,
+      twapPrice: twapValue !== null ? twapValue : (result ? result.twapPrice : undefined),
     });
 
     try {
@@ -221,19 +250,20 @@ async function settleRoom(
         systemProgram: SystemProgram.programId,
       };
 
-      let finalPriceParam: anchor.BN;
-      if (twapValue !== null) {
-        const scaledPrice = Math.round(twapValue * 1_000_000_000_000);
-        finalPriceParam = new anchor.BN(scaledPrice);
-        logger.info({
-          msg: 'Using Pyth TWAP price for settlement',
-          room: roomPubkeyStr,
-          twapPrice: twapValue,
-          scaledPrice,
-        });
-      } else {
-        const scaledPrice = result.priceI64 * 1_000_000;
-        finalPriceParam = new anchor.BN(scaledPrice);
+      if (!isOneSided) {
+        if (twapValue !== null) {
+          const scaledPrice = Math.round(twapValue * 1_000_000_000_000);
+          finalPriceParam = new anchor.BN(scaledPrice);
+          logger.info({
+            msg: 'Using Pyth TWAP price for settlement',
+            room: roomPubkeyStr,
+            twapPrice: twapValue,
+            scaledPrice,
+          });
+        } else {
+          const scaledPrice = result.priceI64 * 1_000_000;
+          finalPriceParam = new anchor.BN(scaledPrice);
+        }
       }
 
       const tx = await program.methods

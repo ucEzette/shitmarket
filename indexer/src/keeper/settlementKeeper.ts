@@ -223,7 +223,7 @@ async function settleRoom(
 
       let finalPriceParam: anchor.BN;
       if (twapValue !== null) {
-        const scaledPrice = Math.round(twapValue * 100_000_000);
+        const scaledPrice = Math.round(twapValue * 1_000_000_000_000);
         finalPriceParam = new anchor.BN(scaledPrice);
         logger.info({
           msg: 'Using Pyth TWAP price for settlement',
@@ -232,7 +232,7 @@ async function settleRoom(
           scaledPrice,
         });
       } else {
-        const scaledPrice = result.priceI64 * 100;
+        const scaledPrice = result.priceI64 * 1_000_000;
         finalPriceParam = new anchor.BN(scaledPrice);
       }
 

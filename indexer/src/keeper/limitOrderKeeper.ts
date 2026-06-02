@@ -139,7 +139,7 @@ async function processLimitOrder(
       currentPrice = parseFloat(aggResult.priceUsd);
     } else if (config.nodeEnv === 'development' || config.solana.rpcUrl.includes('devnet')) {
       // In development, fall back to simulated price around openingPrice if real feeds fail
-      const openingPriceNum = Number(roomRecord.openingPrice || 0n) / 1e8;
+      const openingPriceNum = Number(roomRecord.openingPrice || 0n) / 1e12;
       const swing = (Math.random() - 0.5) * 0.1; // ±5% swing
       currentPrice = openingPriceNum * (1 + swing);
       logger.debug({
@@ -274,7 +274,7 @@ export function startLimitOrderKeeper(
         const side = data[72] === 0 ? 'moon' as const : 'jeet' as const;
         
         const amount = Number(data.readBigUInt64LE(73)) / 1e9;
-        const limitPrice = Number(data.readBigInt64LE(81)) / 1e8;
+        const limitPrice = Number(data.readBigInt64LE(81)) / 1e12;
         const triggerDirection = data[89] === 0 ? 'below' as const : 'above' as const;
         const nonce = data[90];
         const status = data[91];

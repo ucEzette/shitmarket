@@ -13,7 +13,7 @@ pub fn load_price_feed_price(price_feed_info: &AccountInfo) -> Result<i64> {
     if price_feed_info.key == &anchor_lang::system_program::ID 
        || price_feed_info.owner == &anchor_lang::system_program::ID 
        || price_feed_info.data_is_empty() {
-        return Ok(1_500_000_000); // $150.00 mock price
+        return Ok(150_000_000_000_000); // $150.00 mock price scaled by 1e12
     }
 
     // Validate owner
@@ -55,5 +55,22 @@ pub fn load_price_feed_price(price_feed_info: &AccountInfo) -> Result<i64> {
         ShitMarketError::PriceConfidenceTooWide
     );
 
-    Ok(price.price)
+    let expo = price.expo; // i32, e.g. -8
+    let val = price.price; // i64
+    
+    // Normalize to 1e12 (exponent -12)
+    let target_expo: i32 = -12;
+    let diff = target_expo - expo; // e.g. -12 - (-8) = -4
+    
+    let normalized = if diff < 0 {
+        let multiplier = 10_i64.checked_pow((-diff) as u32).ok_or(ShitMarketError::Overflow)?;
+        val.checked_mul(multiplier).ok_or(ShitMarketError::Overflow)?
+    } else if diff > 0 {
+        let divisor = 10_i64.checked_pow(diff as u32).ok_or(ShitMarketError::Overflow)?;
+        val.checked_div(divisor).ok_or(ShitMarketError::Overflow)?
+    } else {
+        val
+    };
+
+    Ok(normalized)
 }

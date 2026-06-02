@@ -176,6 +176,7 @@ export interface AppState {
   placeLimitOrder: (roomId: string, side: 'moon' | 'jeet', amount: number, limitPrice: number) => Promise<void>;
   cancelLimitOrder: (id: string) => void;
   checkLimitOrders: (roomId: string, currentPrice: number) => Promise<void>;
+  executeLimitOrderLocal: (roomId: string, side: 'moon' | 'jeet', amount: number) => void;
 }
 
 // ── Fetch with Timeout helper to prevent offline backend hangs ───
@@ -226,10 +227,10 @@ export const mapApiRoom = (apiRoom: any): Room => {
     winner: apiRoom.winner || undefined,
     createdAt: new Date(apiRoom.createdAt).getTime(),
     duration: Number(apiRoom.duration || 30),
-    openingPrice: apiRoom.openingPrice ? Number(apiRoom.openingPrice) / 1e8 : undefined,
-    finalTWAP: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e8 : undefined,
-    finalPrice: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e8 : undefined,
-    twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e8 : undefined,
+    openingPrice: apiRoom.openingPrice ? Number(apiRoom.openingPrice) / 1e12 : undefined,
+    finalTWAP: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
+    finalPrice: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
+    twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e12 : undefined,
   };
 };
 
@@ -454,9 +455,9 @@ export const useAppState = create<AppState>((set, get) => ({
             winner: winnerStr,
             createdAt: onChain.openingTimestamp.toNumber() * 1000,
             duration: onChain.durationMinutes as any,
-            openingPrice: onChain.openingPrice.toNumber() / 1e8,
-            finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e8 : undefined,
-            twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e8 : undefined,
+            openingPrice: onChain.openingPrice.toNumber() / 1e12,
+            finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e12 : undefined,
+            twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e12 : undefined,
           };
 
           if (!updatedRoom.token.icon || !updatedRoom.token.icon.startsWith('http') || !updatedRoom.token.pairAddress || updatedRoom.token.pairAddress === '') {
@@ -689,7 +690,7 @@ export const useAppState = create<AppState>((set, get) => ({
       if (livePriceUsd) {
         const priceVal = parseFloat(livePriceUsd);
         if (isFinite(priceVal) && priceVal > 0) {
-          openingPriceParam = new BN(Math.round(priceVal * 1e8));
+          openingPriceParam = new BN(Math.round(priceVal * 1e12));
         }
       }
 
@@ -728,7 +729,7 @@ export const useAppState = create<AppState>((set, get) => ({
         if (onChain) {
           onChainExpiry = onChain.expiryTimestamp.toNumber() * 1000;
           onChainCreatedAt = onChain.openingTimestamp.toNumber() * 1000;
-          onChainOpeningPrice = onChain.openingPrice.toNumber() / 1e8;
+          onChainOpeningPrice = onChain.openingPrice.toNumber() / 1e12;
         }
       } catch (fetchErr) {
         console.warn("Failed to fetch on-chain room right after creation for precise countdown:", fetchErr);
@@ -1183,12 +1184,25 @@ export const useAppState = create<AppState>((set, get) => ({
   addUserBet: (bet: Bet) => {
     set((state) => {
       if (!state.user) return {};
-      const exists = state.user.bets.find((b) => b.id === bet.id || (b.roomId === bet.roomId && b.side === bet.side && b.timestamp === bet.timestamp));
-      if (exists) return {};
+      const duplicate = state.user.bets.some((b) => b.id === bet.id);
+      if (duplicate) return {};
+      
+      const existingIdx = state.user.bets.findIndex((b) => b.roomId === bet.roomId && b.side === bet.side);
+      let newBets = [...state.user.bets];
+      if (existingIdx > -1) {
+        newBets[existingIdx] = {
+          ...newBets[existingIdx],
+          amount: newBets[existingIdx].amount + bet.amount,
+          timestamp: Math.max(newBets[existingIdx].timestamp, bet.timestamp),
+          txSig: bet.txSig || newBets[existingIdx].txSig
+        };
+      } else {
+        newBets = [bet, ...newBets];
+      }
       return {
         user: {
           ...state.user,
-          bets: [bet, ...state.user.bets],
+          bets: newBets,
         },
       };
     });
@@ -1245,7 +1259,7 @@ export const useAppState = create<AppState>((set, get) => ({
       );
 
       const triggerDirection = side === 'moon' ? 0 : 1; // 0 = below, 1 = above
-      const limitPriceParam = new BN(Math.round(limitPrice * 1e8));
+      const limitPriceParam = new BN(Math.round(limitPrice * 1e12));
       const amountParam = new BN(amount * 1e9);
 
       const tx = await (program.methods as any)
@@ -1410,6 +1424,17 @@ export const useAppState = create<AppState>((set, get) => ({
 
           await get().placeBet(order.roomId, order.side, order.amount);
 
+          // Update status to executed
+          set((state) => {
+            const updated = state.limitOrders.map((o) =>
+              o.id === order.id ? { ...o, status: 'executed' as const } : o
+            );
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('shitmarket_limit_orders', JSON.stringify(updated));
+            }
+            return { limitOrders: updated };
+          });
+
           get().addActivity({
             type: 'win',
             title: `🎯 LIMIT ORDER EXECUTED!`,
@@ -1439,5 +1464,25 @@ export const useAppState = create<AppState>((set, get) => ({
         }
       }
     }
+  },
+
+  executeLimitOrderLocal: (roomId: string, side: 'moon' | 'jeet', amount: number) => {
+    set((state) => {
+      const updated = state.limitOrders.map((o) => {
+        if (
+          o.status === 'pending' &&
+          o.roomId === roomId &&
+          o.side === side &&
+          Math.abs(o.amount - amount) < 0.001
+        ) {
+          return { ...o, status: 'executed' as const };
+        }
+        return o;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('shitmarket_limit_orders', JSON.stringify(updated));
+      }
+      return { limitOrders: updated };
+    });
   }
 }));

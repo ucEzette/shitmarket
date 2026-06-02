@@ -194,6 +194,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
   const addMessage = useAppState((s) => s.addMessage);
   const fetchRooms = useAppState((s) => s.fetchRooms);
   const fetchLeaderboard = useAppState((s) => s.fetchLeaderboard);
+  const executeLimitOrderLocal = useAppState((s) => s.executeLimitOrderLocal);
 
   const pathname = usePathname();
   const isRoomPage = pathname?.startsWith('/room/');
@@ -439,6 +440,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
                   claimed: false,
                   timestamp: Date.now(),
                 });
+                executeLimitOrderLocal(roomPubkey, data.side, betSol);
               }
             }
             
@@ -459,7 +461,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
                 roomId: roomPubkey,
                 side: 'all',
                 user: 'KEEPER SYSTEM',
-                message: `⚡ ARENA SETTLED! WINNER: ${data.winner.toUpperCase()} at TWAP ${Number(data.twapFinalPrice) / 1e8} USD ⚡`,
+                message: `⚡ ARENA SETTLED! WINNER: ${data.winner.toUpperCase()} at TWAP ${Number(data.twapFinalPrice) / 1e12} USD ⚡`,
                 timestamp: Date.now(),
               });
               

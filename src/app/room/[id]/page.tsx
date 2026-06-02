@@ -377,7 +377,7 @@ export default function RoomDetailPage() {
     const futureWinningPool = (isMoon ? moonPoolSafe : jeetPoolSafe) + stakeAmount;
     const futureLosingPool = isMoon ? jeetPoolSafe : moonPoolSafe;
     const futureTotalPot = futureWinningPool + futureLosingPool;
-    const netPot = futureTotalPot * 0.98;
+    const netPot = futureTotalPot * 0.9875;
     const shareRatio = stakeAmount / futureWinningPool;
     const payout = shareRatio * netPot;
     return isNaN(payout) ? 0 : Number(payout.toFixed(4));
@@ -1596,16 +1596,36 @@ export default function RoomDetailPage() {
                         const entryPrice = openingPriceSafe || 0;
                         const currentSpotPrice = livePrice || openingPriceSafe || 0;
                         
+                        const FEE_RATE = 0.0125; // 1.25% platform fee to match on-chain bps
                         let pnlPercent = 0;
-                        if (entryPrice > 0) {
-                          if (bet.side === 'moon') {
-                            pnlPercent = ((currentSpotPrice - entryPrice) / entryPrice) * 100;
+                        let pnlSol = 0;
+                        let isProfit = false;
+
+                        if (entryPrice > 0 && currentSpotPrice !== entryPrice) {
+                          const isMoonWinning = currentSpotPrice > entryPrice;
+                          const isUserWinning = (bet.side === 'moon' && isMoonWinning) || (bet.side === 'jeet' && !isMoonWinning);
+                          
+                          if (isUserWinning) {
+                            const winningPool = isMoonWinning ? moonPoolSafe : jeetPoolSafe;
+                            const losingPool = isMoonWinning ? jeetPoolSafe : moonPoolSafe;
+                            
+                            if (winningPool > 0) {
+                              pnlPercent = ((losingPool / winningPool) * (1 - FEE_RATE) - FEE_RATE) * 100;
+                              pnlSol = bet.amount * (pnlPercent / 100);
+                            }
+                            isProfit = pnlPercent >= 0;
                           } else {
-                            pnlPercent = ((entryPrice - currentSpotPrice) / entryPrice) * 100;
+                            // User is losing, loss is 100% of the bet amount
+                            pnlPercent = -100;
+                            pnlSol = -bet.amount;
+                            isProfit = false;
                           }
+                        } else {
+                          // No price change or entry price not set
+                          pnlPercent = 0;
+                          pnlSol = 0;
+                          isProfit = true;
                         }
-                        const pnlSol = (bet.amount * pnlPercent) / 100;
-                        const isProfit = pnlPercent >= 0;
 
                         return (
                           <tr key={bet.id} className="border-b border-trench-sandbag/20 hover:bg-trench-mud/30 transition-colors">

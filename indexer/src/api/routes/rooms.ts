@@ -200,6 +200,11 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
       ? { status: { in: ['active', 'settled'] } } 
       : { status };
 
+    // Enforce that pending rooms can only be queried by their creator
+    if (status === 'pending' && !creator) {
+      return res.json({ success: true, data: [] });
+    }
+
     if (creator) {
       whereClause.creator = creator;
     }

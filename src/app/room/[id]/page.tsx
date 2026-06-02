@@ -334,6 +334,41 @@ export default function RoomDetailPage() {
     );
   }
 
+  // Enforce access restriction for pending limit order rooms: accessible to the creator trader alone
+  if (room.status === 'pending') {
+    const isCreator = user && user.wallet && room.creator && user.wallet.toLowerCase() === room.creator.toLowerCase();
+    if (!isCreator) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center py-24 text-center select-none bg-trench-black max-w-lg mx-auto px-4">
+          <div className="relative mb-6">
+            <div className="absolute inset-0 bg-jeet-red/10 rounded-full blur-xl animate-pulse" />
+            <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={120} glowColor="jeet" animated className="rounded-xl relative z-10" />
+          </div>
+          <h3 className="font-staatliches text-3xl text-jeet-red uppercase tracking-wider mb-2">CLASSIFIED SECTOR DETECTED</h3>
+          <p className="font-mono text-sm text-trench-gasmask uppercase max-w-sm font-bold leading-relaxed mb-6">
+            THIS TACTICAL ROOM IS CURRENTLY PENDING TRIGGER UNDER LIMIT ORDER DEPLOYMENT. ONLY THE SEEDING TRADER ({room.creator.slice(0, 6)}...{room.creator.slice(-4)}) HAS AUTHORIZATION TO ACCESS THIS SECTOR BEFORE DETONATION.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
+            {!user ? (
+              <button
+                onClick={connectWallet}
+                className="py-2.5 px-6 font-staatliches text-lg uppercase tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all"
+              >
+                CONNECT AUTHORIZED WALLET
+              </button>
+            ) : null}
+            <button
+              onClick={() => router.push('/rooms')}
+              className="retro-btn retro-btn-neutral px-6 py-2 rounded text-black font-staatliches text-lg uppercase tracking-wider"
+            >
+              RETREAT TO FRONTLINES
+            </button>
+          </div>
+        </div>
+      );
+    }
+  }
+
 
 
   // Potential payout calculation (plat fee is 1.25%)

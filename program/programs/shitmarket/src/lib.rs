@@ -722,7 +722,7 @@ pub mod shitmarket {
         room.token_name = name_bytes;
         room.price_feed = ctx.accounts.price_feed.key();
         room.switchboard_feed = switchboard_feed.unwrap_or(Pubkey::default());
-        room.opening_price = opening_price;
+        room.opening_price = if as_pending { 0 } else { opening_price };
         room.opening_timestamp = now;
         room.duration_minutes = duration_minutes;
         room.moon_pool = 0;
@@ -750,7 +750,7 @@ pub mod shitmarket {
             token_mint,
             token_name: token_name.chars().take(32).collect(),
             price_feed: price_feed_key,
-            opening_price,
+            opening_price: room.opening_price,
             duration_minutes,
             expiry_timestamp: room.expiry_timestamp,
         });
@@ -1221,7 +1221,11 @@ pub mod shitmarket {
             || ctx.accounts.price_feed.data_is_empty();
 
         let current_price = if is_sentinel {
-            room.opening_price
+            if room.status == RoomStatus::Pending {
+                limit_order.limit_price
+            } else {
+                room.opening_price
+            }
         } else {
             load_price_feed_price(&ctx.accounts.price_feed.to_account_info())?
         };

@@ -177,6 +177,7 @@ export interface AppState {
   cancelLimitOrder: (id: string) => void;
   checkLimitOrders: (roomId: string, currentPrice: number) => Promise<void>;
   executeLimitOrderLocal: (roomId: string, side: 'moon' | 'jeet', amount: number) => void;
+  activateRoomLocal: (roomId: string, openingPrice: number, expiry: number) => void;
 }
 
 // ── Fetch with Timeout helper to prevent offline backend hangs ───
@@ -227,7 +228,7 @@ export const mapApiRoom = (apiRoom: any): Room => {
     winner: apiRoom.winner || undefined,
     createdAt: new Date(apiRoom.createdAt).getTime(),
     duration: Number(apiRoom.duration || 30),
-    openingPrice: apiRoom.openingPrice ? Number(apiRoom.openingPrice) / 1e12 : undefined,
+    openingPrice: (apiRoom.openingPrice && BigInt(apiRoom.openingPrice) !== 0n) ? Number(apiRoom.openingPrice) / 1e12 : undefined,
     finalTWAP: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
     finalPrice: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
     twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e12 : undefined,
@@ -455,7 +456,7 @@ export const useAppState = create<AppState>((set, get) => ({
             winner: winnerStr,
             createdAt: onChain.openingTimestamp.toNumber() * 1000,
             duration: onChain.durationMinutes as any,
-            openingPrice: onChain.openingPrice.toNumber() / 1e12,
+            openingPrice: onChain.openingPrice.toNumber() === 0 ? undefined : onChain.openingPrice.toNumber() / 1e12,
             finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e12 : undefined,
             twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e12 : undefined,
           };
@@ -729,7 +730,7 @@ export const useAppState = create<AppState>((set, get) => ({
         if (onChain) {
           onChainExpiry = onChain.expiryTimestamp.toNumber() * 1000;
           onChainCreatedAt = onChain.openingTimestamp.toNumber() * 1000;
-          onChainOpeningPrice = onChain.openingPrice.toNumber() / 1e12;
+          onChainOpeningPrice = onChain.openingPrice.toNumber() === 0 ? undefined : onChain.openingPrice.toNumber() / 1e12;
         }
       } catch (fetchErr) {
         console.warn("Failed to fetch on-chain room right after creation for precise countdown:", fetchErr);
@@ -744,7 +745,7 @@ export const useAppState = create<AppState>((set, get) => ({
         id: roomPda.toBase58(),
         expiry: onChainExpiry,
         createdAt: onChainCreatedAt,
-        openingPrice: onChainOpeningPrice,
+        openingPrice: asPending ? undefined : onChainOpeningPrice,
         status: asPending ? 'pending' as const : 'active' as const,
       };
       set((state) => ({ rooms: [optimisticRoom, ...state.rooms] }));
@@ -1484,5 +1485,15 @@ export const useAppState = create<AppState>((set, get) => ({
       }
       return { limitOrders: updated };
     });
+  },
+
+  activateRoomLocal: (roomId: string, openingPrice: number, expiry: number) => {
+    set((state) => ({
+      rooms: state.rooms.map((r) =>
+        r.id === roomId
+          ? { ...r, status: 'active' as const, openingPrice, expiry }
+          : r
+      ),
+    }));
   }
 }));

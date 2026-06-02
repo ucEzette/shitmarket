@@ -138,8 +138,10 @@ async function processLimitOrder(
     if (aggResult) {
       currentPrice = parseFloat(aggResult.priceUsd);
     } else if (config.nodeEnv === 'development' || config.solana.rpcUrl.includes('devnet')) {
-      // In development, fall back to simulated price around openingPrice if real feeds fail
-      const openingPriceNum = Number(roomRecord.openingPrice || 0n) / 1e12;
+      // In development, fall back to simulated price around openingPrice (or limitPrice if pending) if real feeds fail
+      const openingPriceNum = roomRecord.status === 'pending'
+        ? order.limitPrice
+        : Number(roomRecord.openingPrice || 0n) / 1e12;
       const swing = (Math.random() - 0.5) * 0.1; // ±5% swing
       currentPrice = openingPriceNum * (1 + swing);
       logger.debug({

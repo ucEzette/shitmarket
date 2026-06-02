@@ -195,6 +195,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
   const fetchRooms = useAppState((s) => s.fetchRooms);
   const fetchLeaderboard = useAppState((s) => s.fetchLeaderboard);
   const executeLimitOrderLocal = useAppState((s) => s.executeLimitOrderLocal);
+  const activateRoomLocal = useAppState((s) => s.activateRoomLocal);
 
   const pathname = usePathname();
   const isRoomPage = pathname?.startsWith('/room/');
@@ -380,7 +381,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
         try {
           const msg = JSON.parse(event.data);
           
-          if (msg.type === 'new_room') {
+          if (msg.type === 'new_room' || msg.type === 'RoomCreated') {
             console.log('WS Event [New Room Deployed]:', msg);
             const newRoomObj = mapApiRoom(msg);
             addRoom(newRoomObj);
@@ -404,11 +405,22 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
             }
           }
           
-          else if (msg.type === 'room_update') {
-            const { roomPubkey, ...data } = msg;
-            console.log('WS Event [Room State Change]:', roomPubkey, data);
+          else if (
+            msg.type === 'room_update' ||
+            msg.type === 'BetPlaced' ||
+            msg.type === 'RoomActivated' ||
+            msg.type === 'RoomSettled' ||
+            msg.type === 'WinningsClaimed' ||
+            msg.type === 'NewChatMessage'
+          ) {
+            const roomPubkey = msg.roomPubkey || msg.room;
+            const eventType = msg.type === 'room_update' ? msg.data?.type : msg.type;
+            const data = msg.type === 'room_update' ? msg.data : msg;
             
-            if (data.type === 'BetPlaced') {
+            console.log('WS Event [Room State Change]:', roomPubkey, eventType, data);
+            if (!roomPubkey) return;
+            
+            if (eventType === 'BetPlaced') {
               const moonAmount = Number(data.moonPool) / 1e9;
               const jeetAmount = Number(data.jeetPool) / 1e9;
               updateRoomPools(roomPubkey, moonAmount, jeetAmount);
@@ -444,7 +456,25 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               }
             }
             
-            else if (data.type === 'NewChatMessage') {
+            else if (eventType === 'RoomActivated') {
+              const openingPrice = Number(data.openingPrice) / 1e12;
+              const expiry = new Date(data.expiryTimestamp ? Number(data.expiryTimestamp) * 1000 : data.expiry).getTime();
+              activateRoomLocal(roomPubkey, openingPrice, expiry);
+              
+              addMessage({
+                roomId: roomPubkey,
+                side: 'all',
+                user: 'COMMAND HQ',
+                message: `🚀 LIMIT ORDER EXECUTED & TRENCH ACTIVATED! Opening Price: $${openingPrice} 🚀`,
+                timestamp: Date.now(),
+              });
+              
+              if (audioEnabledRef.current) {
+                synthSound('whistle');
+              }
+            }
+            
+            else if (eventType === 'NewChatMessage') {
               addMessage({
                 roomId: roomPubkey,
                 side: data.side,
@@ -454,7 +484,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               });
             }
             
-            else if (data.type === 'RoomSettled') {
+            else if (eventType === 'RoomSettled') {
               settleRoom(roomPubkey, data.winner);
               
               addMessage({
@@ -493,7 +523,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               }
             }
             
-            else if (data.type === 'WinningsClaimed') {
+            else if (eventType === 'WinningsClaimed') {
               markBetClaimed(roomPubkey, data.user);
               
               const formattedUser = `${data.user.slice(0, 6)}...${data.user.slice(-4)}`;

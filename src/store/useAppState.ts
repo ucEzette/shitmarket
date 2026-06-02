@@ -235,6 +235,16 @@ export const mapApiRoom = (apiRoom: any): Room => {
   };
 };
 
+function handleRpcError(actionName: string, err: any) {
+  const errMsg = err?.message || String(err);
+  const lowerMsg = errMsg.toLowerCase();
+  if (lowerMsg.includes('not confirmed') || lowerMsg.includes('timeout')) {
+    alert(`TRANSACTION TIMEOUT: The Solana network is taking too long to confirm your transaction. It might have still succeeded! Please wait a few moments, refresh the page, and check your wallet balance.`);
+  } else {
+    alert(`${actionName.toUpperCase()} FAILED: ${errMsg}`);
+  }
+}
+
 export const useAppState = create<AppState>((set, get) => ({
   rooms: [],
   roomsLoaded: false,
@@ -716,7 +726,7 @@ export const useAppState = create<AppState>((set, get) => ({
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
         ])
         .rpc({ skipPreflight: true });
         
@@ -760,7 +770,7 @@ export const useAppState = create<AppState>((set, get) => ({
     } catch (err: any) {
       console.error("Failed to create room on-chain:", err);
       setTransactionError(err.message || String(err));
-      alert(`DEPLOY MISSION REJECTED BY COMMAND HQ: ${err.message || err}`);
+      handleRpcError("deploy mission", err);
       throw err;
     } finally {
       setTransactionLoading(false);
@@ -799,7 +809,7 @@ export const useAppState = create<AppState>((set, get) => ({
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 150_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
         ])
         .rpc({ skipPreflight: true });
         
@@ -836,7 +846,7 @@ export const useAppState = create<AppState>((set, get) => ({
     } catch (err: any) {
       console.error("Failed to place bet on-chain:", err);
       setTransactionError(err.message || String(err));
-      alert(`BATTLE ORDER FAILED: ${err.message || err}`);
+      handleRpcError("battle order", err);
       throw err;
     } finally {
       setTransactionLoading(false);
@@ -899,7 +909,7 @@ export const useAppState = create<AppState>((set, get) => ({
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
         ])
         .rpc({ skipPreflight: true });
         
@@ -920,7 +930,7 @@ export const useAppState = create<AppState>((set, get) => ({
     } catch (err: any) {
       console.error("Failed to claim winnings on-chain:", err);
       setTransactionError(err.message || String(err));
-      alert(`WAR BOOTY CLAIM REJECTED: ${err.message || err}`);
+      handleRpcError("booty secure retrieval", err);
       throw err;
     } finally {
       setTransactionLoading(false);
@@ -1280,7 +1290,7 @@ export const useAppState = create<AppState>((set, get) => ({
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
         ])
         .rpc();
 
@@ -1321,7 +1331,7 @@ export const useAppState = create<AppState>((set, get) => ({
     } catch (err: any) {
       console.error("Failed to create limit order on-chain:", err);
       setTransactionError(err.message || String(err));
-      alert(`BATTLE ORDER FAILED: ${err.message || err}`);
+      handleRpcError("tactical order queue", err);
       throw err;
     } finally {
       setTransactionLoading(false);
@@ -1353,7 +1363,7 @@ export const useAppState = create<AppState>((set, get) => ({
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 100_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
         ])
         .rpc();
 
@@ -1380,7 +1390,7 @@ export const useAppState = create<AppState>((set, get) => ({
     } catch (err: any) {
       console.error("Failed to cancel limit order on-chain:", err);
       setTransactionError(err.message || String(err));
-      alert(`CANCEL BATTLE ORDER FAILED: ${err.message || err}`);
+      handleRpcError("tactical order abort", err);
       throw err;
     } finally {
       setTransactionLoading(false);

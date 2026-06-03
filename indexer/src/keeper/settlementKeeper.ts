@@ -44,6 +44,32 @@ import { acquireRoomLock, releaseLock } from './keeperLock';
 
 // ─── Keeper wallet ────────────────────────────────────────────────────────────
 
+export function extractErrorMessage(err: any): string {
+  if (!err) return 'Unknown error';
+  if (typeof err === 'string') return err;
+  if (err.message && typeof err.message === 'string') return err.message;
+  if (err.error && typeof err.error.message === 'string') return err.error.message;
+  if (Array.isArray(err.logs) && err.logs.length > 0) {
+    for (const log of err.logs) {
+      if (log.includes('AnchorError') || log.includes('Error Message:')) {
+        return log.replace('Program log: ', '');
+      }
+    }
+    return `Logs: ${err.logs.slice(-3).join(' | ')}`;
+  }
+  try {
+    const cleanObj: any = {};
+    if (err.code !== undefined) cleanObj.code = err.code;
+    if (err.type !== undefined) cleanObj.type = err.type;
+    if (err.InstructionError !== undefined) cleanObj.InstructionError = err.InstructionError;
+    if (err.err !== undefined) cleanObj.err = err.err;
+    if (Object.keys(cleanObj).length > 0) return JSON.stringify(cleanObj);
+    const str = JSON.stringify(err);
+    if (str && str !== '{}') return str.length > 200 ? str.slice(0, 200) + '...' : str;
+  } catch {}
+  return String(err);
+}
+
 let activeConnection: Connection | null = null;
 let activeProgram: anchor.Program | null = null;
 
@@ -340,7 +366,7 @@ async function settleRoom(
 
       return txSig;
     } catch (err: any) {
-      const msg = err?.message ?? String(err);
+      const msg = extractErrorMessage(err);
       // Gracefully handle already-settled rooms (race condition with another keeper)
       if (msg.includes('RoomAlreadySettled') || msg.includes('6002')) {
         logger.info({ msg: 'Room already settled by another keeper', room: roomPubkeyStr });
@@ -501,7 +527,8 @@ export async function settleRoomByPubkey(pubkeyStr: string): Promise<{ success: 
     const txSig = await settleRoom(program, connection, keeper, roomRecord);
     return { success: true, txSig };
   } catch (err: any) {
-    logger.error({ msg: 'On-demand settlement error', pubkeyStr, err: err?.message });
-    return { success: false, error: err?.message || String(err) };
+    const errMsg = extractErrorMessage(err);
+    logger.error({ msg: 'On-demand settlement error', pubkeyStr, err: errMsg });
+    return { success: false, error: errMsg };
   }
 }

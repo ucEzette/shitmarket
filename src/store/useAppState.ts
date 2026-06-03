@@ -235,8 +235,34 @@ export const mapApiRoom = (apiRoom: any): Room => {
   };
 };
 
+function extractErrorMessage(err: any): string {
+  if (!err) return 'Unknown error';
+  if (typeof err === 'string') return err;
+  if (err.message && typeof err.message === 'string') return err.message;
+  if (err.error && typeof err.error.message === 'string') return err.error.message;
+  if (Array.isArray(err.logs) && err.logs.length > 0) {
+    for (const log of err.logs) {
+      if (log.includes('AnchorError') || log.includes('Error Message:')) {
+        return log.replace('Program log: ', '');
+      }
+    }
+    return `Logs: ${err.logs.slice(-3).join(' | ')}`;
+  }
+  try {
+    const cleanObj: any = {};
+    if (err.code !== undefined) cleanObj.code = err.code;
+    if (err.type !== undefined) cleanObj.type = err.type;
+    if (err.InstructionError !== undefined) cleanObj.InstructionError = err.InstructionError;
+    if (err.err !== undefined) cleanObj.err = err.err;
+    if (Object.keys(cleanObj).length > 0) return JSON.stringify(cleanObj);
+    const str = JSON.stringify(err);
+    if (str && str !== '{}') return str.length > 200 ? str.slice(0, 200) + '...' : str;
+  } catch {}
+  return String(err);
+}
+
 function handleRpcError(actionName: string, err: any) {
-  const errMsg = err?.message || String(err);
+  const errMsg = extractErrorMessage(err);
   const lowerMsg = errMsg.toLowerCase();
   if (lowerMsg.includes('not confirmed') || lowerMsg.includes('timeout')) {
     alert(`TRANSACTION TIMEOUT: The Solana network is taking too long to confirm your transaction. It might have still succeeded! Please wait a few moments, refresh the page, and check your wallet balance.`);

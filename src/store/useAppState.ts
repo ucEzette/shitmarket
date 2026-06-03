@@ -967,7 +967,7 @@ export const useAppState = create<AppState>((set, get) => ({
       get().addActivity({
         type: 'win',
         title: `BOOTY CLAIMED IN ROOM ${roomId.substring(0, 4)}`,
-        message: `Successfully recovered spoils from ${winningSide.toUpperCase()} victory.`,
+        message: `Successfully recovered spoils from ${claimSide.toUpperCase()} victory.`,
         link: `/room/${roomId}`
       });
 

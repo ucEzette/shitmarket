@@ -903,8 +903,23 @@ export const useAppState = create<AppState>((set, get) => ({
         const settleJson = await settleRes.json();
         console.log(`On-demand settlement completed! txSig: ${settleJson.txSig}`);
         
-        // Wait a small moment (500ms) for the event listener to catch up and DB to update.
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        if (settleJson.txSig) {
+          console.log(`Waiting for settlement transaction ${settleJson.txSig} to confirm...`);
+          try {
+            const latestBlockhash = await connection.getLatestBlockhash();
+            await connection.confirmTransaction({
+              signature: settleJson.txSig,
+              blockhash: latestBlockhash.blockhash,
+              lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
+            }, 'confirmed');
+            console.log(`Settlement transaction confirmed on-chain.`);
+          } catch (confirmErr) {
+            console.warn("Failed to confirm settlement transaction, proceeding anyway", confirmErr);
+          }
+        }
+        
+        // Wait a moment (1500ms) for the indexer event listener to sync DB
+        await new Promise((resolve) => setTimeout(resolve, 1500));
         
         // Refresh rooms to update frontend state
         await get().fetchRooms();

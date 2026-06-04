@@ -978,6 +978,23 @@ export const useAppState = create<AppState>((set, get) => ({
         
       console.log("Winnings claimed successfully! Tx:", tx);
       
+      // Optimistically update the claimed flag for all bets of this user in this room
+      const currentUser = get().user;
+      if (currentUser && currentUser.bets) {
+        const updatedBets = currentUser.bets.map((b) => {
+          if (b.roomId === roomId) {
+            return { ...b, claimed: true };
+          }
+          return b;
+        });
+        set({
+          user: {
+            ...currentUser,
+            bets: updatedBets
+          }
+        });
+      }
+
       // Add to personal activity log
       get().addActivity({
         type: 'win',
@@ -988,6 +1005,13 @@ export const useAppState = create<AppState>((set, get) => ({
 
       // Reload balance and user stats
       await get().fetchBalance();
+
+      // In the background, refresh the profile/balance after 2 seconds to sync with the database
+      setTimeout(() => {
+        if (wallet.publicKey) {
+          get().setWalletAddress(wallet.publicKey.toBase58()).catch(() => {});
+        }
+      }, 2000);
       
       return tx;
     } catch (err: any) {

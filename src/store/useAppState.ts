@@ -235,6 +235,89 @@ export const mapApiRoom = (apiRoom: any): Room => {
   };
 };
 
+function isRoomEqual(a: Room, b: Room): boolean {
+  if (a.id !== b.id) return false;
+  if (a.status !== b.status) return false;
+  if (a.winner !== b.winner) return false;
+  if (a.moonPool !== b.moonPool) return false;
+  if (a.jeetPool !== b.jeetPool) return false;
+  if (a.expiry !== b.expiry) return false;
+  if (a.openingPrice !== b.openingPrice) return false;
+  if (a.finalPrice !== b.finalPrice) return false;
+  if (a.twapFinalPrice !== b.twapFinalPrice) return false;
+  if (a.token.address !== b.token.address) return false;
+  if (a.token.name !== b.token.name) return false;
+  if (a.token.symbol !== b.token.symbol) return false;
+  if (a.token.pairAddress !== b.token.pairAddress) return false;
+  if (a.token.chainId !== b.token.chainId) return false;
+  if (a.token.icon !== b.token.icon) return false;
+  return true;
+}
+
+function mergeRooms(currentRoom: Room | undefined, indexerRoom: Room | null, onChainRoom: Room | null): Room | null {
+  if (!indexerRoom && !onChainRoom) return currentRoom || null;
+  
+  const primary = onChainRoom || indexerRoom!;
+  const secondary = onChainRoom ? indexerRoom : null;
+  const base = currentRoom || primary;
+
+  const token = {
+    address: base.token.address || primary.token.address || secondary?.token?.address || '',
+    name: base.token.name && base.token.name !== 'Unknown Token' ? base.token.name : (primary.token.name !== 'Unknown Token' ? primary.token.name : secondary?.token?.name || 'Unknown Token'),
+    symbol: base.token.symbol && base.token.symbol !== 'UNKNWN' ? base.token.symbol : (primary.token.symbol !== 'UNKNWN' ? primary.token.symbol : secondary?.token?.symbol || 'UNKNWN'),
+    icon: base.token.icon && base.token.icon !== '💰' ? base.token.icon : (primary.token.icon !== '💰' ? primary.token.icon : secondary?.token?.icon || '💰'),
+    chainId: primary.token.chainId || secondary?.token?.chainId || base.token.chainId || 'solana',
+    pairAddress: primary.token.pairAddress || secondary?.token?.pairAddress || base.token.pairAddress || '',
+  };
+
+  let status = base.status;
+  if (onChainRoom) {
+    status = onChainRoom.status;
+  } else if (indexerRoom) {
+    status = indexerRoom.status;
+  }
+  
+  if (base.status === 'settled' || currentRoom?.status === 'settled') {
+    status = 'settled';
+  }
+
+  let winner = base.winner;
+  if (onChainRoom?.winner) {
+    winner = onChainRoom.winner;
+  } else if (indexerRoom?.winner) {
+    winner = indexerRoom.winner;
+  }
+  
+  if (currentRoom?.winner) {
+    winner = currentRoom.winner;
+  }
+
+  const moonPool = onChainRoom ? onChainRoom.moonPool : (indexerRoom ? indexerRoom.moonPool : base.moonPool);
+  const jeetPool = onChainRoom ? onChainRoom.jeetPool : (indexerRoom ? indexerRoom.jeetPool : base.jeetPool);
+
+  const openingPrice = onChainRoom?.openingPrice ?? indexerRoom?.openingPrice ?? base.openingPrice;
+  const finalPrice = onChainRoom?.finalPrice ?? indexerRoom?.finalPrice ?? base.finalPrice;
+  const twapFinalPrice = onChainRoom?.twapFinalPrice ?? indexerRoom?.twapFinalPrice ?? base.twapFinalPrice;
+
+  return {
+    ...base,
+    token,
+    creator: onChainRoom?.creator || indexerRoom?.creator || base.creator,
+    moonPool,
+    jeetPool,
+    expiry: onChainRoom?.expiry || indexerRoom?.expiry || base.expiry,
+    status,
+    winner,
+    createdAt: onChainRoom?.createdAt || indexerRoom?.createdAt || base.createdAt,
+    duration: onChainRoom?.duration || indexerRoom?.duration || base.duration,
+    openingPrice,
+    finalPrice,
+    twapFinalPrice,
+  };
+}
+
+
+
 function extractErrorMessage(err: any): string {
   if (!err) return 'Unknown error';
   if (typeof err === 'string') return err;
@@ -420,6 +503,9 @@ export const useAppState = create<AppState>((set, get) => ({
   },
 
   fetchSingleRoom: async (roomId: string) => {
+    let indexerResult: Room | null = null;
+    let onChainResult: Room | null = null;
+
     // Run indexer API fetch and on-chain fetch in parallel to prevent sequential blocking lag!
     const indexerFetch = (async () => {
       try {
@@ -427,20 +513,11 @@ export const useAppState = create<AppState>((set, get) => ({
         const res = await fetchWithTimeout(`${indexerApi}/api/rooms/${roomId}`, {}, 3000);
         const json = await res.json();
         if (json.success && json.data) {
-          const roomObj = mapApiRoom(json.data);
-          set((state) => {
-            const exists = state.rooms.some((r) => r.id === roomId);
-            const newRooms = exists
-              ? state.rooms.map((r) => (r.id === roomId ? roomObj : r))
-              : [roomObj, ...state.rooms];
-            return { rooms: newRooms };
-          });
-          return roomObj;
+          indexerResult = mapApiRoom(json.data);
         }
       } catch (err) {
         console.warn(`Failed to fetch room ${roomId} from indexer API:`, err);
       }
-      return null;
     })();
 
     const onChainFetch = (async () => {
@@ -521,29 +598,7 @@ export const useAppState = create<AppState>((set, get) => ({
             }
           }
 
-          set((state) => {
-            const existingRoom = state.rooms.find((r) => r.id === roomId);
-            
-            // Merge safely: preserve the indexer-provided original EVM address and chain details!
-            const mergedRoom: Room = {
-              ...updatedRoom,
-              token: {
-                ...updatedRoom.token,
-                address: existingRoom?.token?.address || updatedRoom.token.address,
-                chainId: existingRoom?.token?.chainId || updatedRoom.token.chainId,
-                name: existingRoom?.token?.name || updatedRoom.token.name,
-                symbol: existingRoom?.token?.symbol || updatedRoom.token.symbol,
-                icon: existingRoom?.token?.icon || updatedRoom.token.icon,
-                pairAddress: existingRoom?.token?.pairAddress || updatedRoom.token.pairAddress,
-              }
-            };
-
-            const exists = state.rooms.some((r) => r.id === roomId);
-            const newRooms = exists
-              ? state.rooms.map((r) => (r.id === roomId ? mergedRoom : r))
-              : [mergedRoom, ...state.rooms];
-            return { rooms: newRooms };
-          });
+          onChainResult = updatedRoom;
         }
       } catch (e) {
         console.warn('Could not fetch or hydrate single on-chain room state in background:', e);
@@ -551,6 +606,21 @@ export const useAppState = create<AppState>((set, get) => ({
     })();
 
     await Promise.all([indexerFetch, onChainFetch]);
+
+    const currentRoom = get().rooms.find((r) => r.id === roomId);
+    const merged = mergeRooms(currentRoom, indexerResult, onChainResult);
+    
+    if (merged) {
+      if (!currentRoom || !isRoomEqual(currentRoom, merged)) {
+        set((state) => {
+          const exists = state.rooms.some((r) => r.id === roomId);
+          const newRooms = exists
+            ? state.rooms.map((r) => (r.id === roomId ? merged : r))
+            : [merged, ...state.rooms];
+          return { rooms: newRooms };
+        });
+      }
+    }
   },
 
   fetchLeaderboard: async () => {
@@ -1217,8 +1287,14 @@ export const useAppState = create<AppState>((set, get) => ({
         const json = await res.json();
         if (json.success && json.data) {
           set((state) => {
+            const currentRoomChats = state.chatMessages.filter((c) => c.roomId === roomId);
+            const newChats = json.data;
+            if (currentRoomChats.length === newChats.length &&
+                currentRoomChats.every((c, i) => c.message === newChats[i]?.message && c.user === newChats[i]?.user && c.side === newChats[i]?.side)) {
+              return {};
+            }
             const otherChats = state.chatMessages.filter((c) => c.roomId !== roomId);
-            return { chatMessages: [...otherChats, ...json.data].slice(-500) };
+            return { chatMessages: [...otherChats, ...newChats].slice(-500) };
           });
         }
       }

@@ -832,68 +832,75 @@ export default function RoomDetailPage() {
           </div>
 
           {/* Stable and Static DexScreener Chart Terminal with Militarized Console Shell Frame (Permanently Flicker-Free) */}
-          {room.token.chainId && (
-            <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[320px] sm:h-[410px] flex flex-col justify-between z-10 scanlines">
+          <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[320px] sm:h-[410px] flex flex-col justify-between z-10 scanlines">
+            
+            {/* Steel Console Top Header Bar */}
+            <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">
+              {/* corner rivets */}
+              <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+              <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
               
-              {/* Steel Console Top Header Bar */}
-              <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">
-                {/* corner rivets */}
-                <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                
-                <div className="flex items-center gap-2 pl-4">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
-                  <span className="text-white tracking-widest font-staatliches text-xs">CRT RADAR CONSOLE</span>
+              <div className="flex items-center gap-2 pl-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
+                <span className="text-white tracking-widest font-staatliches text-xs">CRT RADAR CONSOLE</span>
+              </div>
+              
+              {/* System status LEDs */}
+              <div className="flex items-center gap-3 pr-4">
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_6px_#16a34a]" />
+                  <span>SYS ON</span>
                 </div>
-                
-                {/* System status LEDs */}
-                <div className="flex items-center gap-3 pr-4">
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_6px_#16a34a]" />
-                    <span>SYS ON</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_6px_#f59e0b] animate-ping" />
-                    <span>DEX SYNC</span>
-                  </div>
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_6px_#f59e0b] animate-ping" />
+                  <span>DEX SYNC</span>
                 </div>
               </div>
+            </div>
 
-              {/* Interactive Iframe CRT Panel Overlay Container */}
-              <div className="w-full flex-1 relative bg-black overflow-hidden group">
-                
-                {/* 1. Vertical Sweep Radar Overlay */}
-                <div className="radar-sweep-line absolute left-0 right-0 h-[2px] bg-neon-moon/20 shadow-[0_0_10px_#16a34a] z-10 pointer-events-none" />
+            {/* Interactive Iframe CRT Panel Overlay Container */}
+            <div className="w-full flex-1 relative bg-black overflow-hidden group">
+              
+              {/* 1. Vertical Sweep Radar Overlay */}
+              <div className="radar-sweep-line absolute left-0 right-0 h-[2px] bg-neon-moon/20 shadow-[0_0_10px_#16a34a] z-10 pointer-events-none" />
 
-                {/* 2. Glass Reflection Glare Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none z-10" />
+              {/* 2. Glass Reflection Glare Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none z-10" />
 
-                {/* 3. CRT Scanline Grid Overlay */}
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.15)_50%)] bg-[size:100%_4px] opacity-25 z-10" />
+              {/* 3. CRT Scanline Grid Overlay */}
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.15)_50%)] bg-[size:100%_4px] opacity-25 z-10" />
 
-                {/* 4. Steel Overlay Inner Shadows */}
-                <div className="absolute inset-0 border border-white/5 pointer-events-none z-10 shadow-[inset_0_0_15px_rgba(0,0,0,0.95)]" />
+              {/* 4. Steel Overlay Inner Shadows */}
+              <div className="absolute inset-0 border border-white/5 pointer-events-none z-10 shadow-[inset_0_0_15px_rgba(0,0,0,0.95)]" />
 
-                {/* Memoized Stable chart iframe. Specifying a unique React Key forces React to reuse 
-                    the existing DOM node instead of rebuilding it on parent wagers state updates,
-                    completely resolving any iframe flashing/flickering! */}
+              {/* Memoized Stable chart iframe. Specifying a unique React Key forces React to reuse 
+                  the existing DOM node instead of rebuilding it on parent wagers state updates,
+                  completely resolving any iframe flashing/flickering! */}
+              {room.token.chainId && room.token.pairAddress ? (
                 <StableDexChart 
                   key={`dexscreener-${room.id}`}
                   chainId={room.token.chainId}
-                  pairAddress={room.token.pairAddress || ''}
+                  pairAddress={room.token.pairAddress}
                 />
-              </div>
-
-              {/* Steel Console Bottom Panel */}
-              <div className="w-full bg-[#0d140a] border-t border-[#2c3d25] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-1 font-mono text-[8px] text-trench-gasmask uppercase font-bold relative select-none">
-                <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                
-                <span className="pl-4">INDEXER ADDR: {room.token.pairAddress ? room.token.pairAddress.substring(0, 16) : 'WAITING'}...</span>
-                <span className="pr-4 text-neon-moon">CHANNEL SECURE</span>
-              </div>
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] pt-12 z-10 animate-pulse">
+                  <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
+                  <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
+                    WAITING FOR MARKET TELEMETRY...
+                  </span>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Steel Console Bottom Panel */}
+            <div className="w-full bg-[#0d140a] border-t border-[#2c3d25] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-1 font-mono text-[8px] text-trench-gasmask uppercase font-bold relative select-none">
+              <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+              <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+              
+              <span className="pl-4">INDEXER ADDR: {room.token.pairAddress ? room.token.pairAddress.substring(0, 16) : 'WAITING'}...</span>
+              <span className="pr-4 text-neon-moon">CHANNEL SECURE</span>
+            </div>
+          </div>
 
           {/* 🛡️ TARGET AREA TELEMETRY & COIN INTEL BRIEFING */}
           <div className="bg-trench-black border-2 border-trench-sandbag p-4 rounded-lg font-mono text-xs shadow-2xl relative space-y-4">
@@ -902,7 +909,21 @@ export default function RoomDetailPage() {
               <span>🛡️ TARGET AREA TELEMETRY & COIN BRIEFING</span>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
+                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NAME</span>
+                <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.name}>
+                  {room.token.name || 'UNKNOWN'}
+                </span>
+              </div>
+
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
+                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TICKER / SYMBOL</span>
+                <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.symbol}>
+                  ${room.token.symbol || 'UNKNWN'}
+                </span>
+              </div>
+
               <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
                 <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
                 <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate">

@@ -434,4 +434,92 @@ body {
   z-index: 0;
 }
 
+/* Premium Glassmorphic Faction Cards & Panels */
+.premium-glass-card {
+  background: rgba(10, 11, 18, 0.65);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.premium-glow-moon {
+  box-shadow: 0 0 30px -5px rgba(22, 163, 74, 0.35), inset 0 0 12px 1px rgba(22, 163, 74, 0.15);
+  border: 1px solid rgba(22, 163, 74, 0.45);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-glow-moon:hover {
+  box-shadow: 0 0 40px -2px rgba(22, 163, 74, 0.55), inset 0 0 16px 2px rgba(22, 163, 74, 0.25);
+  border: 1px solid rgba(22, 163, 74, 0.7);
+  transform: translateY(-4px);
+}
+
+.premium-glow-jeet {
+  box-shadow: 0 0 30px -5px rgba(255, 42, 77, 0.35), inset 0 0 12px 1px rgba(255, 42, 77, 0.15);
+  border: 1px solid rgba(255, 42, 77, 0.45);
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-glow-jeet:hover {
+  box-shadow: 0 0 40px -2px rgba(255, 42, 77, 0.55), inset 0 0 16px 2px rgba(255, 42, 77, 0.25);
+  border: 1px solid rgba(255, 42, 77, 0.7);
+  transform: translateY(-4px);
+}
+
+/* Premium Buttons & Glows */
+.premium-btn-moon {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow: 0 0 20px rgba(22, 163, 74, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.premium-btn-moon:hover {
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+  box-shadow: 0 0 30px rgba(22, 163, 74, 0.6);
+  transform: translateY(-2px);
+}
+
+.premium-btn-neutral {
+  background: linear-gradient(135deg, #fbbf24 0%, #d97706 100%);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.4);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.premium-btn-neutral:hover {
+  background: linear-gradient(135deg, #fcd34d 0%, #fbbf24 100%);
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.6);
+  transform: translateY(-2px);
+}
+
+/* Floating coin animations */
+@keyframes coin-float-slow {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-20px) rotate(180deg); }
+  100% { transform: translateY(0px) rotate(360deg); }
+}
+
+@keyframes coin-float-medium {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-30px) rotate(-180deg); }
+  100% { transform: translateY(0px) rotate(-360deg); }
+}
+
+@keyframes coin-float-fast {
+  0% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-40px) rotate(360deg); }
+  100% { transform: translateY(0px) rotate(720deg); }
+}
+
+.animate-coin-slow {
+  animation: coin-float-slow 16s ease-in-out infinite;
+}
+.animate-coin-medium {
+  animation: coin-float-medium 11s ease-in-out infinite;
+}
+.animate-coin-fast {
+  animation: coin-float-fast 7s ease-in-out infinite;
+}
+
+/* Background Central Portal Glow */
+.portal-glow {
+  background: radial-gradient(circle at center, rgba(22, 163, 74, 0.15) 0%, rgba(255, 42, 77, 0.05) 50%, transparent 80%);
+}
+
+
 

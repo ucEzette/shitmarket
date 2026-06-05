@@ -9,6 +9,7 @@ import { useAppState } from '@/store/useAppState';
 import { PEPE_ASSETS, DegenQuoteBanner, PepePortrait, WarPropaganda, MascotRow } from '@/components/MemeAssets';
 import { AgentKeyAlphaZone } from '@/components/AgentKeyAlphaZone';
 import { IntroScreen } from '@/components/IntroScreen';
+import { FloatingCoins } from '@/components/FloatingCoins';
 import { Flame, ShieldAlert, Award, ArrowUpRight, Zap, Target, Users, Swords, Skull, Rocket } from 'lucide-react';
 
 function HomeContent() {
@@ -78,164 +79,138 @@ function HomeContent() {
   return (
     <div className="relative flex flex-col w-full overflow-hidden select-none">
 
-      {/* 1. HERO SECTION — MASSIVE BATTLEFIELD PANORAMA */}
-      <section className="relative w-full py-24 md:py-32 border-b border-white/10 overflow-hidden min-h-[700px] flex items-center justify-center">
-        {/* Full battlefield scene */}
+      {/* 1. HERO SECTION — PVP ARENA */}
+      <section className="relative w-full py-20 md:py-28 border-b border-white/10 overflow-hidden min-h-[750px] flex items-center justify-center bg-[#07080d]">
+        {/* Full battlefield scene background */}
         <div className="absolute inset-0 z-0">
           <img
-            alt="Meme Trench Battlefield with raining coins"
-            className="w-full h-full object-cover opacity-30 mix-blend-luminosity"
+            alt="Meme Trench Battlefield"
+            className="w-full h-full object-cover opacity-25 mix-blend-luminosity filter blur-[1px]"
             src={PEPE_ASSETS.battlefield}
           />
         </div>
         {/* Atmospheric Overlays */}
-        <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#05050A_85%)] pointer-events-none" />
-        <div className="absolute inset-0 z-0 bg-neon-moon/5 pointer-events-none" />
+        <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#07080d_90%)] pointer-events-none" />
+        <div className="absolute inset-0 z-0 portal-glow pointer-events-none" />
+        
+        {/* Floating Coins Layer */}
+        <FloatingCoins />
 
-        <div className="mx-auto max-w-7xl px-4 flex flex-col items-center justify-between gap-12 relative z-10 w-full">
+        <div className="mx-auto max-w-7xl px-4 flex flex-col items-center justify-center relative z-10 w-full">
+          {/* Main Title Heading */}
+          <motion.h1
+            initial={{ y: -30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="font-staatliches text-4xl sm:text-6xl md:text-7xl leading-none text-white tracking-widest text-center mb-10 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+          >
+            PICK A SIDE. <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-moon to-emerald-400">BET THE TRENCH.</span>
+          </motion.h1>
 
-          {/* Main Battlefield Statue Visuals */}
-          <div className="w-full flex flex-col md:flex-row items-center justify-around gap-8 md:gap-4">
-
-            {/* Desktop Chad Bull Statue (Moon Army) - Hidden on Mobile */}
+          {/* Cards & Middle Info Grid */}
+          <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-8 xl:gap-12 mt-4">
+            
+            {/* Left Card: Chad Bull General */}
             <motion.div
-              initial={{ x: -80, opacity: 0 }}
+              initial={{ x: -60, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
-              transition={{ type: 'spring', duration: 1.2 }}
-              className="hidden md:flex flex-col items-center text-center p-3 sm:p-6 retro-panel rounded-2xl max-w-[240px] shrink-0"
+              transition={{ type: 'spring', damping: 20, stiffness: 85, delay: 0.15 }}
+              className="w-full max-w-[340px] sm:max-w-[360px] premium-glass-card rounded-[24px] overflow-hidden p-6 flex flex-col items-center premium-glow-moon group shrink-0"
             >
-              <div className="relative mb-4">
-                <div className="absolute -inset-2 rounded-full bg-neon-moon/20 blur-xl animate-pulse" />
-                <PepePortrait src={PEPE_ASSETS.chadBull} glowColor="moon" animated className="w-28 h-28 rounded-full border-0" />
-              </div>
-              <span className="font-staatliches text-xl text-neon-moon tracking-wider uppercase glow-moon leading-tight">
+              <h3 className="font-staatliches text-2xl sm:text-3xl tracking-wider text-neon-moon text-center mb-4 uppercase drop-shadow-[0_0_8px_rgba(22,163,74,0.4)] transition-colors group-hover:text-emerald-400">
                 CHAD BULL GENERAL
-              </span>
-              <p className="font-mono text-[10px] text-trench-gasmask mt-1 uppercase font-bold leading-normal">
-                Commander of the MOON Forces. Stake SOL on the PUMP.
-              </p>
+              </h3>
+              
+              <div className="relative overflow-hidden w-full aspect-square rounded-2xl border border-neon-moon/20 mb-5 bg-black/60 shadow-inner group-hover:border-neon-moon/40 transition-colors">
+                <img
+                  src={PEPE_ASSETS.chadBull}
+                  alt="Chad Bull General"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+              </div>
+
+              <div className="w-full flex flex-col justify-between min-h-[90px]">
+                <p className="font-staatliches text-base sm:text-lg text-white tracking-wide uppercase leading-snug text-center px-1">
+                  COMMANDER OF THE MOON FORCES. STAKE SOL ON THE PUMP.
+                </p>
+                <p className="font-mono text-[10px] sm:text-xs text-trench-gasmask text-center mt-3 leading-relaxed italic opacity-85">
+                  &ldquo;It&apos;s not a rug if you never own the coin, big brain.&rdquo;
+                </p>
+              </div>
             </motion.div>
 
-            {/* Middle Combat Information Banner - Always Center & Top on Mobile */}
-            <div className="flex flex-col items-center text-center max-w-2xl px-4 flex-1 min-w-[280px] w-full">
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1 bg-trench-mud border-2 border-trench-sandbag rounded-full mb-6 shadow"
-              >
-                <Flame size={14} className="text-moon-gold animate-bounce" />
-                <span className="font-mono text-[10px] sm:text-xs font-bold text-moon-gold uppercase tracking-wider">
-                  Meme Coin PvP Prediction Trenches
-                </span>
-              </motion.div>
-
-              {/* Pepe mascot above headline */}
-              <motion.div
-                initial={{ y: -40, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.4, type: 'spring' }}
-                className="mb-4"
-              >
-                <PepePortrait src={PEPE_ASSETS.fewUnderstand} glowColor="gold" animated className="w-12 h-12 sm:w-20 sm:h-20 rounded-xl mx-auto border-0" />
-              </motion.div>
-
-              <motion.h2
-                initial={{ y: -20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ duration: 0.6 }}
-                className="font-staatliches text-2xl sm:text-5xl md:text-7xl leading-none text-white tracking-wide stencil-shadow"
-              >
-                Pick a side.<br />
-                <span className="text-neon-moon glow-moon">Bet the trench.</span><br />
-                <span className="text-jeet-red glow-jeet text-sm sm:text-lg md:text-2xl leading-none">It's not a rug if you never own the coin, big brain.</span>
-              </motion.h2>
-
-              <p className="font-mono text-[11px] sm:text-sm text-trench-gasmask mt-4 sm:mt-6 max-w-lg uppercase font-bold leading-relaxed">
-                Bet on coin pumps (Moon) or dumps (Jeet) within short windows (5m, 15m, 60m). You never hold the actual token. You bet against other degens. Plat fee is 1.25%.
-              </p>
-
-              {/* Enter Trenches CTA Button */}
-              <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-4 sm:gap-6 justify-center items-center w-full">
-                <Link href="/rooms" className="w-full sm:w-auto">
-                  <button className="w-full sm:w-72 px-8 py-3.5 sm:py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-wider retro-btn retro-btn-moon text-black">
-                    ENTER THE TRENCHES 💣
-                  </button>
-                </Link>
-                {isPaused ? (
-                  <button disabled className="w-full sm:w-72 px-8 py-3.5 sm:py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-wider bg-gray-600 text-gray-300 rounded border-b-4 border-gray-800 opacity-50 cursor-not-allowed">
-                    SYSTEM PAUSED ⛏️
-                  </button>
-                ) : (
-                  <Link href="/create-room" className="w-full sm:w-auto">
-                    <button className="w-full sm:w-72 px-8 py-3.5 sm:py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-wider retro-btn retro-btn-neutral text-black">
-                      DIG A TRENCH (CREATE) ⛏️
-                    </button>
-                  </Link>
-                )}
-              </div>
-            </div>
-
-            {/* Mobile-Only Statues Side-by-Side Grid */}
-            <div className="flex md:hidden w-full flex-row justify-center gap-3 mt-6">
-              {/* Chad Bull Statue Mobile */}
-              <motion.div
-                initial={{ x: -40, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="flex-1 flex flex-col items-center text-center p-2.5 retro-panel rounded-xl max-w-[145px]"
-              >
-                <div className="relative mb-2 shrink-0">
-                  <div className="absolute -inset-1 rounded-full bg-neon-moon/20 blur-lg animate-pulse" />
-                  <PepePortrait src={PEPE_ASSETS.chadBull} glowColor="moon" animated className="w-12 h-12 rounded-full border-0" />
-                </div>
-                <span className="font-staatliches text-[11px] text-neon-moon tracking-wide uppercase glow-moon leading-tight block">
-                  CHAD BULL
-                </span>
-                <p className="font-mono text-[7px] text-trench-gasmask mt-0.5 uppercase font-bold leading-normal block">
-                  Commander Moon. SOL Pump.
-                </p>
-              </motion.div>
-
-              {/* Skeleton Jeet Statue Mobile */}
-              <motion.div
-                initial={{ x: 40, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                className="flex-1 flex flex-col items-center text-center p-2.5 retro-panel rounded-xl max-w-[145px]"
-              >
-                <div className="relative mb-2 shrink-0">
-                  <div className="absolute -inset-1 rounded-full bg-jeet-red/20 blur-lg animate-pulse" />
-                  <PepePortrait src={PEPE_ASSETS.jeetSkeleton} glowColor="jeet" animated className="w-12 h-12 rounded-full border-0" />
-                </div>
-                <span className="font-staatliches text-[11px] text-jeet-red tracking-wide uppercase glow-jeet leading-tight block">
-                  JEET REAPER
-                </span>
-                <p className="font-mono text-[7px] text-trench-gasmask mt-0.5 uppercase font-bold leading-normal block">
-                  Commander Jeet. SOL Dump.
-                </p>
-              </motion.div>
-            </div>
-
-            {/* Desktop Skeleton Jeet Statue (Jeet Army) - Hidden on Mobile */}
+            {/* Middle Combat Branding Emblem */}
             <motion.div
-              initial={{ x: 80, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ type: 'spring', duration: 1.2 }}
-              className="hidden md:flex flex-col items-center text-center p-3 sm:p-6 retro-panel rounded-2xl max-w-[240px] shrink-0"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.6, delay: 0.35 }}
+              className="flex flex-col items-center justify-center py-6 px-4 lg:w-64 shrink-0"
             >
-              <div className="relative mb-4">
-                <div className="absolute -inset-2 rounded-full bg-jeet-red/20 blur-xl animate-pulse" />
-                <PepePortrait src={PEPE_ASSETS.jeetSkeleton} glowColor="jeet" animated className="w-28 h-28 rounded-full border-0" />
-              </div>
-              <span className="font-staatliches text-xl text-jeet-red tracking-wider uppercase glow-jeet leading-tight">
-                SKELETON JEET REAPER
+              <div className="h-[1px] w-24 sm:w-32 bg-gradient-to-r from-transparent via-moon-gold to-transparent opacity-60" />
+              <span className="font-mono text-[10px] sm:text-xs text-moon-gold uppercase tracking-widest font-extrabold my-3 text-center drop-shadow-[0_0_6px_rgba(251,191,36,0.3)]">
+                MEME COIN PVP PREDICTION
               </span>
-              <p className="font-mono text-[10px] text-trench-gasmask mt-1 uppercase font-bold leading-normal">
-                Commander of the JEET Forces. Stake SOL on the DUMP.
-              </p>
+              <h2 className="font-staatliches text-5xl sm:text-6xl md:text-7xl text-white tracking-widest font-extrabold uppercase my-1 text-center drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]">
+                TRENCHES
+              </h2>
+              <div className="h-[1px] w-24 sm:w-32 bg-gradient-to-r from-transparent via-moon-gold to-transparent opacity-60 mt-3" />
+            </motion.div>
+
+            {/* Right Card: Jeet Skeleton */}
+            <motion.div
+              initial={{ x: 60, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ type: 'spring', damping: 20, stiffness: 85, delay: 0.15 }}
+              className="w-full max-w-[340px] sm:max-w-[360px] premium-glass-card rounded-[24px] overflow-hidden p-6 flex flex-col items-center premium-glow-jeet group shrink-0"
+            >
+              <h3 className="font-staatliches text-2xl sm:text-3xl tracking-wider text-jeet-red text-center mb-4 uppercase drop-shadow-[0_0_8px_rgba(255,42,77,0.4)] transition-colors group-hover:text-red-400">
+                JEET SKELETON
+              </h3>
+              
+              <div className="relative overflow-hidden w-full aspect-square rounded-2xl border border-jeet-red/20 mb-5 bg-black/60 shadow-inner group-hover:border-jeet-red/40 transition-colors">
+                <img
+                  src={PEPE_ASSETS.jeetSkeleton}
+                  alt="Jeet Skeleton"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+              </div>
+
+              <div className="w-full flex flex-col justify-between min-h-[90px]">
+                <p className="font-staatliches text-base sm:text-lg text-white tracking-wide uppercase leading-snug text-center px-1">
+                  COMMANDER OF THE JEET FORCES. STAKE SOL ON THE DUMP.
+                </p>
+                <div className="h-5" /> {/* Empty spacing to balance height perfectly */}
+              </div>
             </motion.div>
 
           </div>
 
+          {/* Bottom CTA Buttons */}
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.7, ease: 'easeOut', delay: 0.45 }}
+            className="mt-14 sm:mt-16 flex flex-col sm:flex-row gap-6 justify-center items-center w-full max-w-4xl"
+          >
+            <Link href="/rooms" className="w-full sm:w-auto">
+              <button className="w-full sm:w-80 py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-widest text-black premium-btn-moon rounded-full flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(34,197,94,0.3)]">
+                ENTER THE TRENCHES 💣
+              </button>
+            </Link>
+            {isPaused ? (
+              <button disabled className="w-full sm:w-80 py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-widest bg-gray-700/60 text-gray-400 rounded-full border border-gray-600/30 cursor-not-allowed flex items-center justify-center gap-3">
+                SYSTEM PAUSED ⛏️
+              </button>
+            ) : (
+              <Link href="/create-room" className="w-full sm:w-auto">
+                <button className="w-full sm:w-80 py-4 font-staatliches text-xl sm:text-2xl uppercase tracking-widest text-black premium-btn-neutral rounded-full flex items-center justify-center gap-3 shadow-[0_0_20px_rgba(251,191,36,0.3)]">
+                  CREATE A TRENCH ⛏️
+                </button>
+              </Link>
+            )}
+          </motion.div>
         </div>
       </section>
 
@@ -280,8 +255,8 @@ function HomeContent() {
 
       {/* 3. MASCOT PARADE / CHARACTER LINEUP */}
       <section className="mx-auto max-w-7xl w-full px-4 py-12">
-        <div className="retro-panel p-8 rounded-2xl relative shadow-2xl">
-          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-1 rounded-full font-staatliches text-sm tracking-widest shadow-lg uppercase">
+        <div className="premium-glass-card p-8 rounded-[24px] relative shadow-2xl border border-white/10">
+          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-black/60 backdrop-blur-md border border-white/15 text-white px-6 py-1.5 rounded-full font-mono text-[10px] tracking-widest shadow-lg uppercase font-bold">
             ⚔️ THE TRENCH COMMANDERS ⚔️
           </div>
           <h3 className="font-staatliches text-2xl text-white tracking-wider mb-4 mt-2 text-center uppercase">
@@ -295,9 +270,9 @@ function HomeContent() {
       <section className="mx-auto max-w-7xl w-full px-4 py-12 grid grid-cols-1 lg:grid-cols-2 gap-12">
 
         {/* Left Column: Blueprint Guide */}
-        <div className="retro-panel p-8 rounded-2xl shadow-2xl relative">
+        <div className="premium-glass-card p-8 rounded-[24px] shadow-2xl relative border border-white/10">
           {/* Clipboard binder clip */}
-          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-1 rounded-full font-staatliches text-sm tracking-widest shadow-lg uppercase">
+          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-black/60 backdrop-blur-md border border-white/15 text-white px-6 py-1.5 rounded-full font-mono text-[10px] tracking-widest shadow-lg uppercase font-bold">
             OPERATIONAL PROTOCOLS
           </div>
 
@@ -355,9 +330,9 @@ function HomeContent() {
         </div>
 
         {/* Right Column: Top Winners Leaderboard */}
-        <div className="retro-panel p-8 rounded-2xl shadow-2xl relative">
+        <div className="premium-glass-card p-8 rounded-[24px] shadow-2xl relative border border-white/10">
           {/* Clip */}
-          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-1 rounded-full font-staatliches text-sm tracking-widest shadow-lg uppercase">
+          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-black/60 backdrop-blur-md border border-white/15 text-white px-6 py-1.5 rounded-full font-mono text-[10px] tracking-widest shadow-lg uppercase font-bold">
             FRONT-LINE DECORATIONS
           </div>
 
@@ -417,8 +392,8 @@ function HomeContent() {
 
       {/* 5. WAR PROPAGANDA GALLERY */}
       <section className="mx-auto max-w-7xl w-full px-4 py-12">
-        <div className="retro-panel p-8 rounded-2xl relative shadow-2xl">
-          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-white/10 backdrop-blur-md border border-white/20 text-white px-6 py-1 rounded-full font-staatliches text-sm tracking-widest shadow-lg uppercase">
+        <div className="premium-glass-card p-8 rounded-[24px] relative shadow-2xl border border-white/10">
+          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-black/60 backdrop-blur-md border border-white/15 text-white px-6 py-1.5 rounded-full font-mono text-[10px] tracking-widest shadow-lg uppercase font-bold">
             🎖️ WAR PROPAGANDA 🎖️
           </div>
           <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 mt-2 text-center uppercase">

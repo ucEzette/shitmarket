@@ -69,3 +69,18 @@ solana-release*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local one-off script files and diffs
+/diff.txt
+/test.js
+/test2.js
+/test_pda_query.js
+/update_fees.js
+/update_rust.js
+/update_tests.js
+/fix_div.js
+/fix_optimistic_room.js
+/fix_page.js
+/fix_rooms.js
+/rewrite_profile.js
+

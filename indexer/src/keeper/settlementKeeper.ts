@@ -367,9 +367,11 @@ async function settleRoom(
       return txSig;
     } catch (err: any) {
       const msg = extractErrorMessage(err);
-      // Gracefully handle already-settled rooms (race condition with another keeper)
-      if (msg.includes('RoomAlreadySettled') || msg.includes('6002')) {
-        logger.info({ msg: 'Room already settled by another keeper', room: roomPubkeyStr });
+      // Gracefully handle already-settled or not-active or low-liquidity rooms (race condition, stale DB state, or failed minimum liquidity requirement)
+      if (msg.includes('RoomAlreadySettled') || msg.includes('6002') ||
+          msg.includes('RoomNotActive') || msg.includes('6000') || msg.includes('0x1770') ||
+          msg.includes('InsufficientLiquidity') || msg.includes('6022') || msg.includes('0x1786')) {
+        logger.info({ msg: 'Room already settled/inactive/under-liquidity on-chain — marking settled in DB', room: roomPubkeyStr, error: msg });
         // Mark as settled in DB to prevent future attempts
         await prisma.room.update({
           where: { roomPubkey: roomPubkeyStr },
@@ -405,8 +407,16 @@ export function startSettlementKeeper(
     process.exit(1);
   }
 
-  // Run every 3 seconds
-  const task = cron.schedule('*/3 * * * * *', async () => {
+  // Devnet rate limits are much stricter — slow down polling
+  const isDevnet =
+    config.solana.rpcUrl.includes('devnet') ||
+    config.solana.rpcUrl.includes('localhost') ||
+    config.solana.rpcUrl.includes('127.0.0.1');
+  const cronExpr = isDevnet ? '*/10 * * * * *' : '*/3 * * * * *';
+  const intervalLabel = isDevnet ? '10 seconds' : '3 seconds';
+
+  // Run every N seconds
+  const task = cron.schedule(cronExpr, async () => {
     let expiredRooms: {
       roomPubkey: string;
       tokenMint: string;
@@ -447,7 +457,7 @@ export function startSettlementKeeper(
     );
   });
 
-  logger.info('Settlement keeper started — running every 3 seconds');
+  logger.info(`Settlement keeper started — running every ${intervalLabel}`);
   return task;
 }
 

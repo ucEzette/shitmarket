@@ -27,7 +27,6 @@ import { startWsServer } from './websocket/wsServer';
 import { startEventListener, stopEventListener } from './listener/eventListener';
 import { runBackfiller } from './listener/backfiller';
 import { startSettlementKeeper } from './keeper/settlementKeeper';
-import { startLimitOrderKeeper } from './keeper/limitOrderKeeper';
 import { runTwapCron } from './keeper/twapCron';
 import { RpcCircuitBreaker } from './solana/rpcCircuitBreaker';
 import cron from 'node-cron';
@@ -260,15 +259,21 @@ async function main(): Promise<void> {
   // 8. Settlement keeper
   startSettlementKeeper(connection, program);
 
-  // 8.5. Limit Order Relayer keeper
-  startLimitOrderKeeper(connection, program);
 
-  // 9. TWAP Cron
+  // Detect devnet/local for more conservative RPC polling intervals
+  const isDevnet =
+    config.solana.rpcUrl.includes('devnet') ||
+    config.solana.rpcUrl.includes('localhost') ||
+    config.solana.rpcUrl.includes('127.0.0.1');
+
+  // 9. TWAP Cron (slower on devnet to avoid 429s)
+  const twapIntervalMs = isDevnet ? 120_000 : 60_000;
   setInterval(() => {
     runTwapCron().catch(err => logger.error({ msg: 'twapCron failed', error: err }));
-  }, 60000);
+  }, twapIntervalMs);
 
-  // 10. Self-Healing Backfiller failsafe (Startup run + 60-second interval)
+  // 10. Self-Healing Backfiller failsafe (startup run + periodic interval)
+  const backfillIntervalMs = isDevnet ? 180_000 : 60_000;
   runBackfiller(connection, program, eventParser).catch(err =>
     logger.error({ msg: 'Startup self-healing backfiller failed', error: err })
   );
@@ -276,7 +281,8 @@ async function main(): Promise<void> {
     runBackfiller(connection, program, eventParser).catch(err =>
       logger.error({ msg: 'Interval self-healing backfiller failed', error: err })
     );
-  }, 60000);
+  }, backfillIntervalMs);
+  logger.info({ msg: 'Scheduled intervals', twapIntervalMs, backfillIntervalMs, isDevnet });
 
   // 11. Scheduled DB space pruner and chat radar backup (every night at midnight)
   cron.schedule('0 0 * * *', () => {

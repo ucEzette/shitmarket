@@ -124,11 +124,7 @@ interface RoomCreatedEvent {
   expiryTimestamp: anchor.BN;
 }
 
-interface RoomActivatedEvent {
-  room: anchor.web3.PublicKey;
-  openingPrice: anchor.BN;
-  expiryTimestamp: anchor.BN;
-}
+
 
 interface BetPlacedEvent {
   room: anchor.web3.PublicKey;
@@ -227,8 +223,7 @@ async function handleRoomCreated(event: RoomCreatedEvent): Promise<void> {
     const meta = await fetchTokenMeta(tokenMint);
     const openingPrice = BigInt(event.openingPrice.toString());
 
-    const isPending = event.expiryTimestamp.toNumber() === 0;
-    const statusVal = isPending ? 'pending' : 'active';
+    const statusVal = 'active';
 
     await prisma.room.upsert({
       where: { roomPubkey },
@@ -352,41 +347,7 @@ async function handleBetPlaced(event: BetPlacedEvent, signature?: string): Promi
   }
 }
 
-async function handleRoomActivated(event: RoomActivatedEvent): Promise<void> {
-  const end = eventProcessingDuration.startTimer({ event_type: 'RoomActivated' });
-  try {
-    const roomPubkey = event.room.toBase58();
-    const openingPrice = BigInt(event.openingPrice.toString());
-    const expiry = new Date(event.expiryTimestamp.toNumber() * 1000);
 
-    await prisma.room.update({
-      where: { roomPubkey },
-      data: {
-        status: 'active',
-        openingPrice,
-        expiry,
-      },
-    });
-
-    const cached = await getCachedRoom(roomPubkey);
-    await cacheRoom(roomPubkey, {
-      ...cached,
-      status: 'active',
-      openingPrice: openingPrice.toString(),
-      expiry: expiry.toISOString(),
-    });
-
-    await publishRoomUpdate(roomPubkey, {
-      type: 'RoomActivated',
-      openingPrice: openingPrice.toString(),
-      expiry: expiry.toISOString(),
-    });
-
-    logger.info({ msg: 'RoomActivated processed', roomPubkey, openingPrice: openingPrice.toString(), expiry: expiry.toISOString() });
-  } finally {
-    end();
-  }
-}
 
 async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
   const end = eventProcessingDuration.startTimer({ event_type: 'RoomSettled' });
@@ -953,9 +914,7 @@ export async function processParsedEvents(events: any[], signature: string): Pro
       case 'RoomCreated':
         await handleRoomCreated(event.data as RoomCreatedEvent);
         break;
-      case 'RoomActivated':
-        await handleRoomActivated(event.data as RoomActivatedEvent);
-        break;
+
       case 'BetPlaced':
         await handleBetPlaced(event.data as BetPlacedEvent, signature);
         break;

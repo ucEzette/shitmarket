@@ -62,12 +62,15 @@ pub struct PlatformConfig {
     pub minimum_liquidity: u64,
     /// Time window (seconds) for TWAP sampling at settlement.
     pub twap_window_seconds: i64,
+    /// Cooling-off period (seconds) after room expiry before escrow can be swept.
+    /// Default: 14 days (1_209_600 seconds).
+    pub cooling_off_seconds: i64,
     pub bump: u8,
 }
 
 impl PlatformConfig {
-    // 8 discrim + 32 admin + 32 treasury + 32 keeper + 2 fee + 1 paused + 8 min_liquidity + 8 twap_window + 1 bump
-    pub const LEN: usize = 8 + 32 + 32 + 32 + 2 + 1 + 8 + 8 + 1;
+    // 8 discrim + 32 admin + 32 treasury + 32 keeper + 2 fee + 1 paused + 8 min_liquidity + 8 twap_window + 8 cooling_off + 1 bump
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 2 + 1 + 8 + 8 + 8 + 1;
 }
 
 /// One prediction room per token per game.
@@ -251,6 +254,13 @@ pub struct PlatformPaused {
     pub paused: bool,
 }
 
+#[event]
+pub struct EscrowSwept {
+    pub room: Pubkey,
+    pub receiver: Pubkey,
+    pub amount: u64,
+}
+
 // ReputationUpdated event scrapped
 
 // ─────────────────────────────────────────────
@@ -405,6 +415,38 @@ pub struct SettleRoom<'info> {
 }
 
 #[derive(Accounts)]
+pub struct SweepEscrow<'info> {
+    #[account(
+        constraint = room.status == RoomStatus::Settled @ ShitMarketError::RoomNotSettled
+    )]
+    pub room: Account<'info, Room>,
+
+    #[account(
+        seeds = [b"platform_config"],
+        bump = config.bump,
+        constraint = admin.key() == config.admin @ ShitMarketError::Unauthorized
+    )]
+    pub config: Account<'info, PlatformConfig>,
+
+    /// CHECK: Escrow PDA; validated by seeds.
+    #[account(
+        mut,
+        seeds = [b"escrow", room.key().as_ref()],
+        bump
+    )]
+    pub escrow: UncheckedAccount<'info>,
+
+    /// CHECK: Recipient of the swept funds
+    #[account(mut)]
+    pub receiver: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct ClaimWinnings<'info> {
     #[account(
         constraint = room.status == RoomStatus::Settled @ ShitMarketError::RoomNotSettled
@@ -533,6 +575,7 @@ pub mod shitmarket {
         config.paused = false;
         config.minimum_liquidity = MINIMUM_LIQUIDITY_SOL;
         config.twap_window_seconds = 300; // 5 minutes default TWAP window
+        config.cooling_off_seconds = 14 * 24 * 3600; // 14 days default cooling-off
         config.bump = ctx.bumps.config;
 
         msg!(
@@ -871,6 +914,54 @@ pub mod shitmarket {
         Ok(())
     }
 
+    // ── sweep_escrow ────────────────────────────────────────────────────
+
+    /// Admin-only: sweeps all remaining/unclaimed funds from a settled room's escrow PDA.
+    /// Enforces a cooling-off period after room expiry before sweep is permitted.
+    pub fn sweep_escrow(ctx: Context<SweepEscrow>) -> Result<()> {
+        let room = &ctx.accounts.room;
+        let config = &ctx.accounts.config;
+        require!(room.status == RoomStatus::Settled, ShitMarketError::RoomNotSettled);
+
+        // Enforce cooling-off: now >= expiry + cooling_off_seconds
+        let now = Clock::get()?.unix_timestamp;
+        let sweep_eligible_at = room.expiry_timestamp
+            .checked_add(config.cooling_off_seconds)
+            .ok_or(ShitMarketError::Overflow)?;
+        require!(now >= sweep_eligible_at, ShitMarketError::CoolingOffActive);
+
+        let escrow_info = ctx.accounts.escrow.to_account_info();
+        let receiver_info = ctx.accounts.receiver.to_account_info();
+
+        let sweep_amount = escrow_info.lamports();
+
+        if sweep_amount > 0 {
+            **escrow_info.lamports.borrow_mut() = escrow_info
+                .lamports()
+                .checked_sub(sweep_amount)
+                .ok_or(ShitMarketError::Underflow)?;
+            **receiver_info.lamports.borrow_mut() = receiver_info
+                .lamports()
+                .checked_add(sweep_amount)
+                .ok_or(ShitMarketError::Overflow)?;
+
+            emit!(EscrowSwept {
+                room: room.key(),
+                receiver: receiver_info.key(),
+                amount: sweep_amount,
+            });
+
+            msg!(
+                "Swept {} lamports from room {} escrow to receiver {}",
+                sweep_amount,
+                room.key(),
+                receiver_info.key()
+            );
+        }
+
+        Ok(())
+    }
+
     // ── claim_winnings ──────────────────────────────────────────────────
 
     /// Winners claim their proportional share of the pot after settlement.
@@ -933,7 +1024,7 @@ pub mod shitmarket {
     // ── update_config ───────────────────────────────────────────────────
 
     /// Admin-only: update platform fee, treasury, keeper, minimum liquidity,
-    /// and TWAP window.
+    /// TWAP window, and cooling-off period.
     pub fn update_config(
         ctx: Context<UpdateConfig>,
         new_fee_bps: Option<u16>,
@@ -941,6 +1032,7 @@ pub mod shitmarket {
         new_keeper: Option<Pubkey>,
         new_minimum_liquidity: Option<u64>,
         new_twap_window: Option<i64>,
+        new_cooling_off: Option<i64>,
     ) -> Result<()> {
         let config = &mut ctx.accounts.config;
 
@@ -966,13 +1058,19 @@ pub mod shitmarket {
             config.twap_window_seconds = twap_window;
         }
 
+        if let Some(cooling_off) = new_cooling_off {
+            require!(cooling_off >= 0, ShitMarketError::InvalidDuration);
+            config.cooling_off_seconds = cooling_off;
+        }
+
         msg!(
-            "Config updated: fee_bps={} treasury={} keeper={} min_liquidity={} twap_window={}",
+            "Config updated: fee_bps={} treasury={} keeper={} min_liquidity={} twap_window={} cooling_off={}",
             config.platform_fee_bps,
             config.treasury,
             config.keeper,
             config.minimum_liquidity,
-            config.twap_window_seconds
+            config.twap_window_seconds,
+            config.cooling_off_seconds
         );
         Ok(())
     }

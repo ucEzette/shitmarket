@@ -81,7 +81,7 @@ function loadKeeperKeypair(): Keypair {
       const arr: number[] = JSON.parse(raw);
       return Keypair.fromSecretKey(Uint8Array.from(arr));
     }
-    return Keypair.fromSecretKey(bs58.decode(raw));
+    return Keypair.fromSecretKey(new Uint8Array(bs58.decode(raw)));
   } catch (err) {
     throw new Error(`Invalid KEEPER_PRIVATE_KEY format: ${err}`);
   }
@@ -156,7 +156,18 @@ async function settleRoom(
     // Fetch config to get treasury pubkey
     let treasury: PublicKey;
     try {
-      const configAccount = await (program.account as any).platformConfig.fetch(configPda);
+      const accountInfo = await connection.getAccountInfo(configPda);
+      if (!accountInfo) {
+        throw new Error('PlatformConfig account not found');
+      }
+      let data = accountInfo.data;
+      const expectedLen = 162;
+      if (data.length < expectedLen) {
+        const padded = Buffer.alloc(expectedLen);
+        data.copy(padded);
+        data = padded;
+      }
+      const configAccount = program.coder.accounts.decode('platformConfig', data);
       treasury = configAccount.treasury;
     } catch (err: any) {
       logger.error({ msg: 'Failed to fetch platform config', err: err?.message });
@@ -296,6 +307,8 @@ async function settleRoom(
         .settleRoom(finalPriceParam)
         .accounts(accounts)
         .transaction();
+
+      tx.feePayer = keeper.publicKey;
 
       // Add Compute Budget limit & Priority Fee instructions to guarantee inclusion in congested blocks
       const modifyComputeBudget = anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({ 

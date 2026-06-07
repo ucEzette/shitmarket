@@ -15,6 +15,21 @@ function loadAdminKeypair(): Keypair {
   return Keypair.fromSecretKey(bs58.decode(raw));
 }
 
+async function fetchConfig(connection: Connection, program: anchor.Program, configPda: PublicKey) {
+  const accountInfo = await connection.getAccountInfo(configPda);
+  if (!accountInfo) {
+    throw new Error('PlatformConfig account not found');
+  }
+  let data = accountInfo.data;
+  const expectedLen = 162;
+  if (data.length < expectedLen) {
+    const padded = Buffer.alloc(expectedLen);
+    data.copy(padded);
+    data = padded;
+  }
+  return program.coder.accounts.decode('platformConfig', data);
+}
+
 async function main() {
   const connection = new Connection(config.solana.rpcUrl, 'confirmed');
   const admin = loadAdminKeypair();
@@ -36,7 +51,7 @@ async function main() {
   console.log(`Config PDA: ${configPda.toBase58()}`);
 
   try {
-    const configState = await (program.account as any).platformConfig.fetch(configPda);
+    const configState = await fetchConfig(connection, program, configPda);
     console.log(`Current paused state: ${configState.paused}`);
 
     const tx = await program.methods
@@ -50,7 +65,7 @@ async function main() {
 
     console.log(`Successfully toggled platform pause state! TX: ${tx}`);
     
-    const newConfigState = await (program.account as any).platformConfig.fetch(configPda);
+    const newConfigState = await fetchConfig(connection, program, configPda);
     console.log(`New paused state: ${newConfigState.paused}`);
   } catch (err: any) {
     console.error(`Failed to pause platform:`, err.message);

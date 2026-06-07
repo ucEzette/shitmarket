@@ -13,7 +13,7 @@ function loadKeeperKeypair(): Keypair {
   if (raw.startsWith('[')) {
     return Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw)));
   }
-  return Keypair.fromSecretKey(bs58.decode(raw));
+  return Keypair.fromSecretKey(new Uint8Array(bs58.decode(raw)));
 }
 
 export async function runTwapCron() {

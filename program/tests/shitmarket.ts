@@ -74,7 +74,7 @@ function deriveEscrow(room: PublicKey, programId: PublicKey): [PublicKey, number
 const MOCK_TOKEN_MINT = Keypair.generate().publicKey;
 const MOCK_TOKEN_NAME = "PEPE5";
 const MOCK_PRICE_FEED = Keypair.generate();
-const MOCK_OPENING_PRICE = new BN(1_500_000_000); // $150.00 mock price
+const MOCK_OPENING_PRICE = new BN("150000000000000"); // $150.00 mock price scaled by 1e12
 
 async function createFakePythFeedAccount(provider: anchor.AnchorProvider, feedKeypair: Keypair) {
   const lamports = await provider.connection.getMinimumBalanceForRentExemption(2048);
@@ -169,7 +169,7 @@ describe("shitmarket", () => {
   it("rejects fee > 10%", async () => {
     try {
       await program.methods
-        .updateConfig(1001, null, null, null, null)
+        .updateConfig(1001, null, null, null, null, null)
         .accounts({
           config: configPda,
           admin: admin.publicKey,
@@ -524,11 +524,11 @@ describe("shitmarket", () => {
     // and set BPF_LOADER_UPGRADEABLE=1
 
     it("settles room after expiry — Moon wins", async function () {
-      const finalPrice = new BN(2_000_000_000); // $200.00 > $150.00 opening → Moon wins
+      const finalPrice = new BN("200000000000000"); // $200.00 > $150.00 opening → Moon wins
       const treasuryBefore = await provider.connection.getBalance(treasury.publicKey);
 
       await program.methods
-        .settleRoom(new BN(2_000_000_000))
+        .settleRoom(new BN("200000000000000"))
         .accounts({
           room: fastRoomPda,
           escrow: fastEscrowPda,
@@ -628,7 +628,7 @@ describe("shitmarket", () => {
     it("rejects double settlement", async function () {
       try {
         await program.methods
-          .settleRoom(new BN(2_000_000_000))
+          .settleRoom(new BN("200000000000000"))
           .accounts({
             room: fastRoomPda,
             escrow: fastEscrowPda,
@@ -648,11 +648,198 @@ describe("shitmarket", () => {
     });
   });
 
+  // ── 4c. Sweep Escrow Funds ───────────────────────────────────────────
+
+  describe("sweep escrow functionality", () => {
+    const sweepMint = Keypair.generate().publicKey;
+    const sweepCreator = Keypair.generate();
+    let sweepRoomPda: PublicKey;
+    let sweepEscrowPda: PublicKey;
+    let sweepBetPda: PublicKey;
+    const sweepBettor = Keypair.generate();
+    const sweepReceiver = Keypair.generate();
+
+    before(async () => {
+      await Promise.all([
+        airdrop(provider, sweepCreator.publicKey, 3),
+        airdrop(provider, sweepBettor.publicKey, 3),
+      ]);
+
+      [sweepRoomPda] = deriveRoom(sweepMint, sweepCreator.publicKey, programId);
+      [sweepEscrowPda] = deriveEscrow(sweepRoomPda, programId);
+      [sweepBetPda] = deriveBet(sweepRoomPda, sweepBettor.publicKey, "moon", programId);
+    });
+
+    it("fails to sweep a room that is not settled yet", async () => {
+      // Create active room
+      await program.methods
+        .createRoom(sweepMint, "SWEEPTKN", 0, null, null, 0)
+        .accounts({
+          room: sweepRoomPda,
+          escrow: sweepEscrowPda,
+          creator: sweepCreator.publicKey,
+          priceFeed: MOCK_PRICE_FEED.publicKey,
+          switchboardFeed: PublicKey.default,
+          config: configPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([sweepCreator])
+        .rpc();
+
+      // Place a bet to fund escrow
+      await program.methods
+        .placeBet({ moon: {} }, new BN(LAMPORTS_PER_SOL))
+        .accounts({
+          room: sweepRoomPda,
+          escrow: sweepEscrowPda,
+          bet: sweepBetPda,
+          user: sweepBettor.publicKey,
+          config: configPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([sweepBettor])
+        .rpc();
+
+      // Attempt sweep (active status) -> should fail
+      try {
+        await program.methods
+          .sweepEscrow()
+          .accounts({
+            room: sweepRoomPda,
+            config: configPda,
+            escrow: sweepEscrowPda,
+            receiver: sweepReceiver.publicKey,
+            admin: admin.publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([admin])
+          .rpc();
+        assert.fail("Should have failed to sweep active room");
+      } catch (err: any) {
+        expect(err.message).to.include("RoomNotSettled");
+      }
+    });
+
+    it("fails to sweep with non-admin signer", async () => {
+      // Settle the room first
+      await program.methods
+        .settleRoom(new BN("200000000000000"))
+        .accounts({
+          room: sweepRoomPda,
+          escrow: sweepEscrowPda,
+          treasury: treasury.publicKey,
+          priceFeed: MOCK_PRICE_FEED.publicKey,
+          switchboardFeed: PublicKey.default,
+          config: configPda,
+          keeper: keeper.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([keeper])
+        .rpc();
+
+      // Attempt sweep using non-admin key -> should fail
+      const nonAdmin = Keypair.generate();
+      await airdrop(provider, nonAdmin.publicKey, 1);
+
+      try {
+        await program.methods
+          .sweepEscrow()
+          .accounts({
+            room: sweepRoomPda,
+            config: configPda,
+            escrow: sweepEscrowPda,
+            receiver: sweepReceiver.publicKey,
+            admin: nonAdmin.publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([nonAdmin])
+          .rpc();
+        assert.fail("Should have failed to sweep with non-admin key");
+      } catch (err: any) {
+        expect(err.message).to.include("Unauthorized");
+      }
+    });
+
+    it("fails to sweep during cooling-off period (14 days default)", async () => {
+      // The room is settled but expiry was very recent, so cooling-off is active
+      try {
+        await program.methods
+          .sweepEscrow()
+          .accounts({
+            room: sweepRoomPda,
+            config: configPda,
+            escrow: sweepEscrowPda,
+            receiver: sweepReceiver.publicKey,
+            admin: admin.publicKey,
+            systemProgram: SystemProgram.programId,
+          })
+          .signers([admin])
+          .rpc();
+        assert.fail("Should have failed due to cooling-off period");
+      } catch (err: any) {
+        expect(err.message).to.include("CoolingOffActive");
+      }
+    });
+
+    it("successfully sweeps after setting cooling-off to 0", async () => {
+      // Admin overrides cooling-off to 0 seconds for immediate sweep
+      await program.methods
+        .updateConfig(null, null, null, null, null, new BN(0))
+        .accounts({
+          config: configPda,
+          admin: admin.publicKey,
+          newTreasury: null,
+        })
+        .signers([admin])
+        .rpc();
+
+      const escrowBefore = await provider.connection.getBalance(sweepEscrowPda);
+      assert.isAbove(escrowBefore, 0, "Escrow should have funds");
+
+      const receiverBefore = await provider.connection.getBalance(sweepReceiver.publicKey);
+
+      // Perform sweep by admin — cooling-off is now 0
+      await program.methods
+        .sweepEscrow()
+        .accounts({
+          room: sweepRoomPda,
+          config: configPda,
+          escrow: sweepEscrowPda,
+          receiver: sweepReceiver.publicKey,
+          admin: admin.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([admin])
+        .rpc();
+
+      const escrowAfter = await provider.connection.getBalance(sweepEscrowPda);
+      const receiverAfter = await provider.connection.getBalance(sweepReceiver.publicKey);
+
+      assert.equal(escrowAfter, 0, "Escrow balance should be completely swept to 0");
+      assert.equal(
+        receiverAfter - receiverBefore,
+        escrowBefore,
+        "Receiver should receive the exact swept amount"
+      );
+
+      // Restore cooling-off to 14 days for subsequent tests
+      await program.methods
+        .updateConfig(null, null, null, null, null, new BN(14 * 24 * 3600))
+        .accounts({
+          config: configPda,
+          admin: admin.publicKey,
+          newTreasury: null,
+        })
+        .signers([admin])
+        .rpc();
+    });
+  });
+
   // ── 5. Update Config ─────────────────────────────────────────────────
 
   it("admin updates fee to 1%", async () => {
     await program.methods
-      .updateConfig(100, null, null, null, null) // 100 bps = 1%
+      .updateConfig(100, null, null, null, null, null) // 100 bps = 1%
       .accounts({
         config: configPda,
         admin: admin.publicKey,
@@ -666,7 +853,7 @@ describe("shitmarket", () => {
 
     // Revert fee back to 1.25% for subsequent tests
     await program.methods
-      .updateConfig(125, null, null, null, null)
+      .updateConfig(125, null, null, null, null, null)
       .accounts({
         config: configPda,
         admin: admin.publicKey,
@@ -679,7 +866,7 @@ describe("shitmarket", () => {
   it("non-admin cannot update config", async () => {
     try {
       await program.methods
-        .updateConfig(50, null, null, null, null)
+        .updateConfig(50, null, null, null, null, null)
         .accounts({
           config: configPda,
           admin: creator.publicKey,
@@ -698,7 +885,7 @@ describe("shitmarket", () => {
   it("admin updates keeper, min liquidity, and twap window (Phase 3)", async () => {
     const newKeeper = Keypair.generate().publicKey;
     await program.methods
-      .updateConfig(null, null, newKeeper, new BN(200_000_000), new BN(600))
+      .updateConfig(null, null, newKeeper, new BN(200_000_000), new BN(600), null)
       .accounts({
         config: configPda,
         admin: admin.publicKey,
@@ -712,7 +899,7 @@ describe("shitmarket", () => {
 
     // Revert keeper back to the original keeper for subsequent tests
     await program.methods
-      .updateConfig(null, null, keeper.publicKey, null, null)
+      .updateConfig(null, null, keeper.publicKey, null, null, null)
       .accounts({
         config: configPda,
         admin: admin.publicKey,
@@ -777,7 +964,7 @@ describe("shitmarket", () => {
 
       // Moon wins (price went up)
       await program.methods
-        .settleRoom(new BN(2_000_000_000))
+        .settleRoom(new BN("200000000000000"))
         .accounts({
           room: edgeRoomPda,
           escrow: edgeEscrowPda,

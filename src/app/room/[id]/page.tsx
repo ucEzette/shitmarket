@@ -1033,10 +1033,19 @@ export default function RoomDetailPage() {
               <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
                 <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME</span>
                 <span className={`font-staatliches text-3xl block mt-1 tracking-wider ${
-                  room.winner === 'moon' ? 'text-neon-moon glow-moon' : 'text-jeet-red glow-jeet'
+                  room.winner === 'moon' ? 'text-neon-moon glow-moon' : room.winner === 'jeet' ? 'text-jeet-red glow-jeet' : 'text-yellow-500 glow-gold'
                 }`}>
-                  {room.winner === 'moon' ? 'MOON ARMY WON' : 'JEET SQUADRON WON'}
+                  {room.winner === 'moon' ? 'MOON ARMY WON' : room.winner === 'jeet' ? 'JEET SQUADRON WON' : 'BATTLE DRAW / VOIDED'}
                 </span>
+                {finalPriceSafe !== undefined && openingPriceSafe !== undefined && (
+                  <p className="font-mono text-[10px] text-gray-300 mt-2 normal-case leading-relaxed">
+                    Exit price of <span className="text-white font-bold">${formatPrice(finalPriceSafe)}</span> was{' '}
+                    <span className={finalPriceSafe > openingPriceSafe ? 'text-neon-moon font-bold' : finalPriceSafe < openingPriceSafe ? 'text-jeet-red font-bold' : 'text-yellow-500 font-bold'}>
+                      {finalPriceSafe > openingPriceSafe ? 'HIGHER' : finalPriceSafe < openingPriceSafe ? 'LOWER' : 'EQUAL'}
+                    </span>{' '}
+                    than the entry price of <span className="text-white font-bold">${formatPrice(openingPriceSafe)}</span>.
+                  </p>
+                )}
               </div>
 
               {/* Tactical Skirmish Receipt / Evidence Card */}
@@ -1164,12 +1173,23 @@ export default function RoomDetailPage() {
             </div>
           ) : room.expiry <= Date.now() ? (
             // Expired but not settled yet (Pending telemetry resolving)
-            <div className="space-y-4 text-center py-4 animate-pulse">
+            <div className="space-y-4 text-center py-4">
               <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
                 <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME PENDING</span>
-                <span className="font-staatliches text-2xl block mt-1 tracking-wider text-moon-gold glow-moon uppercase">
+                <span className="font-staatliches text-2xl block mt-1 tracking-wider text-moon-gold glow-moon uppercase animate-pulse">
                   TELEMETRY RESOLVING
                 </span>
+                {livePrice !== null && openingPriceSafe !== undefined && (
+                  <div className="mt-3 font-mono text-[10px] text-gray-300 border-t border-trench-sandbag/35 pt-2 leading-relaxed">
+                    Last Price: <span className="text-white font-bold">${formatPrice(livePrice)}</span> vs Entry: <span className="text-white font-bold">${formatPrice(openingPriceSafe)}</span>
+                    <div className="mt-1 text-[9px]">
+                      Potential Winner:{' '}
+                      <span className={livePrice > openingPriceSafe ? 'text-neon-moon font-bold glow-moon' : livePrice < openingPriceSafe ? 'text-jeet-red font-bold glow-jeet' : 'text-yellow-500 font-bold'}>
+                        {livePrice > openingPriceSafe ? 'MOON ARMY 🚀' : livePrice < openingPriceSafe ? 'JEET SQUADRON 💀' : 'DRAW / VOIDED 🤝'}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {userBetsInRoom.length > 0 ? (

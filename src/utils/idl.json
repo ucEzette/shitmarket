@@ -259,6 +259,44 @@
       "args": []
     },
     {
+      "name": "sweepEscrow",
+      "discriminator": [
+        199,
+        250,
+        50,
+        208,
+        176,
+        209,
+        42,
+        120
+      ],
+      "accounts": [
+        {
+          "name": "room"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "receiver",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "updateConfig",
       "discriminator": [
         29,
@@ -311,6 +349,12 @@
         },
         {
           "name": "newTwapWindow",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "newCoolingOff",
           "type": {
             "option": "i64"
           }
@@ -502,6 +546,19 @@
         149,
         129
       ]
+    },
+    {
+      "name": "EscrowSwept",
+      "discriminator": [
+        183,
+        123,
+        76,
+        75,
+        208,
+        119,
+        180,
+        208
+      ]
     }
   ],
   "errors": [
@@ -634,6 +691,10 @@
           },
           {
             "name": "twapWindowSeconds",
+            "type": "i64"
+          },
+          {
+            "name": "coolingOffSeconds",
             "type": "i64"
           },
           {
@@ -947,6 +1008,26 @@
           },
           {
             "name": "totalWins",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowSwept",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
             "type": "u64"
           }
         ]

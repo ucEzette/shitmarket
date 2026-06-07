@@ -194,7 +194,7 @@ describe('Platform Initialization', () => {
 
     // Update keeper on-chain since initialize default is admin
     await program.methods
-      .updateConfig(null, null, keeper.publicKey, null, null)
+      .updateConfig(null, null, keeper.publicKey, null, null, null)
       .accounts({
         config: configPda,
         admin: admin.publicKey,

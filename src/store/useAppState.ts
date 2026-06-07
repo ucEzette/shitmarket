@@ -469,12 +469,18 @@ export const useAppState = create<AppState>((set, get) => ({
       try {
         const program = getAnchorProgram(null as any); // using read-only provider
         const configPda = getPlatformConfigPda();
-        const configAccount = await withTimeout(
-          (program.account as any).platformConfig.fetch(configPda),
-          3000,
-          'PlatformConfig fetch timed out'
-        );
-        set({ isPaused: (configAccount as any).paused });
+        const accountInfo = await connection.getAccountInfo(configPda);
+        if (accountInfo) {
+          let data = accountInfo.data;
+          const expectedLen = 162; // 8 discrim + 32 admin + 32 treasury + 32 keeper + 2 fee + 1 paused + 8 min_liquidity + 8 twap_window + 8 cooling_off + 1 bump
+          if (data.length < expectedLen) {
+            const padded = Buffer.alloc(expectedLen);
+            data.copy(padded);
+            data = padded;
+          }
+          const configAccount = program.coder.accounts.decode('platformConfig', data);
+          set({ isPaused: configAccount.paused });
+        }
       } catch (e) {
         console.warn('Could not fetch PlatformConfig for paused state', e);
       }

@@ -77,4 +77,6 @@ pub enum ShitMarketError {
     TriggerConditionNotMet,
     #[msg("Max slippage limit exceeded")]
     SlippageExceeded,
+    #[msg("Cooling off period is still active — cannot sweep yet")]
+    CoolingOffActive,
 }

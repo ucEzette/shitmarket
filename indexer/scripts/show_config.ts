@@ -27,7 +27,18 @@ async function main() {
 
     console.log("Config PDA:", configPda.toBase58());
     try {
-        const configAccount: any = await (program.account as any).platformConfig.fetch(configPda);
+        const accountInfo = await connection.getAccountInfo(configPda);
+        if (!accountInfo) {
+            throw new Error("PlatformConfig account not found");
+        }
+        let data = accountInfo.data;
+        const expectedLen = 162;
+        if (data.length < expectedLen) {
+            const padded = Buffer.alloc(expectedLen);
+            data.copy(padded);
+            data = padded;
+        }
+        const configAccount: any = program.coder.accounts.decode("platformConfig", data);
         console.log("On-chain Platform Config:");
         console.log("  admin:", configAccount.admin.toBase58());
         console.log("  treasury:", configAccount.treasury.toBase58());

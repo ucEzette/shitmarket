@@ -81,6 +81,7 @@ async function main() {
             keeperPubkey, // new_keeper
             null, // new_min_liquidity
             null, // new_twap_window
+            null, // new_cooling_off
         ).accounts({
             config: configPda,
             admin: deployer.publicKey,
@@ -96,6 +97,7 @@ async function main() {
                 keeperPubkey, // new_keeper
                 null, // new_min_liquidity
                 null, // new_twap_window
+                null, // new_cooling_off
             ).accounts({
                 config: configPda,
                 admin: deployer.publicKey,

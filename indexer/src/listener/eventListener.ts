@@ -39,7 +39,7 @@ function getKeeperKeypair(): Keypair {
       const arr: number[] = JSON.parse(raw);
       keeperKeypair = Keypair.fromSecretKey(Uint8Array.from(arr));
     } else {
-      keeperKeypair = Keypair.fromSecretKey(bs58.decode(raw));
+      keeperKeypair = Keypair.fromSecretKey(new Uint8Array(bs58.decode(raw)));
     }
     return keeperKeypair;
   } catch (err) {

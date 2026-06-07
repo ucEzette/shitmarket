@@ -987,38 +987,7 @@ export default function RoomDetailPage() {
             </div>
           </div>
 
-          {/* Split Pool boxes at bottom of Center column */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* Moon Pool Box */}
-            <div className="bg-trench-mud border-2 border-neon-moon/40 p-4 rounded-xl text-center shadow-glow-moon flex flex-col justify-between">
-              <div>
-                <span className="font-mono text-[9px] text-neon-moon block font-bold uppercase tracking-wider">🚀 MOON POOL</span>
-                <span className="font-staatliches text-2xl sm:text-3xl text-neon-moon block mt-1 leading-none">
-                  {moonPoolSafe.toFixed(1)} SOL
-                </span>
-              </div>
-              <div className="mt-3 w-full bg-trench-black rounded-full h-2.5 border border-trench-sandbag overflow-hidden">
-                <div style={{ width: `${moonPercentageSafe}%` }} className="bg-neon-moon h-full shadow-[0_0_10px_#16a34a]" />
-              </div>
-              <span className="font-mono text-[8px] text-trench-gasmask block font-bold uppercase mt-2">Bullish on upswing</span>
-            </div>
 
-            {/* Jeet Pool Box */}
-            <div className="bg-trench-mud border-2 border-jeet-red/40 p-4 rounded-xl text-center shadow-glow-jeet flex flex-col justify-between">
-              <div>
-                <span className="font-mono text-[9px] text-jeet-red block font-bold uppercase tracking-wider">💀 JEET POOL</span>
-                <span className="font-staatliches text-2xl sm:text-3xl text-jeet-red block mt-1 leading-none">
-                  {jeetPoolSafe.toFixed(1)} SOL
-                </span>
-              </div>
-              <div className="mt-3 w-full bg-trench-black rounded-full h-2.5 border border-trench-sandbag overflow-hidden">
-                <div style={{ width: `${jeetPercentageSafe}%` }} className="bg-jeet-red h-full shadow-[0_0_10px_#ff535a]" />
-              </div>
-              <span className="font-mono text-[8px] text-trench-gasmask block font-bold uppercase mt-2">Bearish on rug</span>
-            </div>
-
-          </div>
 
         </section>
 

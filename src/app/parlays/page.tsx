@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useAppState, Room } from '@/store/useAppState';
+import { useAppState, Room, formatCashtag } from '@/store/useAppState';
 import { PixelCrackedHelmet, PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
@@ -134,7 +134,7 @@ export default function ParlaysPage() {
       multiplier: calculateMultiplier(),
       stake: stakeAmount,
       payout: calculatePayout(),
-      legsSummary: legs.map((l) => `${l.tokenSymbol} (${l.side.toUpperCase()}) x${l.odds}`).join(' • '),
+      legsSummary: legs.map((l) => `${formatCashtag(l.tokenSymbol)} (${l.side.toUpperCase()}) x${l.odds}`).join(' • '),
     });
     setShowSuccessModal(true);
   };
@@ -201,7 +201,7 @@ export default function ParlaysPage() {
                   .filter((ar) => !legs.some((l) => l.roomId === ar.id))
                   .map((ar) => (
                     <option key={ar.id} value={ar.id}>
-                      ${ar.token.symbol} (Pool: {(ar.moonPool + ar.jeetPool).toFixed(1)} SOL)
+                      {formatCashtag(ar.token.symbol)} (Pool: {(ar.moonPool + ar.jeetPool).toFixed(1)} SOL)
                     </option>
                   ))}
               </select>
@@ -261,7 +261,7 @@ export default function ParlaysPage() {
                       <PepePortrait src={leg.side === 'moon' ? PEPE_ASSETS.chadBull : PEPE_ASSETS.jeetSkeleton} size={24} className="rounded" />
                     </div>
                     <div>
-                      <span className="text-white block font-bold">${leg.tokenSymbol}</span>
+                      <span className="text-white block font-bold">{formatCashtag(leg.tokenSymbol)}</span>
                       <span className="text-[9px] text-trench-gasmask block font-bold">SECTOR: {leg.roomId.substring(0, 8).toUpperCase()}</span>
                     </div>
                   </div>

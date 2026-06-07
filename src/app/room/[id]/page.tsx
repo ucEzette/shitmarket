@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppState, Room, ChatMessage } from '@/store/useAppState';
+import { useAppState, Room, ChatMessage, formatCashtag } from '@/store/useAppState';
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
 import { HeaderPanel } from '@/components/ui/HeaderPanel';
@@ -105,16 +105,35 @@ export function formatPrice(price: number | string | undefined | null): string {
   if (isNaN(num)) return 'N/A';
   if (num === 0) return '0.00';
   
-  let str = num.toFixed(20);
-  if (/\.0+$/.test(str)) {
-    return str.replace(/\.0+$/, '.00');
+  if (num >= 1.0) {
+    let str = num.toFixed(4).replace(/0+$/, '');
+    if (str.endsWith('.')) {
+      str = str.slice(0, -1);
+    }
+    const parts = str.split('.');
+    if (!parts[1]) {
+      return parts[0] + '.00';
+    }
+    if (parts[1].length < 2) {
+      return parts[0] + '.' + parts[1].padEnd(2, '0');
+    }
+    return str;
   }
-  str = str.replace(/(\.\d*?[1-9])0+$/, '$1');
-  const parts = str.split('.');
-  if (parts[1] && parts[1].length < 2) {
-    str = parts[0] + '.' + parts[1].padEnd(2, '0');
+  
+  // For values < 1.0, count leading zeros to scale precision beautifully
+  const str20 = num.toFixed(20);
+  const match = str20.match(/^0\.(0*)/);
+  if (!match) return num.toString();
+  
+  const leadingZerosCount = match[1].length;
+  // Show leading zeros + 4 significant digits (capped at max 14 decimals for extreme safety)
+  const precision = Math.min(leadingZerosCount + 4, 14);
+  
+  let formatted = num.toFixed(precision).replace(/0+$/, '');
+  if (formatted.endsWith('.')) {
+    formatted = formatted.slice(0, -1);
   }
-  return str;
+  return formatted;
 }
 
 export default function RoomDetailPage() {
@@ -125,8 +144,7 @@ export default function RoomDetailPage() {
   const { 
     rooms, user, chatMessages, placeBet, claimWinnings, 
     addMessage, connectWallet, isTransactionLoading, 
-    fetchSingleRoom, fetchRoomChats, sendRoomChat,
-    placeLimitOrder, cancelLimitOrder, checkLimitOrders, limitOrders
+    fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile
   } = useAppState();
 
   const room = rooms.find((r) => r.id === roomId);
@@ -154,16 +172,7 @@ export default function RoomDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
-  const [limitPrice, setLimitPrice] = useState<string>('');
 
-  // Initialize limit price dynamically to live/opening price
-  useEffect(() => {
-    if (limitPrice === '' && (livePrice || openingPriceSafe)) {
-      const price = livePrice || openingPriceSafe || 0;
-      setLimitPrice(price.toString());
-    }
-  }, [livePrice, openingPriceSafe, limitPrice]);
 
   const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
     if (!isMuted) {
@@ -203,7 +212,8 @@ export default function RoomDetailPage() {
     setIsLoading(true);
     Promise.all([
       fetchSingleRoom(roomId),
-      fetchRoomChats(roomId)
+      fetchRoomChats(roomId),
+      refreshProfile()
     ]).then(() => {
       if (active) setIsLoading(false);
     }).catch(() => {
@@ -213,13 +223,14 @@ export default function RoomDetailPage() {
     const interval = setInterval(() => {
       fetchSingleRoom(roomId);
       fetchRoomChats(roomId);
+      refreshProfile();
     }, 5000);
 
     return () => {
       active = false;
       clearInterval(interval);
     };
-  }, [roomId, fetchSingleRoom]);
+  }, [roomId, fetchSingleRoom, refreshProfile]);
 
   // Poll DexScreener for live token price updating every 5 seconds
   useEffect(() => {
@@ -244,7 +255,6 @@ export default function RoomDetailPage() {
             const price = parseFloat(bestPair.priceUsd);
             if (isFinite(price) && price > 0) {
               setLivePrice(price);
-              checkLimitOrders(room.id, price);
             }
           }
         }
@@ -256,7 +266,7 @@ export default function RoomDetailPage() {
     fetchLivePrice();
     const priceInterval = setInterval(fetchLivePrice, 5000);
     return () => clearInterval(priceInterval);
-  }, [room?.token?.address, room?.token?.pairAddress, room?.token?.chainId, room?.status, checkLimitOrders, room?.id]);
+  }, [room?.token?.address, room?.token?.pairAddress, room?.token?.chainId, room?.status, room?.id]);
 
   // Auto scroll chat list to bottom
   useEffect(() => {
@@ -334,40 +344,7 @@ export default function RoomDetailPage() {
     );
   }
 
-  // Enforce access restriction for pending limit order rooms: accessible to the creator trader alone
-  if (room.status === 'pending') {
-    const isCreator = user && user.wallet && room.creator && user.wallet.toLowerCase() === room.creator.toLowerCase();
-    if (!isCreator) {
-      return (
-        <div className="flex-1 flex flex-col items-center justify-center py-24 text-center select-none bg-trench-black max-w-lg mx-auto px-4">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 bg-jeet-red/10 rounded-full blur-xl animate-pulse" />
-            <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={120} glowColor="jeet" animated className="rounded-xl relative z-10" />
-          </div>
-          <h3 className="font-staatliches text-3xl text-jeet-red uppercase tracking-wider mb-2">CLASSIFIED SECTOR DETECTED</h3>
-          <p className="font-mono text-sm text-trench-gasmask uppercase max-w-sm font-bold leading-relaxed mb-6">
-            THIS TACTICAL ROOM IS CURRENTLY PENDING TRIGGER UNDER LIMIT ORDER DEPLOYMENT. ONLY THE SEEDING TRADER ({room.creator.slice(0, 6)}...{room.creator.slice(-4)}) HAS AUTHORIZATION TO ACCESS THIS SECTOR BEFORE DETONATION.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3 w-full justify-center">
-            {!user ? (
-              <button
-                onClick={connectWallet}
-                className="py-2.5 px-6 font-staatliches text-lg uppercase tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all"
-              >
-                CONNECT AUTHORIZED WALLET
-              </button>
-            ) : null}
-            <button
-              onClick={() => router.push('/rooms')}
-              className="retro-btn retro-btn-neutral px-6 py-2 rounded text-black font-staatliches text-lg uppercase tracking-wider"
-            >
-              RETREAT TO FRONTLINES
-            </button>
-          </div>
-        </div>
-      );
-    }
-  }
+
 
 
 
@@ -411,20 +388,7 @@ export default function RoomDetailPage() {
       return;
     }
 
-    if (orderType === 'limit') {
-      const limitPriceNum = parseFloat(limitPrice) || 0;
-      if (limitPriceNum <= 0) {
-        alert('ENTER A VALID TARGET LIMIT PRICE!');
-        return;
-      }
-      placeLimitOrder(room.id, selectedSide, stakeAmount, limitPriceNum);
-      synthSound('bet');
-      setBattleLogs((prev) => [
-        ...prev,
-        `[LIMIT ORDER QUEUED] Queued ${stakeAmount.toFixed(2)} SOL limit order on ${selectedSide.toUpperCase()} at $${limitPriceNum.toFixed(6)}!`
-      ]);
-      return;
-    }
+
 
     // Dynamic projectile physics relative values
     const tx = selectedSide === 'moon'
@@ -669,7 +633,7 @@ export default function RoomDetailPage() {
                 return (
                   <div key={`${loopIdx}-${idx}`} className="flex items-center gap-2.5 bg-black/50 border border-[#172c12] px-3.5 py-1.5 rounded-md text-xs select-none">
                     <span className="font-staatliches tracking-wider text-white uppercase">{tok.name}</span>
-                    <span className="text-[10px] text-trench-gasmask font-bold">(${tok.symbol})</span>
+                    <span className="text-[10px] text-trench-gasmask font-bold">({formatCashtag(tok.symbol)})</span>
                     <span className="text-yellow-500 font-bold ml-1">{tok.price}</span>
                     <span className={`font-extrabold ml-1.5 ${badgeColor}`}>{arrow} {tok.change}</span>
                   </div>
@@ -821,6 +785,33 @@ export default function RoomDetailPage() {
         {/* COLUMN 1: ACTIVE COIN COMBAT (lg:col-span-9) */}
         <section className="lg:col-span-9 flex flex-col gap-6 min-w-0 w-full overflow-hidden">
 
+          {/* Polymarket-style high-impact prediction question */}
+          <div className="bg-trench-black border-2 border-trench-sandbag p-4 md:p-5 rounded-xl shadow-2xl relative scanlines overflow-hidden">
+            {/* corner rivets */}
+            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+            <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+            <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pl-4 pr-4">
+              <div className="space-y-1.5 flex-1">
+                <span className="font-mono text-[9px] text-neon-moon font-extrabold uppercase tracking-widest block animate-pulse">
+                  🔮 ACTIVE TARGET PREDICTION QUESTION
+                </span>
+                <h2 className="font-staatliches text-2xl sm:text-3xl text-white tracking-wide uppercase leading-tight">
+                  Will {room ? room.token.name : 'Token'} ({room ? formatCashtag(room.token.symbol) : 'TKN'}) end above ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} on {new Date(expirySafe).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}?
+                </h2>
+              </div>
+              
+              <div className="shrink-0 flex items-center gap-2 bg-[#0d140a] border border-[#2c3d25] px-4 py-2 rounded">
+                <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
+                <span className="font-mono text-xs text-white uppercase font-bold tracking-widest">
+                  {isRoomSettling || (room && room.status === 'settled') ? 'RESOLVED' : 'ACTIVE'}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Toggle buttons for Chart view */}
           <div className="flex justify-end gap-2 font-mono text-[10px]">
             <button className="px-3.5 py-1 bg-neon-moon text-black font-bold rounded uppercase tracking-wider border border-neon-moon">
@@ -920,7 +911,7 @@ export default function RoomDetailPage() {
               <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
                 <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TICKER / SYMBOL</span>
                 <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.symbol}>
-                  ${room.token.symbol || 'UNKNWN'}
+                  {formatCashtag(room.token.symbol || 'UNKNWN')}
                 </span>
               </div>
 
@@ -991,7 +982,7 @@ export default function RoomDetailPage() {
               ) : room.token.symbol === 'JEET' ? (
                 <span>💀 Breadline Skeleton. Dev rugged early on, leaving the jeets to pick up the pieces. Volatility is critical, expect sudden explosive action.</span>
               ) : (
-                <span>📊 Operation targeting ${room.token.symbol} (${room.token.name}). Active token index synced in real time via DEXSCREENER. Factions are competing to influence the TWAP before deployment countdown expires.</span>
+                <span>📊 Operation targeting {formatCashtag(room.token.symbol)} (${room.token.name}). Active token index synced in real time via DEXSCREENER. Factions are competing to influence the TWAP before deployment countdown expires.</span>
               )}
             </div>
           </div>
@@ -1090,7 +1081,7 @@ export default function RoomDetailPage() {
                 </h4>
                 <div className="flex justify-between items-center mt-1">
                   <span>TARGET Symbol:</span>
-                  <span className="text-white font-bold">${room.token.symbol}</span>
+                  <span className="text-white font-bold">{formatCashtag(room.token.symbol)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span>ENTRY PRICE:</span>
@@ -1254,24 +1245,6 @@ export default function RoomDetailPage() {
                 </div>
               )}
             </div>
-          ) : room.status === 'pending' ? (
-            // Pending Limit seeded Room state
-            <div className="space-y-4 text-center py-4">
-              <div className="bg-trench-black border-2 border-yellow-500 rounded p-4 text-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-yellow-500/5 animate-pulse" />
-                <ShieldAlert size={36} className="text-yellow-500 mx-auto mb-2 animate-bounce" />
-                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">ARENA SECTOR LOCKED</span>
-                <span className="font-staatliches text-2xl block mt-1 tracking-wider text-yellow-500 glow-moon uppercase">
-                  WAITING FOR TRIGGER
-                </span>
-                <p className="font-mono text-[10px] text-white/80 uppercase leading-relaxed mt-3">
-                  This skirmish arena is seeded with a limit order. Standard market bets are disabled until the spot price reaches the limit trigger threshold.
-                </p>
-                <div className="mt-4 p-2 bg-trench-mud border border-trench-sandbag rounded font-mono text-[9px] text-yellow-500 uppercase font-bold relative z-10">
-                  📢 Standing by for automated Keeper detonation...
-                </div>
-              </div>
-            </div>
           ) : (
             // Active Faction Selector + Slider controls
             <>
@@ -1308,91 +1281,7 @@ export default function RoomDetailPage() {
                 </div>
               </div>
 
-              {/* 2. ORDER TYPE SELECTOR */}
-              <div className="mb-4">
-                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-2">2. ORDER TYPE</span>
-                <div className="grid grid-cols-2 gap-2 bg-trench-black p-1 border border-trench-sandbag rounded">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOrderType('market');
-                      synthSound('bet');
-                    }}
-                    className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
-                      orderType === 'market'
-                        ? 'bg-[#16A34A] text-white font-bold shadow-glow-moon'
-                        : 'text-trench-gasmask hover:text-white'
-                    }`}
-                  >
-                    Market ⚡
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOrderType('limit');
-                      synthSound('bet');
-                    }}
-                    className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
-                      orderType === 'limit'
-                        ? 'bg-moon-gold text-black font-bold shadow-glow-gold'
-                        : 'text-trench-gasmask hover:text-white'
-                    }`}
-                  >
-                    Limit 🎯
-                  </button>
-                </div>
-              </div>
 
-              {orderType === 'limit' && (
-                <div className="mb-4 bg-trench-black p-3 border border-trench-sandbag rounded space-y-2">
-                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block">
-                    🎯 TARGET LIMIT PRICE (USD)
-                  </span>
-                  <div className="relative flex items-center bg-trench-black border border-trench-sandbag rounded focus-within:border-neon-moon transition-all">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Limit Price (USD)"
-                      value={limitPrice}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === '' || /^[0-9]*\.?[0-9]*$/.test(val)) {
-                          setLimitPrice(val);
-                        }
-                      }}
-                      className="w-full bg-transparent px-3 py-2 text-white font-mono text-xs focus:outline-none"
-                    />
-                    <span className="absolute right-3 font-mono text-[8px] text-trench-gasmask font-bold tracking-wider uppercase">
-                      USD
-                    </span>
-                  </div>
-
-                  {/* Percentage Offsets */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2">
-                    {[-10, -5, 5, 10].map((pct) => {
-                      const currentSpotPrice = livePrice || room?.openingPrice || 0;
-                      const computedOffset = currentSpotPrice * (1 + pct / 100);
-                      const sign = pct > 0 ? '+' : '';
-                      return (
-                        <button
-                          key={pct}
-                          type="button"
-                          onClick={() => {
-                            setLimitPrice(formatPrice(computedOffset));
-                            synthSound('bet');
-                          }}
-                          className="py-1 text-center font-mono text-[8px] font-bold border border-trench-sandbag/60 bg-trench-mud rounded text-trench-gasmask hover:text-white hover:border-gray-500 transition-colors"
-                        >
-                          {sign}{pct}%
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold leading-tight block">
-                    *TACTICAL bet WILL DETONATE WHEN spot PRICE CROSSES YOUR TARGET.
-                  </span>
-                </div>
-              )}
 
               {/* 3. AMMUNITION (SOL) Preset Selector Slots */}
               <div className="mb-6 bg-trench-black p-4 border border-trench-sandbag rounded">
@@ -1478,7 +1367,7 @@ export default function RoomDetailPage() {
                 ) : (
                   <span className="relative z-10 flex items-center gap-1.5 justify-center font-bold">
                     <Sparkles size={20} className="text-black shrink-0 animate-pulse" />
-                    {orderType === 'limit' ? 'QUEUE TACTICAL LIMIT ORDER 🎯' : 'STAKE ON POT!'}
+                    STAKE ON POT!
                   </span>
                 )}
                 {/* Shimmer overlay block */}
@@ -1488,9 +1377,7 @@ export default function RoomDetailPage() {
               <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold">
                 <ShieldAlert size={16} className="text-jeet-red shrink-0 mt-0.5" />
                 <p>
-                  {orderType === 'limit'
-                    ? 'Limit orders will queue locally and detonate immediately on-chain when the live price criteria matches.'
-                    : 'Bets are locked. Firing shells takes permanent SOL ammo payload. Finalized on countdown expiry!'}
+                  'Bets are locked. Firing shells takes permanent SOL ammo payload. Finalized on countdown expiry!'
                 </p>
               </div>
             </>
@@ -1521,164 +1408,85 @@ export default function RoomDetailPage() {
           <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
           <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Active Limit Orders */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-lg font-bold uppercase border-b border-trench-sandbag/40 pb-2">
-                <Terminal className="w-5 h-5 text-yellow-500 animate-pulse" />
-                <span>🎯 ACTIVE TACTICAL LIMIT ORDERS BOOK ({(Array.isArray(limitOrders) ? limitOrders : []).filter(o => o.roomId === room.id && o.status === 'pending').length})</span>
-              </div>
-
-              {(Array.isArray(limitOrders) ? limitOrders : []).filter(o => o.roomId === room.id && o.status === 'pending').length > 0 ? (
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left font-mono text-xs uppercase">
-                    <thead>
-                      <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[10px] font-bold">
-                        <th className="py-2.5 px-3">SIDE</th>
-                        <th className="py-2.5 px-3">AMOUNT</th>
-                        <th className="py-2.5 px-3">LIMIT TARGET</th>
-                        <th className="py-2.5 px-3">TRIGGER</th>
-                        <th className="py-2.5 px-3 text-center">ACTION</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Array.isArray(limitOrders) && limitOrders
-                        .filter(o => o.roomId === room.id && o.status === 'pending')
-                        .map((order) => {
-                          const limitPriceSafe = typeof order.limitPrice === 'number' ? order.limitPrice : parseFloat(order.limitPrice as any) || 0;
-                          const amountSafe = typeof order.amount === 'number' ? order.amount : parseFloat(order.amount as any) || 0;
-                          const triggerText = order.triggerDirection === 'below' 
-                            ? `SPOT <= $${formatPrice(limitPriceSafe)}` 
-                            : `SPOT >= $${formatPrice(limitPriceSafe)}`;
-                          return (
-                            <tr key={order.id} className="border-b border-trench-sandbag/20 hover:bg-trench-mud/30 transition-colors">
-                              <td className="py-3 px-3 font-bold">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-staatliches ${
-                                  order.side === 'moon' 
-                                    ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/30 shadow-glow-moon' 
-                                    : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/30 shadow-glow-jeet'
-                                }`}>
-                                  {order.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
-                                </span>
-                              </td>
-                              <td className="py-3 px-3 text-white font-bold">{amountSafe.toFixed(2)} SOL</td>
-                              <td className="py-3 px-3 text-moon-gold font-bold">${formatPrice(limitPriceSafe)}</td>
-                              <td className="py-3 px-3 text-trench-gasmask font-bold font-mono text-[10px]">{triggerText}</td>
-                              <td className="py-3 px-3 text-center">
-                                <button
-                                  onClick={() => {
-                                    cancelLimitOrder(order.id);
-                                    synthSound('bet');
-                                    setBattleLogs((prev) => [
-                                      ...prev,
-                                      `[ORDER ABORTED] limit order of ${amountSafe.toFixed(2)} SOL at $${formatPrice(limitPriceSafe)} successfully cancelled.`
-                                    ]);
-                                  }}
-                                  className="px-2.5 py-1 bg-red-950/60 hover:bg-red-800 text-jeet-red hover:text-white border border-jeet-red/40 rounded font-staatliches text-[11px] uppercase tracking-wider font-bold transition-all active:scale-95"
-                                >
-                                  [ABORT]
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-6 text-trench-gasmask font-mono text-xs font-bold uppercase leading-relaxed">
-                  📢 NO ACTIVE TACTICAL LIMIT ORDERS QUEUED IN THIS TRENCH SECTOR.
-                </div>
-              )}
+          {/* wagers full width list */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-lg font-bold uppercase border-b border-trench-sandbag/40 pb-2">
+              <Swords className="w-5 h-5 text-neon-moon animate-pulse" />
+              <span>⚔️ YOUR LOCKED MARKET POSITIONS ({userBetsInRoom.length})</span>
             </div>
 
-            {/* Active Market Positions / Wagers */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-lg font-bold uppercase border-b border-trench-sandbag/40 pb-2">
-                <Swords className="w-5 h-5 text-neon-moon animate-pulse" />
-                <span>⚔️ YOUR LOCKED MARKET POSITIONS ({userBetsInRoom.length})</span>
-              </div>
+            {userBetsInRoom.length > 0 ? (
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left font-mono text-xs uppercase">
+                  <thead>
+                    <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[10px] font-bold">
+                      <th className="py-2.5 px-3">SIDE</th>
+                      <th className="py-2.5 px-3">AMOUNT</th>
+                      <th className="py-2.5 px-3">ENTRY</th>
+                      <th className="py-2.5 px-3">CURRENT</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {userBetsInRoom.map((bet) => {
+                      const entryPrice = openingPriceSafe || 0;
+                      const currentSpotPrice = livePrice || openingPriceSafe || 0;
+                      
+                      const FEE_RATE = 0.0125; // 1.25% platform fee to match on-chain bps
+                      let pnlPercent = 0;
+                      let pnlSol = 0;
+                      let isProfit = false;
 
-              {userBetsInRoom.length > 0 ? (
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left font-mono text-xs uppercase">
-                    <thead>
-                      <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[10px] font-bold">
-                        <th className="py-2.5 px-3">SIDE</th>
-                        <th className="py-2.5 px-3">AMOUNT</th>
-                        <th className="py-2.5 px-3">ENTRY</th>
-                        <th className="py-2.5 px-3">CURRENT</th>
-                        <th className="py-2.5 px-3">UNREALIZED P&L</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {userBetsInRoom.map((bet) => {
-                        const entryPrice = openingPriceSafe || 0;
-                        const currentSpotPrice = livePrice || openingPriceSafe || 0;
+                      if (entryPrice > 0 && currentSpotPrice !== entryPrice) {
+                        const isMoonWinning = currentSpotPrice > entryPrice;
+                        const isUserWinning = (bet.side === 'moon' && isMoonWinning) || (bet.side === 'jeet' && !isMoonWinning);
                         
-                        const FEE_RATE = 0.0125; // 1.25% platform fee to match on-chain bps
-                        let pnlPercent = 0;
-                        let pnlSol = 0;
-                        let isProfit = false;
-
-                        if (entryPrice > 0 && currentSpotPrice !== entryPrice) {
-                          const isMoonWinning = currentSpotPrice > entryPrice;
-                          const isUserWinning = (bet.side === 'moon' && isMoonWinning) || (bet.side === 'jeet' && !isMoonWinning);
+                        if (isUserWinning) {
+                          const winningPool = isMoonWinning ? moonPoolSafe : jeetPoolSafe;
+                          const losingPool = isMoonWinning ? jeetPoolSafe : moonPoolSafe;
                           
-                          if (isUserWinning) {
-                            const winningPool = isMoonWinning ? moonPoolSafe : jeetPoolSafe;
-                            const losingPool = isMoonWinning ? jeetPoolSafe : moonPoolSafe;
-                            
-                            if (winningPool > 0) {
-                              pnlPercent = ((losingPool / winningPool) * (1 - FEE_RATE) - FEE_RATE) * 100;
-                              pnlSol = bet.amount * (pnlPercent / 100);
-                            }
-                            isProfit = pnlPercent >= 0;
-                          } else {
-                            // User is losing, loss is 100% of the bet amount
-                            pnlPercent = -100;
-                            pnlSol = -bet.amount;
-                            isProfit = false;
+                          if (winningPool > 0) {
+                            pnlPercent = ((losingPool / winningPool) * (1 - FEE_RATE) - FEE_RATE) * 100;
+                            pnlSol = bet.amount * (pnlPercent / 100);
                           }
+                          isProfit = pnlPercent >= 0;
                         } else {
-                          // No price change or entry price not set
-                          pnlPercent = 0;
-                          pnlSol = 0;
-                          isProfit = true;
+                          // User is losing, loss is 100% of the bet amount
+                          pnlPercent = -100;
+                          pnlSol = -bet.amount;
+                          isProfit = false;
                         }
+                      } else {
+                        // No price change or entry price not set
+                        pnlPercent = 0;
+                        pnlSol = 0;
+                        isProfit = true;
+                      }
 
-                        return (
-                          <tr key={bet.id} className="border-b border-trench-sandbag/20 hover:bg-trench-mud/30 transition-colors">
-                            <td className="py-3 px-3 font-bold">
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-staatliches ${
-                                bet.side === 'moon' 
-                                  ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/30 shadow-glow-moon' 
-                                  : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/30 shadow-glow-jeet'
-                              }`}>
-                                {bet.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
-                              </span>
-                            </td>
-                            <td className="py-3 px-3 text-white font-bold">{bet.amount.toFixed(2)} SOL</td>
-                            <td className="py-3 px-3 text-gray-300 font-bold">${formatPrice(entryPrice)}</td>
-                            <td className="py-3 px-3 text-gray-300 font-bold">${formatPrice(currentSpotPrice)}</td>
-                            <td className="py-3 px-3 font-bold">
-                              <span className={`font-bold ${isProfit ? 'text-[#16A34A] drop-shadow-[0_0_6px_rgba(22,163,74,0.4)]' : 'text-jeet-red drop-shadow-[0_0_6px_rgba(239,68,68,0.4)]'}`}>
-                                {isProfit ? '+' : ''}{pnlSol.toFixed(4)} SOL ({isProfit ? '+' : ''}{pnlPercent.toFixed(2)}%)
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="text-center py-6 text-trench-gasmask font-mono text-xs font-bold uppercase leading-relaxed">
-                  📢 NO LOCKED POSITIONS IN THIS SECTOR. STAKE SOL TO ENTER COMBAT.
-                </div>
-              )}
-            </div>
+                      return (
+                        <tr key={bet.id} className="border-b border-trench-sandbag/20 hover:bg-trench-mud/30 transition-colors">
+                          <td className="py-3 px-3 font-bold">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-staatliches ${
+                              bet.side === 'moon' 
+                                ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/30 shadow-glow-moon' 
+                                : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/30 shadow-glow-jeet'
+                            }`}>
+                              {bet.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-white font-bold">{bet.amount.toFixed(2)} SOL</td>
+                          <td className="py-3 px-3 text-gray-300 font-bold">${formatPrice(entryPrice)}</td>
+                          <td className="py-3 px-3 text-gray-300 font-bold">${formatPrice(currentSpotPrice)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-trench-gasmask font-mono text-xs font-bold uppercase leading-relaxed">
+                📢 NO LOCKED POSITIONS IN THIS SECTOR. STAKE SOL TO ENTER COMBAT.
+              </div>
+            )}
           </div>
         </div>
 
@@ -1733,7 +1541,7 @@ export default function RoomDetailPage() {
             {/* Always seed a static system status entry at the top */}
             <div className="flex gap-1.5 items-start text-neon-moon font-bold uppercase">
               <span>📡</span>
-              <span>[RADAR LOG] Scanning decentralized sector {room.token.symbol} for combat activities...</span>
+              <span>[RADAR LOG] Scanning decentralized sector {formatCashtag(room.token.symbol)} for combat activities...</span>
             </div>
             <div className="flex gap-1.5 items-start text-jeet-red font-bold animate-pulse uppercase">
               <span>⚠️</span>

@@ -81,14 +81,40 @@ function HomeContent() {
 
       {/* 1. HERO SECTION — PVP ARENA */}
       <section className="relative w-full py-20 md:py-28 border-b border-white/10 overflow-hidden min-h-[750px] flex items-center justify-center bg-[#07080d]">
-        {/* Full battlefield scene background */}
-        <div className="absolute inset-0 z-0">
-          <img
-            alt="Meme Trench Battlefield"
-            className="w-full h-full object-cover opacity-25 mix-blend-luminosity filter blur-[1px]"
-            src={PEPE_ASSETS.battlefield}
-          />
+        {/* Splitscreen Battlefield Background */}
+        <div className="absolute inset-0 z-0 flex w-full h-full">
+          {/* Left Side: Bullish Trench */}
+          <div className="w-1/2 h-full relative overflow-hidden border-r border-[#193012]/30">
+            <img 
+              alt="Moon Army Charging" 
+              className="w-full h-full object-cover opacity-20 filter sepia saturate-[250%] hue-rotate-[85deg] contrast-[1.1]" 
+              src={PEPE_ASSETS.moonJuice}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#07080d] via-[#07080d]/35 to-transparent"></div>
+            <div className="absolute inset-0 bg-neon-moon/5 mix-blend-color pointer-events-none"></div>
+            <div className="absolute bottom-6 left-6 font-mono text-[9px] text-neon-moon/20 font-bold uppercase tracking-widest pointer-events-none hidden md:block">
+              BULLISH TRENCH // REGION A
+            </div>
+          </div>
+
+          {/* Right Side: Bearish Wasteland */}
+          <div className="w-1/2 h-full relative overflow-hidden">
+            <img 
+              alt="Jeet Skeleton Forces" 
+              className="w-full h-full object-cover opacity-20 filter sepia saturate-[300%] hue-rotate-[320deg] contrast-[1.1]" 
+              src={PEPE_ASSETS.jeetSkeleton}
+            />
+            <div className="absolute inset-0 bg-gradient-to-l from-[#07080d] via-[#07080d]/35 to-transparent"></div>
+            <div className="absolute inset-0 bg-jeet-red/5 mix-blend-color pointer-events-none"></div>
+            <div className="absolute bottom-6 right-6 font-mono text-[9px] text-jeet-red/20 font-bold uppercase tracking-widest pointer-events-none hidden md:block text-right">
+              BEARISH WASTELAND // REGION B
+            </div>
+          </div>
         </div>
+
+        {/* Center Divider Line */}
+        <div className="absolute left-1/2 top-0 bottom-0 -translate-x-1/2 w-[1px] bg-gradient-to-b from-transparent via-[#5c5244]/40 to-transparent z-10 hidden lg:block" />
+
         {/* Atmospheric Overlays */}
         <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_center,_transparent_0%,_#07080d_90%)] pointer-events-none" />
         <div className="absolute inset-0 z-0 portal-glow pointer-events-none" />
@@ -107,85 +133,36 @@ function HomeContent() {
             PICK A SIDE. <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-moon to-emerald-400">BET THE TRENCH.</span>
           </motion.h1>
 
-          {/* Cards & Middle Info Grid */}
-          <div className="w-full flex flex-col lg:flex-row items-center justify-center gap-8 xl:gap-12 mt-4">
-            
-            {/* Left Card: Chad Bull General */}
-            <motion.div
-              initial={{ x: -60, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 85, delay: 0.15 }}
-              className="w-full max-w-[340px] sm:max-w-[360px] premium-glass-card rounded-[24px] overflow-hidden p-6 flex flex-col items-center premium-glow-moon group shrink-0"
-            >
-              <h3 className="font-staatliches text-2xl sm:text-3xl tracking-wider text-neon-moon text-center mb-4 uppercase drop-shadow-[0_0_8px_rgba(22,163,74,0.4)] transition-colors group-hover:text-emerald-400">
-                CHAD BULL GENERAL
-              </h3>
-              
-              <div className="relative overflow-hidden w-full aspect-square rounded-2xl border border-neon-moon/20 mb-5 bg-black/60 shadow-inner group-hover:border-neon-moon/40 transition-colors">
-                <img
-                  src={PEPE_ASSETS.chadBull}
-                  alt="Chad Bull General"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+          {/* Centered Premium Dynamic Battle Arena Splitscreen Card */}
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
+            className="w-full max-w-2xl px-4 mt-6 flex justify-center"
+          >
+            <div className="w-full premium-glass-card rounded-[20px] overflow-hidden p-2 md:p-2.5 shadow-2xl border border-trench-sandbag/45 relative scanlines group">
+              {/* Decorative corner rivets */}
+              <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/30 z-20" />
+              <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/30 z-20" />
+              <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/30 z-20" />
+              <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/30 z-20" />
+
+              {/* Video Banner Container */}
+              <div className="relative overflow-hidden w-full aspect-video rounded-xl border border-trench-sandbag/30 bg-black/60 shadow-inner">
+                <video
+                  src="/pepes/Chad_soldiers_and_Wojak_soldier_202606070100.mp4"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover opacity-90"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+                <div className="absolute inset-0 bg-[#16A34A]/5 mix-blend-color pointer-events-none" />
               </div>
+            </div>
+          </motion.div>
 
-              <div className="w-full flex flex-col justify-between min-h-[90px]">
-                <p className="font-staatliches text-base sm:text-lg text-white tracking-wide uppercase leading-snug text-center px-1">
-                  COMMANDER OF THE MOON FORCES. STAKE SOL ON THE PUMP.
-                </p>
-                <p className="font-mono text-[10px] sm:text-xs text-trench-gasmask text-center mt-3 leading-relaxed italic opacity-85">
-                  &ldquo;It&apos;s not a rug if you never own the coin, big brain.&rdquo;
-                </p>
-              </div>
-            </motion.div>
-
-            {/* Middle Combat Branding Emblem */}
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.35 }}
-              className="flex flex-col items-center justify-center py-6 px-4 lg:w-64 shrink-0"
-            >
-              <div className="h-[1px] w-24 sm:w-32 bg-gradient-to-r from-transparent via-moon-gold to-transparent opacity-60" />
-              <span className="font-mono text-[10px] sm:text-xs text-moon-gold uppercase tracking-widest font-extrabold my-3 text-center drop-shadow-[0_0_6px_rgba(251,191,36,0.3)]">
-                MEME COIN PVP PREDICTION
-              </span>
-              <h2 className="font-staatliches text-5xl sm:text-6xl md:text-7xl text-white tracking-widest font-extrabold uppercase my-1 text-center drop-shadow-[0_0_15px_rgba(255,255,255,0.15)]">
-                TRENCHES
-              </h2>
-              <div className="h-[1px] w-24 sm:w-32 bg-gradient-to-r from-transparent via-moon-gold to-transparent opacity-60 mt-3" />
-            </motion.div>
-
-            {/* Right Card: Jeet Skeleton */}
-            <motion.div
-              initial={{ x: 60, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ type: 'spring', damping: 20, stiffness: 85, delay: 0.15 }}
-              className="w-full max-w-[340px] sm:max-w-[360px] premium-glass-card rounded-[24px] overflow-hidden p-6 flex flex-col items-center premium-glow-jeet group shrink-0"
-            >
-              <h3 className="font-staatliches text-2xl sm:text-3xl tracking-wider text-jeet-red text-center mb-4 uppercase drop-shadow-[0_0_8px_rgba(255,42,77,0.4)] transition-colors group-hover:text-red-400">
-                JEET SKELETON
-              </h3>
-              
-              <div className="relative overflow-hidden w-full aspect-square rounded-2xl border border-jeet-red/20 mb-5 bg-black/60 shadow-inner group-hover:border-jeet-red/40 transition-colors">
-                <img
-                  src={PEPE_ASSETS.jeetSkeleton}
-                  alt="Jeet Skeleton"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-              </div>
-
-              <div className="w-full flex flex-col justify-between min-h-[90px]">
-                <p className="font-staatliches text-base sm:text-lg text-white tracking-wide uppercase leading-snug text-center px-1">
-                  COMMANDER OF THE JEET FORCES. STAKE SOL ON THE DUMP.
-                </p>
-                <div className="h-5" /> {/* Empty spacing to balance height perfectly */}
-              </div>
-            </motion.div>
-
-          </div>
 
           {/* Bottom CTA Buttons */}
           <motion.div

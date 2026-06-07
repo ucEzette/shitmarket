@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useAppState } from '@/store/useAppState';
+import { useAppState, formatCashtag } from '@/store/useAppState';
 import {
   MedalFirstBlood,
   MedalMoonMillionaire,
@@ -526,7 +526,7 @@ export default function ProfilePage() {
                         <div className={`w-3 h-3 rounded-full ${roomActive ? 'bg-yellow-500 animate-ping' : outcome === 'win' ? 'bg-neon-moon' : 'bg-jeet-red'}`} />
                         <div>
                           <span className="font-bold text-white block uppercase text-[11px]">
-                            {bet.amount.toFixed(2)} SOL ON ${tokenSym}
+                            {bet.amount.toFixed(2)} SOL ON {formatCashtag(tokenSym)}
                           </span>
                           <span className="font-bold text-[9px] text-trench-gasmask uppercase tracking-wider block mt-0.5">
                             BET SIDE: <span className={bet.side === 'moon' ? 'text-neon-moon' : 'text-jeet-red'}>{bet.side.toUpperCase()}</span>

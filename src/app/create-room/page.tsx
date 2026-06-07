@@ -19,15 +19,15 @@ const MOCK_TOKENS = [
 
 export default function CreateRoomPage() {
   const router = useRouter();
-  const { createRoom, user, connectWallet, placeBet, placeLimitOrder, isTransactionLoading, wallet } = useAppState();
+  const { createRoom, user, connectWallet, placeBet, isTransactionLoading, wallet } = useAppState();
 
   // Form State
   const [contractAddress, setContractAddress] = useState('');
   const [duration, setDuration] = useState<number>(30);
   const [seedSide, setSeedSide] = useState<'moon' | 'jeet'>('moon');
   const [seedAmount, setSeedAmount] = useState<number>(0.1);
-  const [seedOrderType, setSeedOrderType] = useState<'market' | 'limit'>('market');
-  const [seedLimitPrice, setSeedLimitPrice] = useState<string>('');
+  const [openingPriceType, setOpeningPriceType] = useState<'market' | 'set'>('market');
+  const [customSetPrice, setCustomSetPrice] = useState<string>('');
 
   // Scanner Loading and Results
   const [scanning, setScanning] = useState(false);
@@ -122,7 +122,7 @@ export default function CreateRoomPage() {
           pairAddress: pair.pairAddress,
           rawPriceUsd: rawPrice
         });
-        setSeedLimitPrice(rawPrice.toString());
+        setCustomSetPrice(rawPrice.toString());
         
         synthSound('victory');
       } else {
@@ -178,6 +178,10 @@ export default function CreateRoomPage() {
     const moonSeed = seedSide === 'moon' ? seedAmount : 0;
     const jeetSeed = seedSide === 'jeet' ? seedAmount : 0;
 
+    const targetOpeningPrice = openingPriceType === 'set'
+      ? (parseFloat(customSetPrice) || tokenInfo.rawPriceUsd)
+      : tokenInfo.rawPriceUsd;
+
     const newRoom: Room = {
       id: generatedId,
       token: {
@@ -197,23 +201,19 @@ export default function CreateRoomPage() {
       status: 'active',
       createdAt: Date.now(),
       duration: duration,
-      openingPrice: tokenInfo.rawPriceUsd
+      openingPrice: targetOpeningPrice
     };
 
     try {
       // First create the room on-chain (or sync if it already exists)
-      const res = await createRoom(newRoom, seedOrderType === 'limit');
+      const res = await createRoom(newRoom, openingPriceType === 'set');
       
-      // If they seeded and it's a brand new room, place the bet or limit order
+      // If they seeded and it's a brand new room, place the bet
       if (res && !res.alreadyExists) {
         try {
-          if (seedOrderType === 'limit') {
-            await placeLimitOrder(res.roomPda, seedSide, seedAmount, parseFloat(seedLimitPrice) || 0);
-          } else {
-            await placeBet(res.roomPda, seedSide as any, seedAmount);
-          }
+          await placeBet(res.roomPda, seedSide as any, seedAmount);
         } catch (betErr) {
-          console.error("Initial seeding bet/order failed, but room was created:", betErr);
+          console.error("Initial seeding bet failed, but room was created:", betErr);
         }
       }
       
@@ -514,61 +514,61 @@ export default function CreateRoomPage() {
               </div>
             </div>
 
-            {/* Seeding Order Type Selector */}
+            {/* Opening Price Type Selector */}
             <div className="space-y-2 pt-2 border-t border-trench-sandbag/40">
               <label className="block font-mono text-xs font-bold text-white uppercase tracking-wider">
-                Seeding Order Type:
+                Opening Price Type:
               </label>
               <div className="grid grid-cols-2 gap-2 bg-trench-black p-1 border border-trench-sandbag rounded">
                 <button
                   type="button"
                   onClick={() => {
-                    setSeedOrderType('market');
+                    setOpeningPriceType('market');
                     synthSound('bet');
                   }}
                   className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
-                    seedOrderType === 'market' ? 'bg-neon-moon text-black font-bold shadow-glow-moon' : 'text-trench-gasmask hover:text-white'
+                    openingPriceType === 'market' ? 'bg-neon-moon text-black font-bold shadow-glow-moon' : 'text-trench-gasmask hover:text-white'
                   }`}
                 >
-                  Market Order ⚡
+                  Market Price ⚡
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setSeedOrderType('limit');
+                    setOpeningPriceType('set');
                     synthSound('bet');
                   }}
                   className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded transition-all ${
-                    seedOrderType === 'limit' ? 'bg-moon-gold text-black font-bold shadow-glow-gold' : 'text-trench-gasmask hover:text-white'
+                    openingPriceType === 'set' ? 'bg-moon-gold text-black font-bold shadow-glow-gold' : 'text-trench-gasmask hover:text-white'
                   }`}
                 >
-                  Limit Order 🎯
+                  Set Price 🎯
                 </button>
               </div>
 
-              {seedOrderType === 'limit' && (
+              {openingPriceType === 'set' && (
                 <div className="space-y-2 pt-2 animate-fadeIn">
                   <span className="font-mono text-[10px] text-moon-gold font-bold uppercase tracking-wider block">
-                    🎯 TARGET LIMIT PRICE (USD):
+                    🎯 TARGET CUSTOM PRICE (USD):
                   </span>
                   <div className="relative flex items-center bg-trench-black border-2 border-trench-sandbag rounded focus-within:border-moon-gold transition-all">
                     <input
                       type="number"
                       step="any"
                       required
-                      placeholder="Limit Price (USD)"
-                      value={seedLimitPrice}
+                      placeholder="Custom Price (USD)"
+                      value={customSetPrice}
                       onChange={(e) => {
-                        setSeedLimitPrice(e.target.value);
+                        setCustomSetPrice(e.target.value);
                       }}
                       className="w-full bg-transparent px-3 py-2 text-white font-mono text-xs focus:outline-none"
                     />
                     <span className="absolute right-3 font-mono text-[10px] text-trench-gasmask font-bold tracking-wider uppercase">
-                      USD LIMIT
+                      USD PRICE
                     </span>
                   </div>
                   <p className="font-mono text-[9px] text-trench-gasmask uppercase font-bold leading-tight">
-                    *Seeding bet will be queued and automatically executed on-chain when the live price crosses this threshold.
+                    *The room will execute and activate immediately using this custom price as the starting pool boundary.
                   </p>
                 </div>
               )}

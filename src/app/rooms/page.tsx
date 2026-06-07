@@ -3,11 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAppState, Room } from '@/store/useAppState';
+import { useAppState, Room, formatCashtag } from '@/store/useAppState';
 import { PixelCrackedHelmet, PixelShovel, PixelGasMask } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
 import { Search, Flame, Bomb, ArrowRight, UserPlus } from 'lucide-react';
+import { formatPrice } from '@/app/room/[id]/page';
 
 export default function RoomsPage() {
   const formatDuration = (mins: number) => {
@@ -360,7 +361,7 @@ export default function RoomsPage() {
                         {room.token.name}
                       </h4>
                       <span className="font-mono text-[10px] md:text-xs text-neon-moon font-bold flex items-center gap-1 shrink-0">
-                        ${room.token.symbol}
+                        {formatCashtag(room.token.symbol)}
                         {room.token.chainId && (
                           <span className="text-[8px] md:text-[9px] bg-trench-black text-gray-400 px-1 md:px-1.5 py-0.5 rounded border border-trench-sandbag uppercase">
                             {room.token.chainId}
@@ -390,6 +391,14 @@ export default function RoomsPage() {
                       })()} UTC
                     </span>
                   </div>
+                </div>
+
+                {/* Polymarket-style concise prediction question box */}
+                <div className="bg-trench-black/40 border border-trench-sandbag/20 p-2.5 rounded-lg mb-3 text-left font-mono relative">
+                  <span className="text-[8px] text-neon-moon uppercase font-bold tracking-wider block">PREDICTION TARGET</span>
+                  <p className="text-[10px] text-white font-bold leading-normal uppercase mt-0.5">
+                    Will {formatCashtag(room.token.symbol)} end above ${formatPrice(room.openingPrice)}?
+                  </p>
                 </div>
 
                 {/* Pools Breakdown progress bar — stacked on mobile too */}

@@ -109,10 +109,6 @@
         {
           "name": "nonce",
           "type": "u8"
-        },
-        {
-          "name": "asPending",
-          "type": "bool"
         }
       ]
     },
@@ -398,147 +394,6 @@
         }
       ],
       "args": []
-    },
-    {
-      "name": "createLimitOrder",
-      "discriminator": [
-        76,
-        161,
-        70,
-        122,
-        82,
-        20,
-        142,
-        75
-      ],
-      "accounts": [
-        {
-          "name": "limitOrder",
-          "writable": true
-        },
-        {
-          "name": "room"
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "systemProgram"
-        }
-      ],
-      "args": [
-        {
-          "name": "side",
-          "type": {
-            "defined": {
-              "name": "Side"
-            }
-          }
-        },
-        {
-          "name": "amount",
-          "type": "u64"
-        },
-        {
-          "name": "limitPrice",
-          "type": "i64"
-        },
-        {
-          "name": "triggerDirection",
-          "type": "u8"
-        },
-        {
-          "name": "nonce",
-          "type": "u8"
-        },
-        {
-          "name": "maxSlippageBps",
-          "type": "u16"
-        }
-      ]
-    },
-    {
-      "name": "executeLimitOrder",
-      "discriminator": [
-        52,
-        33,
-        60,
-        30,
-        47,
-        100,
-        40,
-        22
-      ],
-      "accounts": [
-        {
-          "name": "limitOrder",
-          "writable": true
-        },
-        {
-          "name": "room",
-          "writable": true
-        },
-        {
-          "name": "escrow",
-          "writable": true
-        },
-        {
-          "name": "bet",
-          "writable": true
-        },
-        {
-          "name": "priceFeed"
-        },
-        {
-          "name": "relayer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "config"
-        },
-        {
-          "name": "user",
-          "writable": true
-        },
-        {
-          "name": "systemProgram"
-        }
-      ],
-      "args": []
-    },
-    {
-      "name": "cancelLimitOrder",
-      "discriminator": [
-        132,
-        156,
-        132,
-        31,
-        67,
-        40,
-        232,
-        97
-      ],
-      "accounts": [
-        {
-          "name": "limitOrder",
-          "writable": true
-        },
-        {
-          "name": "room"
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "systemProgram"
-        }
-      ],
-      "args": []
     }
   ],
   "accounts": [
@@ -579,19 +434,6 @@
         75,
         155,
         32
-      ]
-    },
-    {
-      "name": "limitOrder",
-      "discriminator": [
-        137,
-        183,
-        212,
-        91,
-        115,
-        29,
-        141,
-        227
       ]
     }
   ],
@@ -659,19 +501,6 @@
         222,
         149,
         129
-      ]
-    },
-    {
-      "name": "RoomActivated",
-      "discriminator": [
-        135,
-        55,
-        162,
-        248,
-        181,
-        65,
-        252,
-        152
       ]
     }
   ],
@@ -1119,78 +948,6 @@
           {
             "name": "totalWins",
             "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "limitOrder",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "room",
-            "type": "pubkey"
-          },
-          {
-            "name": "side",
-            "type": {
-              "defined": {
-                "name": "Side"
-              }
-            }
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "limitPrice",
-            "type": "i64"
-          },
-          {
-            "name": "triggerDirection",
-            "type": "u8"
-          },
-          {
-            "name": "nonce",
-            "type": "u8"
-          },
-          {
-            "name": "status",
-            "type": "u8"
-          },
-          {
-            "name": "maxSlippageBps",
-            "type": "u16"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "RoomActivated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "room",
-            "type": "pubkey"
-          },
-          {
-            "name": "openingPrice",
-            "type": "i64"
-          },
-          {
-            "name": "expiryTimestamp",
-            "type": "i64"
           }
         ]
       }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { useAppState, mapApiRoom, Bet } from '@/store/useAppState';
+import { useAppState, mapApiRoom, Bet, formatCashtag } from '@/store/useAppState';
 import { FloatingPepe } from './FloatingPepe';
 import { Header } from './Header';
 import { Footer } from './Footer';
@@ -194,9 +194,6 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
   const addMessage = useAppState((s) => s.addMessage);
   const fetchRooms = useAppState((s) => s.fetchRooms);
   const fetchLeaderboard = useAppState((s) => s.fetchLeaderboard);
-  const executeLimitOrderLocal = useAppState((s) => s.executeLimitOrderLocal);
-  const activateRoomLocal = useAppState((s) => s.activateRoomLocal);
-
   const pathname = usePathname();
   const isRoomPage = pathname?.startsWith('/room/');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -396,7 +393,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               roomId: newRoomObj.id,
               side: 'all',
               user: 'COMMAND HQ',
-              message: `🚨 NEW DEGEN ARENA DEPLOYED: $${newRoomObj.token.symbol} is ready for action! 🚨`,
+              message: `🚨 NEW DEGEN ARENA DEPLOYED: ${formatCashtag(newRoomObj.token.symbol)} is ready for action! 🚨`,
               timestamp: Date.now(),
             });
             
@@ -452,25 +449,6 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
                   claimed: false,
                   timestamp: Date.now(),
                 });
-                executeLimitOrderLocal(roomPubkey, data.side, betSol);
-              }
-            }
-            
-            else if (eventType === 'RoomActivated') {
-              const openingPrice = Number(data.openingPrice) / 1e12;
-              const expiry = new Date(data.expiryTimestamp ? Number(data.expiryTimestamp) * 1000 : data.expiry).getTime();
-              activateRoomLocal(roomPubkey, openingPrice, expiry);
-              
-              addMessage({
-                roomId: roomPubkey,
-                side: 'all',
-                user: 'COMMAND HQ',
-                message: `🚀 LIMIT ORDER EXECUTED & TRENCH ACTIVATED! Opening Price: $${openingPrice} 🚀`,
-                timestamp: Date.now(),
-              });
-              
-              if (audioEnabledRef.current) {
-                synthSound('whistle');
               }
             }
             
@@ -695,6 +673,11 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
           </div>
         </div>
       )}
+
+      {/* Devnet Warning Notice */}
+      <div className="w-full bg-[#fcd34d] text-black font-mono text-[10px] sm:text-xs tracking-wider uppercase py-1.5 px-4 text-center border-b border-yellow-600 flex items-center justify-center gap-2 z-[110] relative font-bold shadow-[0_2px_8px_rgba(251,191,36,0.15)]">
+        <span>⚠️ NOTICE: THE PLATFORM IS RUNNING ON SOLANA DEVNET. ALL STAKED SOL AND TOKENS ARE MOCK FAUCET ASSETS.</span>
+      </div>
 
       {/* Main Header */}
       <Header isRoomPage={isRoomPage} onMenuToggle={() => setDrawerOpen(!drawerOpen)} />

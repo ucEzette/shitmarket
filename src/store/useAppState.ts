@@ -9,7 +9,10 @@ import {
   getBetPda,
   getPlatformConfigPda,
 } from '@/utils/solanaClient';
-import pythFeedMap from '@/utils/pythFeedMap.json';
+export const formatCashtag = (sym: string) => {
+  if (!sym) return '';
+  return sym.startsWith('$') ? sym : `$${sym}`;
+};
 
 export interface Bet {
   id: string;
@@ -32,17 +35,7 @@ export interface Activity {
   link?: string;
 }
 
-export interface LimitOrder {
-  id: string;
-  roomId: string;
-  user: string; // wallet address
-  side: 'moon' | 'jeet';
-  amount: number; // SOL
-  limitPrice: number; // USD
-  status: 'pending' | 'triggered' | 'cancelled' | 'failed';
-  createdAt: number;
-  triggerDirection: 'above' | 'below'; // below for moon, above for jeet
-}
+
 
 export interface Room {
   id: string;
@@ -134,8 +127,7 @@ export interface AppState {
   isTransactionLoading: boolean;
   transactionError: string | null;
 
-  // actions
-  createRoom: (room: Room, asPending?: boolean) => Promise<any>;
+  createRoom: (room: Room, isSetPrice?: boolean) => Promise<any>;
   placeBet: (roomId: string, side: 'moon' | 'jeet', amount: number) => Promise<any>;
   claimWinnings: (roomId: string) => Promise<any>;
   connectWallet: () => void;
@@ -164,20 +156,13 @@ export interface AppState {
   fetchLeaderboard: () => Promise<void>;
   fetchBalance: () => Promise<void>;
   updateProfile: (username: string | null, avatarUrl: string | null, referredBy?: string | null) => Promise<{ success: boolean; error?: string }>;
+  refreshProfile: () => Promise<void>;
   
   // Real-time synchronization actions
   addRoom: (room: Room) => void;
   updateRoomPools: (roomId: string, moonPool: number, jeetPool: number) => void;
   markBetClaimed: (roomId: string, userAddress: string) => void;
   addUserBet: (bet: Bet) => void;
-
-  // Limit & Market Order Types Integration
-  limitOrders: LimitOrder[];
-  placeLimitOrder: (roomId: string, side: 'moon' | 'jeet', amount: number, limitPrice: number) => Promise<void>;
-  cancelLimitOrder: (id: string) => void;
-  checkLimitOrders: (roomId: string, currentPrice: number) => Promise<void>;
-  executeLimitOrderLocal: (roomId: string, side: 'moon' | 'jeet', amount: number) => void;
-  activateRoomLocal: (roomId: string, openingPrice: number, expiry: number) => void;
 }
 
 // ── Fetch with Timeout helper to prevent offline backend hangs ───
@@ -366,7 +351,7 @@ export const useAppState = create<AppState>((set, get) => ({
   chatMessages: [],
   activityLog: [],
   fullDegenMode: false,
-  limitOrders: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('shitmarket_limit_orders') || '[]') : [],
+
 
   wallet: null,
   isTransactionLoading: false,
@@ -678,7 +663,7 @@ export const useAppState = create<AppState>((set, get) => ({
     }
   },
 
-  createRoom: async (room: Room, asPending = false) => {
+  createRoom: async (room: Room, isSetPrice?: boolean) => {
     const { wallet, setTransactionLoading, setTransactionError } = get();
     if (!wallet || !wallet.publicKey) {
       alert("PLEASE ENLIST YOUR WALLET TO THE PLATFORM CONFIG!");
@@ -705,7 +690,9 @@ export const useAppState = create<AppState>((set, get) => ({
           if (valData.pubkeyStr) {
             onChainPubkeyStr = valData.pubkeyStr;
           }
-          livePriceUsd = valData.priceUsd;
+          if (!isSetPrice) {
+            livePriceUsd = valData.priceUsd;
+          }
         } else {
           throw new Error(`Non-ok response from validation API: ${valRes.status}`);
         }
@@ -808,8 +795,7 @@ export const useAppState = create<AppState>((set, get) => ({
           room.duration,
           null, // switchboardFeed Option<Pubkey>
           openingPriceParam, // openingPriceParam Option<i64>
-          chosenNonce, // new nonce parameter
-          asPending
+          chosenNonce // new nonce parameter
         )
         .accounts({
           room: roomPda,
@@ -851,8 +837,8 @@ export const useAppState = create<AppState>((set, get) => ({
         id: roomPda.toBase58(),
         expiry: onChainExpiry,
         createdAt: onChainCreatedAt,
-        openingPrice: asPending ? undefined : onChainOpeningPrice,
-        status: asPending ? 'pending' as const : 'active' as const,
+        openingPrice: onChainOpeningPrice,
+        status: 'active' as const,
       };
       set((state) => ({ rooms: [optimisticRoom, ...state.rooms] }));
       
@@ -1168,7 +1154,7 @@ export const useAppState = create<AppState>((set, get) => ({
             user: b.userPubkey,
             side: b.side,
             amount: Number(b.amount) / 1e9,
-            claimed: b.claimedAt ? true : false,
+            claimed: b.claimed,
             timestamp: new Date(b.createdAt).getTime(),
             txSig: b.txSig || null,
           }));
@@ -1270,6 +1256,57 @@ export const useAppState = create<AppState>((set, get) => ({
     } catch (err: any) {
       console.error('Failed to update profile:', err);
       return { success: false, error: err.message || 'Internal server error' };
+    }
+  },
+
+  refreshProfile: async () => {
+    const { user } = get();
+    if (!user || !user.wallet) return;
+    const address = user.wallet;
+
+    try {
+      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const res = await fetchWithTimeout(`${indexerApi}/api/profile/${address}`, {}, 3000);
+      const json = await res.json();
+      if (json.success && json.data) {
+        const stats = {
+          totalBets: json.data.totalBets || 0,
+          wins: json.data.wins || 0,
+          losses: json.data.losses || 0,
+          profit: Number(json.data.profit || 0) / 1e9,
+          winStreak: json.data.winStreak || 0,
+          longestWinStreak: json.data.longestWinStreak || 0,
+          biggestBet: Number(json.data.biggestBet || 0) / 1e9,
+        };
+        const bets = (json.data.bets || []).map((b: any) => ({
+          id: b.id,
+          roomId: b.roomPubkey,
+          user: b.userPubkey,
+          side: b.side,
+          amount: Number(b.amount) / 1e9,
+          claimed: b.claimed,
+          timestamp: new Date(b.createdAt).getTime(),
+          txSig: b.txSig || null,
+        }));
+        
+        set({
+          user: {
+            ...user,
+            bets,
+            stats,
+            trenchScore: json.data.trenchScore || 'D',
+            username: json.data.username || null,
+            avatarUrl: json.data.avatarUrl || null,
+            referredBy: json.data.referredBy || null,
+            referralCode: json.data.referralCode || null,
+            referralsCount: json.data.referralsCount || 0,
+            referralEarnings: json.data.referralEarnings || '0',
+            referralPayouts: json.data.referralPayouts || [],
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Failed to refresh profile from indexer:', err);
     }
   },
 
@@ -1410,263 +1447,5 @@ export const useAppState = create<AppState>((set, get) => ({
 
   parlayBet: (legs: any[], amount: number) => {
     console.log("Parlay bet processed:", legs, amount);
-  },
-
-  placeLimitOrder: async (roomId: string, side: 'moon' | 'jeet', amount: number, limitPrice: number) => {
-    const { wallet, setTransactionLoading, setTransactionError } = get();
-    if (!wallet || !wallet.publicKey) {
-      alert("PLEASE ENLIST YOUR WALLET TO TACTICALLY ALLOCATE LIMIT ORDERS!");
-      return;
-    }
-    
-    setTransactionLoading(true);
-    setTransactionError(null);
-
-    try {
-      const program = getAnchorProgram(wallet);
-      const roomPda = new PublicKey(roomId);
-      const nonce = Math.floor(Math.random() * 256); // simple unique limit order identifier
-      
-      const [limitOrderPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('limit_order'), wallet.publicKey.toBuffer(), roomPda.toBuffer(), Buffer.from([nonce])],
-        program.programId
-      );
-
-      const triggerDirection = side === 'moon' ? 0 : 1; // 0 = below, 1 = above
-      const limitPriceParam = new BN(Math.round(limitPrice * 1e12));
-      const amountParam = new BN(amount * 1e9);
-
-      const tx = await (program.methods as any)
-        .createLimitOrder(
-          side === 'moon' ? { moon: {} } : { jeet: {} },
-          amountParam,
-          limitPriceParam,
-          triggerDirection,
-          nonce,
-          1000 // default max_slippage_bps = 10%
-        )
-        .accounts({
-          limitOrder: limitOrderPda,
-          room: roomPda,
-          user: wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
-        ])
-        .rpc();
-
-      console.log("Limit order created successfully on-chain! Tx:", tx);
-
-      // Optimistically append local limit order state so it renders immediately
-      const direction = side === 'moon' ? 'below' as const : 'above' as const;
-      const newOrder: LimitOrder = {
-        id: limitOrderPda.toBase58(),
-        roomId,
-        user: wallet.publicKey.toBase58(),
-        side,
-        amount,
-        limitPrice,
-        status: 'pending',
-        createdAt: Date.now(),
-        triggerDirection: direction
-      };
-
-      set((state) => {
-        const updated = [newOrder, ...state.limitOrders];
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('shitmarket_limit_orders', JSON.stringify(updated));
-        }
-        return { limitOrders: updated };
-      });
-
-      get().addActivity({
-        type: 'bet',
-        title: `QUEUED ${side.toUpperCase()} LIMIT ORDER`,
-        message: `On-chain Limit order funded with ${amount} SOL at target price $${limitPrice.toFixed(6)}.`,
-        link: `/room/${roomId}`
-      });
-
-      await get().fetchBalance();
-      return tx;
-
-    } catch (err: any) {
-      console.error("Failed to create limit order on-chain:", err);
-      setTransactionError(err.message || String(err));
-      handleRpcError("tactical order queue", err);
-      throw err;
-    } finally {
-      setTransactionLoading(false);
-    }
-  },
-
-  cancelLimitOrder: async (id: string) => {
-    const { wallet, setTransactionLoading, setTransactionError } = get();
-    if (!wallet || !wallet.publicKey) return;
-
-    setTransactionLoading(true);
-    setTransactionError(null);
-
-    try {
-      const program = getAnchorProgram(wallet);
-      const limitOrderPda = new PublicKey(id);
-
-      // Fetch limit order account from chain to resolve target room
-      const limitOrderData: any = await (program.account as any).limitOrder.fetch(limitOrderPda);
-      const roomPda = limitOrderData.room;
-
-      const tx = await (program.methods as any)
-        .cancelLimitOrder()
-        .accounts({
-          limitOrder: limitOrderPda,
-          room: roomPda,
-          user: wallet.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
-        ])
-        .rpc();
-
-      console.log("Limit order cancelled successfully on-chain! Tx:", tx);
-
-      // Update local state status
-      set((state) => {
-        const updated = state.limitOrders.map(o => o.id === id ? { ...o, status: 'cancelled' as const } : o);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('shitmarket_limit_orders', JSON.stringify(updated));
-        }
-        return { limitOrders: updated };
-      });
-
-      get().addActivity({
-        type: 'bet',
-        title: `CANCELLED LIMIT ORDER`,
-        message: `Locked SOL refunded trustlessly back to your wallet.`,
-        link: `/room/${roomPda.toBase58()}`
-      });
-
-      await get().fetchBalance();
-
-    } catch (err: any) {
-      console.error("Failed to cancel limit order on-chain:", err);
-      setTransactionError(err.message || String(err));
-      handleRpcError("tactical order abort", err);
-      throw err;
-    } finally {
-      setTransactionLoading(false);
-    }
-  },
-
-  checkLimitOrders: async (roomId: string, currentPrice: number) => {
-    const pendingOrders = get().limitOrders.filter(
-      (o) => o.roomId === roomId && o.status === 'pending'
-    );
-
-    if (pendingOrders.length === 0) return;
-
-    for (const order of pendingOrders) {
-      let isTriggered = false;
-      if (order.triggerDirection === 'below') {
-        isTriggered = currentPrice <= order.limitPrice;
-      } else {
-        isTriggered = currentPrice >= order.limitPrice;
-      }
-
-      if (isTriggered) {
-        console.log(`[Limit Order Triggered!] ID: ${order.id} | Token price ${currentPrice} matched target ${order.limitPrice}`);
-        
-        // Optimistically set status to triggered first to prevent double-firing
-        set((state) => {
-          const updated = state.limitOrders.map((o) =>
-            o.id === order.id ? { ...o, status: 'triggered' as const } : o
-          );
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('shitmarket_limit_orders', JSON.stringify(updated));
-          }
-          return { limitOrders: updated };
-        });
-
-        // Trigger on-chain bet!
-        try {
-          // Play tactical alert beep sound
-          if (typeof window !== 'undefined' && (window as any).playDAppSound) {
-            (window as any).playDAppSound('degen');
-          }
-
-          await get().placeBet(order.roomId, order.side, order.amount);
-
-          // Update status to executed
-          set((state) => {
-            const updated = state.limitOrders.map((o) =>
-              o.id === order.id ? { ...o, status: 'executed' as const } : o
-            );
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('shitmarket_limit_orders', JSON.stringify(updated));
-            }
-            return { limitOrders: updated };
-          });
-
-          get().addActivity({
-            type: 'win',
-            title: `🎯 LIMIT ORDER EXECUTED!`,
-            message: `Limit bet of ${order.amount} SOL on ${order.side.toUpperCase()} successfully deployed on-chain!`,
-            link: `/room/${order.roomId}`
-          });
-        } catch (err: any) {
-          console.error(`Failed to execute limit order ${order.id} on-chain:`, err);
-          
-          // Revert status to failed if on-chain tx failed
-          set((state) => {
-            const updated = state.limitOrders.map((o) =>
-              o.id === order.id ? { ...o, status: 'failed' as const } : o
-            );
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('shitmarket_limit_orders', JSON.stringify(updated));
-            }
-            return { limitOrders: updated };
-          });
-
-          get().addActivity({
-            type: 'settlement',
-            title: `⚠️ LIMIT ORDER FAILED`,
-            message: `Could not dispatch limit order ${order.amount} SOL: ${err.message || String(err)}`,
-            link: `/room/${order.roomId}`
-          });
-        }
-      }
-    }
-  },
-
-  executeLimitOrderLocal: (roomId: string, side: 'moon' | 'jeet', amount: number) => {
-    set((state) => {
-      const updated = state.limitOrders.map((o) => {
-        if (
-          o.status === 'pending' &&
-          o.roomId === roomId &&
-          o.side === side &&
-          Math.abs(o.amount - amount) < 0.001
-        ) {
-          return { ...o, status: 'executed' as const };
-        }
-        return o;
-      });
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('shitmarket_limit_orders', JSON.stringify(updated));
-      }
-      return { limitOrders: updated };
-    });
-  },
-
-  activateRoomLocal: (roomId: string, openingPrice: number, expiry: number) => {
-    set((state) => ({
-      rooms: state.rooms.map((r) =>
-        r.id === roomId
-          ? { ...r, status: 'active' as const, openingPrice, expiry }
-          : r
-      ),
-    }));
   }
 }));

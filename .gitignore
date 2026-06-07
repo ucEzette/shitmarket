@@ -55,6 +55,10 @@ target/
 # dumps and local databases
 dump.rdb
 test-ledger/
+.anchor/
+program/.anchor/
+reports/
+indexer/reports/
 
 # log files
 *.log

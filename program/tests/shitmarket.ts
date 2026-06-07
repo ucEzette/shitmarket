@@ -69,17 +69,6 @@ function deriveEscrow(room: PublicKey, programId: PublicKey): [PublicKey, number
 }
 
 
-function deriveLimitOrder(
-  user: PublicKey,
-  room: PublicKey,
-  nonce: number,
-  programId: PublicKey
-): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("limit_order"), user.toBuffer(), room.toBuffer(), Buffer.from([nonce])],
-    programId
-  );
-}
 
 // Mock token mint — we only store its pubkey on-chain, no real SPL mint needed
 const MOCK_TOKEN_MINT = Keypair.generate().publicKey;
@@ -202,8 +191,7 @@ describe("shitmarket", () => {
         30, // 30 minutes
         null, // no switchboard feed
         null, // no opening price override
-        0, // nonce
-        false // as_pending
+        0 // nonce
       )
       .accounts({
         room: roomPda,
@@ -233,7 +221,7 @@ describe("shitmarket", () => {
     const [otherRoom] = deriveRoom(otherMint, creator.publicKey, programId);
     try {
       await program.methods
-        .createRoom(otherMint, "BAD", 525601, null, null, 0, false)
+        .createRoom(otherMint, "BAD", 525601, null, null, 0)
         .accounts({
           room: otherRoom,
           escrow: deriveEscrow(otherRoom, programId)[0],
@@ -268,7 +256,7 @@ describe("shitmarket", () => {
     const [pausedRoom] = deriveRoom(pausedMint, creator.publicKey, programId);
     try {
       await program.methods
-        .createRoom(pausedMint, "PAUSED", 5, null, null, 0, false)
+        .createRoom(pausedMint, "PAUSED", 5, null, null, 0)
         .accounts({
           room: pausedRoom,
           escrow: deriveEscrow(pausedRoom, programId)[0],
@@ -481,7 +469,7 @@ describe("shitmarket", () => {
 
     it("creates an instantly-expired room (0-min)", async () => {
       await program.methods
-        .createRoom(fastMint, "FASTTOKEN", 0, null, null, 0, false)
+        .createRoom(fastMint, "FASTTOKEN", 0, null, null, 0)
         .accounts({
           room: fastRoomPda,
           escrow: fastEscrowPda,
@@ -760,7 +748,7 @@ describe("shitmarket", () => {
       this.timeout(400_000);
 
       await program.methods
-        .createRoom(edgeMint, "LONELY", 0, null, null, 0, false)
+        .createRoom(edgeMint, "LONELY", 0, null, null, 0)
         .accounts({
           room: edgeRoomPda,
           escrow: edgeEscrowPda,
@@ -827,281 +815,5 @@ describe("shitmarket", () => {
     });
   });
 
-  describe("limit orders", () => {
-    const limitMint = Keypair.generate().publicKey;
-    const limitCreator = Keypair.generate();
-    const bettor = Keypair.generate();
-    const relayer = Keypair.generate();
-    
-    let limitRoomPda: PublicKey;
-    let limitEscrowPda: PublicKey;
-    let orderPda0: PublicKey;
-    let orderPda1: PublicKey;
-    let betPda: PublicKey;
 
-    before(async () => {
-      await Promise.all([
-        airdrop(provider, limitCreator.publicKey, 5),
-        airdrop(provider, bettor.publicKey, 10),
-        airdrop(provider, relayer.publicKey, 2),
-      ]);
-
-      [limitRoomPda] = deriveRoom(limitMint, limitCreator.publicKey, programId);
-      [limitEscrowPda] = deriveEscrow(limitRoomPda, programId);
-      [orderPda0] = deriveLimitOrder(bettor.publicKey, limitRoomPda, 0, programId);
-      [orderPda1] = deriveLimitOrder(bettor.publicKey, limitRoomPda, 1, programId);
-      [betPda] = deriveBet(limitRoomPda, bettor.publicKey, "moon", programId);
-    });
-
-    it("creates a room for limit order betting", async () => {
-      await program.methods
-        .createRoom(limitMint, "LIMITOK", 30, null, null, 0, false)
-        .accounts({
-          room: limitRoomPda,
-          escrow: limitEscrowPda,
-          creator: limitCreator.publicKey,
-          priceFeed: MOCK_PRICE_FEED.publicKey,
-          switchboardFeed: PublicKey.default,
-          config: configPda,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([limitCreator])
-        .rpc();
-      
-      const r = await program.account.room.fetch(limitRoomPda);
-      assert.deepEqual(r.status, { active: {} });
-    });
-
-    it("queues and funds a secure escrow-based limit order", async () => {
-      const orderAmount = new BN(1.5 * LAMPORTS_PER_SOL);
-      const limitPrice = new BN(1_600_000_000); // Trigger when <= $16.00
-      
-      await program.methods
-        .createLimitOrder(
-          { moon: {} },
-          orderAmount,
-          limitPrice,
-          0, // trigger_direction: 0 (below)
-          0, // nonce
-          50 // max_slippage_bps
-        )
-        .accounts({
-          limitOrder: orderPda0,
-          room: limitRoomPda,
-          user: bettor.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([bettor])
-        .rpc();
-
-      const order = await program.account.limitOrder.fetch(orderPda0);
-      assert.equal(order.user.toBase58(), bettor.publicKey.toBase58());
-      assert.equal(order.room.toBase58(), limitRoomPda.toBase58());
-      assert.deepEqual(order.side, { moon: {} });
-      assert.isTrue(order.amount.eq(orderAmount));
-      assert.isTrue(order.limitPrice.eq(limitPrice));
-      assert.equal(order.triggerDirection, 0);
-      assert.equal(order.nonce, 0);
-      assert.equal(order.status, 0); // Pending
-
-      // Verify the limit order PDA is funded
-      const orderBal = await provider.connection.getBalance(orderPda0);
-      assert.isAtLeast(orderBal, orderAmount.toNumber());
-    });
-
-    it("cancels a limit order and refunds 100% of escrowed SOL", async () => {
-      const orderAmount = new BN(1 * LAMPORTS_PER_SOL);
-      const limitPrice = new BN(1_600_000_000);
-      
-      // 1. Create order 1
-      await program.methods
-        .createLimitOrder(
-          { moon: {} },
-          orderAmount,
-          limitPrice,
-          0,
-          1, // nonce: 1
-          50
-        )
-        .accounts({
-          limitOrder: orderPda1,
-          room: limitRoomPda,
-          user: bettor.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([bettor])
-        .rpc();
-
-      const userBefore = await provider.connection.getBalance(bettor.publicKey);
-
-      // 2. Cancel order 1
-      await program.methods
-        .cancelLimitOrder()
-        .accounts({
-          limitOrder: orderPda1,
-          room: limitRoomPda,
-          user: bettor.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([bettor])
-        .rpc();
-
-      try {
-        await program.account.limitOrder.fetch(orderPda1);
-        assert.fail("Account should have been deleted");
-      } catch (err: any) {
-        expect(err.message).to.include("Account does not exist");
-      }
-
-      const userAfter = await provider.connection.getBalance(bettor.publicKey);
-      // User got refunded, so balance should be back minus a tiny gas fee
-      assert.isAbove(userAfter - userBefore, 0.99 * LAMPORTS_PER_SOL);
-    });
-
-    it("executes a limit order autonomously signed by a relayer", async () => {
-      // Current Pyth feed mock price is $150.00, which is <= $160.00 (trigger condition met!)
-      const roomBefore = await program.account.room.fetch(limitRoomPda);
-      assert.isTrue(roomBefore.moonPool.eq(new BN(0)));
-
-      // Pre-fetch order data before execution closes the account
-      const order = await program.account.limitOrder.fetch(orderPda0);
-
-      await program.methods
-        .executeLimitOrder()
-        .accounts({
-          limitOrder: orderPda0,
-          room: limitRoomPda,
-          escrow: limitEscrowPda,
-          bet: betPda,
-          priceFeed: MOCK_PRICE_FEED.publicKey,
-          relayer: relayer.publicKey,
-          config: configPda,
-          user: bettor.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([relayer])
-        .rpc();
-
-      try {
-        await program.account.limitOrder.fetch(orderPda0);
-        assert.fail("Account should have been deleted");
-      } catch (err: any) {
-        expect(err.message).to.include("Account does not exist");
-      }
-
-      const roomAfter = await program.account.room.fetch(limitRoomPda);
-      assert.isTrue(roomAfter.moonPool.eq(order.amount));
-
-      const bet = await program.account.bet.fetch(betPda);
-      assert.isTrue(bet.amount.eq(order.amount));
-    });
-  });
-
-  describe("pending limit-seeded rooms", () => {
-    const pendingMint = Keypair.generate().publicKey;
-    const pendingCreator = Keypair.generate();
-    const pendingBettor = Keypair.generate();
-    const relayer = Keypair.generate();
-    let pendingRoomPda: PublicKey;
-    let pendingEscrowPda: PublicKey;
-    let pendingOrderPda: PublicKey;
-    let pendingBetPda: PublicKey;
-
-    before(async () => {
-      await Promise.all([
-        airdrop(provider, pendingCreator.publicKey, 5),
-        airdrop(provider, pendingBettor.publicKey, 10),
-        airdrop(provider, relayer.publicKey, 2),
-      ]);
-      [pendingRoomPda] = deriveRoom(pendingMint, pendingCreator.publicKey, programId);
-      [pendingEscrowPda] = deriveEscrow(pendingRoomPda, programId);
-      [pendingOrderPda] = deriveLimitOrder(pendingBettor.publicKey, pendingRoomPda, 0, programId);
-      [pendingBetPda] = deriveBet(pendingRoomPda, pendingBettor.publicKey, "moon", programId);
-    });
-
-    it("creates a room as pending", async () => {
-      await program.methods
-        .createRoom(pendingMint, "PENDINGCOIN", 60, null, new BN(2_000_000_000), 0, true) // as_pending = true, init price $20.00
-        .accounts({
-          room: pendingRoomPda,
-          escrow: pendingEscrowPda,
-          creator: pendingCreator.publicKey,
-          priceFeed: MOCK_PRICE_FEED.publicKey,
-          switchboardFeed: PublicKey.default,
-          config: configPda,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([pendingCreator])
-        .rpc();
-
-      const r = await program.account.room.fetch(pendingRoomPda);
-      assert.deepEqual(r.status, { pending: {} });
-      assert.equal(r.expiryTimestamp.toNumber(), 0); // Countdown has NOT started
-    });
-
-    it("rejects normal market bets while pending", async () => {
-      try {
-        await program.methods
-          .placeBet({ moon: {} }, new BN(LAMPORTS_PER_SOL))
-          .accounts({
-            room: pendingRoomPda,
-            escrow: pendingEscrowPda,
-            bet: pendingBetPda,
-            user: pendingBettor.publicKey,
-            config: configPda,
-            systemProgram: SystemProgram.programId,
-          })
-          .signers([pendingBettor])
-          .rpc();
-        assert.fail("Should have failed - room is not active");
-      } catch (err: any) {
-        expect(err.message).to.include("RoomNotActive");
-      }
-    });
-
-    it("queues and activates room upon limit order execution", async () => {
-      // Queue a limit order to trigger when price is >= $15.00
-      const orderAmount = new BN(LAMPORTS_PER_SOL);
-      const limitPrice = new BN(1_500_000_000); 
-
-      await program.methods
-        .createLimitOrder({ moon: {} }, orderAmount, limitPrice, 1, 0, 100) // trigger_direction = 1 (spot >= limitPrice)
-        .accounts({
-          limitOrder: pendingOrderPda,
-          room: pendingRoomPda,
-          user: pendingBettor.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([pendingBettor])
-        .rpc();
-
-      // Trigger condition is met if current_price >= $15.00 (sentinel evaluates to room's opening price $20.00)
-
-      // Execute the limit order
-      await program.methods
-        .executeLimitOrder()
-        .accounts({
-          limitOrder: pendingOrderPda,
-          room: pendingRoomPda,
-          escrow: pendingEscrowPda,
-          bet: pendingBetPda,
-          priceFeed: MOCK_PRICE_FEED.publicKey,
-          relayer: relayer.publicKey,
-          config: configPda,
-          user: pendingBettor.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([relayer])
-        .rpc();
-
-      // Verify room status has transitioned to Active
-      const r = await program.account.room.fetch(pendingRoomPda);
-      assert.deepEqual(r.status, { active: {} });
-      assert.equal(r.openingPrice.toNumber(), 2_000_000_000); // sentinel evaluates to room's opening price $20.00
-      assert.isAbove(r.expiryTimestamp.toNumber(), 0); // Countdown has started!
-      
-      const b = await program.account.bet.fetch(pendingBetPda);
-      assert.equal(b.amount.toNumber(), LAMPORTS_PER_SOL);
-    });
-  });
 });

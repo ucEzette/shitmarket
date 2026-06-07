@@ -49,18 +49,24 @@ try {
 }
 
 async function airdrop(connection: Connection, pubkey: PublicKey, sol: number): Promise<void> {
-  if (deployer) {
-    const tx = new anchor.web3.Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: deployer.publicKey,
-        toPubkey: pubkey,
-        lamports: sol * LAMPORTS_PER_SOL,
-      })
-    );
-    await anchor.web3.sendAndConfirmTransaction(connection, tx, [deployer], { commitment: 'confirmed' });
-  } else {
-    const sig = await connection.requestAirdrop(pubkey, sol * LAMPORTS_PER_SOL);
-    await connection.confirmTransaction(sig, 'confirmed');
+  try {
+    for (let i = 0; i < sol; i++) {
+      const sig = await connection.requestAirdrop(pubkey, LAMPORTS_PER_SOL);
+      await connection.confirmTransaction(sig, 'confirmed');
+    }
+  } catch (err) {
+    if (deployer) {
+      const tx = new anchor.web3.Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: deployer.publicKey,
+          toPubkey: pubkey,
+          lamports: sol * LAMPORTS_PER_SOL,
+        })
+      );
+      await anchor.web3.sendAndConfirmTransaction(connection, tx, [deployer], { commitment: 'confirmed' });
+    } else {
+      throw err;
+    }
   }
 }
 

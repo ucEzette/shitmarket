@@ -6,7 +6,7 @@ pub mod price;
 pub mod pyth;
 
 use error::ShitMarketError;
-use price::{calc_payout, calc_platform_fee, moon_wins, compute_ema};
+use price::{calc_payout, calc_platform_fee, compute_ema};
 use pyth::load_price_feed_price;
 
 declare_id!("2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ");
@@ -20,7 +20,7 @@ const SECONDS_PER_MINUTE: i64 = 60;
 const TOKEN_NAME_LEN: usize = 32;
 const MINIMUM_LIQUIDITY_SOL: u64 = 100_000_000; // 0.1 SOL minimum pool requirement
 const MAX_TWAP_SAMPLES: usize = 5; // number of price samples to store for TWAP
-const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
+
 
 // ─────────────────────────────────────────────
 //  ENUMS
@@ -186,33 +186,7 @@ impl Bet {
     pub const LEN: usize = 8 + 32 + 32 + 1 + 8 + 1 + 1;
 }
 
-#[account]
-pub struct LimitOrder {
-    /// The wallet that created and funded this limit order.
-    pub user: Pubkey,
-    /// The prediction room this limit order targets.
-    pub room: Pubkey,
-    /// Moon or Jeet side.
-    pub side: Side,
-    /// Total amount locked in escrow (lamports).
-    pub amount: u64,
-    /// Target execution price (USD x 1e8).
-    pub limit_price: i64,
-    /// Trigger direction: 0 = Spot <= Limit (MOON), 1 = Spot >= Limit (JEET).
-    pub trigger_direction: u8,
-    /// Unique user-specific order nonce.
-    pub nonce: u8,
-    /// Current order state: 0 = Pending, 1 = Executed, 2 = Cancelled.
-    pub status: u8,
-    /// Max slippage accepted (basis points) relative to pool ratio when executing.
-    pub max_slippage_bps: u16,
-    pub bump: u8,
-}
 
-impl LimitOrder {
-    // 8 discrim + 32 user + 32 room + 1 side + 8 amount + 8 price + 1 direction + 1 nonce + 1 status + 2 slippage + 1 bump = 95 bytes
-    pub const LEN: usize = 8 + 32 + 32 + 1 + 8 + 8 + 1 + 1 + 1 + 2 + 1;
-}
 
 
 // Reputation struct scrapped
@@ -233,12 +207,7 @@ pub struct RoomCreated {
     pub expiry_timestamp: i64,
 }
 
-#[event]
-pub struct RoomActivated {
-    pub room: Pubkey,
-    pub opening_price: i64,
-    pub expiry_timestamp: i64,
-}
+
 
 #[event]
 pub struct BetPlaced {
@@ -315,8 +284,7 @@ pub struct Initialize<'info> {
     duration_minutes: u32,
     switchboard_feed: Option<Pubkey>,
     opening_price_param: Option<i64>,
-    nonce: u8,
-    as_pending: bool
+    nonce: u8
 )]
 pub struct CreateRoom<'info> {
     #[account(
@@ -535,99 +503,7 @@ pub struct PausePlatform<'info> {
 
 // Reputation instructions scrapped
 
-#[derive(Accounts)]
-#[instruction(side: Side, amount: u64, limit_price: i64, trigger_direction: u8, nonce: u8, max_slippage_bps: u16)]
-pub struct CreateLimitOrder<'info> {
-    #[account(
-        init,
-        payer = user,
-        space = LimitOrder::LEN,
-        seeds = [b"limit_order", user.key().as_ref(), room.key().as_ref(), &[nonce]],
-        bump
-    )]
-    pub limit_order: Account<'info, LimitOrder>,
 
-    #[account(constraint = room.status == RoomStatus::Active || room.status == RoomStatus::Pending @ ShitMarketError::RoomNotActive)]
-    pub room: Account<'info, Room>,
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct ExecuteLimitOrder<'info> {
-    #[account(
-        mut,
-        close = user,
-        seeds = [b"limit_order", limit_order.user.as_ref(), room.key().as_ref(), &[limit_order.nonce]],
-        bump = limit_order.bump,
-        constraint = limit_order.status == 0 @ ShitMarketError::OrderNotPending
-    )]
-    pub limit_order: Account<'info, LimitOrder>,
-
-    #[account(
-        mut,
-        constraint = room.key() == limit_order.room @ ShitMarketError::InvalidRoom,
-        constraint = room.status == RoomStatus::Active || room.status == RoomStatus::Pending @ ShitMarketError::RoomNotActive
-    )]
-    pub room: Account<'info, Room>,
-
-    /// CHECK: Room escrow PDA to receive the locked limit funds.
-    #[account(mut, seeds = [b"escrow", room.key().as_ref()], bump)]
-    pub escrow: UncheckedAccount<'info>,
-
-    #[account(
-        init_if_needed,
-        payer = relayer,
-        space = Bet::LEN,
-        seeds = [
-            b"bet", 
-            room.key().as_ref(), 
-            limit_order.user.as_ref(),
-            &[match limit_order.side { Side::Moon => 0, Side::Jeet => 1 }]
-        ],
-        bump
-    )]
-    pub bet: Account<'info, Bet>,
-
-    /// CHECK: Primary price feed (Pyth). Validated by Pyth helper.
-    pub price_feed: UncheckedAccount<'info>,
-
-    #[account(mut)]
-    pub relayer: Signer<'info>,
-
-    #[account(seeds = [b"platform_config"], bump)]
-    pub config: Account<'info, PlatformConfig>,
-
-    /// CHECK: Recipient of the limit order rent refund.
-    #[account(mut, constraint = user.key() == limit_order.user)]
-    pub user: UncheckedAccount<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct CancelLimitOrder<'info> {
-    #[account(
-        mut,
-        close = user,
-        seeds = [b"limit_order", user.key().as_ref(), room.key().as_ref(), &[limit_order.nonce]],
-        bump = limit_order.bump,
-        constraint = limit_order.user == user.key() @ ShitMarketError::Unauthorized,
-        constraint = limit_order.status == 0 @ ShitMarketError::OrderNotPending
-    )]
-    pub limit_order: Account<'info, LimitOrder>,
-
-    #[account(constraint = room.key() == limit_order.room @ ShitMarketError::InvalidRoom)]
-    pub room: Account<'info, Room>,
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
 
 // ─────────────────────────────────────────────
 //  PROGRAM
@@ -672,15 +548,14 @@ pub mod shitmarket {
 
     /// Create a new prediction room. Snapshot opening price from Pyth.
     /// Requires config.paused == false.
-        pub fn create_room(
+    pub fn create_room(
         ctx: Context<CreateRoom>,
         token_mint: Pubkey,
         token_name: String,
         duration_minutes: u32,
         switchboard_feed: Option<Pubkey>,
         opening_price_param: Option<i64>,
-        nonce: u8,
-        as_pending: bool,
+        _nonce: u8,
     ) -> Result<()> {
         // Circuit breaker: platform must not be paused
         require!(!ctx.accounts.config.paused, ShitMarketError::Paused);
@@ -692,12 +567,8 @@ pub mod shitmarket {
         );
 
         // Validate Pyth price feed and snapshot the opening price.
-        let is_sentinel = ctx.accounts.price_feed.key() == anchor_lang::system_program::ID 
-            || ctx.accounts.price_feed.owner == &anchor_lang::system_program::ID 
-            || ctx.accounts.price_feed.data_is_empty();
-
-        let opening_price = if is_sentinel && opening_price_param.is_some() {
-            opening_price_param.unwrap()
+        let opening_price = if let Some(custom_price) = opening_price_param {
+            custom_price
         } else {
             load_price_feed_price(&ctx.accounts.price_feed.to_account_info())?
         };
@@ -722,7 +593,7 @@ pub mod shitmarket {
         room.token_name = name_bytes;
         room.price_feed = ctx.accounts.price_feed.key();
         room.switchboard_feed = switchboard_feed.unwrap_or(Pubkey::default());
-        room.opening_price = if as_pending { 0 } else { opening_price };
+        room.opening_price = opening_price;
         room.opening_timestamp = now;
         room.duration_minutes = duration_minutes;
         room.moon_pool = 0;
@@ -736,13 +607,8 @@ pub mod shitmarket {
         room.twap_final_price = 0;
         room.bump = ctx.bumps.room;
 
-        if as_pending {
-            room.status = RoomStatus::Pending;
-            room.expiry_timestamp = 0; // indicates countdown hasn't started
-        } else {
-            room.status = RoomStatus::Active;
-            room.expiry_timestamp = expiry;
-        }
+        room.status = RoomStatus::Active;
+        room.expiry_timestamp = expiry;
 
         emit!(RoomCreated {
             room: room_key,
@@ -755,7 +621,7 @@ pub mod shitmarket {
             expiry_timestamp: room.expiry_timestamp,
         });
 
-        msg!("Room created: {} ({}) as_pending={}", room.token_name_str(), room.token_mint, as_pending);
+        msg!("Room created: {} ({})", room.token_name_str(), room.token_mint);
         Ok(())
     }
 
@@ -1137,229 +1003,6 @@ pub mod shitmarket {
 
 
 
-    // ── create_limit_order ──────────────────────────────────────────────
 
-    /// Fund and queue a secure, on-chain escrow-based limit order.
-    pub fn create_limit_order(
-        ctx: Context<CreateLimitOrder>,
-        side: Side,
-        amount: u64,
-        limit_price: i64,
-        trigger_direction: u8,
-        nonce: u8,
-        max_slippage_bps: u16,
-    ) -> Result<()> {
-        let now = Clock::get()?.unix_timestamp;
-        let room = &ctx.accounts.room;
-        if room.status == RoomStatus::Active {
-            require!(!room.is_expired(now), ShitMarketError::RoomExpired);
-        } else {
-            require!(room.status == RoomStatus::Pending, ShitMarketError::RoomNotActive);
-        }
-        require!(amount > 0, ShitMarketError::ZeroBetAmount);
-
-        // CPI transfer SOL from user → limit_order PDA account
-        let cpi_ctx = CpiContext::new(
-            ctx.accounts.system_program.to_account_info(),
-            system_program::Transfer {
-                from: ctx.accounts.user.to_account_info(),
-                to: ctx.accounts.limit_order.to_account_info(),
-            },
-        );
-        system_program::transfer(cpi_ctx, amount)?;
-
-        let limit_order = &mut ctx.accounts.limit_order;
-        limit_order.user = ctx.accounts.user.key();
-        limit_order.room = ctx.accounts.room.key();
-        limit_order.side = side;
-        limit_order.amount = amount;
-        limit_order.limit_price = limit_price;
-        limit_order.trigger_direction = trigger_direction;
-        limit_order.nonce = nonce;
-        limit_order.status = 0; // Pending
-        limit_order.max_slippage_bps = max_slippage_bps;
-        limit_order.bump = ctx.bumps.limit_order;
-
-        msg!(
-            "Limit order created: user={} room={} amount={} limit_price={} direction={}",
-            limit_order.user,
-            limit_order.room,
-            amount,
-            limit_price,
-            trigger_direction
-        );
-        Ok(())
-    }
-
-    // ── execute_limit_order ──────────────────────────────────────────────
-
-    /// Executed autonomously by keepers when target price thresholds are crossed.
-    /// On-chain price validation checks Pyth oracle before executing.
-    pub fn execute_limit_order(
-        ctx: Context<ExecuteLimitOrder>,
-    ) -> Result<()> {
-        let room = &mut ctx.accounts.room;
-        let limit_order = &mut ctx.accounts.limit_order;
-        let now = Clock::get()?.unix_timestamp;
-
-        require!(
-            room.status == RoomStatus::Active || room.status == RoomStatus::Pending,
-            ShitMarketError::RoomNotActive
-        );
-        
-        if room.status == RoomStatus::Active {
-            require!(!room.is_expired(now), ShitMarketError::RoomExpired);
-        }
-        
-        require!(limit_order.status == 0, ShitMarketError::OrderNotPending);
-
-        // Validate Pyth price feed on-chain
-        require!(ctx.accounts.price_feed.key() == room.price_feed, ShitMarketError::InvalidPythFeed);
-        
-        let is_sentinel = ctx.accounts.price_feed.key() == anchor_lang::system_program::ID 
-            || ctx.accounts.price_feed.owner == &anchor_lang::system_program::ID 
-            || ctx.accounts.price_feed.data_is_empty();
-
-        let current_price = if is_sentinel {
-            if room.status == RoomStatus::Pending {
-                limit_order.limit_price
-            } else {
-                room.opening_price
-            }
-        } else {
-            load_price_feed_price(&ctx.accounts.price_feed.to_account_info())?
-        };
-
-        // Check trigger condition: 0 = below, 1 = above
-        let is_triggered = if is_sentinel {
-            true // Trust the keeper for devnet mock/sentinel feeds
-        } else if limit_order.trigger_direction == 0 {
-            current_price <= limit_order.limit_price
-        } else {
-            current_price >= limit_order.limit_price
-        };
-
-        require!(is_triggered, ShitMarketError::TriggerConditionNotMet);
-
-        // If the room was pending execution, activate it now!
-        if room.status == RoomStatus::Pending {
-            room.status = RoomStatus::Active;
-            room.opening_price = current_price;
-            room.opening_timestamp = now;
-            room.expiry_timestamp = now
-                .checked_add((room.duration_minutes as i64).checked_mul(SECONDS_PER_MINUTE).ok_or(ShitMarketError::Overflow)?)
-                .ok_or(ShitMarketError::Overflow)?;
-            msg!(
-                "Limit order activated Pending room: new_opening_price={} expiry_timestamp={}",
-                room.opening_price,
-                room.expiry_timestamp
-            );
-            emit!(RoomActivated {
-                room: room.key(),
-                opening_price: room.opening_price,
-                expiry_timestamp: room.expiry_timestamp,
-            });
-        }
-
-        // Lock in execution status before transfer (reentrancy guard)
-        limit_order.status = 1; // Executed
-
-        let amount = limit_order.amount;
-        let side = limit_order.side;
-        
-        // Transfer escrowed lamports from limit_order PDA → room escrow account
-        let order_info = limit_order.to_account_info();
-        let escrow_info = ctx.accounts.escrow.to_account_info();
-
-        **order_info.lamports.borrow_mut() = order_info
-            .lamports()
-            .checked_sub(amount)
-            .ok_or(ShitMarketError::Underflow)?;
-        **escrow_info.lamports.borrow_mut() = escrow_info
-            .lamports()
-            .checked_add(amount)
-            .ok_or(ShitMarketError::Overflow)?;
-
-        // Update room pools
-        match side {
-            Side::Moon => {
-                room.moon_pool = room.moon_pool
-                    .checked_add(amount)
-                    .ok_or(ShitMarketError::Overflow)?;
-            }
-            Side::Jeet => {
-                room.jeet_pool = room.jeet_pool
-                    .checked_add(amount)
-                    .ok_or(ShitMarketError::Overflow)?;
-            }
-        }
-
-        // Initialize / Update Bet Account for the user
-        let bet = &mut ctx.accounts.bet;
-        if bet.amount == 0 && bet.room == Pubkey::default() {
-            bet.room = room.key();
-            bet.user = limit_order.user;
-            bet.side = side;
-            bet.claimed = false;
-            bet.bump = ctx.bumps.bet;
-        } else {
-            require!(bet.side == side, ShitMarketError::SideMismatch);
-        }
-        bet.amount = bet.amount
-            .checked_add(amount)
-            .ok_or(ShitMarketError::Overflow)?;
-
-        emit!(BetPlaced {
-            room: room.key(),
-            user: limit_order.user,
-            side: if side == Side::Moon { 0 } else { 1 },
-            amount,
-            moon_pool: room.moon_pool,
-            jeet_pool: room.jeet_pool,
-        });
-
-        msg!(
-            "Limit order executed: user={} amount={} side={} | MoonPool={} JeetPool={}",
-            limit_order.user,
-            amount,
-            if side == Side::Moon { "MOON" } else { "JEET" },
-            room.moon_pool,
-            room.jeet_pool
-        );
-        Ok(())
-    }
-
-    // ── cancel_limit_order ──────────────────────────────────────────────
-
-    /// Cancel order trustlessly while pending and refund 100% of escrowed SOL.
-    pub fn cancel_limit_order(
-        ctx: Context<CancelLimitOrder>,
-    ) -> Result<()> {
-        let limit_order = &mut ctx.accounts.limit_order;
-        require!(limit_order.status == 0, ShitMarketError::OrderNotPending);
-
-        limit_order.status = 2; // Cancelled
-
-        let amount = limit_order.amount;
-        let order_info = limit_order.to_account_info();
-        let user_info = ctx.accounts.user.to_account_info();
-
-        // Refund all escrowed funds back to the user
-        **order_info.lamports.borrow_mut() = order_info
-            .lamports()
-            .checked_sub(amount)
-            .ok_or(ShitMarketError::Underflow)?;
-        **user_info.lamports.borrow_mut() = user_info
-            .lamports()
-            .checked_add(amount)
-            .ok_or(ShitMarketError::Overflow)?;
-
-        msg!(
-            "Limit order cancelled: user={} amount={} returned",
-            limit_order.user,
-            amount
-        );
-        Ok(())
-    }
 }
 

@@ -85,6 +85,43 @@ const newInstructions = [
       { name: "systemProgram" }
     ],
     args: []
+  },
+  {
+    name: "registerReferral",
+    rustName: "register_referral",
+    accounts: [
+      { name: "userReferral", writable: true },
+      { name: "user", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: [
+      { name: "referrer", type: "pubkey" }
+    ]
+  },
+  {
+    name: "claimReferralRewards",
+    rustName: "claim_referral_rewards",
+    accounts: [
+      { name: "referralState", writable: true },
+      { name: "vault", writable: true },
+      { name: "referrer", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: []
+  },
+  {
+    name: "withdrawVaultFees",
+    rustName: "withdraw_vault_fees",
+    accounts: [
+      { name: "config" },
+      { name: "vault", writable: true },
+      { name: "treasury", writable: true },
+      { name: "admin", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: [
+      { name: "amount", type: "u64" }
+    ]
   }
 ];
 
@@ -176,6 +213,100 @@ if (existingRoomActivatedEventIndex >= 0) {
 } else {
   idl.events.push(roomActivatedEvent);
 }
+
+// 3.7. Add UserReferral & ReferralState types
+const userReferralType = {
+  name: "UserReferral",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "user", type: "pubkey" },
+      { name: "referrer", type: "pubkey" },
+      { name: "bump", type: "u8" }
+    ]
+  }
+};
+const referralStateType = {
+  name: "ReferralState",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "referrer", type: "pubkey" },
+      { name: "unclaimedRewards", type: "u64" },
+      { name: "claimedRewards", type: "u64" },
+      { name: "bump", type: "u8" }
+    ]
+  }
+};
+[userReferralType, referralStateType].forEach(t => {
+  const existingIdx = idl.types.findIndex(item => item.name === t.name);
+  if (existingIdx >= 0) idl.types[existingIdx] = t;
+  else idl.types.push(t);
+});
+
+// 3.8. Add UserReferral & ReferralState accounts
+const userReferralAccount = {
+  name: "userReferral",
+  discriminator: getAccountDiscriminator("UserReferral")
+};
+const referralStateAccount = {
+  name: "referralState",
+  discriminator: getAccountDiscriminator("ReferralState")
+};
+[userReferralAccount, referralStateAccount].forEach(a => {
+  const existingIdx = idl.accounts.findIndex(item => item.name === a.name);
+  if (existingIdx >= 0) idl.accounts[existingIdx] = a;
+  else idl.accounts.push(a);
+});
+
+// 3.9. Add Referral Event Types
+const referralRegisteredType = {
+  name: "ReferralRegistered",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "user", type: "pubkey" },
+      { name: "referrer", type: "pubkey" }
+    ]
+  }
+};
+const referralRewardAccruedType = {
+  name: "ReferralRewardAccrued",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "referrer", type: "pubkey" },
+      { name: "invitee", type: "pubkey" },
+      { name: "room", type: "pubkey" },
+      { name: "rewardAmount", type: "u64" }
+    ]
+  }
+};
+const referralRewardsClaimedType = {
+  name: "ReferralRewardsClaimed",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "referrer", type: "pubkey" },
+      { name: "amount", type: "u64" }
+    ]
+  }
+};
+[referralRegisteredType, referralRewardAccruedType, referralRewardsClaimedType].forEach(t => {
+  const existingIdx = idl.types.findIndex(item => item.name === t.name);
+  if (existingIdx >= 0) idl.types[existingIdx] = t;
+  else idl.types.push(t);
+});
+
+// 3.10. Add Referral Events
+const referralRegisteredEvent = { name: "ReferralRegistered", discriminator: getEventDiscriminator("ReferralRegistered") };
+const referralRewardAccruedEvent = { name: "ReferralRewardAccrued", discriminator: getEventDiscriminator("ReferralRewardAccrued") };
+const referralRewardsClaimedEvent = { name: "ReferralRewardsClaimed", discriminator: getEventDiscriminator("ReferralRewardsClaimed") };
+[referralRegisteredEvent, referralRewardAccruedEvent, referralRewardsClaimedEvent].forEach(e => {
+  const existingIdx = idl.events.findIndex(item => item.name === e.name);
+  if (existingIdx >= 0) idl.events[existingIdx] = e;
+  else idl.events.push(e);
+});
 
 // 4. Save patched IDL back to all destinations
 idlPaths.forEach(p => {

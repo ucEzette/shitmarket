@@ -7,6 +7,7 @@ import { Header } from './Header';
 import { Footer } from './Footer';
 import { WalletAdapterBridge } from './WalletAdapterBridge';
 import { MemePopup, PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from './MemeAssets';
+import { ShareCardModal } from './ShareCardModal';
 import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Link from 'next/link';
@@ -828,6 +829,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
 
       {/* Random Degen Meme Popups */}
       <MemePopup triggerInterval={20000} />
+
+      {/* Shareable Wager Card Telemetry Modal */}
+      <ShareCardModal />
     </div>
   );
 };

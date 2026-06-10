@@ -192,7 +192,20 @@ impl Bet {
 
 
 
-// Reputation struct scrapped
+#[account]
+pub struct UserReferral {
+    pub user: Pubkey,
+    pub referrer: Pubkey,
+    pub bump: u8,
+}
+
+#[account]
+pub struct ReferralState {
+    pub referrer: Pubkey,
+    pub unclaimed_rewards: u64,
+    pub claimed_rewards: u64,
+    pub bump: u8,
+}
 
 // ─────────────────────────────────────────────
 //  EVENTS
@@ -261,7 +274,25 @@ pub struct EscrowSwept {
     pub amount: u64,
 }
 
-// ReputationUpdated event scrapped
+#[event]
+pub struct ReferralRegistered {
+    pub user: Pubkey,
+    pub referrer: Pubkey,
+}
+
+#[event]
+pub struct ReferralRewardAccrued {
+    pub referrer: Pubkey,
+    pub invitee: Pubkey,
+    pub room: Pubkey,
+    pub reward_amount: u64,
+}
+
+#[event]
+pub struct ReferralRewardsClaimed {
+    pub referrer: Pubkey,
+    pub amount: u64,
+}
 
 // ─────────────────────────────────────────────
 //  INSTRUCTION ACCOUNTS
@@ -389,12 +420,13 @@ pub struct SettleRoom<'info> {
     )]
     pub escrow: UncheckedAccount<'info>,
 
-    /// CHECK: Treasury from PlatformConfig; must match config.treasury.
+    /// CHECK: Vault PDA holding platform fees
     #[account(
         mut,
-        constraint = treasury.key() == config.treasury @ ShitMarketError::Unauthorized
+        seeds = [b"vault"],
+        bump
     )]
-    pub treasury: UncheckedAccount<'info>,
+    pub vault: UncheckedAccount<'info>,
 
     /// CHECK: Primary price feed (Pyth). Validated by Pyth helper.
     pub price_feed: UncheckedAccount<'info>,
@@ -543,7 +575,76 @@ pub struct PausePlatform<'info> {
     pub admin: Signer<'info>,
 }
 
-// Reputation instructions scrapped
+#[derive(Accounts)]
+pub struct RegisterReferral<'info> {
+    #[account(
+        init,
+        payer = user,
+        space = 8 + 32 + 32 + 1,
+        seeds = [b"user_referral", user.key().as_ref()],
+        bump
+    )]
+    pub user_referral: Account<'info, UserReferral>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClaimReferralRewards<'info> {
+    #[account(
+        mut,
+        seeds = [b"referral_state", referrer.key().as_ref()],
+        bump = referral_state.bump,
+        constraint = referral_state.referrer == referrer.key() @ ShitMarketError::Unauthorized
+    )]
+    pub referral_state: Account<'info, ReferralState>,
+
+    /// CHECK: Vault PDA holding the platform fees
+    #[account(
+        mut,
+        seeds = [b"vault"],
+        bump
+    )]
+    pub vault: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub referrer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct WithdrawVaultFees<'info> {
+    #[account(
+        seeds = [b"platform_config"],
+        bump = config.bump,
+        constraint = admin.key() == config.admin @ ShitMarketError::Unauthorized
+    )]
+    pub config: Account<'info, PlatformConfig>,
+
+    /// CHECK: Vault PDA holding the platform fees
+    #[account(
+        mut,
+        seeds = [b"vault"],
+        bump
+    )]
+    pub vault: UncheckedAccount<'info>,
+
+    /// CHECK: Treasury account to receive the fees; must match config.treasury.
+    #[account(
+        mut,
+        constraint = treasury.key() == config.treasury @ ShitMarketError::Unauthorized
+    )]
+    pub treasury: UncheckedAccount<'info>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
 
 
 
@@ -868,13 +969,13 @@ pub mod shitmarket {
 
         if platform_fee > 0 && total_pool > 0 {
             let escrow_info = ctx.accounts.escrow.to_account_info();
-            let treasury_info = ctx.accounts.treasury.to_account_info();
+            let vault_info = ctx.accounts.vault.to_account_info();
 
             **escrow_info.lamports.borrow_mut() = escrow_info
                 .lamports()
                 .checked_sub(platform_fee)
                 .ok_or(ShitMarketError::Underflow)?;
-            **treasury_info.lamports.borrow_mut() = treasury_info
+            **vault_info.lamports.borrow_mut() = vault_info
                 .lamports()
                 .checked_add(platform_fee)
                 .ok_or(ShitMarketError::Overflow)?;
@@ -966,7 +1067,7 @@ pub mod shitmarket {
 
     /// Winners claim their proportional share of the pot after settlement.
     /// CRITICAL: claimed flag is set BEFORE lamport transfer to prevent reentrancy.
-    pub fn claim_winnings(ctx: Context<ClaimWinnings>) -> Result<()> {
+    pub fn claim_winnings<'a, 'b, 'c, 'info>(ctx: Context<'a, 'b, 'c, 'info, ClaimWinnings<'info>>) -> Result<()> {
         let room = &ctx.accounts.room;
         let bet = &mut ctx.accounts.bet;
         let config = &ctx.accounts.config;
@@ -997,6 +1098,112 @@ pub mod shitmarket {
 
         // ── REENTRANCY GUARD: set claimed BEFORE transfer ──────────────
         bet.claimed = true;
+
+        // ── REFERRAL COMMISSIONS (0.1% reward to referrer) ────────────
+        if ctx.remaining_accounts.len() >= 2 {
+            let user_referral_info = &ctx.remaining_accounts[0];
+            let referral_state_info = &ctx.remaining_accounts[1];
+
+            let user_key = ctx.accounts.user.key();
+            let (expected_user_referral_pda, _) = Pubkey::find_program_address(
+                &[b"user_referral", user_key.as_ref()],
+                ctx.program_id
+            );
+
+            if user_referral_info.key() == expected_user_referral_pda && !user_referral_info.data_is_empty() {
+                let user_referral: UserReferral = AccountDeserialize::try_deserialize(&mut &user_referral_info.try_borrow_data()?[..])?;
+                
+                let (expected_referral_state_pda, bump) = Pubkey::find_program_address(
+                    &[b"referral_state", user_referral.referrer.as_ref()],
+                    ctx.program_id
+                );
+
+                if referral_state_info.key() == expected_referral_state_pda {
+                    if referral_state_info.data_is_empty() {
+                        let rent = Rent::get()?;
+                        let space = 8 + 32 + 8 + 8 + 1;
+                        let lamports = rent.minimum_balance(space);
+
+                        let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
+                            ctx.accounts.payer.key,
+                            referral_state_info.key,
+                            lamports,
+                        );
+                        anchor_lang::solana_program::program::invoke(
+                            &transfer_ix,
+                            &[
+                                ctx.accounts.payer.to_account_info(),
+                                referral_state_info.clone(),
+                                ctx.accounts.system_program.to_account_info(),
+                            ],
+                        )?;
+
+                        let signer_seeds: &[&[u8]] = &[
+                            b"referral_state",
+                            user_referral.referrer.as_ref(),
+                            &[bump],
+                        ];
+                        anchor_lang::solana_program::program::invoke_signed(
+                            &anchor_lang::solana_program::system_instruction::allocate(
+                                referral_state_info.key,
+                                space as u64,
+                            ),
+                            &[referral_state_info.to_account_info()],
+                            &[signer_seeds],
+                        )?;
+                        anchor_lang::solana_program::program::invoke_signed(
+                            &anchor_lang::solana_program::system_instruction::assign(
+                                referral_state_info.key,
+                                ctx.program_id,
+                            ),
+                            &[referral_state_info.to_account_info()],
+                            &[signer_seeds],
+                        )?;
+
+                        let new_state = ReferralState {
+                            referrer: user_referral.referrer,
+                            unclaimed_rewards: 0,
+                            claimed_rewards: 0,
+                            bump,
+                        };
+                        let mut data = referral_state_info.try_borrow_mut_data()?;
+                        new_state.try_serialize(&mut &mut data[..])?;
+                    }
+
+                    let mut referral_state: ReferralState = AccountDeserialize::try_deserialize(&mut &referral_state_info.try_borrow_data()?[..])?;
+                    
+                    let winning_pool = if let Some(winner) = room.winner {
+                        if winner == Side::Moon { room.moon_pool } else { room.jeet_pool }
+                    } else {
+                        total_pool
+                    };
+                    
+                    if winning_pool > 0 {
+                        let user_total_share = (bet.amount as u128)
+                            .checked_mul(total_pool as u128).ok_or(ShitMarketError::Overflow)?
+                            .checked_div(winning_pool as u128).ok_or(ShitMarketError::DivisionByZero)? as u64;
+
+                        let referrer_reward = user_total_share.checked_div(1000).unwrap_or(0);
+
+                        if referrer_reward > 0 {
+                            referral_state.unclaimed_rewards = referral_state.unclaimed_rewards.checked_add(referrer_reward).ok_or(ShitMarketError::Overflow)?;
+                            
+                            let mut data = referral_state_info.try_borrow_mut_data()?;
+                            referral_state.try_serialize(&mut &mut data[..])?;
+
+                            emit!(ReferralRewardAccrued {
+                                referrer: user_referral.referrer,
+                                invitee: user_key,
+                                room: room.key(),
+                                reward_amount: referrer_reward,
+                            });
+
+                            msg!("Referral reward accrued: {} lamports → {}", referrer_reward, user_referral.referrer);
+                        }
+                    }
+                }
+            }
+        }
 
         // Transfer lamports from escrow → user
         let escrow_info = ctx.accounts.escrow.to_account_info();
@@ -1096,6 +1303,94 @@ pub mod shitmarket {
         emit!(PlatformPaused { paused: false });
 
         msg!("Platform unpaused by admin {}", config.admin);
+        Ok(())
+    }
+
+    /// Register a user's referrer on-chain
+    pub fn register_referral(ctx: Context<RegisterReferral>, referrer: Pubkey) -> Result<()> {
+        let user_referral = &mut ctx.accounts.user_referral;
+        user_referral.user = ctx.accounts.user.key();
+        user_referral.referrer = referrer;
+        user_referral.bump = ctx.bumps.user_referral;
+
+        emit!(ReferralRegistered {
+            user: ctx.accounts.user.key(),
+            referrer,
+        });
+
+        msg!("Referral registered: user={} referrer={}", ctx.accounts.user.key(), referrer);
+        Ok(())
+    }
+
+    /// Claim accrued referral rewards from the vault PDA
+    pub fn claim_referral_rewards(ctx: Context<ClaimReferralRewards>) -> Result<()> {
+        let referral_state = &mut ctx.accounts.referral_state;
+        let amount = referral_state.unclaimed_rewards.checked_sub(referral_state.claimed_rewards).ok_or(ShitMarketError::Underflow)?;
+        require!(amount > 0, ShitMarketError::NoRewardsToClaim);
+
+        referral_state.claimed_rewards = referral_state.unclaimed_rewards;
+
+        let vault_info = ctx.accounts.vault.to_account_info();
+        let system_program_info = ctx.accounts.system_program.to_account_info();
+
+        let vault_bump = ctx.bumps.vault;
+        let signer_seeds: &[&[u8]] = &[
+            b"vault",
+            &[vault_bump],
+        ];
+
+        let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
+            vault_info.key,
+            ctx.accounts.referrer.key,
+            amount,
+        );
+        anchor_lang::solana_program::program::invoke_signed(
+            &transfer_ix,
+            &[
+                vault_info,
+                ctx.accounts.referrer.to_account_info(),
+                system_program_info,
+            ],
+            &[signer_seeds],
+        )?;
+
+        emit!(ReferralRewardsClaimed {
+            referrer: ctx.accounts.referrer.key(),
+            amount,
+        });
+
+        msg!("Referral rewards claimed: {} lamports → {}", amount, ctx.accounts.referrer.key());
+        Ok(())
+    }
+
+    /// Admin-only: Withdraw platform fees from the vault PDA to treasury wallet
+    pub fn withdraw_vault_fees(ctx: Context<WithdrawVaultFees>, amount: u64) -> Result<()> {
+        let vault_info = ctx.accounts.vault.to_account_info();
+        let treasury_info = ctx.accounts.treasury.to_account_info();
+        let system_program_info = ctx.accounts.system_program.to_account_info();
+
+        let vault_bump = ctx.bumps.vault;
+        let signer_seeds: &[&[u8]] = &[
+            b"vault",
+            &[vault_bump],
+        ];
+
+        let transfer_ix = anchor_lang::solana_program::system_instruction::transfer(
+            vault_info.key,
+            treasury_info.key,
+            amount,
+        );
+        anchor_lang::solana_program::program::invoke_signed(
+            &transfer_ix,
+            &[
+                vault_info,
+                treasury_info,
+                system_program_info,
+            ],
+            &[signer_seeds],
+        )?;
+
+        msg!("Withdrew {} platform fee lamports to treasury", amount);
         Ok(())
     }
 

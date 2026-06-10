@@ -21,8 +21,42 @@ export const PEPE_ASSETS = {
 
 export const ALL_PEPES = Object.values(PEPE_ASSETS);
 
-export const MOON_PEPES = [PEPE_ASSETS.chadBull, PEPE_ASSETS.apeGeneral, PEPE_ASSETS.diamondHands, PEPE_ASSETS.fewUnderstand];
-export const JEET_PEPES = [PEPE_ASSETS.jeetSkeleton, PEPE_ASSETS.neonWojak];
+// ─── Media card images for the share card canvas ───────────────────────────
+// Moon: bullish / diamond-hands imagery
+export const MOON_PEPES = [
+  '/pepes/mediacards/moon/ape-general.png',
+  '/pepes/mediacards/moon/chad-bull-general.png',
+  '/pepes/mediacards/moon/chadbull.png',
+  '/pepes/mediacards/moon/diamond-hands-ape.png',
+  '/pepes/mediacards/moon/meme-trench-battlefield.png',
+  '/pepes/mediacards/moon/moonvsjeet.png',
+  '/pepes/mediacards/moon/screen%20copy.png',
+  '/pepes/mediacards/moon/screen%20copy%202.png',
+  '/pepes/mediacards/moon/screen%20copy%204.png',
+  '/pepes/mediacards/moon/screen%20copy%2012.png',
+  '/pepes/mediacards/moon/screen%20copy%2013.png',
+  '/pepes/mediacards/moon/screen%20copy%2014.png',
+  '/pepes/mediacards/moon/screen%20copy%2015.png',
+  '/pepes/mediacards/moon/screen.png',
+  '/pepes/mediacards/moon/moon-juice-trench.png_202606070042.jpeg',
+  '/pepes/mediacards/moon/Create_a_looping_animated_GIF_202606070035%20(1).jpeg',
+];
+
+// Jeet: bearish / skeleton / rugpull imagery
+export const JEET_PEPES = [
+  '/pepes/mediacards/jeet/pepe.png',
+  '/pepes/mediacards/jeet/skeletonwojak.png',
+  '/pepes/mediacards/jeet/screen%206.png',
+  '/pepes/mediacards/jeet/screen%20copy%203.png',
+  '/pepes/mediacards/jeet/screen%20copy%205.png',
+  '/pepes/mediacards/jeet/screen%20copy%206.png',
+  '/pepes/mediacards/jeet/screen%20copy%207.png',
+  '/pepes/mediacards/jeet/screen%20copy%208.png',
+  '/pepes/mediacards/jeet/screen%20copy%209.png',
+  '/pepes/mediacards/jeet/screen%20copy%2010.png',
+  '/pepes/mediacards/jeet/screen%20copy%2011.png',
+  '/pepes/mediacards/jeet/jeet-skeleton.png_202606070041.jpeg',
+];
 export const SCENE_PEPES = [PEPE_ASSETS.moonJuice, PEPE_ASSETS.cryptoBunker, PEPE_ASSETS.battlefield];
 
 // ========== DEGEN QUOTE LIBRARY ==========

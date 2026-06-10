@@ -79,4 +79,8 @@ pub enum ShitMarketError {
     SlippageExceeded,
     #[msg("Cooling off period is still active — cannot sweep yet")]
     CoolingOffActive,
+    #[msg("No referral rewards available to claim")]
+    NoRewardsToClaim,
+    #[msg("Invalid PDA derivation or seeds mismatch")]
+    InvalidPDA,
 }

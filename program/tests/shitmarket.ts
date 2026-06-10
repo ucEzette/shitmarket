@@ -68,6 +68,27 @@ function deriveEscrow(room: PublicKey, programId: PublicKey): [PublicKey, number
   );
 }
 
+function deriveVault(programId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("vault")],
+    programId
+  );
+}
+
+function deriveUserReferral(user: PublicKey, programId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("user_referral"), user.toBuffer()],
+    programId
+  );
+}
+
+function deriveReferralState(referrer: PublicKey, programId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("referral_state"), referrer.toBuffer()],
+    programId
+  );
+}
+
 
 
 // Mock token mint — we only store its pubkey on-chain, no real SPL mint needed
@@ -121,6 +142,7 @@ describe("shitmarket", () => {
   let jeetBetPda: PublicKey;
   let secondMoonBetPda: PublicKey;
   let whaleBetPda: PublicKey;
+  let vaultPda: PublicKey;
 
   before(async () => {
     // Fund all wallets
@@ -143,6 +165,7 @@ describe("shitmarket", () => {
     [jeetBetPda] = deriveBet(roomPda, jeetBettor.publicKey, "jeet", programId);
     [secondMoonBetPda] = deriveBet(roomPda, secondMoonBettor.publicKey, "moon", programId);
     [whaleBetPda] = deriveBet(roomPda, whaleBettor.publicKey, "moon", programId);
+    [vaultPda] = deriveVault(programId);
   });
 
   // ── 1. Initialize ─────────────────────────────────────────────────────
@@ -418,7 +441,7 @@ describe("shitmarket", () => {
           .accounts({
             room: roomPda,
             escrow: escrowPda,
-            treasury: treasury.publicKey,
+            vault: vaultPda,
             priceFeed: MOCK_PRICE_FEED.publicKey,
             switchboardFeed: PublicKey.default,
             config: configPda,
@@ -525,14 +548,14 @@ describe("shitmarket", () => {
 
     it("settles room after expiry — Moon wins", async function () {
       const finalPrice = new BN("200000000000000"); // $200.00 > $150.00 opening → Moon wins
-      const treasuryBefore = await provider.connection.getBalance(treasury.publicKey);
+      const vaultBefore = await provider.connection.getBalance(vaultPda);
 
       await program.methods
         .settleRoom(new BN("200000000000000"))
         .accounts({
           room: fastRoomPda,
           escrow: fastEscrowPda,
-          treasury: treasury.publicKey,
+          vault: vaultPda,
           priceFeed: MOCK_PRICE_FEED.publicKey,
           switchboardFeed: PublicKey.default,
           config: configPda,
@@ -548,11 +571,11 @@ describe("shitmarket", () => {
       assert.isTrue(room.finalPrice.eq(finalPrice));
       assert.isTrue(room.twapFinalPrice.gt(new BN(0)), "TWAP final price should be set");
 
-      // Verify platform fee arrived at treasury
+      // Verify platform fee arrived at vault
       // Total pool = 1.5 SOL; fee = 1.25% = 0.01875 SOL = 18_750_000 lamports
-      const treasuryAfter = await provider.connection.getBalance(treasury.publicKey);
-      const feeReceived = treasuryAfter - treasuryBefore;
-      assert.isAtLeast(feeReceived, 18_000_000, "Treasury should receive ~1.25% fee");
+      const vaultAfter = await provider.connection.getBalance(vaultPda);
+      const feeReceived = vaultAfter - vaultBefore;
+      assert.isAtLeast(feeReceived, 18_000_000, "Vault should receive ~1.25% fee");
     });
 
     it("winning Moon bettor claims proportional winnings", async function () {
@@ -632,7 +655,7 @@ describe("shitmarket", () => {
           .accounts({
             room: fastRoomPda,
             escrow: fastEscrowPda,
-            treasury: treasury.publicKey,
+            vault: vaultPda,
             priceFeed: MOCK_PRICE_FEED.publicKey,
             switchboardFeed: PublicKey.default,
             config: configPda,
@@ -727,7 +750,7 @@ describe("shitmarket", () => {
         .accounts({
           room: sweepRoomPda,
           escrow: sweepEscrowPda,
-          treasury: treasury.publicKey,
+          vault: vaultPda,
           priceFeed: MOCK_PRICE_FEED.publicKey,
           switchboardFeed: PublicKey.default,
           config: configPda,
@@ -968,7 +991,7 @@ describe("shitmarket", () => {
         .accounts({
           room: edgeRoomPda,
           escrow: edgeEscrowPda,
-          treasury: treasury.publicKey,
+          vault: vaultPda,
           priceFeed: MOCK_PRICE_FEED.publicKey,
           switchboardFeed: PublicKey.default,
           config: configPda,
@@ -1002,5 +1025,164 @@ describe("shitmarket", () => {
     });
   });
 
+  // ── 7. Referrals & Rewards ───────────────────────────────────────────
+  describe("referral reward system", () => {
+    const refMint = Keypair.generate().publicKey;
+    const refCreator = Keypair.generate();
+    const referrer = Keypair.generate();
+    const referredUser = Keypair.generate();
+    let refRoomPda: PublicKey;
+    let refEscrowPda: PublicKey;
+    let refBetPda: PublicKey;
+    let userReferralPda: PublicKey;
+    let referralStatePda: PublicKey;
+
+    before(async () => {
+      await Promise.all([
+        airdrop(provider, refCreator.publicKey, 3),
+        airdrop(provider, referrer.publicKey, 3),
+        airdrop(provider, referredUser.publicKey, 3),
+      ]);
+
+      [refRoomPda] = deriveRoom(refMint, refCreator.publicKey, programId);
+      [refEscrowPda] = deriveEscrow(refRoomPda, programId);
+      [refBetPda] = deriveBet(refRoomPda, referredUser.publicKey, "moon", programId);
+      [userReferralPda] = deriveUserReferral(referredUser.publicKey, programId);
+      [referralStatePda] = deriveReferralState(referrer.publicKey, programId);
+    });
+
+    it("registers user referral link on-chain", async () => {
+      await program.methods
+        .registerReferral(referrer.publicKey)
+        .accounts({
+          userReferral: userReferralPda,
+          user: referredUser.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([referredUser])
+        .rpc();
+
+      const userReferral = await program.account.userReferral.fetch(userReferralPda);
+      assert.equal(userReferral.user.toBase58(), referredUser.publicKey.toBase58());
+      assert.equal(userReferral.referrer.toBase58(), referrer.publicKey.toBase58());
+    });
+
+    it("accrues 0.1% referral rewards to ReferralState during claim_winnings", async () => {
+      // Create instantly-expired room
+      await program.methods
+        .createRoom(refMint, "REFTOKEN", 0, null, null, 0)
+        .accounts({
+          room: refRoomPda,
+          escrow: refEscrowPda,
+          creator: refCreator.publicKey,
+          priceFeed: MOCK_PRICE_FEED.publicKey,
+          switchboardFeed: PublicKey.default,
+          config: configPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([refCreator])
+        .rpc();
+
+      // User places a bet of 1 SOL
+      await program.methods
+        .placeBet({ moon: {} }, new BN(LAMPORTS_PER_SOL))
+        .accounts({
+          room: refRoomPda,
+          escrow: refEscrowPda,
+          bet: refBetPda,
+          user: referredUser.publicKey,
+          config: configPda,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([referredUser])
+        .rpc();
+
+      // Settle room (Moon wins)
+      await program.methods
+        .settleRoom(new BN("200000000000000"))
+        .accounts({
+          room: refRoomPda,
+          escrow: refEscrowPda,
+          vault: vaultPda,
+          priceFeed: MOCK_PRICE_FEED.publicKey,
+          switchboardFeed: PublicKey.default,
+          config: configPda,
+          keeper: keeper.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([keeper])
+        .rpc();
+
+      // Claim winnings, passing userReferral and referralState as remaining accounts
+      await program.methods
+        .claimWinnings()
+        .accounts({
+          room: refRoomPda,
+          config: configPda,
+          escrow: refEscrowPda,
+          bet: refBetPda,
+          user: referredUser.publicKey,
+          payer: referredUser.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .remainingAccounts([
+          { pubkey: userReferralPda, isWritable: false, isSigner: false },
+          { pubkey: referralStatePda, isWritable: true, isSigner: false },
+        ])
+        .signers([referredUser])
+        .rpc();
+
+      const referralState = await program.account.referralState.fetch(referralStatePda);
+      assert.equal(referralState.referrer.toBase58(), referrer.publicKey.toBase58());
+      // Total pool = 1 SOL. 0.1% = 0.001 SOL = 1_000_000 lamports.
+      assert.isTrue(referralState.unclaimedRewards.eq(new BN(1_000_000)));
+      assert.isTrue(referralState.claimedRewards.eq(new BN(0)));
+    });
+
+    it("allows the referrer to claim their referral rewards", async () => {
+      const referrerBefore = await provider.connection.getBalance(referrer.publicKey);
+
+      await program.methods
+        .claimReferralRewards()
+        .accounts({
+          referralState: referralStatePda,
+          vault: vaultPda,
+          referrer: referrer.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([referrer])
+        .rpc();
+
+      const referrerAfter = await provider.connection.getBalance(referrer.publicKey);
+      // Gained 1_000_000 lamports (minus transaction fees, so at least 950_000)
+      assert.isAbove(referrerAfter - referrerBefore, 950_000);
+
+      const referralState = await program.account.referralState.fetch(referralStatePda);
+      assert.isTrue(referralState.claimedRewards.eq(referralState.unclaimedRewards));
+    });
+
+    it("allows admin to withdraw vault fees to treasury", async () => {
+      const vaultBal = await provider.connection.getBalance(vaultPda);
+      assert.isAbove(vaultBal, 0);
+
+      const treasuryBefore = await provider.connection.getBalance(treasury.publicKey);
+
+      // Withdraw all vault fees except rent exemption if any
+      await program.methods
+        .withdrawVaultFees(new BN(10_000_000))
+        .accounts({
+          config: configPda,
+          vault: vaultPda,
+          treasury: treasury.publicKey,
+          admin: admin.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([admin])
+        .rpc();
+
+      const treasuryAfter = await provider.connection.getBalance(treasury.publicKey);
+      assert.equal(treasuryAfter - treasuryBefore, 10_000_000);
+    });
+  });
 
 });

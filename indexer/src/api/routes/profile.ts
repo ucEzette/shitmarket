@@ -11,9 +11,28 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
   try {
     const { wallet } = req.params;
 
-    const profile = await prisma.userProfile.findUnique({
+    let profile = await prisma.userProfile.findUnique({
       where: { userPubkey: wallet },
     });
+
+    if (profile && !profile.referralCode) {
+      let fallbackCode = wallet.slice(0, 6) + Math.floor(1000 + Math.random() * 9000);
+      let attempts = 0;
+      let success = false;
+      while (attempts < 5 && !success) {
+        try {
+          profile = await prisma.userProfile.update({
+            where: { userPubkey: wallet },
+            data: { referralCode: fallbackCode }
+          });
+          logger.info({ msg: 'Self-healed missing referral code in profile', wallet, fallbackCode });
+          success = true;
+        } catch (err: any) {
+          fallbackCode = wallet.slice(0, 6) + Math.floor(1000 + Math.random() * 9000);
+          attempts++;
+        }
+      }
+    }
 
     // Compute referral stats
     const referralsCount = await prisma.userProfile.count({
@@ -29,31 +48,53 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
     const totalReferralEarnings = referralPayouts.reduce((acc, p) => acc + BigInt(p.rewardAmount), BigInt(0));
 
     if (!profile) {
-      // Return empty profile for unknown wallets (not an error)
-      return res.json({
-        success: true,
-        data: {
-          userPubkey: wallet,
-          totalBets: 0,
-          wins: 0,
-          losses: 0,
-          profit: '0',
-          trenchScore: 'D',
-          achievements: [],
-          winRate: 0,
-          username: null,
-          avatarUrl: null,
-          referredBy: null,
-          referralCode: wallet.slice(0, 6) + Math.floor(1000 + Math.random() * 9000),
-          referralsCount: 0,
-          referralEarnings: '0',
-          referralPayouts: [],
-          bets: [],
-          winStreak: 0,
-          longestWinStreak: 0,
-          biggestBet: '0',
-        },
-      });
+      // Create a default profile to ensure unique referralCode is persisted immediately
+      let generatedReferralCode = wallet.slice(0, 6) + Math.floor(1000 + Math.random() * 9000);
+      let attempts = 0;
+      let success = false;
+      while (attempts < 5 && !success) {
+        try {
+          profile = await prisma.userProfile.create({
+            data: {
+              userPubkey: wallet,
+              referralCode: generatedReferralCode,
+            }
+          });
+          logger.info({ msg: 'Created default user profile on GET', wallet, referralCode: generatedReferralCode });
+          success = true;
+        } catch (err: any) {
+          generatedReferralCode = wallet.slice(0, 6) + Math.floor(1000 + Math.random() * 9000);
+          attempts++;
+        }
+      }
+
+      if (!profile) {
+        // Fallback in case DB write fails to prevent route crashing
+        return res.json({
+          success: true,
+          data: {
+            userPubkey: wallet,
+            totalBets: 0,
+            wins: 0,
+            losses: 0,
+            profit: '0',
+            trenchScore: 'D',
+            achievements: [],
+            winRate: 0,
+            username: null,
+            avatarUrl: null,
+            referredBy: null,
+            referralCode: generatedReferralCode,
+            referralsCount: 0,
+            referralEarnings: '0',
+            referralPayouts: [],
+            bets: [],
+            winStreak: 0,
+            longestWinStreak: 0,
+            biggestBet: '0',
+          },
+        });
+      }
     }
 
     // Compute win rate

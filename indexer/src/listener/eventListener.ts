@@ -168,6 +168,23 @@ interface RoomVoidedEvent {
   reason: string;
 }
 
+interface ReferralRegisteredEvent {
+  user: anchor.web3.PublicKey;
+  referrer: anchor.web3.PublicKey;
+}
+
+interface ReferralRewardAccruedEvent {
+  referrer: anchor.web3.PublicKey;
+  invitee: anchor.web3.PublicKey;
+  room: anchor.web3.PublicKey;
+  rewardAmount: anchor.BN;
+}
+
+interface ReferralRewardsClaimedEvent {
+  referrer: anchor.web3.PublicKey;
+  amount: anchor.BN;
+}
+
 // ─── Token metadata fetch ─────────────────────────────────────────────────────
 
 interface TokenMeta {
@@ -899,6 +916,77 @@ async function handleRoomVoided(event: RoomVoidedEvent): Promise<void> {
   }
 }
 
+async function handleReferralRegistered(event: ReferralRegisteredEvent): Promise<void> {
+  try {
+    const userPubkey = event.user.toBase58();
+    const referrerPubkey = event.referrer.toBase58();
+
+    await prisma.userProfile.upsert({
+      where: { userPubkey },
+      create: { userPubkey, referredBy: referrerPubkey },
+      update: { referredBy: referrerPubkey },
+    });
+
+    logger.info({ msg: 'ReferralRegistered processed', userPubkey, referrerPubkey });
+  } catch (err: any) {
+    logger.error({ msg: 'ReferralRegistered failed', err: err.message });
+  }
+}
+
+async function handleReferralRewardAccrued(event: ReferralRewardAccruedEvent, signature?: string): Promise<void> {
+  try {
+    const referrer = event.referrer.toBase58();
+    const invitee = event.invitee.toBase58();
+    const roomPubkey = event.room.toBase58();
+    const rewardAmount = BigInt(event.rewardAmount.toString());
+
+    const bet = await prisma.bet.findFirst({
+      where: { roomPubkey, userPubkey: invitee },
+    });
+    const betAmount = bet ? bet.amount : BigInt(0);
+
+    await prisma.referralPayout.create({
+      data: {
+        referrer,
+        invitee,
+        roomPubkey,
+        betAmount,
+        rewardAmount,
+        txSig: signature,
+      },
+    });
+
+    await publishRoomUpdate(roomPubkey, {
+      type: 'ReferralRewardAccrued',
+      referrer,
+      invitee,
+      rewardAmount: rewardAmount.toString(),
+    });
+
+    logger.info({ msg: 'ReferralRewardAccrued processed', referrer, invitee, rewardAmount: rewardAmount.toString() });
+  } catch (err: any) {
+    logger.error({ msg: 'ReferralRewardAccrued failed', err: err.message });
+  }
+}
+
+async function handleReferralRewardsClaimed(event: ReferralRewardsClaimedEvent, signature?: string): Promise<void> {
+  try {
+    const referrer = event.referrer.toBase58();
+    const amount = BigInt(event.amount.toString());
+
+    await publishRoomUpdate('__referrals__', {
+      type: 'ReferralRewardsClaimed',
+      referrer,
+      amount: amount.toString(),
+      txSig: signature,
+    });
+
+    logger.info({ msg: 'ReferralRewardsClaimed processed', referrer, amount: amount.toString() });
+  } catch (err: any) {
+    logger.error({ msg: 'ReferralRewardsClaimed failed', err: err.message });
+  }
+}
+
 let subscriptionId: number | null = null;
 
 export async function processParsedEvents(events: any[], signature: string): Promise<void> {
@@ -932,6 +1020,15 @@ export async function processParsedEvents(events: any[], signature: string): Pro
         break;
       case 'RoomVoided':
         await handleRoomVoided(event.data as RoomVoidedEvent);
+        break;
+      case 'ReferralRegistered':
+        await handleReferralRegistered(event.data as ReferralRegisteredEvent);
+        break;
+      case 'ReferralRewardAccrued':
+        await handleReferralRewardAccrued(event.data as ReferralRewardAccruedEvent, signature);
+        break;
+      case 'ReferralRewardsClaimed':
+        await handleReferralRewardsClaimed(event.data as ReferralRewardsClaimedEvent, signature);
         break;
       default:
         logger.warn({ msg: 'Unknown event', name: event.name });

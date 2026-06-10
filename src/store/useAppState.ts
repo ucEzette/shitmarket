@@ -8,11 +8,49 @@ import {
   getEscrowPda,
   getBetPda,
   getPlatformConfigPda,
+  getVaultPda,
+  getUserReferralPda,
+  getReferralStatePda,
 } from '@/utils/solanaClient';
 export const formatCashtag = (sym: string) => {
   if (!sym) return '';
   return sym.startsWith('$') ? sym : `$${sym}`;
 };
+
+export function formatPrice(price: number | string | undefined | null): string {
+  if (price === undefined || price === null) return 'N/A';
+  const num = typeof price === 'number' ? price : parseFloat(price);
+  if (isNaN(num)) return 'N/A';
+  if (num === 0) return '0.00';
+  
+  if (num >= 1.0) {
+    let str = num.toFixed(4).replace(/0+$/, '');
+    if (str.endsWith('.')) {
+      str = str.slice(0, -1);
+    }
+    const parts = str.split('.');
+    if (!parts[1]) {
+      return parts[0] + '.00';
+    }
+    if (parts[1].length < 2) {
+      return parts[0] + '.' + parts[1].padEnd(2, '0');
+    }
+    return str;
+  }
+  
+  const str20 = num.toFixed(20);
+  const match = str20.match(/^0\.(0*)/);
+  if (!match) return num.toString();
+  
+  const leadingZerosCount = match[1].length;
+  const precision = Math.min(leadingZerosCount + 4, 14);
+  
+  let formatted = num.toFixed(precision).replace(/0+$/, '');
+  if (formatted.endsWith('.')) {
+    formatted = formatted.slice(0, -1);
+  }
+  return formatted;
+}
 
 export interface Bet {
   id: string;
@@ -86,6 +124,7 @@ export interface UserProfile {
   referralsCount: number;
   referralEarnings: string;
   referralPayouts: any[];
+  unclaimedReferralRewards: number; // SOL
 }
 
 export interface ChatMessage {
@@ -121,6 +160,18 @@ export interface AppState {
   chatMessages: ChatMessage[];
   activityLog: Activity[];
   fullDegenMode: boolean;
+  shareCardData: {
+    roomId: string;
+    side: 'moon' | 'jeet';
+    tokenSymbol: string;
+    duration: number;
+    amount: number;
+    isNewRoom?: boolean;
+    onCloseRedirectUrl?: string;
+    expiry?: number;
+    openingPrice?: number;
+  } | null;
+  setShareCardData: (data: any) => void;
   
   // Transactional & Web3 states
   wallet: any | null;
@@ -128,8 +179,9 @@ export interface AppState {
   transactionError: string | null;
 
   createRoom: (room: Room, isSetPrice?: boolean) => Promise<any>;
-  placeBet: (roomId: string, side: 'moon' | 'jeet', amount: number) => Promise<any>;
+  placeBet: (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => Promise<any>;
   claimWinnings: (roomId: string) => Promise<any>;
+  claimReferralRewardsOnChain: () => Promise<any>;
   connectWallet: () => void;
   disconnectWallet: () => void;
   setWallet: (wallet: any) => void;
@@ -351,6 +403,8 @@ export const useAppState = create<AppState>((set, get) => ({
   chatMessages: [],
   activityLog: [],
   fullDegenMode: false,
+  shareCardData: null,
+  setShareCardData: (data) => set({ shareCardData: data }),
 
 
   wallet: null,
@@ -865,7 +919,7 @@ export const useAppState = create<AppState>((set, get) => ({
     }
   },
 
-  placeBet: async (roomId: string, side: 'moon' | 'jeet', amount: number) => {
+  placeBet: async (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => {
     const { wallet, setTransactionLoading, setTransactionError } = get();
     if (!wallet || !wallet.publicKey) {
       alert("PLEASE ENLIST YOUR WALLET TO CHARGE ENEMY LINES!");
@@ -929,6 +983,24 @@ export const useAppState = create<AppState>((set, get) => ({
 
       // Refresh user balance immediately
       await get().fetchBalance();
+      
+      const room = get().rooms.find((r) => r.id === roomId);
+      const tokenSymbol = room?.token?.symbol || 'UNKNOWN';
+      const duration = room?.duration || 5;
+      const expiry = room?.expiry || (Date.now() + duration * 60000);
+      const openingPrice = room?.openingPrice;
+      
+      get().setShareCardData({
+        roomId,
+        side,
+        tokenSymbol,
+        duration,
+        amount,
+        isNewRoom: !!isNewRoom,
+        onCloseRedirectUrl,
+        expiry,
+        openingPrice
+      });
       
       return tx;
     } catch (err: any) {
@@ -1020,6 +1092,43 @@ export const useAppState = create<AppState>((set, get) => ({
       }
 
       const betPda = getBetPda(roomPda, wallet.publicKey, claimSide);
+
+      const remainingAccounts = [];
+      const userState = get().user;
+      if (userState && userState.referredBy) {
+        try {
+          const referrerPubkey = new PublicKey(userState.referredBy);
+          const userReferralPda = getUserReferralPda(wallet.publicKey);
+          const referralStatePda = getReferralStatePda(referrerPubkey);
+
+          const referralAccInfo = await connection.getAccountInfo(userReferralPda);
+          if (!referralAccInfo) {
+            console.log("On-chain user referral not registered. Registering now...");
+            const regTx = await (program.methods as any)
+              .registerReferral(referrerPubkey)
+              .accounts({
+                userReferral: userReferralPda,
+                user: wallet.publicKey,
+                systemProgram: SystemProgram.programId,
+              })
+              .rpc({ skipPreflight: true });
+            console.log("On-chain referral registered! Tx:", regTx);
+          }
+
+          remainingAccounts.push({
+            pubkey: userReferralPda,
+            isWritable: false,
+            isSigner: false,
+          });
+          remainingAccounts.push({
+            pubkey: referralStatePda,
+            isWritable: true,
+            isSigner: false,
+          });
+        } catch (e) {
+          console.warn("Failed to register/verify referral on-chain:", e);
+        }
+      }
       
       const tx = await (program.methods as any)
         .claimWinnings()
@@ -1032,8 +1141,9 @@ export const useAppState = create<AppState>((set, get) => ({
           payer: wallet.publicKey,
           systemProgram: SystemProgram.programId,
         })
+        .remainingAccounts(remainingAccounts)
         .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 180_000 }),
           ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
         ])
         .rpc({ skipPreflight: true });
@@ -1086,6 +1196,59 @@ export const useAppState = create<AppState>((set, get) => ({
     }
   },
 
+  claimReferralRewardsOnChain: async () => {
+    const { wallet, setTransactionLoading, setTransactionError } = get();
+    if (!wallet || !wallet.publicKey) {
+      alert("PLEASE ENLIST YOUR WALLET TO CLAIM REFERRAL REWARDS!");
+      return;
+    }
+
+    setTransactionLoading(true);
+    setTransactionError(null);
+
+    try {
+      const program = getAnchorProgram(wallet);
+      const referralStatePda = getReferralStatePda(wallet.publicKey);
+      const vaultPda = getVaultPda();
+
+      const tx = await (program.methods as any)
+        .claimReferralRewards()
+        .accounts({
+          referralState: referralStatePda,
+          vault: vaultPda,
+          referrer: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
+        ])
+        .rpc({ skipPreflight: true });
+
+      console.log("Referral rewards claimed successfully! Tx:", tx);
+
+      // Add to personal activity log
+      get().addActivity({
+        type: 'win',
+        title: `REFERRAL REWARDS CLAIMED`,
+        message: `Successfully recovered referral commission spoils.`,
+      });
+
+      // Reload balance and profile
+      await get().fetchBalance();
+      await get().refreshProfile();
+
+      return tx;
+    } catch (err: any) {
+      console.error("Failed to claim referral rewards on-chain:", err);
+      setTransactionError(err.message || String(err));
+      handleRpcError("referral booty retrieval", err);
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
   connectWallet: () => {
     // Left as a mock visual helper for sandbox mode, though standard Solana wallets connect via adapter components
     console.log("Connect wallet action invoked");
@@ -1131,6 +1294,20 @@ export const useAppState = create<AppState>((set, get) => ({
       let referralsCount = 0;
       let referralEarnings = '0';
       let referralPayouts: any[] = [];
+      let unclaimedReferralRewards = 0;
+      
+      try {
+        const program = getAnchorProgram(null as any);
+        const referralStatePda = getReferralStatePda(new PublicKey(address));
+        const account = await program.account.referralState.fetch(referralStatePda);
+        if (account) {
+          const unclaimed = (account.unclaimedRewards as any).toNumber();
+          const claimed = (account.claimedRewards as any).toNumber();
+          unclaimedReferralRewards = Math.max(0, (unclaimed - claimed) / 1e9);
+        }
+      } catch (e) {
+        // Account not initialized or fetch failed (e.g. no rewards)
+      }
       
       try {
         const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
@@ -1210,6 +1387,7 @@ export const useAppState = create<AppState>((set, get) => ({
           referralsCount,
           referralEarnings,
           referralPayouts,
+          unclaimedReferralRewards,
         }
       });
     } else {
@@ -1270,6 +1448,20 @@ export const useAppState = create<AppState>((set, get) => ({
     if (!user || !user.wallet) return;
     const address = user.wallet;
 
+    let unclaimedReferralRewards = 0;
+    try {
+      const program = getAnchorProgram(null as any);
+      const referralStatePda = getReferralStatePda(new PublicKey(address));
+      const account = await program.account.referralState.fetch(referralStatePda);
+      if (account) {
+        const unclaimed = (account.unclaimedRewards as any).toNumber();
+        const claimed = (account.claimedRewards as any).toNumber();
+        unclaimedReferralRewards = Math.max(0, (unclaimed - claimed) / 1e9);
+      }
+    } catch (e) {
+      // Account not initialized or fetch failed (e.g. no rewards)
+    }
+
     try {
       const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
       const res = await fetchWithTimeout(`${indexerApi}/api/profile/${address}`, {}, 3000);
@@ -1308,6 +1500,7 @@ export const useAppState = create<AppState>((set, get) => ({
             referralsCount: json.data.referralsCount || 0,
             referralEarnings: json.data.referralEarnings || '0',
             referralPayouts: json.data.referralPayouts || [],
+            unclaimedReferralRewards,
           }
         });
       }

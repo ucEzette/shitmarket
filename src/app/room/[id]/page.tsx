@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppState, Room, ChatMessage, formatCashtag } from '@/store/useAppState';
+import { useAppState, Room, ChatMessage, formatCashtag, formatPrice } from '@/store/useAppState';
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
 import { HeaderPanel } from '@/components/ui/HeaderPanel';
@@ -99,42 +99,7 @@ const formatDuration = (mins: number) => {
   return `${mins} MINS`;
 };
 
-export function formatPrice(price: number | string | undefined | null): string {
-  if (price === undefined || price === null) return 'N/A';
-  const num = typeof price === 'number' ? price : parseFloat(price);
-  if (isNaN(num)) return 'N/A';
-  if (num === 0) return '0.00';
-  
-  if (num >= 1.0) {
-    let str = num.toFixed(4).replace(/0+$/, '');
-    if (str.endsWith('.')) {
-      str = str.slice(0, -1);
-    }
-    const parts = str.split('.');
-    if (!parts[1]) {
-      return parts[0] + '.00';
-    }
-    if (parts[1].length < 2) {
-      return parts[0] + '.' + parts[1].padEnd(2, '0');
-    }
-    return str;
-  }
-  
-  // For values < 1.0, count leading zeros to scale precision beautifully
-  const str20 = num.toFixed(20);
-  const match = str20.match(/^0\.(0*)/);
-  if (!match) return num.toString();
-  
-  const leadingZerosCount = match[1].length;
-  // Show leading zeros + 4 significant digits (capped at max 14 decimals for extreme safety)
-  const precision = Math.min(leadingZerosCount + 4, 14);
-  
-  let formatted = num.toFixed(precision).replace(/0+$/, '');
-  if (formatted.endsWith('.')) {
-    formatted = formatted.slice(0, -1);
-  }
-  return formatted;
-}
+
 
 export default function RoomDetailPage() {
   const params = useParams();

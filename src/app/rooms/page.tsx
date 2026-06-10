@@ -3,12 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAppState, Room, formatCashtag } from '@/store/useAppState';
+import { useAppState, Room, formatCashtag, formatPrice } from '@/store/useAppState';
 import { PixelCrackedHelmet, PixelShovel, PixelGasMask } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
 import { Search, Flame, Bomb, ArrowRight, UserPlus } from 'lucide-react';
-import { formatPrice } from '@/app/room/[id]/page';
 
 export default function RoomsPage() {
   const formatDuration = (mins: number) => {

@@ -72,4 +72,28 @@ export const getAnchorProgram = (walletAdapter: any): anchor.Program<any> => {
   return new anchor.Program(idlJson as any, provider);
 };
 
+export const getVaultPda = (): PublicKey => {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('vault')],
+    PROGRAM_ID
+  );
+  return pda;
+};
+
+export const getUserReferralPda = (user: PublicKey): PublicKey => {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('user_referral'), user.toBuffer()],
+    PROGRAM_ID
+  );
+  return pda;
+};
+
+export const getReferralStatePda = (referrer: PublicKey): PublicKey => {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('referral_state'), referrer.toBuffer()],
+    PROGRAM_ID
+  );
+  return pda;
+};
+
 

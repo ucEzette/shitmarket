@@ -186,7 +186,7 @@
           "writable": true
         },
         {
-          "name": "treasury",
+          "name": "vault",
           "writable": true
         },
         {

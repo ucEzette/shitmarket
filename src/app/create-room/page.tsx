@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppState, Room } from '@/store/useAppState';
 import { PixelShovel, PixelGasMask, PixelCrackedHelmet } from '@/components/PixelArt';
@@ -20,6 +20,17 @@ const MOCK_TOKENS = [
 export default function CreateRoomPage() {
   const router = useRouter();
   const { createRoom, user, connectWallet, placeBet, isTransactionLoading, wallet } = useAppState();
+
+  // On mount: if the user refreshes the page after a room was just created,
+  // redirect them straight to the new room instead of showing the form again.
+  useEffect(() => {
+    const pendingRoom = sessionStorage.getItem('shitmarket_pending_room');
+    if (pendingRoom) {
+      sessionStorage.removeItem('shitmarket_pending_room');
+      router.replace(`/room/${pendingRoom}`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Form State
   const [contractAddress, setContractAddress] = useState('');
@@ -208,10 +219,12 @@ export default function CreateRoomPage() {
       // First create the room on-chain (or sync if it already exists)
       const res = await createRoom(newRoom, openingPriceType === 'set');
       
+      let betSucceeded = false;
       // If they seeded and it's a brand new room, place the bet
       if (res && !res.alreadyExists) {
         try {
-          await placeBet(res.roomPda, seedSide as any, seedAmount);
+          await placeBet(res.roomPda, seedSide as any, seedAmount, true, `/room/${res.roomPda}`);
+          betSucceeded = true;
         } catch (betErr) {
           console.error("Initial seeding bet failed, but room was created:", betErr);
         }
@@ -222,10 +235,19 @@ export default function CreateRoomPage() {
         alert("COMMAND HQ DETECTED THAT A PREDICTION ARENA ALREADY EXISTS FOR THIS TOKEN! REDIRECTING YOU TO THE ON-CHAIN ARENA...");
       }
       
-      if (res && res.roomPda) {
-        router.push(`/room/${res.roomPda}`);
-      } else {
-        router.push('/rooms');
+      // If the bet succeeded, the ShareCardModal is open and will route the user to `/room/${res.roomPda}` upon close.
+      // Save the room PDA to sessionStorage so a page refresh also redirects there.
+      if (betSucceeded && res?.roomPda) {
+        sessionStorage.setItem('shitmarket_pending_room', res.roomPda);
+      }
+
+      // Only push the route immediately if the bet did not succeed (modal not open).
+      if (!betSucceeded) {
+        if (res && res.roomPda) {
+          router.push(`/room/${res.roomPda}`);
+        } else {
+          router.push('/rooms');
+        }
       }
     } catch (err: any) {
       console.error("Launch Arena transaction failed:", err);

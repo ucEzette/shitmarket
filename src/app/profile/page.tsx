@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Award, Zap, TrendingUp, TrendingDown, RefreshCw, X, Play, Edit2, Camera, AlertTriangle, Save, Loader2, Copy, Check, Users, Coins, ExternalLink } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user, connectWallet, updateProfile } = useAppState();
+  const { user, connectWallet, updateProfile, claimReferralRewardsOnChain } = useAppState();
   const [replayBet, setReplayBet] = useState<{
     token: string;
     side: 'moon' | 'jeet';
@@ -34,6 +34,16 @@ export default function ProfilePage() {
   
   // --- Referral State ---
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.search.includes('mock_wallet=true')) {
+      const state = useAppState.getState();
+      if (!state.user || !state.user.wallet) {
+        state.setWalletAddress("5qb94vvR5sTkwC1vjXFp5A7Wc6E98L92yHqS2z7rF8K2");
+      }
+    }
+  }, []);
 
   React.useEffect(() => {
     if (user && !isEditing) {
@@ -99,13 +109,36 @@ export default function ProfilePage() {
   };
 
   const handleCopyLink = () => {
-    if (user?.referralCode) {
-      const link = `${window.location.origin}/rooms?ref=${user.referralCode}`;
-      navigator.clipboard.writeText(link);
-      setCopiedLink(true);
-      synthSound('bet');
-      setTimeout(() => setCopiedLink(false), 2000);
+    const refCode = user?.referralCode || (user?.wallet ? user.wallet.slice(0, 6) + '9999' : 'recruit');
+    const link = `${window.location.origin}/rooms?ref=${refCode}`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).catch((err) => {
+        console.error("Clipboard copy failed, using fallback:", err);
+        fallbackCopyText(link);
+      });
+    } else {
+      fallbackCopyText(link);
     }
+    setCopiedLink(true);
+    synthSound('bet');
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const fallbackCopyText = (text: string) => {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback copy method failed:', err);
+    }
+    document.body.removeChild(textArea);
   };
 
 
@@ -512,9 +545,15 @@ export default function ProfilePage() {
                   const tokenSym = bRoom ? bRoom.token.symbol : 'UNKNOWN';
                   const roomActive = bRoom ? bRoom.status === 'active' : false;
                   
-                  let outcome: 'active' | 'win' | 'loss' = 'active';
-                  if (bRoom && bRoom.status === 'settled') {
-                    outcome = bRoom.winner === bet.side ? 'win' : 'loss';
+                  let outcome: 'active' | 'win' | 'loss' | 'pending' | 'cancelled' = 'active';
+                  if (bRoom) {
+                    if (bRoom.status === 'pending') {
+                      outcome = 'pending';
+                    } else if (bRoom.status === 'cancelled') {
+                      outcome = 'cancelled';
+                    } else if (bRoom.status === 'settled') {
+                      outcome = bRoom.winner === bet.side ? 'win' : 'loss';
+                    }
                   }
 
                   return (
@@ -523,14 +562,34 @@ export default function ProfilePage() {
                       className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-3 bg-trench-black border border-trench-sandbag rounded shadow-inner"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${roomActive ? 'bg-yellow-500 animate-ping' : outcome === 'win' ? 'bg-neon-moon' : 'bg-jeet-red'}`} />
+                        <div className={`w-3 h-3 rounded-full shrink-0 ${
+                          roomActive 
+                            ? 'bg-yellow-500 animate-ping' 
+                            : outcome === 'pending'
+                            ? 'bg-yellow-500 animate-pulse'
+                            : outcome === 'cancelled'
+                            ? 'bg-gray-500'
+                            : outcome === 'win' 
+                            ? 'bg-neon-moon shadow-glow-moon' 
+                            : 'bg-jeet-red shadow-glow-jeet'
+                        }`} />
                         <div>
                           <span className="font-bold text-white block uppercase text-[11px]">
                             {bet.amount.toFixed(2)} SOL ON {formatCashtag(tokenSym)}
+                            {bRoom && (
+                              <span className="text-trench-gasmask text-[9px] lowercase font-normal ml-2">
+                                ({bRoom.duration} mins round)
+                              </span>
+                            )}
                           </span>
-                          <span className="font-bold text-[9px] text-trench-gasmask uppercase tracking-wider block mt-0.5">
-                            BET SIDE: <span className={bet.side === 'moon' ? 'text-neon-moon' : 'text-jeet-red'}>{bet.side.toUpperCase()}</span>
-                          </span>
+                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 font-mono text-[9px] text-trench-gasmask font-bold uppercase tracking-wider">
+                            <span>
+                              SIDE: <span className={bet.side === 'moon' ? 'text-neon-moon' : 'text-jeet-red'}>{bet.side.toUpperCase()}</span>
+                            </span>
+                            <span>
+                              DATE: {new Date(bet.timestamp).toLocaleString()}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -539,6 +598,14 @@ export default function ProfilePage() {
                           {roomActive ? (
                             <span className="text-yellow-500 font-bold uppercase text-[10px] px-2 py-0.5 bg-yellow-500/5 border border-yellow-500/20 rounded">
                               UNDER SIEGE (ACTIVE)
+                            </span>
+                          ) : outcome === 'pending' ? (
+                            <span className="text-yellow-500 font-bold uppercase text-[10px] px-2 py-0.5 bg-yellow-500/5 border border-yellow-500/20 rounded">
+                              PENDING TRIGGER
+                            </span>
+                          ) : outcome === 'cancelled' ? (
+                            <span className="text-gray-400 font-bold uppercase text-[10px] px-2 py-0.5 bg-gray-500/5 border border-gray-500/20 rounded">
+                              CANCELLED / REFUNDED
                             </span>
                           ) : outcome === 'win' ? (
                             <span className="text-neon-moon font-bold uppercase text-[10px] px-2 py-0.5 bg-neon-moon/5 border border-neon-moon/20 rounded">
@@ -560,15 +627,15 @@ export default function ProfilePage() {
                               } 
                               target="_blank" 
                               rel="noreferrer" 
-                              className="text-neon-moon hover:text-white underline text-[9px] uppercase font-bold tracking-wide flex items-center gap-0.5 mt-0.5"
+                              className="text-neon-moon hover:text-white border border-neon-moon/30 hover:border-neon-moon bg-neon-moon/5 px-2 py-0.5 rounded text-[9px] uppercase font-bold tracking-wide flex items-center gap-1 mt-1.5 transition-all"
                             >
-                              <span>TX LINK</span>
-                              <ExternalLink size={8} />
+                              <span>TX EXPLORER</span>
+                              <ExternalLink size={10} />
                             </a>
                           )}
                         </div>
 
-                        {!roomActive && (
+                        {!roomActive && outcome !== 'pending' && outcome !== 'cancelled' && (
                           <button
                             onClick={() => handleReplayClick(bet, outcome as 'win' | 'loss')}
                             className="btn-wood py-1.5 px-3 rounded font-staatliches text-xs tracking-wider uppercase flex items-center gap-1"
@@ -618,7 +685,7 @@ export default function ProfilePage() {
                   
                   <div className="flex flex-col sm:flex-row gap-3">
                     <div className="flex-1 bg-trench-mud border-2 border-trench-sandbag rounded px-3 py-2 font-mono text-xs text-white truncate shadow-inner flex items-center">
-                      {typeof window !== 'undefined' ? window.location.origin : ''}/rooms?ref={user?.referralCode}
+                      {typeof window !== 'undefined' ? window.location.origin : ''}/rooms?ref={user?.referralCode || (user?.wallet ? user.wallet.slice(0, 6) + '9999' : 'recruit')}
                     </div>
                     <button 
                       onClick={handleCopyLink}
@@ -647,6 +714,64 @@ export default function ProfilePage() {
                       {((Number(user.referralEarnings) || 0) / 1e9).toFixed(3)}
                     </span>
                   </div>
+                </div>
+
+                <div className="bg-trench-black border border-trench-sandbag rounded p-5 shadow-inner relative overflow-hidden flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <div className="flex-1 min-w-0 w-full">
+                    <span className="font-mono text-[9px] text-trench-gasmask block uppercase font-bold mb-1">
+                      UNCLAIMED REFERRAL SPOILS
+                    </span>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="font-staatliches text-3xl text-neon-moon glow-moon">
+                        {(user.unclaimedReferralRewards || 0).toFixed(4)}
+                      </span>
+                      <span className="font-mono text-[10px] text-trench-gasmask font-bold uppercase">
+                        SOL
+                      </span>
+                    </div>
+                    <p className="font-mono text-[8px] text-trench-gasmask uppercase font-bold mt-1.5 leading-tight">
+                      Accrued commissions are held in the on-chain vault. Click claim to transfer them directly to your wallet.
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      const unclaimedAmt = user.unclaimedReferralRewards || 0;
+                      if (unclaimedAmt <= 0) {
+                        synthSound('defeat');
+                        alert("NO UNCLAIMED COMMISSIONS TO RETRIEVE!");
+                        return;
+                      }
+                      setIsClaiming(true);
+                      synthSound('bet');
+                      try {
+                        await claimReferralRewardsOnChain();
+                        synthSound('victory');
+                      } catch (err) {
+                        synthSound('defeat');
+                      } finally {
+                        setIsClaiming(false);
+                      }
+                    }}
+                    disabled={isClaiming || (user.unclaimedReferralRewards || 0) <= 0}
+                    className={`w-full sm:w-auto shrink-0 py-3 px-5 font-staatliches text-lg uppercase tracking-wider rounded transition-all flex items-center justify-center gap-2 border-b-4 active:translate-y-1 ${
+                      (user.unclaimedReferralRewards || 0) > 0
+                        ? 'bg-neon-moon text-trench-black border-neon-moon/50 hover:bg-[#34e213] shadow-glow-moon'
+                        : 'bg-[#1a1c23] text-trench-gasmask border-trench-black cursor-not-allowed'
+                    }`}
+                  >
+                    {isClaiming ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        <span>CLAIMING...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Coins size={16} />
+                        <span>CLAIM REWARDS</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 

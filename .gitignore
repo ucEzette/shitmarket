@@ -87,4 +87,4 @@ next-env.d.ts
 /fix_page.js
 /fix_rooms.js
 /rewrite_profile.js
-
+/auto_push.sh

@@ -357,7 +357,7 @@ roomsRouter.post('/:pubkey/settle', validate(roomPubkeyParamSchema, 'params'), a
 roomsRouter.get('/:pubkey/chats', validate(roomPubkeyParamSchema, 'params'), async (req, res) => {
   try {
     const { pubkey } = req.params;
-    const chats = await prisma.chatMessage.findMany({
+    const chats = await prismaRead.chatMessage.findMany({
       where: { roomPubkey: pubkey },
       orderBy: { timestamp: 'asc' },
       take: 100,

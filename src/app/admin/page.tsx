@@ -1,3 +1,4 @@
+import { INDEXER_URL } from "@/utils/config";
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -109,7 +110,7 @@ export default function AdminDashboardPage() {
   const [twapWindow, setTwapWindow] = useState<number>(60);
   const [coolingOffDays, setCoolingOffDays] = useState<number>(14);
 
-  const indexerUrl = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+  const indexerUrl = INDEXER_URL;
 
   // Live timer tick for cooling off countdowns
   const [, setTick] = useState(0);

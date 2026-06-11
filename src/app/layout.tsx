@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Staatliches, JetBrains_Mono, Permanent_Marker } from 'next/font/google';
 import "./globals.css";
 import { ClientWrapper } from '@/components/ClientWrapper';
 import { SolanaWalletProvider } from '@/components/WalletProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 
 const fontStaatliches = Staatliches({
   weight: '400',

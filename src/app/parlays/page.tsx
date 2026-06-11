@@ -176,6 +176,12 @@ export default function ParlaysPage() {
             </div>
           </div>
 
+          {/* Simulated Training Deck Alert Banner */}
+          <div className="mb-4 border border-yellow-500/40 bg-yellow-500/5 p-3 rounded text-[9px] font-mono text-yellow-500 uppercase font-bold tracking-wider animate-pulse flex items-center gap-2">
+            <span>⚠️</span>
+            <span>SIMULATED TRAINING DECK: ATOMIC PARLAYS RUN IN MOCK ENVIRONMENT. MULTI-LEG PVP PREDICTIONS DO NOT EXECUTE ON-CHAIN TRANSACTIONS ON SOLANA MAINNET.</span>
+          </div>
+
           {/* Warning badge */}
           <div className="mb-6 flex gap-2.5 p-3.5 bg-yellow-500/5 border-2 border-dashed border-yellow-500/20 rounded text-trench-gasmask items-center">
             <PepePortrait src={PEPE_ASSETS.jeetSkeleton} size={36} glowColor="jeet" className="rounded-full shrink-0" />

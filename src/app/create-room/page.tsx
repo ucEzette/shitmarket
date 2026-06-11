@@ -1,3 +1,4 @@
+import { INDEXER_URL } from "@/utils/config";
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -103,7 +104,7 @@ export default function CreateRoomPage() {
         });
 
         // Validate via indexer API to verify age and market cap constraints
-        const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+        const indexerApi = INDEXER_URL;
         try {
           const valRes = await fetch(`${indexerApi}/api/rooms/validate?mint=${contractAddress.trim()}`);
           if (valRes.ok) {

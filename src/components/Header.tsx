@@ -2,17 +2,27 @@
 
 import React, { useState, useCallback } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useAppState } from '@/store/useAppState';
 import { PepePortrait, PEPE_ASSETS } from './MemeAssets';
-import { LogOut, Loader2, Coins, Menu } from 'lucide-react';
+import { LogOut, Loader2, Coins } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+
+const navItems = [
+  { label: 'HQ LANDING', href: '/' },
+  { label: 'WAR TABLE', href: '/rooms' },
+  { label: 'DEPLOY MISSION', href: '/create-room' },
+  { label: 'PARLAYS', href: '/parlays' },
+  { label: 'LEADERBOARD', href: '/leaderboard' },
+];
 
 export const Header: React.FC<{
   isRoomPage?: boolean;
   onMenuToggle?: () => void;
 }> = ({ isRoomPage, onMenuToggle }) => {
+  const pathname = usePathname();
   const { user, disconnectWallet: mockDisconnect } = useAppState();
   const { publicKey, connected, connecting: walletConnecting, disconnect } = useWallet();
   const { setVisible } = useWalletModal();
@@ -30,36 +40,45 @@ export const Header: React.FC<{
 
   return (
     <header className="sticky top-0 z-[100] w-full border-b-4 border-trench-sandbag bg-black px-3 py-2.5 sm:p-4 retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0" style={{ overflow: 'visible' }}>
-      <div className="mx-auto flex max-w-7xl flex-row items-center justify-between gap-2">
-        {/* Left Aligned branding section */}
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-          {/* Menu toggle button inside a token room */}
-          {isRoomPage && (
-            <button
-              onClick={onMenuToggle}
-              className="flex items-center gap-1.5 px-3 py-1.5 retro-btn text-neon-moon border-2 border-trench-sandbag rounded bg-black hover:border-neon-moon font-staatliches text-xs tracking-wider uppercase transition-colors shrink-0 font-bold"
-            >
-              <Menu size={14} className="text-neon-moon" />
-              <span>MENU</span>
-            </button>
-          )}
-          
+      <div className="mx-auto flex max-w-full px-4 md:px-8 flex-row items-center justify-between gap-2">
+        {/* Left Aligned branding and navigation section */}
+        <div className="flex items-center gap-2 sm:gap-6 shrink-0">
           {/* Logo and Tagline */}
           <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0">
-          <div className="flex flex-col">
-            <img
-              src="/pepes/screen (1).png"
-              alt="ShitMarket"
-              className="h-[32px] sm:h-[44px] w-auto object-contain group-hover:scale-105 transition-all duration-300"
-              loading="eager"
-              decoding="sync"
-            />
-            <p className="hidden sm:block font-mono text-[9px] text-trench-gasmask uppercase tracking-widest mt-1 font-bold pl-2 stencil-shadow">
-              PvP Meme Trenches • 1.25% Settle Fee
-            </p>
-          </div>
-        </Link>
-      </div>
+            <div className="flex flex-col">
+              <img
+                src="/pepes/screen (1).png"
+                alt="ShitMarket"
+                className="h-[32px] sm:h-[44px] w-auto object-contain group-hover:scale-105 transition-all duration-300"
+                loading="eager"
+                decoding="sync"
+              />
+              <p className="hidden sm:block font-mono text-[9px] text-trench-gasmask uppercase tracking-widest mt-1 font-bold pl-2 stencil-shadow">
+                PvP Meme Trenches • 1.25% Settle Fee
+              </p>
+            </div>
+          </Link>
+
+          {/* Desktop Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-3 ml-4">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`font-staatliches text-base tracking-wider uppercase transition-all px-2.5 py-1.5 rounded ${
+                    isActive
+                      ? 'bg-trench-black text-neon-moon border-b-2 border-neon-moon shadow-[0_3px_10px_rgba(57,255,20,0.15)] font-bold'
+                      : 'text-trench-gasmask hover:text-white hover:bg-trench-black/20'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
 
         {/* Wallet Connection / Ammo Status */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
@@ -70,7 +89,7 @@ export const Header: React.FC<{
           </Link>
           
           {user && user.wallet ? (
-            <div className="flex items-center gap-1 bg-black border-2 border-trench-sandbag rounded p-0.5 sm:p-1">
+            <div className="flex items-center gap-2 bg-black border-2 border-trench-sandbag rounded p-0.5 sm:p-1">
               {/* Notification Bell */}
               <NotificationBell />
 
@@ -82,24 +101,27 @@ export const Header: React.FC<{
                 </span>
               </div>
 
-              {/* User Address with Gas Mask Indicator */}
+              {/* Connected wallet profile image linking to profile */}
               <Link
                 href="/profile"
-                className="flex items-center gap-1 px-1 py-0.5 sm:px-3 sm:py-1 bg-trench-sandbag hover:bg-trench-gasmask transition-all rounded-sm text-white retro-btn"
+                className="block shrink-0 transition-transform hover:scale-105"
+                title={`Trench Pass: ${user.username || user.wallet.substring(0, 6)}`}
               >
-                <PepePortrait src={user.avatarUrl || PEPE_ASSETS.fewUnderstand} size={16} loading="eager" className="rounded-full sm:size-[20px]" />
-                <span className="font-mono text-[10px] sm:text-xs font-bold pl-0.5 max-w-[45px] sm:max-w-[120px] truncate block">
-                  {user.username || `${user.wallet.substring(0, 4)}...${user.wallet.substring(user.wallet.length - 4)}`}
-                </span>
+                <PepePortrait
+                  src={user.avatarUrl || PEPE_ASSETS.fewUnderstand}
+                  size={32}
+                  glowColor="moon"
+                  className="rounded-full"
+                />
               </Link>
 
               {/* Disconnect trigger */}
               <button
                 onClick={handleDisconnect}
                 title="RESERVE FORCES (DISCONNECT)"
-                className="p-1 text-white hover:bg-red-500 transition-all rounded retro-btn retro-btn-jeet"
+                className="p-2 text-trench-gasmask hover:text-white hover:bg-red-500/20 transition-all rounded border border-trench-sandbag bg-trench-black"
               >
-                <LogOut size={14} className="sm:size-[16px]" />
+                <LogOut size={16} />
               </button>
             </div>
           ) : (

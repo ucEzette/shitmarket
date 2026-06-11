@@ -252,7 +252,6 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
     { label: 'DEPLOY MISSION', href: '/create-room', icon: Hammer },
     { label: 'PARLAYS', href: '/parlays', icon: Layers },
     { label: 'LEADERBOARD', href: '/leaderboard', icon: Trophy },
-    { label: 'TRENCH PASS', href: '/profile', icon: User },
   ];
 
   // Play background tactical rumble loop if audioEnabled
@@ -692,106 +691,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       )}
 
       <div className="flex-1 flex min-h-0 w-full relative">
-        {/* Backdrop overlay when the drawer is open on room pages (Mobile only) */}
-        {isRoomPage && drawerOpen && (
-          <div 
-            onClick={() => setDrawerOpen(false)} 
-            className="fixed inset-0 bg-black/70 z-45 transition-opacity duration-300 cursor-pointer pointer-events-auto lg:hidden"
-          />
-        )}
-
-        {/* Sidebar Nav (Desktop / Drawer inside Room) */}
-        <aside className={`${
-          isRoomPage
-            ? `${
-                drawerOpen 
-                  ? 'fixed lg:static translate-x-0 lg:w-64 lg:border-r-4 lg:opacity-100 flex' 
-                  : 'hidden lg:flex lg:static -translate-x-full lg:w-0 lg:overflow-hidden lg:border-r-0 lg:opacity-0 lg:pointer-events-none'
-              } inset-y-0 left-0 z-50 lg:z-30 transform lg:transform-none transition-all duration-300 ease-in-out`
-            : 'hidden lg:flex w-64 relative'
-        } flex-col bg-trench-mud border-r-4 border-trench-sandbag shadow-[inset_-4px_0_8px_rgba(0,0,0,0.5)] shrink-0 pt-4 scanlines justify-between pb-8`}>
-          <div>
-            <div className="p-6 border-b-2 border-trench-sandbag mb-4 bg-trench-black/20">
-              <div className="flex items-center gap-3 mb-2">
-                <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={40} glowColor="gold" className="rounded-full" />
-                <div>
-                  <h3 className="font-staatliches text-2xl text-neon-moon tracking-wider leading-none uppercase">
-                    TRENCH HQ
-                  </h3>
-                  <p className="font-mono text-[10px] text-trench-gasmask mt-0.5 uppercase font-bold">
-                    {user && user.wallet 
-                      ? `COMMANDER #${user.wallet.substring(2, 6).toUpperCase()}` 
-                      : 'GUEST RECRUIT'}
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            <nav className="flex flex-col gap-1.5 px-3">
-              {navItems.map((item) => {
-                const isActive = pathname === item.href;
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`flex items-center gap-3 px-4 py-2.5 font-staatliches text-base tracking-wider uppercase rounded transition-all ${
-                      isActive
-                        ? 'bg-trench-black text-neon-moon border-l-4 border-neon-moon shadow-[0_0_10px_rgba(57,255,20,0.15)] font-bold'
-                        : 'text-trench-gasmask hover:text-white hover:bg-trench-black/40'
-                    }`}
-                  >
-                    <Icon size={16} className={isActive ? 'text-neon-moon font-bold' : 'text-trench-gasmask'} />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-          
-          {/* Quick Mission Deployer Widget at the bottom */}
-          <div className="px-4 mt-auto">
-            {user && user.wallet ? (
-              <div className="bg-trench-black p-3.5 border-2 border-trench-sandbag rounded mb-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <PepePortrait src={PEPE_ASSETS.diamondHands} size={32} glowColor="gold" className="rounded" />
-                  <div>
-                    <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block">AMMUNITION</span>
-                    <span className="font-staatliches text-lg text-moon-gold glow-gold tracking-wider leading-none uppercase">
-                      {user.balance.toFixed(2)} SOL
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="bg-trench-black/60 p-3.5 border-2 border-dashed border-trench-sandbag rounded mb-4 text-center">
-                <PepePortrait src={PEPE_ASSETS.neonWojak} size={40} className="rounded-full mx-auto mb-2" />
-                <p className="font-mono text-[9px] text-trench-gasmask uppercase font-bold leading-normal">
-                  STASH OFFLINE. ENLIST VIA WALLET CONNECTION!
-                </p>
-              </div>
-            )}
-
-            {/* Rotating degen quote */}
-            <div className="mb-4">
-              <DegenQuoteBanner interval={12000} />
-            </div>
-            
-            {isPaused ? (
-              <button disabled className="w-full py-2.5 font-staatliches text-lg uppercase tracking-wider text-black bg-gray-500 rounded border-b-4 border-gray-800 font-bold opacity-50 cursor-not-allowed">
-                SYSTEM PAUSED
-              </button>
-            ) : (
-              <Link href="/create-room" className="block w-full">
-                <button className="w-full py-2.5 font-staatliches text-lg uppercase tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-0.5 transition-all font-bold">
-                  DEPLOY NEW MISSION
-                </button>
-              </Link>
-            )}
-          </div>
-        </aside>
-
-        {/* Main Page Content shifted on desktop */}
+        {/* Main Page Content */}
         <main className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-0 transition-all duration-300 ease-in-out">
           <div className="flex-1 flex flex-col">
             {children}

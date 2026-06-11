@@ -17,7 +17,7 @@ export const Footer: React.FC = () => {
         <PixelBarbedWire height={16} />
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 pt-4 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="mx-auto max-w-full px-4 md:px-8 pt-4 flex flex-col md:flex-row items-center justify-between gap-6">
         {/* Info Column */}
         <div className="flex flex-col items-center md:items-start text-center md:text-left gap-2">
           <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 mt-6 text-center border-t border-trench-sandbag/40 pt-4">
+      <div className="mx-auto max-w-full px-4 md:px-8 mt-6 text-center border-t border-trench-sandbag/40 pt-4">
         <p className="font-mono text-[10px] text-neon-moon uppercase tracking-wider font-bold mb-1.5">
           HQ RADIO COURIER: <a href="mailto:contact@shitmarket.lol" className="underline hover:text-white transition-colors">contact@shitmarket.lol</a>
         </p>

@@ -66,21 +66,19 @@ export default function RoomsPage() {
     return () => clearInterval(interval);
   }, [rooms]);
 
-  // Filtering Logic
-  const getFilteredRooms = () => {
-    let list = [...rooms];
+  // Filtering & Sorting Logic for the 3 columns
+  const getCategorizedRooms = () => {
     const now = Date.now();
+    // Base active or expired rooms
+    let list = rooms.filter((r) => {
+      if (filter === 'expired') {
+        return r.status === 'settled' || r.expiry <= now;
+      } else {
+        return r.status === 'active' && r.expiry > now;
+      }
+    });
 
-    // Separate active, pending, and expired rooms
-    if (filter === 'pending-orders') {
-      list = list.filter((r) => r.status === 'pending');
-    } else if (filter !== 'expired') {
-      list = list.filter((r) => r.status === 'active' && r.expiry > now);
-    } else {
-      list = list.filter((r) => r.status === 'settled' || (r.status === 'active' && r.expiry <= now));
-    }
-
-    // Filter by search query
+    // Apply global search query
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(
@@ -91,33 +89,28 @@ export default function RoomsPage() {
       );
     }
 
-    // Filter by active bets
-    if (filter === 'active-bets') {
-      if (!user) return [];
-      const userRoomIds = user.bets.map((b) => b.roomId);
-      list = list.filter((r) => userRoomIds.includes(r.id));
-    }
+    // 1. New (Newest listed first)
+    const newRoomsList = [...list].sort((a, b) => b.createdAt - a.createdAt);
 
-    // Sorting
-    if (filter === 'ending') {
-      // nearest expiry first
-      list.sort((a, b) => a.expiry - b.expiry);
-    } else if (filter === 'biggest') {
-      // total pot descending
-      list.sort((a, b) => {
-        const potA = a.moonPool + a.jeetPool;
-        const potB = b.moonPool + b.jeetPool;
-        return potB - potA;
-      });
-    } else if (filter === 'expired') {
-      // newest expired/settled first
-      list.sort((a, b) => b.expiry - a.expiry);
-    }
+    // 2. Ending Soon (Closest expiry first)
+    const endingSoonRoomsList = [...list].sort((a, b) => a.expiry - b.expiry);
 
-    return list;
+    // 3. Biggest Pot (Highest total pot first)
+    const biggestPotRoomsList = [...list].sort((a, b) => {
+      const potA = a.moonPool + a.jeetPool;
+      const potB = b.moonPool + b.jeetPool;
+      return potB - potA;
+    });
+
+    return {
+      newRooms: newRoomsList,
+      endingSoonRooms: endingSoonRoomsList,
+      biggestPotRooms: biggestPotRoomsList,
+      allMatchingCount: list.length
+    };
   };
 
-  const activeFiltered = getFilteredRooms();
+  const { newRooms, endingSoonRooms, biggestPotRooms, allMatchingCount } = getCategorizedRooms();
 
   // Quick Bet Placement handler
   const handleQuickBet = (e: React.MouseEvent, roomId: string, side: 'moon' | 'jeet', amount: number) => {
@@ -134,11 +127,161 @@ export default function RoomsPage() {
     synthSound('bet');
   };
 
+  const renderRoomCard = (room: Room) => {
+    const isMoonLeading = room.moonPool > room.jeetPool;
+    const totalPot = room.moonPool + room.jeetPool;
+    const moonPercentage = totalPot > 0 ? (room.moonPool / totalPot) * 100 : 50;
+    const jeetPercentage = totalPot > 0 ? (room.jeetPool / totalPot) * 100 : 50;
+
+    const timeText = timeRemainingText[room.id] || '00:00:00';
+    const isSettled = room.status === 'settled';
+
+    // Glow styling depends on which side is leading
+    const hoverGlow = isSettled
+      ? 'hover:shadow-glow-gold hover:border-moon-gold/80'
+      : isMoonLeading
+      ? 'hover:shadow-glow-moon hover:border-neon-moon/80'
+      : 'hover:shadow-glow-jeet hover:border-jeet-red/80';
+
+    return (
+      <div
+        key={room.id}
+        onClick={() => router.push(`/room/${room.id}`)}
+        className={`retro-panel p-3 cursor-pointer flex flex-col justify-between relative group transition-all duration-200 hover:-translate-y-0.5 select-none scanlines rounded-lg border-2 ${hoverGlow}`}
+      >
+        {/* Timer Bomb Clock Header */}
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center gap-1 bg-trench-black border border-trench-sandbag/80 rounded px-1.5 py-0.5">
+            <Bomb size={9} className={isSettled ? 'text-moon-gold' : 'text-jeet-red'} />
+            <span className={`font-mono text-[9px] font-bold ${isSettled ? 'text-moon-gold' : 'text-white'}`}>
+              {formatDuration(room.duration)}
+            </span>
+          </div>
+          <div className={`text-[9px] font-mono font-bold bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 uppercase ${isSettled ? 'text-moon-gold' : 'text-neon-moon animate-pulse'}`}>
+            {timeText}
+          </div>
+        </div>
+
+        {/* Token Details with compact structure */}
+        <div className="flex items-center gap-2 border-b border-trench-sandbag/30 pb-2 mb-2">
+          <div className="relative bg-trench-black p-0.5 border border-trench-sandbag rounded overflow-hidden shrink-0 w-8 h-8 flex items-center justify-center">
+            {room.token.icon && room.token.icon.startsWith('http') ? (
+              <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded" />
+            ) : (
+              <PepePortrait
+                src={(() => {
+                  const id = room.id || '';
+                  let hash = 0;
+                  for (let i = 0; i < id.length; i++) {
+                    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+                  }
+                  const index = Math.abs(hash);
+                  return isMoonLeading 
+                    ? MOON_PEPES[index % MOON_PEPES.length] 
+                    : JEET_PEPES[index % JEET_PEPES.length];
+                })()}
+                size={24}
+                glowColor={isMoonLeading ? 'moon' : 'jeet'}
+                className="rounded"
+              />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-1 flex-wrap">
+              <h4 className="font-staatliches text-base text-white tracking-wide truncate max-w-[90px]">
+                {room.token.name}
+              </h4>
+              <span className="font-mono text-[9px] text-neon-moon font-bold truncate">
+                {formatCashtag(room.token.symbol)}
+              </span>
+            </div>
+            <span 
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(room.token.address);
+                alert("CONTRACT COPIED!");
+              }}
+              className="font-mono text-[8px] text-trench-gasmask hover:text-white transition-colors cursor-pointer select-all truncate block max-w-[140px]"
+              title="Click to copy CA"
+            >
+              📋 {room.token.address}
+            </span>
+          </div>
+        </div>
+
+        {/* Polymarket prediction target box */}
+        <div className="bg-trench-black/40 border border-trench-sandbag/20 p-1.5 rounded mb-2 text-center font-mono text-[9px] leading-tight">
+          <p className="text-white font-bold uppercase">
+            ENDS ABOVE ${formatPrice(room.openingPrice)}?
+          </p>
+        </div>
+
+        {/* Pools Breakdown progress bar */}
+        <div className="space-y-1 mb-2 font-mono text-[8px] font-bold">
+          <div className="flex justify-between">
+            <span className="text-neon-moon">🟢 {room.moonPool.toFixed(2)} SOL</span>
+            <span className="text-jeet-red">🔴 {room.jeetPool.toFixed(2)} SOL</span>
+          </div>
+
+          {/* Dual Bar */}
+          <div className="w-full h-1.5 bg-trench-black border border-trench-sandbag/60 rounded overflow-hidden flex">
+            <div
+              style={{ width: `${moonPercentage}%` }}
+              className="bg-neon-moon h-full transition-all duration-300"
+            />
+            <div
+              style={{ width: `${jeetPercentage}%` }}
+              className="bg-jeet-red h-full transition-all duration-300"
+            />
+          </div>
+        </div>
+
+        {/* Quick Bet Buttons */}
+        {!isSettled ? (
+          <div className="grid grid-cols-2 gap-1.5 mt-auto">
+            <button
+              onClick={(e) => handleQuickBet(e, room.id, 'moon', 0.01)}
+              className="retro-btn retro-btn-moon py-1 px-1 rounded font-staatliches text-xs tracking-wider uppercase text-center active:translate-y-0.5 transition-transform"
+            >
+              MOON 0.01
+            </button>
+            <button
+              onClick={(e) => handleQuickBet(e, room.id, 'jeet', 0.05)}
+              className="retro-btn retro-btn-jeet py-1 px-1 rounded font-staatliches text-xs tracking-wider uppercase text-center active:translate-y-0.5 transition-transform"
+            >
+              JEET 0.05
+            </button>
+          </div>
+        ) : (
+          <div className="w-full py-1 bg-trench-black border border-dashed border-moon-gold/40 text-center rounded mt-auto">
+            <span className="font-staatliches text-xs text-moon-gold uppercase tracking-widest glow-gold font-bold">
+              WINNER: {room.winner?.toUpperCase() || 'MOON'}
+            </span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderColumnSkeleton = () => (
+    <div className="space-y-3 animate-pulse">
+      {[1, 2, 3].map((n) => (
+        <div key={n} className="retro-panel p-3.5 rounded-lg border-2 border-trench-sandbag/40 h-28 bg-trench-black/20" />
+      ))}
+    </div>
+  );
+
+  const renderEmptyColumn = () => (
+    <div className="flex flex-col items-center justify-center py-10 text-center text-trench-gasmask border border-dashed border-trench-sandbag/40 rounded-lg p-4 font-mono text-[10px] uppercase font-bold">
+      <p>No Arenas Found</p>
+    </div>
+  );
+
   return (
-    <div className="mx-auto max-w-7xl w-full px-4 py-8 flex-1 flex flex-col select-none">
+    <div className="w-full px-4 md:px-8 py-6 flex-1 flex flex-col select-none max-w-full">
       
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
         <div className="flex items-center gap-4">
           <PepePortrait src={PEPE_ASSETS.apeGeneral} size={56} glowColor="moon" animated className="rounded-lg" />
           <div>
@@ -162,52 +305,28 @@ export default function RoomsPage() {
       </div>
 
       {/* Filter and Search Panel */}
-      <div className="retro-panel p-4 rounded-xl mb-8 flex flex-col lg:flex-row justify-between gap-4 items-stretch lg:items-center">
+      <div className="retro-panel p-3 rounded-xl mb-6 flex flex-col md:flex-row justify-between gap-4 items-center">
         
-        {/* Tactical filter radio tabs */}
-        <div className="flex flex-wrap justify-center lg:justify-start gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner w-full lg:w-auto">
+        {/* Live / Expired toggle */}
+        <div className="flex gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner w-full md:w-auto">
           <button
-            onClick={() => setFilter('ending')}
+            onClick={() => {
+              setFilter('ending');
+              synthSound('bet');
+            }}
             className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
-              filter === 'ending'
+              filter !== 'expired'
                 ? 'bg-trench-sandbag text-neon-moon font-bold shadow-glow-moon'
                 : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
             }`}
           >
-            ⏳ Ending Soon
+            🟢 Live Prediction Arenas
           </button>
           <button
-            onClick={() => setFilter('biggest')}
-            className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
-              filter === 'biggest'
-                ? 'bg-trench-sandbag text-moon-gold font-bold shadow-glow-gold'
-                : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
-            }`}
-          >
-            💰 Biggest Pots
-          </button>
-          <button
-            onClick={() => setFilter('active-bets')}
-            className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
-              filter === 'active-bets'
-                ? 'bg-trench-sandbag text-jeet-red font-bold shadow-glow-jeet'
-                : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
-            }`}
-          >
-            🎖️ My Active Bets
-          </button>
-          <button
-            onClick={() => setFilter('pending-orders')}
-            className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
-              filter === 'pending-orders'
-                ? 'bg-trench-sandbag text-yellow-500 font-bold shadow-glow-gold'
-                : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
-            }`}
-          >
-            🎯 My Orders
-          </button>
-          <button
-            onClick={() => setFilter('expired')}
+            onClick={() => {
+              setFilter('expired');
+              synthSound('bet');
+            }}
             className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
               filter === 'expired'
                 ? 'bg-trench-sandbag text-moon-gold font-bold shadow-glow-gold'
@@ -218,37 +337,22 @@ export default function RoomsPage() {
           </button>
         </div>
 
-        {/* Jeet Alerts Stub Button with Custom Tooltip */}
-        <div className="relative group shrink-0 w-full lg:w-auto">
-          <button className="px-4 py-2 retro-btn retro-btn-neutral text-black hover:text-black border border-trench-sandbag rounded font-staatliches text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-1.5 active:translate-y-0.5 w-full lg:w-auto">
-            <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff535a]" />
-            <span>ENABLE JEET ALERTS</span>
-          </button>
-          
-          {/* Tooltip */}
-          <div className="absolute bottom-full left-[50%] -translate-x-[50%] mb-2 hidden group-hover:block w-52 bg-trench-black border-2 border-trench-sandbag p-2.5 rounded shadow-2xl z-20 text-center font-mono text-[9px] text-trench-gasmask uppercase tracking-wider font-bold">
-            <span className="text-jeet-red font-bold block mb-1">🔴 RADAR DE-ENERGIZED</span>
-            Audio alarms sound when developers dump tokens. Operational features coming soon.
-            <div className="absolute top-full left-[50%] -translate-x-[50%] border-4 border-transparent border-t-trench-black" />
-          </div>
-        </div>
-
         {/* Contract/Name Search Input */}
-        <div className="relative w-full lg:max-w-md shrink-0">
+        <div className="relative w-full md:max-w-md shrink-0">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neon-moon">
             <Search size={16} />
           </div>
           <input
             type="text"
-            placeholder="PASTE CONTRACT ADDRESS OR TOKEN SYMBOL..."
+            placeholder="SEARCH CONTRACT OR TOKEN SYMBOL..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 bg-trench-black/80 border border-trench-sandbag text-white font-mono text-xs placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none tracking-widest uppercase font-bold shadow-inner"
+            className="w-full pl-9 pr-12 py-2 bg-trench-black/80 border border-trench-sandbag text-white font-mono text-xs placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none tracking-widest uppercase font-bold shadow-inner"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-trench-gasmask hover:text-white font-mono text-xs"
+              className="absolute inset-y-0 right-0 pr-3 flex items-center text-trench-gasmask hover:text-white font-mono text-[10px] font-bold"
             >
               CLEAR
             </button>
@@ -257,240 +361,80 @@ export default function RoomsPage() {
 
       </div>
 
-      {/* Loading Skeleton while syncing with backend */}
-      {showSkeleton && activeFiltered.length === 0 ? (
-        <div className="flex flex-col md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 animate-pulse">
-          {[1, 2, 3, 4, 5, 6].map((n) => (
-            <div key={n} className="retro-panel p-3 md:p-5 flex flex-col justify-between relative group select-none scanlines rounded-xl">
-              <div className="flex justify-between items-center mb-2 md:mb-4">
-                <div className="h-5 w-24 bg-trench-sandbag/40 rounded shadow-inner" />
-                <div className="h-4 w-16 bg-trench-sandbag/40 rounded shadow-inner" />
-              </div>
-              <div className="flex items-center gap-2 md:gap-3.5 mb-2 md:mb-4 border-b border-trench-sandbag/40 pb-2 md:pb-3">
-                <div className="w-[36px] h-[36px] md:w-[48px] md:h-[48px] bg-trench-sandbag/40 rounded shadow-inner" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-5 w-36 bg-trench-sandbag/40 rounded shadow-inner" />
-                  <div className="h-3 w-20 bg-trench-sandbag/30 rounded shadow-inner" />
-                </div>
-              </div>
-              <div className="space-y-1.5 md:space-y-2 mb-3 md:mb-5">
-                <div className="flex justify-between">
-                  <div className="h-3 w-20 bg-trench-sandbag/40 rounded shadow-inner" />
-                  <div className="h-3 w-20 bg-trench-sandbag/40 rounded shadow-inner" />
-                </div>
-                <div className="h-2 md:h-3 bg-trench-sandbag/30 rounded shadow-inner" />
-              </div>
-              <div className="grid grid-cols-2 gap-1.5 md:gap-2">
-                <div className="h-8 md:h-10 bg-trench-sandbag/30 rounded shadow-inner" />
-                <div className="h-8 md:h-10 bg-trench-sandbag/30 rounded shadow-inner" />
-              </div>
-              <div className="mt-3 flex items-center justify-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-neon-moon/40 animate-ping" />
-                <span className="font-mono text-[9px] text-trench-gasmask/60 uppercase font-bold tracking-wider">
-                  SYNCING WITH COMMAND HQ...
-                </span>
-              </div>
+      {/* 3-Column Dashboard View */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 items-start min-h-0 w-full mb-6">
+        
+        {/* Column 1: New */}
+        <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
+          <div className="flex items-center justify-between border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-neon-moon shadow-[0_0_6px_#39ff14]" />
+              <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">NEW</h3>
             </div>
-          ))}
-        </div>
-      ) : activeFiltered.length > 0 ? (
-        <div className="flex flex-col md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
-          {activeFiltered.map((room) => {
-            const isMoonLeading = room.moonPool > room.jeetPool;
-            const totalPot = room.moonPool + room.jeetPool;
-            const moonPercentage = totalPot > 0 ? (room.moonPool / totalPot) * 100 : 50;
-            const jeetPercentage = totalPot > 0 ? (room.jeetPool / totalPot) * 100 : 50;
-
-            const timeText = timeRemainingText[room.id] || '00:00:00';
-            const isSettled = room.status === 'settled';
-
-            // Glow styling depends on which side is leading
-            const hoverGlow = isSettled
-              ? 'hover:shadow-glow-gold hover:border-moon-gold/80'
-              : isMoonLeading
-              ? 'hover:shadow-glow-moon hover:border-neon-moon/80'
-              : 'hover:shadow-glow-jeet hover:border-jeet-red/80';
-
-            return (
-              <div
-                key={room.id}
-                onClick={() => router.push(`/room/${room.id}`)}
-                className={`retro-panel p-3 md:p-5 cursor-pointer flex flex-col justify-between relative group transition-all duration-200 hover:-translate-y-1 select-none scanlines rounded-xl ${hoverGlow}`}
-              >
-                {/* Timer Bomb Clock Header */}
-                <div className="flex justify-between items-center mb-2 md:mb-4">
-                  <div className="flex items-center gap-1 bg-trench-black border border-trench-sandbag/80 rounded px-2 md:px-2.5 py-0.5 md:py-1">
-                    <Bomb size={10} className={isSettled ? 'text-moon-gold' : 'text-jeet-red'} />
-                    <span className={`font-mono text-[10px] md:text-xs font-bold ${isSettled ? 'text-moon-gold' : 'text-white'}`}>
-                      {formatDuration(room.duration)} ROUND
-                    </span>
-                  </div>
-                  <div className={`text-[9px] md:text-[10px] font-mono font-bold bg-trench-black px-1.5 md:px-2 py-0.5 rounded border border-trench-sandbag/30 uppercase ${isSettled ? 'text-moon-gold' : 'text-neon-moon animate-pulse'}`}>
-                    {timeText}
-                  </div>
-                </div>
-
-                {/* Token Details with Helmet overlay — more compact row on mobile */}
-                <div className="flex items-center gap-2 md:gap-3.5 mb-2 md:mb-4 border-b border-trench-sandbag/40 pb-2 md:pb-3">
-                  <div className="relative bg-trench-black p-0.5 border border-trench-sandbag rounded group-hover:scale-105 transition-transform duration-200 overflow-hidden shrink-0 w-[36px] h-[36px] md:w-[48px] md:h-[48px] flex items-center justify-center">
-                    {room.token.icon && room.token.icon.startsWith('http') ? (
-                      <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded" />
-                    ) : (
-                      <PepePortrait
-                        src={(() => {
-                          const id = room.id || '';
-                          let hash = 0;
-                          for (let i = 0; i < id.length; i++) {
-                            hash = id.charCodeAt(i) + ((hash << 5) - hash);
-                          }
-                          const index = Math.abs(hash);
-                          return isMoonLeading 
-                            ? MOON_PEPES[index % MOON_PEPES.length] 
-                            : JEET_PEPES[index % JEET_PEPES.length];
-                        })()}
-                        size={32}
-                        glowColor={isMoonLeading ? 'moon' : 'jeet'}
-                        className="rounded"
-                      />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className="font-staatliches text-lg md:text-2xl text-white tracking-wide group-hover:text-neon-moon transition-colors -mb-1 truncate max-w-[160px] md:max-w-none">
-                        {room.token.name}
-                      </h4>
-                      <span className="font-mono text-[10px] md:text-xs text-neon-moon font-bold flex items-center gap-1 shrink-0">
-                        {formatCashtag(room.token.symbol)}
-                        {room.token.chainId && (
-                          <span className="text-[8px] md:text-[9px] bg-trench-black text-gray-400 px-1 md:px-1.5 py-0.5 rounded border border-trench-sandbag uppercase">
-                            {room.token.chainId}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <span 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(room.token.address);
-                          alert("CONTRACT ADDRESS COPIED TO CLIPBOARD!");
-                        }}
-                        className="font-mono text-[8px] md:text-[9px] text-neon-moon hover:text-white transition-colors bg-trench-black/60 px-1.5 py-0.5 rounded border border-trench-sandbag/30 cursor-pointer select-all truncate block w-full max-w-[180px] md:max-w-[240px]"
-                        title="Click to copy full contract address"
-                      >
-                        📋 {room.token.address}
-                      </span>
-                    </div>
-                    <span className="font-mono text-[7px] md:text-[8px] text-trench-gasmask block mt-1 uppercase font-bold">
-                      ⚔️ LISTED: {(() => {
-                        if (!room.createdAt) return 'TBD';
-                        const d = new Date(room.createdAt);
-                        if (isNaN(d.getTime())) return 'TBD';
-                        return d.toISOString().replace('T', ' ').substring(0, 19);
-                      })()} UTC
-                    </span>
-                  </div>
-                </div>
-
-                {/* Polymarket-style concise prediction question box */}
-                <div className="bg-trench-black/40 border border-trench-sandbag/20 p-2.5 rounded-lg mb-3 text-left font-mono relative">
-                  <span className="text-[8px] text-neon-moon uppercase font-bold tracking-wider block">PREDICTION TARGET</span>
-                  <p className="text-[10px] text-white font-bold leading-normal uppercase mt-0.5">
-                    Will {formatCashtag(room.token.symbol)} end above ${formatPrice(room.openingPrice)}?
-                  </p>
-                </div>
-
-                {/* Pools Breakdown progress bar — stacked on mobile too */}
-                <div className="space-y-1.5 md:space-y-2 mb-3 md:mb-5">
-                  <div className="flex justify-between text-[10px] md:text-xs font-mono font-bold leading-none">
-                    <span className="text-neon-moon flex items-center gap-1">
-                      🟢 <span className="hidden sm:inline">MOON:</span> {room.moonPool.toFixed(2)} SOL
-                    </span>
-                    <span className="text-jeet-red flex items-center gap-1">
-                      🔴 <span className="hidden sm:inline">JEET:</span> {room.jeetPool.toFixed(2)} SOL
-                    </span>
-                  </div>
-
-                  {/* Dual Bar */}
-                  <div className="w-full h-2 md:h-3 bg-trench-black border border-trench-sandbag/80 rounded overflow-hidden flex">
-                    <div
-                      style={{ width: `${moonPercentage}%` }}
-                      className="bg-neon-moon h-full transition-all duration-500 shadow-[inset_0_0_5px_rgba(0,0,0,0.6)]"
-                    />
-                    <div
-                      style={{ width: `${jeetPercentage}%` }}
-                      className="bg-jeet-red h-full transition-all duration-500 shadow-[inset_0_0_5px_rgba(0,0,0,0.6)]"
-                    />
-                  </div>
-                  
-                  <div className="flex justify-between font-mono text-[8px] md:text-[9px] text-trench-gasmask font-bold uppercase mt-0.5 md:mt-1">
-                    <span>MOON ({moonPercentage.toFixed(0)}%)</span>
-                    <span>JEET ({jeetPercentage.toFixed(0)}%)</span>
-                  </div>
-                </div>
-
-                {/* Quick Bet Buttons */}
-                {!isSettled ? (
-                  <div className="grid grid-cols-2 gap-1.5 md:gap-2 mt-1 md:mt-2">
-                    <button
-                      onClick={(e) => handleQuickBet(e, room.id, 'moon', 0.01)}
-                      className="retro-btn retro-btn-moon py-1 md:py-1.5 px-1 md:px-2.5 rounded font-staatliches text-[10px] md:text-sm tracking-wider uppercase text-center active:translate-y-0.5 md:active:translate-y-1 transition-transform"
-                    >
-                      MOON 0.01
-                    </button>
-                    <button
-                      onClick={(e) => handleQuickBet(e, room.id, 'jeet', 0.05)}
-                      className="retro-btn retro-btn-jeet py-1 md:py-1.5 px-1 md:px-2.5 rounded font-staatliches text-[10px] md:text-sm tracking-wider uppercase text-center active:translate-y-0.5 md:active:translate-y-1 transition-transform"
-                    >
-                      JEET 0.05
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-full py-1.5 md:py-2 bg-trench-black border border-dashed md:border-2 border-moon-gold/40 text-center rounded">
-                    <span className="font-staatliches text-sm md:text-base text-moon-gold uppercase tracking-widest glow-gold font-bold">
-                      WINNER: {room.winner?.toUpperCase() || 'MOON'}
-                    </span>
-                    <span className="block font-mono text-[8px] md:text-[9px] text-trench-gasmask font-bold mt-0.5">
-                      BATTLE DECREED • CLICK FOR BOOTY
-                    </span>
-                  </div>
-                )}
-
-                {/* Room Detail Entry Overlay Chevron */}
-                <div className="absolute bottom-2 right-2 md:bottom-2.5 md:right-2.5 opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-1 pointer-events-none text-white">
-                  <ArrowRight size={10} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-      ) : (
-        /* Empty State */
-        <div className="flex flex-col items-center justify-center py-20 retro-panel rounded-xl text-center p-6 scanlines">
-          <div className="relative mb-6">
-            <div className="absolute inset-0 bg-jeet-red/10 rounded-full blur-xl animate-pulse" />
-            <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={120} glowColor="gold" animated className="rounded-xl relative z-10" />
+            <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
+              {newRooms.length} ROOMS
+            </span>
           </div>
-          <h3 className="font-staatliches text-3xl text-white uppercase tracking-wider mb-2">
-            No trenches dug yet!
-          </h3>
-          <p className="font-mono text-sm text-trench-gasmask uppercase max-w-sm font-bold leading-relaxed mb-6">
-            The battlefield lies silent. Paste a token contract and launch a fresh prediction room now to seed the first war pot.
-          </p>
-
-          <Link href="/create-room">
-            <button className="py-3 px-8 font-staatliches text-2xl uppercase tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all flex items-center gap-2">
-              <PixelShovel size={24} />
-              DIG THE FIRST TRENCH
-            </button>
-          </Link>
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
+            {showSkeleton ? (
+              renderColumnSkeleton()
+            ) : newRooms.length > 0 ? (
+              newRooms.map(renderRoomCard)
+            ) : (
+              renderEmptyColumn()
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Column 2: Ending Soon */}
+        <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
+          <div className="flex items-center justify-between border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff073a]" />
+              <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">ENDING SOON</h3>
+            </div>
+            <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
+              {endingSoonRooms.length} ROOMS
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
+            {showSkeleton ? (
+              renderColumnSkeleton()
+            ) : endingSoonRooms.length > 0 ? (
+              endingSoonRooms.map(renderRoomCard)
+            ) : (
+              renderEmptyColumn()
+            )}
+          </div>
+        </div>
+
+        {/* Column 3: Biggest Pot */}
+        <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
+          <div className="flex items-center justify-between border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-moon-gold shadow-[0_0_6px_#ffd700]" />
+              <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">BIGGEST POT</h3>
+            </div>
+            <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
+              {biggestPotRooms.length} ROOMS
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
+            {showSkeleton ? (
+              renderColumnSkeleton()
+            ) : biggestPotRooms.length > 0 ? (
+              biggestPotRooms.map(renderRoomCard)
+            ) : (
+              renderEmptyColumn()
+            )}
+          </div>
+        </div>
+
+      </div>
 
       {/* Wallet Connection Helper Prompter */}
       {!user && (
-        <div className="mt-12 bg-trench-mud/50 border-2 border-trench-sandbag rounded-lg p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md">
+        <div className="bg-trench-mud/50 border-2 border-trench-sandbag rounded-lg p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md">
           <div className="flex items-center gap-3">
             <PepePortrait src={PEPE_ASSETS.neonWojak} size={56} glowColor="jeet" animated className="rounded-lg" />
             <div>
@@ -513,7 +457,7 @@ export default function RoomsPage() {
       )}
 
       {/* Degen Quote Banner at bottom */}
-      <div className="mt-8">
+      <div className="mt-4 shrink-0">
         <DegenQuoteBanner />
       </div>
 

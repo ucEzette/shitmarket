@@ -187,11 +187,23 @@ function buildAnchorProgram(circuitBreaker: RpcCircuitBreaker): {
       }
       
       // Copy the account type definition into types so that BorshAccountsCoder finds it
-      if (!newTypes.some((ty: any) => ty.name === camelName)) {
-        newTypes.push({
-          name: camelName,
-          type: acc.type
-        });
+      const existingType = idl.types ? idl.types.find(
+        (ty: any) => ty.name.toLowerCase() === originalName.toLowerCase()
+      ) : null;
+      if (existingType) {
+        if (!newTypes.some((ty: any) => ty.name === camelName)) {
+          newTypes.push({
+            name: camelName,
+            type: existingType.type
+          });
+        }
+      } else if (acc.type) {
+        if (!newTypes.some((ty: any) => ty.name === camelName)) {
+          newTypes.push({
+            name: camelName,
+            type: acc.type
+          });
+        }
       }
       
       return acc;

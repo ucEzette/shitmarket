@@ -14,7 +14,7 @@ export const PEPE_ASSETS = {
   neonWojak: '/pepes/neon-wojak.png',
   diamondHands: '/pepes/diamond-hands-ape.png',
   jeetSkeleton: '/pepes/jeet-skeleton.png',
-  logoMain: '/pepes/screen (1).png',
+  logoMain: '/pepes/logo-main.png',
   logoAlt: '/pepes/screen 2.png',
   logoHeader: '/pepes/logo-header.png',
 } as const;

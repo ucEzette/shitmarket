@@ -265,7 +265,7 @@ export const mapApiRoom = (apiRoom: any): Room => {
     winner: apiRoom.winner || undefined,
     createdAt: new Date(apiRoom.createdAt).getTime(),
     duration: Number(apiRoom.duration || 30),
-    openingPrice: (apiRoom.openingPrice && BigInt(apiRoom.openingPrice) !== 0n) ? Number(apiRoom.openingPrice) / 1e12 : undefined,
+    openingPrice: (apiRoom.openingPrice && Number(apiRoom.openingPrice) !== 0) ? Number(apiRoom.openingPrice) / 1e12 : undefined,
     finalTWAP: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
     finalPrice: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
     twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e12 : undefined,

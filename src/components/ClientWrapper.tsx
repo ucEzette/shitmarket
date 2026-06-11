@@ -247,9 +247,8 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [audioEnabled]);
 
   const navItems = [
-    { label: 'HQ LANDING', href: '/', icon: Home },
-    { label: 'WAR TABLE', href: '/rooms', icon: List },
-    { label: 'DEPLOY MISSION', href: '/create-room', icon: Hammer },
+    { label: 'TRENCHES', href: '/rooms', icon: List },
+    { label: 'DEPLOY', href: '/create-room', icon: Hammer },
     { label: 'PARLAYS', href: '/parlays', icon: Layers },
     { label: 'LEADERBOARD', href: '/leaderboard', icon: Trophy },
   ];

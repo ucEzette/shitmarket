@@ -22,7 +22,7 @@ export const Footer: React.FC = () => {
         <div className="flex flex-col items-center md:items-start text-center md:text-left gap-2">
           <div className="flex items-center gap-2">
             <img
-              src="/pepes/screen (1).png"
+              src="/pepes/logo-main.png"
               alt="ShitMarket"
               className="h-[28px] w-auto object-contain"
             />

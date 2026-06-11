@@ -19,11 +19,22 @@ export default function RoomsPage() {
   };
 
   const router = useRouter();
-  const { rooms, roomsLoaded, user, placeBet, connectWallet } = useAppState();
+  const { rooms, roomsLoaded, fetchRooms, user, placeBet, connectWallet } = useAppState();
   const [filter, setFilter] = useState<'ending' | 'biggest' | 'active-bets' | 'expired' | 'pending-orders'>('ending');
-  const [search, setSearch] = useState('');
+  const [selectedNetwork, setSelectedNetwork] = useState<'all' | 'solana' | 'base' | 'ethereum'>('all');
+  const [searchNew, setSearchNew] = useState('');
+  const [searchSoon, setSearchSoon] = useState('');
+  const [searchBiggest, setSearchBiggest] = useState('');
+  const [sortNew, setSortNew] = useState<'newest' | 'pot'>('newest');
+  const [sortSoon, setSortSoon] = useState<'expiry' | 'pot'>('expiry');
+  const [sortBiggest, setSortBiggest] = useState<'pot' | 'newest'>('pot');
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
   const [showSkeleton, setShowSkeleton] = useState(true);
+
+  // Load fresh active rooms directly on mount
+  useEffect(() => {
+    fetchRooms().catch(console.error);
+  }, [fetchRooms]);
 
   // Show loading skeleton while rooms are syncing, hide instantly when loaded
   useEffect(() => {
@@ -78,25 +89,66 @@ export default function RoomsPage() {
       }
     });
 
-    // Apply global search query
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
+    // Apply network category filter
+    if (selectedNetwork !== 'all') {
+      list = list.filter((r) => r.token.chainId === selectedNetwork);
+    }
+
+    // 1. New (Newest listed first / or sorted by pot)
+    let newRoomsList = [...list];
+    if (searchNew.trim()) {
+      const q = searchNew.toLowerCase();
+      newRoomsList = newRoomsList.filter(
         (r) =>
           r.token.name.toLowerCase().includes(q) ||
           r.token.symbol.toLowerCase().includes(q) ||
           r.token.address.toLowerCase() === q
       );
     }
+    newRoomsList.sort((a, b) => {
+      if (sortNew === 'pot') {
+        const potA = a.moonPool + a.jeetPool;
+        const potB = b.moonPool + b.jeetPool;
+        return potB - potA;
+      }
+      return b.createdAt - a.createdAt;
+    });
 
-    // 1. New (Newest listed first)
-    const newRoomsList = [...list].sort((a, b) => b.createdAt - a.createdAt);
+    // 2. Ending Soon (Closest expiry first / or sorted by pot)
+    let endingSoonRoomsList = [...list];
+    if (searchSoon.trim()) {
+      const q = searchSoon.toLowerCase();
+      endingSoonRoomsList = endingSoonRoomsList.filter(
+        (r) =>
+          r.token.name.toLowerCase().includes(q) ||
+          r.token.symbol.toLowerCase().includes(q) ||
+          r.token.address.toLowerCase() === q
+      );
+    }
+    endingSoonRoomsList.sort((a, b) => {
+      if (sortSoon === 'pot') {
+        const potA = a.moonPool + a.jeetPool;
+        const potB = b.moonPool + b.jeetPool;
+        return potB - potA;
+      }
+      return a.expiry - b.expiry;
+    });
 
-    // 2. Ending Soon (Closest expiry first)
-    const endingSoonRoomsList = [...list].sort((a, b) => a.expiry - b.expiry);
-
-    // 3. Biggest Pot (Highest total pot first)
-    const biggestPotRoomsList = [...list].sort((a, b) => {
+    // 3. Biggest Pot (Highest total pot first / or sorted by date)
+    let biggestPotRoomsList = [...list];
+    if (searchBiggest.trim()) {
+      const q = searchBiggest.toLowerCase();
+      biggestPotRoomsList = biggestPotRoomsList.filter(
+        (r) =>
+          r.token.name.toLowerCase().includes(q) ||
+          r.token.symbol.toLowerCase().includes(q) ||
+          r.token.address.toLowerCase() === q
+      );
+    }
+    biggestPotRoomsList.sort((a, b) => {
+      if (sortBiggest === 'newest') {
+        return b.createdAt - a.createdAt;
+      }
       const potA = a.moonPool + a.jeetPool;
       const potB = b.moonPool + b.jeetPool;
       return potB - potA;
@@ -304,9 +356,29 @@ export default function RoomsPage() {
         </Link>
       </div>
 
-      {/* Filter and Search Panel */}
+      {/* Filter Panel (Network Selection and Live/Expired Toggle) */}
       <div className="retro-panel p-3 rounded-xl mb-6 flex flex-col md:flex-row justify-between gap-4 items-center">
         
+        {/* Network Selection Tabs */}
+        <div className="flex flex-wrap gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner w-full md:w-auto">
+          {(['all', 'solana', 'base', 'ethereum'] as const).map((net) => (
+            <button
+              key={net}
+              onClick={() => {
+                setSelectedNetwork(net);
+                synthSound('bet');
+              }}
+              className={`px-3 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
+                selectedNetwork === net
+                  ? 'bg-trench-sandbag text-neon-moon font-bold shadow-glow-moon'
+                  : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
+              }`}
+            >
+              {net === 'all' ? '🌐 All' : net === 'solana' ? '☀️ Solana' : net === 'base' ? '🔵 Base' : '🔷 Ethereum'}
+            </button>
+          ))}
+        </div>
+
         {/* Live / Expired toggle */}
         <div className="flex gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner w-full md:w-auto">
           <button
@@ -337,28 +409,6 @@ export default function RoomsPage() {
           </button>
         </div>
 
-        {/* Contract/Name Search Input */}
-        <div className="relative w-full md:max-w-md shrink-0">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-neon-moon">
-            <Search size={16} />
-          </div>
-          <input
-            type="text"
-            placeholder="SEARCH CONTRACT OR TOKEN SYMBOL..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-12 py-2 bg-trench-black/80 border border-trench-sandbag text-white font-mono text-xs placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none tracking-widest uppercase font-bold shadow-inner"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute inset-y-0 right-0 pr-3 flex items-center text-trench-gasmask hover:text-white font-mono text-[10px] font-bold"
-            >
-              CLEAR
-            </button>
-          )}
-        </div>
-
       </div>
 
       {/* 3-Column Dashboard View */}
@@ -366,14 +416,45 @@ export default function RoomsPage() {
         
         {/* Column 1: New */}
         <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex items-center justify-between border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-neon-moon shadow-[0_0_6px_#39ff14]" />
-              <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">NEW</h3>
+          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-neon-moon shadow-[0_0_6px_#39ff14]" />
+                <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">NEW</h3>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setSortNew(prev => prev === 'newest' ? 'pot' : 'newest');
+                    synthSound('bet');
+                  }}
+                  className="font-mono text-[9px] text-neon-moon bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 hover:border-neon-moon font-bold transition-all uppercase"
+                >
+                  ⇅ {sortNew === 'newest' ? 'DATE' : 'POT'}
+                </button>
+                <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
+                  {newRooms.length} ROOMS
+                </span>
+              </div>
             </div>
-            <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
-              {newRooms.length} ROOMS
-            </span>
+            {/* Localized Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search symbol/address..."
+                value={searchNew}
+                onChange={(e) => setSearchNew(e.target.value)}
+                className="w-full pl-2 pr-8 py-1 bg-trench-black/60 border border-trench-sandbag/40 text-white font-mono text-[10px] placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none uppercase font-bold"
+              />
+              {searchNew && (
+                <button
+                  onClick={() => setSearchNew('')}
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-trench-gasmask hover:text-white font-mono text-[8px]"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
             {showSkeleton ? (
@@ -388,14 +469,45 @@ export default function RoomsPage() {
 
         {/* Column 2: Ending Soon */}
         <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex items-center justify-between border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff073a]" />
-              <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">ENDING SOON</h3>
+          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff073a]" />
+                <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">ENDING SOON</h3>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setSortSoon(prev => prev === 'expiry' ? 'pot' : 'expiry');
+                    synthSound('bet');
+                  }}
+                  className="font-mono text-[9px] text-jeet-red bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 hover:border-jeet-red font-bold transition-all uppercase"
+                >
+                  ⇅ {sortSoon === 'expiry' ? 'TIME' : 'POT'}
+                </button>
+                <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
+                  {endingSoonRooms.length} ROOMS
+                </span>
+              </div>
             </div>
-            <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
-              {endingSoonRooms.length} ROOMS
-            </span>
+            {/* Localized Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search symbol/address..."
+                value={searchSoon}
+                onChange={(e) => setSearchSoon(e.target.value)}
+                className="w-full pl-2 pr-8 py-1 bg-trench-black/60 border border-trench-sandbag/40 text-white font-mono text-[10px] placeholder-trench-gasmask/60 rounded focus:border-jeet-red focus:outline-none uppercase font-bold"
+              />
+              {searchSoon && (
+                <button
+                  onClick={() => setSearchSoon('')}
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-trench-gasmask hover:text-white font-mono text-[8px]"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
             {showSkeleton ? (
@@ -410,14 +522,45 @@ export default function RoomsPage() {
 
         {/* Column 3: Biggest Pot */}
         <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex items-center justify-between border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-moon-gold shadow-[0_0_6px_#ffd700]" />
-              <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">BIGGEST POT</h3>
+          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 gap-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-moon-gold shadow-[0_0_6px_#ffd700]" />
+                <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">BIGGEST POT</h3>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    setSortBiggest(prev => prev === 'pot' ? 'newest' : 'pot');
+                    synthSound('bet');
+                  }}
+                  className="font-mono text-[9px] text-moon-gold bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 hover:border-moon-gold font-bold transition-all uppercase"
+                >
+                  ⇅ {sortBiggest === 'pot' ? 'POT' : 'DATE'}
+                </button>
+                <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
+                  {biggestPotRooms.length} ROOMS
+                </span>
+              </div>
             </div>
-            <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
-              {biggestPotRooms.length} ROOMS
-            </span>
+            {/* Localized Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search symbol/address..."
+                value={searchBiggest}
+                onChange={(e) => setSearchBiggest(e.target.value)}
+                className="w-full pl-2 pr-8 py-1 bg-trench-black/60 border border-trench-sandbag/40 text-white font-mono text-[10px] placeholder-trench-gasmask/60 rounded focus:border-moon-gold focus:outline-none uppercase font-bold"
+              />
+              {searchBiggest && (
+                <button
+                  onClick={() => setSearchBiggest('')}
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-trench-gasmask hover:text-white font-mono text-[8px]"
+                >
+                  ×
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
             {showSkeleton ? (

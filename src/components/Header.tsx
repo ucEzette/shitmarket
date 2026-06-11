@@ -11,9 +11,8 @@ import { LogOut, Loader2, Coins } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 const navItems = [
-  { label: 'HQ LANDING', href: '/' },
-  { label: 'WAR TABLE', href: '/rooms' },
-  { label: 'DEPLOY MISSION', href: '/create-room' },
+  { label: 'TRENCHES', href: '/rooms' },
+  { label: 'DEPLOY', href: '/create-room' },
   { label: 'PARLAYS', href: '/parlays' },
   { label: 'LEADERBOARD', href: '/leaderboard' },
 ];
@@ -29,7 +28,6 @@ export const Header: React.FC<{
   const [connecting, setConnecting] = useState(false);
 
   const handleConnect = useCallback(() => {
-    // Open the Solana wallet modal to let user choose a wallet
     setVisible(true);
   }, [setVisible]);
 
@@ -39,38 +37,33 @@ export const Header: React.FC<{
   }, [disconnect, mockDisconnect]);
 
   return (
-    <header className="sticky top-0 z-[100] w-full border-b-4 border-trench-sandbag bg-black px-3 py-2.5 sm:p-4 retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0" style={{ overflow: 'visible' }}>
-      <div className="mx-auto flex max-w-full px-4 md:px-8 flex-row items-center justify-between gap-2">
+    <header className="sticky top-0 z-[100] w-full border-b border-trench-sandbag/50 bg-black/95 px-2 h-10 sm:h-11 flex items-center" style={{ overflow: 'visible' }}>
+      <div className="w-full mx-auto px-2 sm:px-4 flex flex-row items-center justify-between gap-2">
         {/* Left Aligned branding and navigation section */}
-        <div className="flex items-center gap-2 sm:gap-6 shrink-0">
-          {/* Logo and Tagline */}
-          <Link href="/" className="flex items-center gap-2 sm:gap-3 group shrink-0">
-            <div className="flex flex-col">
-              <img
-                src="/pepes/screen (1).png"
-                alt="ShitMarket"
-                className="h-[32px] sm:h-[44px] w-auto object-contain group-hover:scale-105 transition-all duration-300"
-                loading="eager"
-                decoding="sync"
-              />
-              <p className="hidden sm:block font-mono text-[9px] text-trench-gasmask uppercase tracking-widest mt-1 font-bold pl-2 stencil-shadow">
-                PvP Meme Trenches • 1.25% Settle Fee
-              </p>
-            </div>
+        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+          {/* Logo */}
+          <Link href="/" className="flex items-center gap-2 group shrink-0">
+            <img
+              src="/pepes/logo-main.png"
+              alt="ShitMarket"
+              className="h-[22px] sm:h-[26px] w-auto object-contain group-hover:scale-105 transition-all duration-300"
+              loading="eager"
+              decoding="sync"
+            />
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-3 ml-4">
+          <nav className="hidden lg:flex items-center gap-2 ml-1">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`font-staatliches text-base tracking-wider uppercase transition-all px-2.5 py-1.5 rounded ${
+                  className={`font-mono text-[10px] tracking-wider uppercase transition-all px-2 py-0.5 rounded-sm border-b-2 ${
                     isActive
-                      ? 'bg-trench-black text-neon-moon border-b-2 border-neon-moon shadow-[0_3px_10px_rgba(57,255,20,0.15)] font-bold'
-                      : 'text-trench-gasmask hover:text-white hover:bg-trench-black/20'
+                      ? 'bg-trench-black text-neon-moon border-neon-moon font-extrabold shadow-[0_1px_4px_rgba(57,255,20,0.08)]'
+                      : 'text-trench-gasmask border-transparent hover:text-white hover:bg-trench-black/40'
                   }`}
                 >
                   {item.label}
@@ -83,20 +76,20 @@ export const Header: React.FC<{
         {/* Wallet Connection / Ammo Status */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Link href="/?play_intro=true" className="hidden sm:block">
-            <button className="px-2.5 py-1.5 retro-btn retro-btn-neutral border border-trench-sandbag rounded font-staatliches text-[10px] sm:text-xs tracking-wider uppercase transition-colors shrink-0 font-bold flex items-center gap-1">
-              📜 BRIEFING
+            <button className="px-1.5 py-0.5 retro-btn retro-btn-neutral border border-trench-sandbag/60 rounded font-staatliches text-[8px] sm:text-[9px] tracking-wider uppercase transition-colors shrink-0 font-bold flex items-center gap-0.5">
+              Briefing
             </button>
           </Link>
           
           {user && user.wallet ? (
-            <div className="flex items-center gap-2 bg-black border-2 border-trench-sandbag rounded p-0.5 sm:p-1">
+            <div className="flex items-center gap-1 bg-black border border-trench-sandbag/50 rounded p-0.5">
               {/* Notification Bell */}
               <NotificationBell />
 
               {/* Ammo Display */}
-              <div className="flex items-center gap-1 px-1.5 py-0.5 sm:px-3 sm:py-1 bg-trench-mud border border-trench-sandbag rounded-sm">
-                <Coins size={12} className="text-moon-gold sm:size-[14px]" />
-                <span className="font-mono text-[10px] sm:text-xs font-bold text-moon-gold">
+              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-trench-mud border border-trench-sandbag/40 rounded-sm">
+                <Coins size={9} className="text-moon-gold" />
+                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-moon-gold">
                   <span className="hidden sm:inline">AMMO: </span><span className="glow-gold font-bold">{user.balance.toFixed(2)} SOL</span>
                 </span>
               </div>
@@ -109,7 +102,7 @@ export const Header: React.FC<{
               >
                 <PepePortrait
                   src={user.avatarUrl || PEPE_ASSETS.fewUnderstand}
-                  size={32}
+                  size={20}
                   glowColor="moon"
                   className="rounded-full"
                 />
@@ -119,25 +112,25 @@ export const Header: React.FC<{
               <button
                 onClick={handleDisconnect}
                 title="RESERVE FORCES (DISCONNECT)"
-                className="p-2 text-trench-gasmask hover:text-white hover:bg-red-500/20 transition-all rounded border border-trench-sandbag bg-trench-black"
+                className="p-0.5 text-trench-gasmask hover:text-white hover:bg-red-500/20 transition-all rounded border border-trench-sandbag/40 bg-trench-black"
               >
-                <LogOut size={16} />
+                <LogOut size={10} />
               </button>
             </div>
           ) : (
             <button
               onClick={handleConnect}
               disabled={connecting}
-              className="relative flex items-center gap-1.5 px-3 py-1.5 sm:px-6 sm:py-2.5 font-staatliches text-xs sm:text-lg tracking-wider uppercase text-black active:translate-y-1 transition-all rounded font-bold retro-btn retro-btn-moon"
+              className="relative flex items-center gap-0.5 px-2 py-0.5 sm:px-3 sm:py-1 font-staatliches text-[10px] sm:text-xs tracking-wider uppercase text-black active:translate-y-0.5 transition-all rounded font-bold retro-btn retro-btn-moon"
             >
               {connecting ? (
                 <>
-                  <Loader2 size={12} className="animate-spin text-white sm:size-[18px]" />
-                  <span>SECURING HELMET...</span>
+                  <Loader2 size={8} className="animate-spin text-white sm:size-[10px]" />
+                  <span>Helmetting...</span>
                 </>
               ) : (
                 <>
-                  <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={18} loading="eager" className="rounded-full animate-bounce sm:size-[24px]" />
+                  <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={11} loading="eager" className="rounded-full animate-bounce sm:size-[13px]" />
                   <span>CONNECT</span>
                 </>
               )}

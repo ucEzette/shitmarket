@@ -327,11 +327,26 @@ export default function CreateRoomPage() {
                     tokenInfo.icon
                   )}
                 </div>
-                <div>
-                  <h4 className="font-staatliches text-2xl text-neon-moon tracking-wide">
-                    {tokenInfo.name} (${tokenInfo.symbol})
-                  </h4>
-                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-staatliches text-2xl text-neon-moon tracking-wide">
+                      {tokenInfo.name} (${tokenInfo.symbol})
+                    </h4>
+                    {tokenInfo.chainId && (
+                      <div className="bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/40 flex items-center gap-1 scale-90 select-none">
+                        <img
+                          src={`https://dd.dexscreener.com/ds-data/chains/${tokenInfo.chainId.toLowerCase()}.png`}
+                          alt={tokenInfo.chainId}
+                          className="w-3.5 h-3.5 object-contain rounded-full"
+                          onError={(e) => {
+                            e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
+                          }}
+                        />
+                        <span className="font-mono text-[8px] text-white font-bold uppercase">{tokenInfo.chainId}</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mt-0.5">
                     TARGET VALIDATED SUCCESSFULLY
                   </span>
                 </div>

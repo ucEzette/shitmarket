@@ -263,7 +263,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const navItems = [
-    { label: 'TRENCHES', href: '/rooms', icon: List },
+    { label: 'WAR ROOM', href: '/rooms', icon: List },
     { label: 'DEPLOY', href: '/create-room', icon: Hammer },
     { label: 'PARLAYS', href: '/parlays', icon: Layers },
     { label: 'LEADERBOARD', href: '/leaderboard', icon: Trophy },

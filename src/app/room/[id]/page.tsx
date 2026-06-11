@@ -10,7 +10,7 @@ import { HeaderPanel } from '@/components/ui/HeaderPanel';
 import { synthSound as originalSynthSound } from '@/components/ClientWrapper';
 import { 
   Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, 
-  AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal 
+  AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal, Bookmark
 } from 'lucide-react';
 import * as Slider from '@radix-ui/react-slider';
 import confetti from 'canvas-confetti';
@@ -137,6 +137,45 @@ export default function RoomDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [watchlistedIds, setWatchlistedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('shitmarket-watchlist');
+      if (stored) {
+        try {
+          setWatchlistedIds(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleWatchlistChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setWatchlistedIds(customEvent.detail);
+      }
+    };
+    window.addEventListener('watchlist-updated', handleWatchlistChange);
+    return () => window.removeEventListener('watchlist-updated', handleWatchlistChange);
+  }, []);
+
+  const toggleBookmark = (id: string) => {
+    setWatchlistedIds((prev) => {
+      let next;
+      if (prev.includes(id)) {
+        next = prev.filter((item) => item !== id);
+      } else {
+        next = [...prev, id];
+      }
+      localStorage.setItem('shitmarket-watchlist', JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent('watchlist-updated', { detail: next }));
+      return next;
+    });
+  };
 
 
   const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
@@ -611,7 +650,14 @@ export default function RoomDetailPage() {
 
       {/* Top Navigation Bar */}
       <div className="w-full px-2 sm:px-4 md:px-6 pt-4 pb-2 z-20 relative bg-[#020501]">
-        <HeaderPanel backHref="/rooms" missionHref="/?play_intro=true" title="WAR ROOM" countdown={countdownText} />
+        <HeaderPanel 
+          backHref="/rooms" 
+          missionHref="/?play_intro=true" 
+          title="WAR ROOM" 
+          countdown={countdownText} 
+          isBookmarked={room ? watchlistedIds.includes(room.id) : false}
+          onToggleBookmark={room ? () => toggleBookmark(room.id) : undefined}
+        />
       </div>
 
       {/* 2. THE SPLIT-SCREEN TRENCH HEADER (Full-Bleed Across Screen) */}
@@ -880,11 +926,25 @@ export default function RoomDetailPage() {
                 </span>
               </div>
 
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
-                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
-                <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate">
-                  {room.token.chainId === 'solana' ? 'Solana Mainnet' : room.token.chainId ? `${room.token.chainId} Net` : 'Solana Network'}
-                </span>
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden flex items-center justify-between">
+                <div className="min-w-0">
+                  <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
+                  <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate">
+                    {room.token.chainId === 'solana' ? 'Solana Mainnet' : room.token.chainId ? `${room.token.chainId} Net` : 'Solana Network'}
+                  </span>
+                </div>
+                {room.token.chainId && (
+                  <div className="bg-trench-black/60 p-1 rounded border border-[#1d3515] flex items-center justify-center h-8 w-8 shrink-0">
+                    <img
+                      src={`https://dd.dexscreener.com/ds-data/chains/${room.token.chainId.toLowerCase()}.png`}
+                      alt={room.token.chainId}
+                      className="w-6 h-6 object-contain rounded-full"
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">

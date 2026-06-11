@@ -1,52 +1,65 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAppState, Room, formatCashtag, formatPrice } from '@/store/useAppState';
 import { PixelCrackedHelmet, PixelShovel, PixelGasMask } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
-import { Search, Flame, Bomb, ArrowRight, UserPlus } from 'lucide-react';
+import { Search, Flame, Bomb, ArrowRight, UserPlus, Plus, X, Bookmark, Rocket } from 'lucide-react';
 
-const SolanaIcon = ({ active }: { active: boolean }) => (
-  <svg className={`w-7 h-7 transition-all ${active ? 'opacity-100 filter drop-shadow-[0_0_8px_#14f195]' : 'opacity-40 hover:opacity-75'}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M4 4.5h16l-3.5 4h-16l3.5-4zM20 10.5H4l3.5 4h16l-3.5-4zM4 16.5h16l-3.5 4h-16l3.5-4z" fill="url(#solana-grad-page)" />
-    <defs>
-      <linearGradient id="solana-grad-page" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#9945FF" />
-        <stop offset="100%" stopColor="#14F195" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
+const NetworkLogo = ({ chainId, active, className = "w-7 h-7" }: { chainId: string; active: boolean; className?: string }) => {
+  if (chainId === 'all') {
+    return (
+      <div 
+        className={`w-7 h-7 rounded-full border flex items-center justify-center font-staatliches text-[10px] tracking-wider transition-all select-none ${
+          active 
+            ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-glow-moon scale-110 font-extrabold' 
+            : 'bg-trench-black/60 border-trench-sandbag/45 text-trench-gasmask hover:text-white hover:border-gray-500'
+        }`}
+      >
+        ALL
+      </div>
+    );
+  }
 
-const BaseIcon = ({ active }: { active: boolean }) => (
-  <svg className={`w-7 h-7 transition-all ${active ? 'opacity-100 text-[#0052FF] filter drop-shadow-[0_0_8px_#0052FF]' : 'text-white opacity-40 hover:opacity-75'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2.5L3.5 7.5v9l8.5 5 8.5-5v-9L12 2.5z" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M12 22.5V12.5M12 12.5L3.5 7.5M12 12.5l8.5-5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+  const normalizedId = chainId.toLowerCase();
 
-const AllNetworksIcon = ({ active }: { active: boolean }) => (
-  <svg className={`w-7 h-7 transition-all ${active ? 'opacity-100 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 'opacity-40 hover:opacity-75'}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <circle cx="12" cy="12" r="9" fill={active ? "#E2E8F0" : "#4A5568"} stroke={active ? "#FFFFFF" : "#718096"} strokeWidth="1.5" />
-    <rect x="5" y="11" width="14" height="2" rx="1" fill="#1A202C" />
-  </svg>
-);
+  return (
+    <img
+      src={`https://dd.dexscreener.com/ds-data/chains/${normalizedId}.png`}
+      alt={chainId}
+      className={`${className} object-contain rounded-full border border-trench-sandbag/20 transition-all ${
+        active 
+          ? 'opacity-100 scale-110 filter drop-shadow-[0_0_8px_#39ff14] border-neon-moon/80' 
+          : 'opacity-50 hover:opacity-80'
+      }`}
+      onError={(e) => {
+        e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
+      }}
+    />
+  );
+};
 
-const EthereumIcon = ({ active }: { active: boolean }) => (
-  <div className="relative flex items-center justify-center">
-    <svg className={`w-7 h-7 transition-all ${active ? 'opacity-100 text-[#627EEA] filter drop-shadow-[0_0_8px_#627EEA]' : 'text-white opacity-40 hover:opacity-75'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2L5 12l7 4 7-4-7-10z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 22l-7-6 7 2 7-2-7 6z" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M12 2v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-    <span className="absolute -bottom-1 -right-2 bg-trench-black text-[7px] font-mono px-0.5 rounded border border-trench-sandbag/60 text-trench-gasmask scale-75 uppercase select-none font-bold">
-      beta
-    </span>
-  </div>
-);
+const OTHER_NETWORKS = [
+  { id: 'arbitrum', name: 'Arbitrum' },
+  { id: 'optimism', name: 'Optimism' },
+  { id: 'polygon', name: 'Polygon' },
+  { id: 'bsc', name: 'BSC' },
+  { id: 'avalanche', name: 'Avalanche' },
+  { id: 'sui', name: 'Sui' },
+  { id: 'aptos', name: 'Aptos' },
+  { id: 'blast', name: 'Blast' },
+  { id: 'linea', name: 'Linea' },
+  { id: 'scroll', name: 'Scroll' },
+  { id: 'fantom', name: 'Fantom' },
+  { id: 'cronos', name: 'Cronos' },
+  { id: 'celo', name: 'Celo' },
+  { id: 'ton', name: 'TON' },
+  { id: 'hedera', name: 'Hedera' }
+];
 
 const formatExpiryUTC = (timestamp: number) => {
   const d = new Date(timestamp);
@@ -70,8 +83,57 @@ export default function RoomsPage() {
 
   const router = useRouter();
   const { rooms, roomsLoaded, fetchRooms, user, placeBet, connectWallet } = useAppState();
-  const [filter, setFilter] = useState<'ending' | 'biggest' | 'active-bets' | 'expired' | 'pending-orders'>('ending');
-  const [selectedNetwork, setSelectedNetwork] = useState<'all' | 'solana' | 'base' | 'ethereum'>('all');
+  const [filterNew, setFilterNew] = useState<'ending' | 'expired'>('ending');
+  const [filterSoon, setFilterSoon] = useState<'ending' | 'expired'>('ending');
+  const [filterBiggest, setFilterBiggest] = useState<'ending' | 'expired'>('ending');
+  const [selectedNetwork, setSelectedNetwork] = useState<string>('all');
+  const [showOtherNetworksDrawer, setShowOtherNetworksDrawer] = useState(false);
+  const [drawerSearch, setDrawerSearch] = useState('');
+  const [mounted, setMounted] = useState(false);
+  const [watchlistedIds, setWatchlistedIds] = useState<string[]>([]);
+  const [showWatchlistDrawer, setShowWatchlistDrawer] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('shitmarket-watchlist');
+      if (stored) {
+        try {
+          setWatchlistedIds(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleWatchlistChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setWatchlistedIds(customEvent.detail);
+      }
+    };
+    window.addEventListener('watchlist-updated', handleWatchlistChange);
+    return () => window.removeEventListener('watchlist-updated', handleWatchlistChange);
+  }, []);
+
+  const toggleBookmark = (roomId: string) => {
+    setWatchlistedIds((prev) => {
+      let next;
+      if (prev.includes(roomId)) {
+        next = prev.filter((id) => id !== roomId);
+      } else {
+        next = [...prev, roomId];
+      }
+      localStorage.setItem('shitmarket-watchlist', JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent('watchlist-updated', { detail: next }));
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [searchNew, setSearchNew] = useState('');
   const [searchSoon, setSearchSoon] = useState('');
   const [searchBiggest, setSearchBiggest] = useState('');
@@ -156,22 +218,22 @@ export default function RoomsPage() {
   // Filtering & Sorting Logic for the 3 columns
   const getCategorizedRooms = () => {
     const now = Date.now();
-    // Base active or expired rooms
-    let list = rooms.filter((r) => {
-      if (filter === 'expired') {
-        return r.status === 'settled' || r.expiry <= now;
-      } else {
-        return r.status === 'active' && r.expiry > now;
-      }
-    });
 
-    // Apply network category filter
-    if (selectedNetwork !== 'all') {
-      list = list.filter((r) => r.token.chainId === selectedNetwork);
-    }
+    // Helper to filter a room by selected status and network
+    const filterRoom = (r: Room, listFilter: 'ending' | 'expired') => {
+      if (listFilter === 'expired') {
+        if (r.status !== 'settled' && r.expiry > now) return false;
+      } else {
+        if (r.status !== 'active' || r.expiry <= now) return false;
+      }
+      if (selectedNetwork !== 'all' && r.token.chainId !== selectedNetwork) {
+        return false;
+      }
+      return true;
+    };
 
     // 1. New (Newest listed first / or sorted by pot)
-    let newRoomsList = [...list];
+    let newRoomsList = rooms.filter(r => filterRoom(r, filterNew));
     if (searchNew.trim()) {
       const q = searchNew.toLowerCase();
       newRoomsList = newRoomsList.filter(
@@ -191,7 +253,7 @@ export default function RoomsPage() {
     });
 
     // 2. Ending Soon (Closest expiry first / or sorted by pot)
-    let endingSoonRoomsList = [...list];
+    let endingSoonRoomsList = rooms.filter(r => filterRoom(r, filterSoon));
     if (searchSoon.trim()) {
       const q = searchSoon.toLowerCase();
       endingSoonRoomsList = endingSoonRoomsList.filter(
@@ -211,7 +273,7 @@ export default function RoomsPage() {
     });
 
     // 3. Biggest Pot (Highest total pot first / or sorted by date)
-    let biggestPotRoomsList = [...list];
+    let biggestPotRoomsList = rooms.filter(r => filterRoom(r, filterBiggest));
     if (searchBiggest.trim()) {
       const q = searchBiggest.toLowerCase();
       biggestPotRoomsList = biggestPotRoomsList.filter(
@@ -234,7 +296,7 @@ export default function RoomsPage() {
       newRooms: newRoomsList,
       endingSoonRooms: endingSoonRoomsList,
       biggestPotRooms: biggestPotRoomsList,
-      allMatchingCount: list.length
+      allMatchingCount: newRoomsList.length + endingSoonRoomsList.length + biggestPotRoomsList.length
     };
   };
 
@@ -286,11 +348,25 @@ export default function RoomsPage() {
             </span>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* Bookmark button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                toggleBookmark(room.id);
+                synthSound('bet');
+              }}
+              className="p-1 hover:bg-trench-black border border-trench-sandbag/30 text-trench-gasmask hover:text-white rounded transition-colors"
+              title={watchlistedIds.includes(room.id) ? "Remove Bookmark" : "Bookmark Room"}
+            >
+              <Bookmark 
+                size={10} 
+                className={watchlistedIds.includes(room.id) ? "fill-neon-moon text-neon-moon" : ""} 
+              />
+            </button>
             {/* Small Chain Icon to indicate network */}
-            <div className="bg-trench-black p-0.5 rounded border border-trench-sandbag/30 flex items-center justify-center scale-[0.65] origin-right h-5 w-5">
-              {room.token.chainId === 'solana' && <SolanaIcon active={true} />}
-              {room.token.chainId === 'base' && <BaseIcon active={true} />}
-              {room.token.chainId === 'ethereum' && <EthereumIcon active={true} />}
+            <div className="bg-trench-black p-0.5 rounded border border-trench-sandbag/30 flex items-center justify-center h-5 w-5 shrink-0" title={`Network: ${room.token.chainId?.toUpperCase() || 'SOLANA'}`}>
+              <NetworkLogo chainId={room.token.chainId || 'solana'} active={true} className="w-3.5 h-3.5" />
             </div>
             <div className={`text-[9px] font-mono font-bold bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 uppercase ${isSettled ? 'text-moon-gold' : 'text-neon-moon animate-pulse'}`}>
               {timeText}
@@ -417,39 +493,329 @@ export default function RoomsPage() {
     <div className="w-full px-4 md:px-8 py-6 flex-1 flex flex-col select-none max-w-full">
       
       {/* Page Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-50">
         <div className="flex items-center gap-6">
           <h2 className="font-staatliches text-4xl text-white tracking-wider font-bold">
-            Trenches
+            War Room
           </h2>
           {/* Network Selection Icons */}
           <div className="flex items-center gap-3">
-            {(['solana', 'base', 'all', 'ethereum'] as const).map((net) => (
+            {(['all', 'solana', 'base', 'ethereum'] as const).map((net) => (
               <button
                 key={net}
                 onClick={() => {
                   setSelectedNetwork(net);
                   synthSound('bet');
                 }}
-                className="focus:outline-none transition-transform active:scale-95"
+                className="focus:outline-none transition-transform active:scale-95 flex items-center justify-center"
                 title={`Network: ${net.toUpperCase()}`}
               >
-                {net === 'solana' && <SolanaIcon active={selectedNetwork === 'solana'} />}
-                {net === 'base' && <BaseIcon active={selectedNetwork === 'base'} />}
-                {net === 'all' && <AllNetworksIcon active={selectedNetwork === 'all'} />}
-                {net === 'ethereum' && <EthereumIcon active={selectedNetwork === 'ethereum'} />}
+                <NetworkLogo chainId={net} active={selectedNetwork === net} />
               </button>
             ))}
+
+            {/* Selected Other Network Tab if it's active */}
+            {!['all', 'solana', 'base', 'ethereum'].includes(selectedNetwork) && (
+              <button
+                onClick={() => {
+                  synthSound('bet');
+                }}
+                className="focus:outline-none transition-transform active:scale-95 flex items-center gap-1 bg-trench-black px-2 py-0.5 rounded border border-neon-moon/60 scale-95"
+                title={`Network: ${selectedNetwork.toUpperCase()}`}
+              >
+                <NetworkLogo chainId={selectedNetwork} active={true} className="w-5 h-5" />
+                <span className="font-mono text-[9px] text-neon-moon font-bold uppercase">{selectedNetwork}</span>
+              </button>
+            )}
+
+            {/* Other Networks Trigger Wrapper */}
+            <div className="relative flex items-center">
+              <button
+                onClick={() => {
+                  setShowOtherNetworksDrawer(prev => !prev);
+                  synthSound('bet');
+                }}
+                className={`focus:outline-none transition-all active:scale-95 w-7 h-7 rounded-full border flex items-center justify-center text-trench-gasmask hover:text-white hover:border-white ${
+                  showOtherNetworksDrawer 
+                    ? 'bg-trench-sandbag text-white border-white scale-110 shadow-glow-moon' 
+                    : 'bg-trench-black/40 border-trench-sandbag/40'
+                }`}
+                title="More Networks"
+              >
+                <Plus size={14} className="stroke-[3]" />
+              </button>
+
+              {showOtherNetworksDrawer && (
+                <>
+                  {/* Invisible Backdrop to close on click outside */}
+                  <div 
+                    className="fixed inset-0 z-[998]"
+                    onClick={() => setShowOtherNetworksDrawer(false)}
+                  />
+                  
+                  {/* Communications Bay Dropdown */}
+                  <div 
+                    className="!absolute right-0 top-full mt-2 w-80 bg-trench-mud border-4 border-trench-sandbag z-[999] flex flex-col shadow-2xl scanlines rounded-lg overflow-hidden animate-fadeIn"
+                    style={{ maxHeight: '60vh' }}
+                  >
+                    {/* Header */}
+                    <div className="p-3 border-b-2 border-trench-sandbag/40 bg-trench-black/60 flex items-center justify-between shrink-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-neon-moon shadow-[0_0_6px_#39ff14] animate-pulse" />
+                        <h3 className="font-staatliches text-base tracking-widest text-white uppercase">COMMUNICATIONS BAY</h3>
+                      </div>
+                      <button 
+                        onClick={() => {
+                          setShowOtherNetworksDrawer(false);
+                          synthSound('bet');
+                        }}
+                        className="p-1 hover:bg-trench-black border border-trench-sandbag/40 text-trench-gasmask hover:text-white rounded transition-colors"
+                        title="Abort Connection"
+                      >
+                        <X size={12} className="stroke-[2.5]" />
+                      </button>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="p-2.5 border-b border-trench-sandbag/20 bg-trench-black/20 shrink-0">
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-trench-gasmask" />
+                        <input
+                          type="text"
+                          placeholder="SEARCH NETWORK CHANNEL..."
+                          value={drawerSearch}
+                          onChange={(e) => setDrawerSearch(e.target.value)}
+                          className="w-full pl-8 pr-3 py-1.5 bg-trench-black/80 border border-trench-sandbag/40 text-white font-mono text-[9px] placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none uppercase tracking-wider font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Drawer Content */}
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0 custom-scrollbar">
+                      <span className="font-mono text-[8px] text-trench-gasmask font-bold uppercase tracking-wider block mb-1">
+                        SELECT ALTERNATIVE TRENCH NETWORK:
+                      </span>
+
+                      {/* Grid of Other Networks */}
+                      <div className="grid grid-cols-2 gap-2">
+                        {OTHER_NETWORKS
+                          .filter(net => net.name.toLowerCase().includes(drawerSearch.toLowerCase()) || net.id.toLowerCase().includes(drawerSearch.toLowerCase()))
+                          .map((net) => {
+                            const isActive = selectedNetwork === net.id;
+                            return (
+                              <button
+                                key={net.id}
+                                onClick={() => {
+                                  setSelectedNetwork(net.id);
+                                  setShowOtherNetworksDrawer(false);
+                                  synthSound('bet');
+                                }}
+                                className={`p-1.5 rounded border flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 group hover:-translate-y-0.5 ${
+                                  isActive
+                                    ? 'bg-neon-moon/10 border-neon-moon text-neon-moon shadow-glow-moon'
+                                    : 'bg-trench-black/60 border-trench-sandbag/40 text-trench-gasmask hover:text-white hover:border-trench-sandbag'
+                                }`}
+                              >
+                                <img
+                                  src={`https://dd.dexscreener.com/ds-data/chains/${net.id}.png`}
+                                  alt={net.name}
+                                  className={`w-6 h-6 object-contain rounded-full transition-transform group-hover:scale-105 ${
+                                    isActive ? 'filter drop-shadow-[0_0_4px_#39ff14]' : 'opacity-70 group-hover:opacity-100'
+                                  }`}
+                                  onError={(e) => {
+                                    e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
+                                  }}
+                                />
+                                <span className="font-mono text-[9px] font-bold uppercase tracking-wider truncate max-w-full text-center">
+                                  {net.name}
+                                </span>
+                              </button>
+                            );
+                          })}
+                      </div>
+
+                      {/* Reset button if filter is active */}
+                      {selectedNetwork !== 'all' && (
+                        <button
+                          onClick={() => {
+                            setSelectedNetwork('all');
+                            setShowOtherNetworksDrawer(false);
+                            synthSound('bet');
+                          }}
+                          className="w-full mt-4 py-2 border-2 border-dashed border-trench-sandbag/60 text-trench-gasmask hover:text-white hover:border-white rounded font-mono text-[10px] uppercase font-bold text-center transition-colors block"
+                        >
+                          CLEAR CHANNEL FILTERS [ALL NETWORKS]
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Drawer Footer */}
+                    <div className="p-3 border-t border-trench-sandbag/40 bg-trench-black/40 text-center font-mono text-[7px] text-trench-gasmask uppercase tracking-wider shrink-0 select-none">
+                      SYSTEM SCANNING ACTIVE // SECURE CONCOM
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Shovel Dig CTA */}
-        <Link href="/create-room" className="w-full md:w-auto">
-          <button className="w-full py-2 px-4 font-staatliches text-lg tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all flex items-center justify-center gap-2 uppercase font-bold">
-            <PixelShovel size={16} />
-            <span>DIG NEW TRENCH</span>
-          </button>
-        </Link>
+        {/* Watchlist Command Center & Deploy CTA */}
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Watchlist Command Console trigger */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setShowWatchlistDrawer(prev => !prev);
+                synthSound('bet');
+              }}
+              className={`p-2 rounded border-2 flex items-center justify-center transition-all h-11 w-11 shrink-0 relative hover:-translate-y-0.5 select-none ${
+                showWatchlistDrawer
+                  ? 'bg-trench-sandbag text-white border-white scale-105 shadow-glow-moon'
+                  : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white hover:border-white'
+              }`}
+              title="Targeted Watchlist"
+            >
+              <Bookmark size={20} className={watchlistedIds.length > 0 ? "fill-neon-moon text-neon-moon" : ""} />
+              {watchlistedIds.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-jeet-red text-white text-[9px] font-bold h-4 w-4 rounded-full border border-trench-black flex items-center justify-center font-mono">
+                  {watchlistedIds.length}
+                </span>
+              )}
+            </button>
+
+            {/* Watchlist Mini-Page Dropdown/Drawer */}
+            {showWatchlistDrawer && (
+              <>
+                {/* Invisible backdrop to click-close */}
+                <div 
+                  className="fixed inset-0 z-[998]"
+                  onClick={() => setShowWatchlistDrawer(false)}
+                />
+                
+                {/* Dropdown Panel */}
+                <div 
+                  className="!absolute right-0 top-full mt-2 w-80 bg-trench-mud border-4 border-trench-sandbag z-[999] flex flex-col shadow-2xl scanlines rounded-lg overflow-hidden animate-fadeIn"
+                  style={{ maxHeight: '60vh' }}
+                >
+                  {/* Header */}
+                  <div className="p-3 border-b-2 border-trench-sandbag/40 bg-trench-black/60 flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <Bookmark size={14} className="text-neon-moon fill-neon-moon animate-pulse" />
+                      <h3 className="font-staatliches text-base tracking-widest text-white uppercase">WATCHLIST CONSOLE</h3>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setShowWatchlistDrawer(false);
+                        synthSound('bet');
+                      }}
+                      className="p-1 hover:bg-trench-black border border-trench-sandbag/40 text-trench-gasmask hover:text-white rounded transition-colors"
+                      title="Close Watchlist"
+                    >
+                      <X size={12} className="stroke-[2.5]" />
+                    </button>
+                  </div>
+
+                  {/* Watchlist content list */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0 custom-scrollbar bg-trench-black/20">
+                    {watchlistedIds.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-8 text-center text-trench-gasmask font-mono text-[9px] font-bold uppercase tracking-wider leading-relaxed">
+                        <p>No Token Channels Targeted</p>
+                        <p className="mt-1 text-[8px] text-trench-gasmask/60">Bookmark active rooms to lock radar tracking</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {rooms
+                          .filter((r) => watchlistedIds.includes(r.id))
+                          .map((r) => {
+                            const totalPot = r.moonPool + r.jeetPool;
+                            const isMoonLeading = r.moonPool > r.jeetPool;
+                            const isSettled = r.status === 'settled';
+                            const timeText = timeRemainingText[r.id] || '00:00:00';
+                            
+                            return (
+                              <div 
+                                key={r.id}
+                                onClick={() => {
+                                  router.push(`/room/${r.id}`);
+                                  setShowWatchlistDrawer(false);
+                                }}
+                                className="p-2 bg-trench-black/60 border border-trench-sandbag/40 hover:border-neon-moon rounded flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="relative shrink-0 w-6 h-6 bg-trench-black border border-trench-sandbag/30 rounded flex items-center justify-center">
+                                    {r.token.icon && r.token.icon.startsWith('http') ? (
+                                      <img src={r.token.icon} alt={r.token.name} className="w-full h-full object-cover rounded" />
+                                    ) : (
+                                      <PepePortrait
+                                        src={(() => {
+                                          let hash = 0;
+                                          for (let i = 0; i < r.id.length; i++) {
+                                            hash = r.id.charCodeAt(i) + ((hash << 5) - hash);
+                                          }
+                                          const index = Math.abs(hash);
+                                          return isMoonLeading 
+                                            ? MOON_PEPES[index % MOON_PEPES.length] 
+                                            : JEET_PEPES[index % JEET_PEPES.length];
+                                        })()}
+                                        size={18}
+                                        glowColor={isMoonLeading ? 'moon' : 'jeet'}
+                                        className="rounded"
+                                      />
+                                    )}
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="font-staatliches text-xs text-white block truncate leading-tight">
+                                      {r.token.name}
+                                    </span>
+                                    <span className="font-mono text-[8px] text-neon-moon font-bold block leading-none">
+                                      {formatCashtag(r.token.symbol)} // {totalPot.toFixed(1)} SOL POT
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <div className={`font-mono text-[8px] font-bold px-1 py-0.5 rounded border border-trench-sandbag/20 ${
+                                    isSettled ? 'text-moon-gold' : 'text-neon-moon'
+                                  }`}>
+                                    {isSettled ? 'SETTLED' : timeText}
+                                  </div>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      toggleBookmark(r.id);
+                                      synthSound('bet');
+                                    }}
+                                    className="p-1 hover:bg-red-500/20 text-trench-gasmask hover:text-jeet-red rounded border border-transparent hover:border-jeet-red/30 transition-all"
+                                    title="Unbookmark Channel"
+                                  >
+                                    <X size={10} className="stroke-[2.5]" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Drawer Footer */}
+                  <div className="p-2 border-t border-trench-sandbag/40 bg-trench-black/40 text-center font-mono text-[7px] text-trench-gasmask uppercase tracking-wider shrink-0 select-none">
+                    RADAR TRACKING CONSOLE ACTIVE // TARGET LOCK
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Rocket Deploy Button */}
+          <Link href="/create-room" className="w-full md:w-auto">
+            <button className="w-full py-2 px-4 font-staatliches text-lg tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all flex items-center justify-center gap-2 uppercase font-bold h-11 text-center">
+              <Rocket size={18} className="animate-bounce text-black" />
+              <span>DEPLOY ROOM</span>
+            </button>
+          </Link>
+        </div>
       </div>
 
       {/* 3-Column Dashboard View */}
@@ -489,7 +855,11 @@ export default function RoomsPage() {
                   }}
                   className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
                 />
-                <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
+                <img
+                  src="https://dd.dexscreener.com/ds-data/chains/solana.png"
+                  alt="SOL"
+                  className="w-3.5 h-3.5 object-contain rounded-full ml-0.5"
+                />
               </div>
 
 
@@ -547,11 +917,11 @@ export default function RoomsPage() {
                       <div className="flex flex-col gap-1">
                         <button
                           onClick={() => {
-                            setFilter('ending');
+                            setFilterNew('ending');
                             synthSound('bet');
                           }}
                           className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filter !== 'expired'
+                            filterNew !== 'expired'
                               ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
                               : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
                           }`}
@@ -560,11 +930,11 @@ export default function RoomsPage() {
                         </button>
                         <button
                           onClick={() => {
-                            setFilter('expired');
+                            setFilterNew('expired');
                             synthSound('bet');
                           }}
                           className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filter === 'expired'
+                            filterNew === 'expired'
                               ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
                               : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
                           }`}
@@ -623,7 +993,11 @@ export default function RoomsPage() {
                   }}
                   className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
                 />
-                <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
+                <img
+                  src="https://dd.dexscreener.com/ds-data/chains/solana.png"
+                  alt="SOL"
+                  className="w-3.5 h-3.5 object-contain rounded-full ml-0.5"
+                />
               </div>
 
 
@@ -681,11 +1055,11 @@ export default function RoomsPage() {
                       <div className="flex flex-col gap-1">
                         <button
                           onClick={() => {
-                            setFilter('ending');
+                            setFilterSoon('ending');
                             synthSound('bet');
                           }}
                           className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filter !== 'expired'
+                            filterSoon !== 'expired'
                               ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
                               : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
                           }`}
@@ -694,11 +1068,11 @@ export default function RoomsPage() {
                         </button>
                         <button
                           onClick={() => {
-                            setFilter('expired');
+                            setFilterSoon('expired');
                             synthSound('bet');
                           }}
                           className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filter === 'expired'
+                            filterSoon === 'expired'
                               ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
                               : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
                           }`}
@@ -757,7 +1131,11 @@ export default function RoomsPage() {
                   }}
                   className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
                 />
-                <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
+                <img
+                  src="https://dd.dexscreener.com/ds-data/chains/solana.png"
+                  alt="SOL"
+                  className="w-3.5 h-3.5 object-contain rounded-full ml-0.5"
+                />
               </div>
 
 
@@ -815,11 +1193,11 @@ export default function RoomsPage() {
                       <div className="flex flex-col gap-1">
                         <button
                           onClick={() => {
-                            setFilter('ending');
+                            setFilterBiggest('ending');
                             synthSound('bet');
                           }}
                           className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filter !== 'expired'
+                            filterBiggest !== 'expired'
                               ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
                               : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
                           }`}
@@ -828,11 +1206,11 @@ export default function RoomsPage() {
                         </button>
                         <button
                           onClick={() => {
-                            setFilter('expired');
+                            setFilterBiggest('expired');
                             synthSound('bet');
                           }}
                           className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filter === 'expired'
+                            filterBiggest === 'expired'
                               ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
                               : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
                           }`}
@@ -887,6 +1265,8 @@ export default function RoomsPage() {
       <div className="mt-4 shrink-0">
         <DegenQuoteBanner />
       </div>
+
+
 
     </div>
   );

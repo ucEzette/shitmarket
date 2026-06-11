@@ -11,7 +11,7 @@ import { LogOut, Loader2, Coins } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 
 const navItems = [
-  { label: 'TRENCHES', href: '/rooms' },
+  { label: 'WAR ROOM', href: '/rooms' },
   { label: 'DEPLOY', href: '/create-room' },
   { label: 'PARLAYS', href: '/parlays' },
   { label: 'LEADERBOARD', href: '/leaderboard' },

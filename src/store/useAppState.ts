@@ -259,6 +259,9 @@ async function fetchWithTimeout(resource: string, options: RequestInit = {}, tim
 
 // ── Promise Timeout helper to prevent infinite on-chain hangs ───
 function withTimeout<T>(promise: Promise<T>, timeoutMs = 3000, errorMsg = 'Operation timed out'): Promise<T> {
+  // Prevent unhandled promise rejection if the promise rejects after the timeout
+  promise.catch(() => {});
+  
   return Promise.race([
     promise,
     new Promise<never>((_, reject) => {

@@ -30,7 +30,8 @@ export const connection = new Proxy(currentConnection, {
           'getAccountInfo', 'getBalance', 'getLatestBlockhash', 'confirmTransaction',
           'sendRawTransaction', 'sendTransaction', 'simulateTransaction',
           'getMinimumBalanceForRentExemption', 'getSlot', 'getTransaction',
-          'getParsedTransaction', 'getProgramAccounts', 'getTokenAccountBalance'
+          'getParsedTransaction', 'getProgramAccounts', 'getTokenAccountBalance',
+          'getMultipleAccountsInfo', 'getRecentPrioritizationFees'
         ];
         
         if (!asyncMethods.includes(String(prop))) {

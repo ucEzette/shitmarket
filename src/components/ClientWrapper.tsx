@@ -9,7 +9,7 @@ import { WalletAdapterBridge } from './WalletAdapterBridge';
 import { MemePopup, PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from './MemeAssets';
 import { ShareCardModal } from './ShareCardModal';
 import { ComplianceModal } from './ComplianceModal';
-import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins, Briefcase, Info, X, ExternalLink } from 'lucide-react';
+import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins, Briefcase, Info, X, ExternalLink, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import Link from 'next/link';
@@ -351,11 +351,11 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       tickTimers();
     }, 2500); // tick pools and countdown timers every 2.5s
 
-    // Hydrate data directly from the blockchain every 5 seconds 
-    // to bypass Indexer delays or outages.
+    // Hydrate data directly from the blockchain every 15 seconds 
+    // to bypass Indexer delays or outages without hitting Devnet rate limits.
     const onChainPoller = setInterval(() => {
       fetchRooms().catch(console.error);
-    }, 5000);
+    }, 15000);
 
     return () => {
       clearInterval(interval);

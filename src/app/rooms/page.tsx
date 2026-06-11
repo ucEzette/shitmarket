@@ -326,18 +326,24 @@ export default function RoomsPage() {
     const timeText = timeRemainingText[room.id] || '00:00:00';
     const isSettled = room.status === 'settled';
 
-    // Glow styling depends on which side is leading
-    const hoverGlow = isSettled
-      ? 'hover:shadow-glow-gold hover:border-moon-gold/80'
+    // Left border indicator & background tint & box shadow glow
+    const borderGlow = isSettled
+      ? 'border-l-[4px] border-l-moon-gold/80 shadow-[inset_4px_0_10px_rgba(255,215,0,0.06)]'
       : isMoonLeading
-      ? 'hover:shadow-glow-moon hover:border-neon-moon/80'
-      : 'hover:shadow-glow-jeet hover:border-jeet-red/80';
+      ? 'border-l-[4px] border-l-neon-moon/80 shadow-[inset_4px_0_10px_rgba(22,163,74,0.1)]'
+      : 'border-l-[4px] border-l-jeet-red/80 shadow-[inset_4px_0_10px_rgba(255,7,58,0.1)]';
+
+    const hoverGlow = isSettled
+      ? 'hover:bg-[#171103] hover:shadow-[inset_4px_0_15px_rgba(255,215,0,0.12),_0_0_12px_rgba(255,215,0,0.1)]'
+      : isMoonLeading
+      ? 'hover:bg-[#07170a] hover:shadow-[inset_4px_0_15px_rgba(22,163,74,0.18),_0_0_12px_rgba(22,163,74,0.12)]'
+      : 'hover:bg-[#180507] hover:shadow-[inset_4px_0_15px_rgba(255,7,58,0.18),_0_0_12px_rgba(255,7,58,0.12)]';
 
     return (
       <div
         key={room.id}
         onClick={() => router.push(`/room/${room.id}`)}
-        className={`retro-panel p-3 cursor-pointer flex flex-col justify-between relative group transition-all duration-200 hover:-translate-y-0.5 select-none scanlines rounded-lg border-2 ${hoverGlow}`}
+        className={`p-3.5 cursor-pointer flex flex-col justify-between relative group transition-all duration-150 select-none scanlines ${borderGlow} ${hoverGlow} bg-[#05050A]`}
       >
         {/* Timer Bomb Clock Header */}
         <div className="flex justify-between items-center mb-2">
@@ -453,15 +459,19 @@ export default function RoomsPage() {
           <div className="grid grid-cols-2 gap-1.5 mt-auto">
             <button
               onClick={(e) => handleQuickBet(e, room.id, 'moon', quickAmount)}
-              className="retro-btn retro-btn-moon py-1.5 px-1 rounded font-staatliches text-xs tracking-wider uppercase text-center active:translate-y-0.5 transition-transform"
+              className="uiverse-btn uiverse-btn-sm uiverse-btn-moon font-staatliches tracking-wider"
             >
-              MOON {quickAmount}
+              <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
+              <span className="now">MOON</span>
+              <span className="play !whitespace-nowrap">MOON {quickAmount}</span>
             </button>
             <button
               onClick={(e) => handleQuickBet(e, room.id, 'jeet', quickAmount)}
-              className="retro-btn retro-btn-jeet py-1.5 px-1 rounded font-staatliches text-xs tracking-wider uppercase text-center active:translate-y-0.5 transition-transform"
+              className="uiverse-btn uiverse-btn-sm uiverse-btn-jeet font-staatliches tracking-wider"
             >
-              JEET {quickAmount}
+              <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
+              <span className="now">JEET</span>
+              <span className="play !whitespace-nowrap">JEET {quickAmount}</span>
             </button>
           </div>
         ) : (
@@ -476,9 +486,9 @@ export default function RoomsPage() {
   };
 
   const renderColumnSkeleton = () => (
-    <div className="space-y-3 animate-pulse">
+    <div className="retro-panel rounded-xl overflow-hidden divide-y divide-trench-sandbag bg-black animate-pulse">
       {[1, 2, 3].map((n) => (
-        <div key={n} className="retro-panel p-3.5 rounded-lg border-2 border-trench-sandbag/40 h-28 bg-trench-black/20" />
+        <div key={n} className="p-3.5 h-44 bg-[#05050A]" />
       ))}
     </div>
   );
@@ -948,11 +958,13 @@ export default function RoomsPage() {
               </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin max-h-[480px] lg:max-h-none">
             {showSkeleton ? (
               renderColumnSkeleton()
             ) : newRooms.length > 0 ? (
-              newRooms.map((room) => renderRoomCard(room, quickAmountNew))
+              <div className="retro-panel rounded-xl overflow-hidden divide-y divide-trench-sandbag bg-black shadow-[0_0_15px_rgba(22,163,74,0.05)]">
+                {newRooms.map((room) => renderRoomCard(room, quickAmountNew))}
+              </div>
             ) : (
               renderEmptyColumn()
             )}
@@ -1086,11 +1098,13 @@ export default function RoomsPage() {
               </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin max-h-[480px] lg:max-h-none">
             {showSkeleton ? (
               renderColumnSkeleton()
             ) : endingSoonRooms.length > 0 ? (
-              endingSoonRooms.map((room) => renderRoomCard(room, quickAmountSoon))
+              <div className="retro-panel rounded-xl overflow-hidden divide-y divide-trench-sandbag bg-black shadow-[0_0_15px_rgba(22,163,74,0.05)]">
+                {endingSoonRooms.map((room) => renderRoomCard(room, quickAmountSoon))}
+              </div>
             ) : (
               renderEmptyColumn()
             )}
@@ -1224,11 +1238,13 @@ export default function RoomsPage() {
               </div>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
+          <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin max-h-[480px] lg:max-h-none">
             {showSkeleton ? (
               renderColumnSkeleton()
             ) : biggestPotRooms.length > 0 ? (
-              biggestPotRooms.map((room) => renderRoomCard(room, quickAmountBiggest))
+              <div className="retro-panel rounded-xl overflow-hidden divide-y divide-trench-sandbag bg-black shadow-[0_0_15px_rgba(22,163,74,0.05)]">
+                {biggestPotRooms.map((room) => renderRoomCard(room, quickAmountBiggest))}
+              </div>
             ) : (
               renderEmptyColumn()
             )}

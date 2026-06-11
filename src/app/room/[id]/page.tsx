@@ -1263,32 +1263,36 @@ export default function RoomDetailPage() {
               {/* 1. PICK YOUR STANCE */}
               <div className="mb-4">
                 <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-2">1. PICK YOUR STANCE</span>
-                <div className="flex gap-3">
+                <div className="flex gap-3 h-14">
                   <button
                     onClick={() => {
                       setSelectedSide('moon');
                       synthSound('bet');
                     }}
-                    className={`flex-1 py-3 font-staatliches text-xl uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 uiverse-btn uiverse-btn-moon font-staatliches text-xl uppercase tracking-wider transition-all ${
                       selectedSide === 'moon'
-                        ? 'retro-btn retro-btn-moon text-black shadow-glow-moon font-bold animate-pulse'
-                        : 'retro-btn bg-black border border-trench-sandbag text-trench-gasmask opacity-70 hover:opacity-100 hover:text-white'
+                        ? 'shadow-glow-moon border-neon-moon animate-pulse'
+                        : 'opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <span>BET MOON 🚀</span>
+                    <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
+                    <span className="now">MOON</span>
+                    <span className="play">BET MOON 🚀</span>
                   </button>
                   <button
                     onClick={() => {
                       setSelectedSide('jeet');
                       synthSound('bet');
                     }}
-                    className={`flex-1 py-3 font-staatliches text-xl uppercase tracking-wider rounded transition-all flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 uiverse-btn uiverse-btn-jeet font-staatliches text-xl uppercase tracking-wider transition-all ${
                       selectedSide === 'jeet'
-                        ? 'retro-btn retro-btn-jeet text-white shadow-glow-jeet font-bold animate-pulse'
-                        : 'retro-btn bg-black border border-trench-sandbag text-trench-gasmask opacity-70 hover:opacity-100 hover:text-white'
+                        ? 'shadow-glow-jeet border-jeet-red animate-pulse'
+                        : 'opacity-70 hover:opacity-100'
                     }`}
                   >
-                    <span>BET JEET 💀</span>
+                    <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
+                    <span className="now">JEET</span>
+                    <span className="play">BET JEET 💀</span>
                   </button>
                 </div>
               </div>

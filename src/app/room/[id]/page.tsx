@@ -7,7 +7,6 @@ import { useAppState, Room, ChatMessage, formatCashtag, formatPrice } from '@/st
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
 import { HeaderPanel } from '@/components/ui/HeaderPanel';
-import { synthSound as originalSynthSound } from '@/components/ClientWrapper';
 import { 
   Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, 
   AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal, Bookmark
@@ -18,21 +17,21 @@ import confetti from 'canvas-confetti';
 // 1. Stable, Static, and Dynamic Memoized DexScreener Iframe Chart Component
 // Encapsulates local loading states internally to prevent parent state updates or callback prop changes,
 // guaranteeing that the chart remains perfectly stable and never flashes or reloads on periodic state poll updates!
-const StableDexChart = React.memo(({ chainId, pairAddress }: { chainId: string; pairAddress: string }) => {
+const StableDexChart = React.memo(({ chainId, pairAddress, tokenAddress }: { chainId: string; pairAddress: string; tokenAddress: string }) => {
   const [localLoading, setLocalLoading] = useState(true);
   
   // Track the actual active loaded pair to prevent loading empty strings or reloading on parent ticks
-  const [activePair, setActivePair] = useState<{ chainId: string; pairAddress: string } | null>(null);
+  const [activePair, setActivePair] = useState<{ chainId: string; pairAddress: string; tokenAddress: string } | null>(null);
 
   // Update active pair ONLY when we receive a valid, non-empty pair address!
   useEffect(() => {
-    if (chainId && pairAddress && pairAddress !== '') {
-      if (!activePair || activePair.pairAddress !== pairAddress || activePair.chainId !== chainId) {
-        setActivePair({ chainId, pairAddress });
+    if (chainId && (pairAddress || tokenAddress)) {
+      if (!activePair || activePair.pairAddress !== pairAddress || activePair.tokenAddress !== tokenAddress || activePair.chainId !== chainId) {
+        setActivePair({ chainId, pairAddress: pairAddress || '', tokenAddress: tokenAddress || '' });
         setLocalLoading(true);
       }
     }
-  }, [chainId, pairAddress, activePair]);
+  }, [chainId, pairAddress, tokenAddress, activePair]);
 
   // If we don't have a valid active pair yet, show a loader
   if (!activePair) {
@@ -46,31 +45,34 @@ const StableDexChart = React.memo(({ chainId, pairAddress }: { chainId: string; 
     );
   }
 
+  const isSolana = activePair.chainId.toLowerCase() === 'solana';
+  const iframeSrc = isSolana && activePair.tokenAddress
+    ? `https://birdeye.so/tv-widget/${activePair.tokenAddress}?chain=solana&theme=dark`
+    : `https://dexscreener.com/${activePair.chainId}/${activePair.pairAddress}?embed=1&theme=dark&info=0&trades=0`;
+
   return (
     <div className="w-full h-full relative">
       {localLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#070c04] z-10 animate-pulse pt-12">
           <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
           <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
-            CONNECTING TO DEXSCREENER TERMINAL...
+            CONNECTING TO TELEMETRY STREAM...
           </span>
         </div>
       )}
       <iframe
         className="w-full h-full border-none"
-        src={`https://dexscreener.com/${activePair.chainId}/${activePair.pairAddress}?embed=1&theme=dark&info=0&trades=0`}
-        title="DexScreener Chart"
+        src={iframeSrc}
+        title="Token Chart Widget"
         onLoad={() => setLocalLoading(false)}
       ></iframe>
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Memoization rule: only re-render if the room actually changes to a different valid pair address
-  // If nextProps has an empty pairAddress (due to polling reset), we completely ignore it and preserve our current view!
-  if (!nextProps.pairAddress || nextProps.pairAddress === '') {
-    return true; 
-  }
-  return prevProps.chainId === nextProps.chainId && prevProps.pairAddress === nextProps.pairAddress;
+  if (prevProps.chainId !== nextProps.chainId) return false;
+  if (prevProps.tokenAddress !== nextProps.tokenAddress) return false;
+  if (prevProps.pairAddress !== nextProps.pairAddress) return false;
+  return true;
 });
 
 StableDexChart.displayName = 'StableDexChart';
@@ -179,8 +181,8 @@ export default function RoomDetailPage() {
 
 
   const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
-    if (!isMuted) {
-      originalSynthSound(type);
+    if (!isMuted && typeof window !== 'undefined' && (window as any).playDAppSound) {
+      (window as any).playDAppSound(type);
     }
   };
   
@@ -878,11 +880,12 @@ export default function RoomDetailPage() {
               {/* Memoized Stable chart iframe. Specifying a unique React Key forces React to reuse 
                   the existing DOM node instead of rebuilding it on parent wagers state updates,
                   completely resolving any iframe flashing/flickering! */}
-              {room.token.chainId && room.token.pairAddress ? (
+              {room.token.chainId && (room.token.pairAddress || room.token.address) ? (
                 <StableDexChart 
                   key={`dexscreener-${room.id}`}
                   chainId={room.token.chainId}
                   pairAddress={room.token.pairAddress}
+                  tokenAddress={room.token.address}
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] pt-12 z-10 animate-pulse">
@@ -926,19 +929,14 @@ export default function RoomDetailPage() {
                 </span>
               </div>
 
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden flex items-center justify-between">
-                <div className="min-w-0">
-                  <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
-                  <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate">
-                    {room.token.chainId === 'solana' ? 'Solana Mainnet' : room.token.chainId ? `${room.token.chainId} Net` : 'Solana Network'}
-                  </span>
-                </div>
+              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden flex flex-col justify-between">
+                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
                 {room.token.chainId && (
-                  <div className="bg-trench-black/60 p-1 rounded border border-[#1d3515] flex items-center justify-center h-8 w-8 shrink-0">
+                  <div className="mt-1 bg-trench-black/60 p-0.5 rounded border border-[#1d3515] flex items-center justify-center h-7 w-7 shrink-0">
                     <img
                       src={`https://dd.dexscreener.com/ds-data/chains/${room.token.chainId.toLowerCase()}.png`}
                       alt={room.token.chainId}
-                      className="w-6 h-6 object-contain rounded-full"
+                      className="w-5 h-5 object-contain rounded-full"
                       onError={(e) => {
                         e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
                       }}

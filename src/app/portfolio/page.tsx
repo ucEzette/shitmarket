@@ -10,6 +10,246 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
+interface ChartPoint {
+  x: number;
+  y: number;
+  label: string;
+  timestamp: number;
+}
+
+const PNLChart: React.FC<{
+  parsedPositions: any[];
+  currency: 'SOL' | 'USD';
+  rate: number;
+}> = ({ parsedPositions, currency, rate }) => {
+  const [hoveredPoint, setHoveredPoint] = useState<ChartPoint | null>(null);
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
+
+  // Filter settled trades & sort by date
+  const settledTrades = [...parsedPositions]
+    .filter((pos) => pos.isSettled)
+    .sort((a, b) => a.bet.timestamp - b.bet.timestamp);
+
+  const chartPoints: ChartPoint[] = [{ x: 0, y: 0, label: 'START', timestamp: Date.now() - 86400000 }];
+  let runningPnl = 0;
+  
+  settledTrades.forEach((trade, idx) => {
+    runningPnl += trade.pnl;
+    chartPoints.push({
+      x: idx + 1,
+      y: runningPnl,
+      label: trade.token?.symbol || 'ARENA',
+      timestamp: trade.bet.timestamp
+    });
+  });
+
+  const width = 800;
+  const height = 240;
+  const paddingX = 50;
+  const paddingY = 40;
+
+  const yValues = chartPoints.map((p) => p.y);
+  const minY = Math.min(0, ...yValues);
+  const maxY = Math.max(0.1, ...yValues);
+  const rangeY = maxY - minY;
+
+  const getX = (index: number) => {
+    if (chartPoints.length <= 1) return paddingX + (width - paddingX * 2) / 2;
+    return paddingX + (index / (chartPoints.length - 1)) * (width - paddingX * 2);
+  };
+
+  const getY = (val: number) => {
+    return height - paddingY - ((val - minY) / rangeY) * (height - paddingY * 2);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    
+    let closestIndex = 0;
+    let closestDist = Infinity;
+    
+    chartPoints.forEach((point, idx) => {
+      const px = getX(idx);
+      const scaledX = (px / width) * rect.width;
+      const dist = Math.abs(clientX - scaledX);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestIndex = idx;
+      }
+    });
+
+    setHoveredPoint(chartPoints[closestIndex]);
+    setHoverIdx(closestIndex);
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredPoint(null);
+    setHoverIdx(null);
+  };
+
+  let pathD = '';
+  chartPoints.forEach((point, idx) => {
+    const px = getX(idx);
+    const py = getY(point.y);
+    if (idx === 0) {
+      pathD = `M ${px} ${py}`;
+    } else {
+      pathD += ` L ${px} ${py}`;
+    }
+  });
+
+  const isNetPositive = runningPnl >= 0;
+  const strokeColor = isNetPositive ? '#39ff14' : '#ff073a';
+  const glowFilterId = isNetPositive ? 'green-glow-pnl' : 'red-glow-pnl';
+
+  const formatVal = (val: number) => {
+    const absVal = Math.abs(val);
+    const formatted = currency === 'USD' 
+      ? `$${(absVal * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+      : `${absVal.toFixed(3)} SOL`;
+    return val >= 0 ? `+${formatted}` : `-${formatted}`;
+  };
+
+  return (
+    <div className="bg-trench-mud/45 border-4 border-trench-sandbag rounded-lg p-5 scanlines relative w-full mb-6 select-none overflow-hidden col-span-1 md:col-span-2">
+      <div className="flex justify-between items-center mb-3">
+        <span className="font-staatliches text-2xl text-white tracking-wider uppercase block">CUMULATIVE COMBAT PNL</span>
+        <div className="font-mono text-[9px] text-trench-gasmask uppercase font-bold flex gap-4">
+          <span>ALL TIME: <span className={isNetPositive ? 'text-neon-moon font-extrabold glow-moon' : 'text-jeet-red font-extrabold glow-jeet'}>{formatVal(runningPnl)}</span></span>
+          <span>SESSIONS: {settledTrades.length} RESOLVED</span>
+        </div>
+      </div>
+
+      <div className="relative w-full h-[180px] bg-black/60 border border-trench-sandbag/40 rounded flex items-center justify-center">
+        {settledTrades.length === 0 ? (
+          <div className="text-center font-mono text-[10px] text-trench-gasmask uppercase font-bold leading-relaxed max-w-sm px-4">
+            <Radio className="mx-auto mb-2 text-trench-gasmask animate-pulse" size={24} />
+            <p>NO TELEMETRY RECORDED ON THIS FREQUENCY</p>
+            <p className="text-[8px] text-trench-gasmask/50 mt-1">Deploy wagers on active token rooms and resolve them to map cumulative sonar chart curves.</p>
+          </div>
+        ) : (
+          <svg 
+            viewBox={`0 0 ${width} ${height}`} 
+            className="w-full h-full cursor-crosshair"
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+          >
+            <defs>
+              <filter id="green-glow-pnl" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="red-glow-pnl" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* Grid Lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+              const y = paddingY + ratio * (height - paddingY * 2);
+              return (
+                <line 
+                  key={i}
+                  x1={paddingX} 
+                  y1={y} 
+                  x2={width - paddingX} 
+                  y2={y} 
+                  stroke="#16a34a" 
+                  strokeDasharray="2,5" 
+                  strokeWidth={0.5} 
+                  opacity={0.3} 
+                />
+              );
+            })}
+
+            {/* Zero Axis Line */}
+            <line 
+              x1={paddingX} 
+              y1={getY(0)} 
+              x2={width - paddingX} 
+              y2={getY(0)} 
+              stroke="#eab308" 
+              strokeDasharray="3,3" 
+              strokeWidth={1} 
+              opacity={0.5} 
+            />
+
+            {/* Cumulative PNL Line Path */}
+            <path
+              d={pathD}
+              fill="none"
+              stroke={strokeColor}
+              strokeWidth={2}
+              filter={`url(#${glowFilterId})`}
+            />
+
+            {/* Circle Dots for each trade */}
+            {chartPoints.map((point, idx) => (
+              <circle
+                key={idx}
+                cx={getX(idx)}
+                cy={getY(point.y)}
+                r={hoverIdx === idx ? 5 : 3}
+                fill={idx === 0 ? '#eab308' : strokeColor}
+                stroke="#000"
+                strokeWidth={1.5}
+                className="transition-all duration-150"
+              />
+            ))}
+
+            {/* Crosshair Line & Tooltip */}
+            {hoveredPoint && hoverIdx !== null && (
+              <>
+                <line
+                  x1={getX(hoverIdx)}
+                  y1={paddingY}
+                  x2={getX(hoverIdx)}
+                  y2={height - paddingY}
+                  stroke="#ffffff"
+                  strokeWidth={0.5}
+                  strokeDasharray="3,3"
+                  opacity={0.4}
+                />
+                
+                {/* HUD Hover Overlay */}
+                <foreignObject 
+                  x={getX(hoverIdx) > width / 2 ? getX(hoverIdx) - 160 : getX(hoverIdx) + 15}
+                  y={getY(hoveredPoint.y) > height / 2 ? getY(hoveredPoint.y) - 65 : getY(hoveredPoint.y) + 15}
+                  width="145"
+                  height="50"
+                >
+                  <div className="bg-black/90 border border-trench-sandbag rounded p-1.5 font-mono text-[7px] text-white uppercase leading-tight pointer-events-none select-none shadow-lg scanlines">
+                    <div className="font-staatliches text-[9px] text-neon-moon leading-tight font-bold">
+                      {hoverIdx === 0 ? 'COMMENCEMENT' : `BATTLE: ${hoveredPoint.label}`}
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-trench-gasmask">CUM. PNL:</span>
+                      <span className={hoveredPoint.y >= 0 ? 'text-neon-moon font-bold' : 'text-jeet-red font-bold'}>
+                        {formatVal(hoveredPoint.y)}
+                      </span>
+                    </div>
+                    <div className="text-[6px] text-trench-gasmask/70 mt-0.5">
+                      {new Date(hoveredPoint.timestamp).toLocaleDateString()} // {new Date(hoveredPoint.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </foreignObject>
+              </>
+            )}
+          </svg>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function PortfolioPage() {
   const { user, rooms, roomsLoaded, fetchRooms, refreshProfile, connectWallet } = useAppState();
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'performance' | 'orders'>('positions');
@@ -525,6 +765,7 @@ export default function PortfolioPage() {
         {/* TAB 2: OVERVIEW STATS */}
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
+            <PNLChart parsedPositions={parsedPositions} currency={currency} rate={SOL_USD_RATE} />
             {/* Classification & Rank details */}
             <div className="bg-trench-mud/40 border-2 border-trench-sandbag/65 rounded-lg p-5 flex flex-col justify-between">
               <div>

@@ -1,3 +1,4 @@
+import { INDEXER_URL } from "../utils/config";
 import { create } from 'zustand';
 import { PublicKey, SystemProgram, ComputeBudgetProgram } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
@@ -148,6 +149,14 @@ interface LeaderboardEntry {
   alignment?: 'moon' | 'jeet';
 }
 
+export interface Toast {
+  id: string;
+  type: 'loading' | 'success' | 'error' | 'info';
+  message: string;
+  description?: string;
+  txSig?: string | null;
+}
+
 export interface AppState {
   isPaused: boolean;
   rooms: Room[];
@@ -177,6 +186,20 @@ export interface AppState {
   wallet: any | null;
   isTransactionLoading: boolean;
   transactionError: string | null;
+  
+  // Toasts
+  toasts: Toast[];
+  addToast: (message: string, type: Toast['type'], description?: string, txSig?: string | null) => string;
+  removeToast: (id: string) => void;
+  updateToast: (id: string, updates: Partial<Omit<Toast, 'id'>>) => void;
+  
+  // Settings
+  settings: {
+    priorityFeeType: 'low' | 'medium' | 'high' | 'turbo' | 'custom';
+    customPriorityFee: number; // micro-lamports
+    slippage: number; // percentage
+  };
+  updateSettings: (updates: Partial<AppState['settings']>) => void;
 
   createRoom: (room: Room, isSetPrice?: boolean) => Promise<any>;
   placeBet: (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => Promise<any>;
@@ -185,7 +208,7 @@ export interface AppState {
   connectWallet: () => void;
   disconnectWallet: () => void;
   setWallet: (wallet: any) => void;
-  setWalletAddress: (address: string | null) => void;
+  setWalletAddress: (address: string | null) => Promise<void>;
   addMessage: (msg: ChatMessage) => void;
   fetchRoomChats: (roomId: string) => Promise<void>;
   sendRoomChat: (roomId: string, side: 'moon' | 'jeet' | 'all', user: string, message: string) => Promise<void>;
@@ -381,14 +404,27 @@ function extractErrorMessage(err: any): string {
   return String(err);
 }
 
+function getPriorityFeePrice(settings: any): number {
+  if (!settings) return 2_000_000;
+  switch (settings.priorityFeeType) {
+    case 'low': return 50_000;
+    case 'medium': return 500_000;
+    case 'high': return 2_000_000;
+    case 'turbo': return 10_000_000;
+    case 'custom': return Number(settings.customPriorityFee || 2_000_000);
+    default: return 2_000_000;
+  }
+}
+
 function handleRpcError(actionName: string, err: any) {
   const errMsg = extractErrorMessage(err);
   const lowerMsg = errMsg.toLowerCase();
-  if (lowerMsg.includes('not confirmed') || lowerMsg.includes('timeout')) {
-    alert(`TRANSACTION TIMEOUT: The Solana network is taking too long to confirm your transaction. It might have still succeeded! Please wait a few moments, refresh the page, and check your wallet balance.`);
-  } else {
-    alert(`${actionName.toUpperCase()} FAILED: ${errMsg}`);
-  }
+  const title = `${actionName.toUpperCase()} FAILED`;
+  const desc = lowerMsg.includes('not confirmed') || lowerMsg.includes('timeout')
+    ? 'The Solana network is taking too long to confirm your transaction. It might have still succeeded! Please wait a few moments, refresh, and verify your ammo balance.'
+    : errMsg;
+  
+  useAppState.getState().addToast(title, 'error', desc);
 }
 
 export const useAppState = create<AppState>((set, get) => ({
@@ -410,6 +446,71 @@ export const useAppState = create<AppState>((set, get) => ({
   wallet: null,
   isTransactionLoading: false,
   transactionError: null,
+
+  // Settings initial state with SSR check
+  settings: (() => {
+    let savedSettings: any = {};
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('sm_settings');
+        if (stored) savedSettings = JSON.parse(stored);
+      } catch (e) {
+        console.warn('Failed to parse saved settings', e);
+      }
+    }
+    return {
+      priorityFeeType: savedSettings.priorityFeeType || 'high',
+      customPriorityFee: savedSettings.customPriorityFee || 2_000_000,
+      slippage: savedSettings.slippage || 1.0,
+    };
+  })(),
+
+  updateSettings: (updates) => {
+    set((state) => {
+      const newSettings = { ...state.settings, ...updates };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('sm_settings', JSON.stringify(newSettings));
+        } catch (e) {
+          console.warn('Failed to save settings to localStorage', e);
+        }
+      }
+      return { settings: newSettings };
+    });
+  },
+
+  toasts: [],
+  addToast: (message, type, description = '', txSig = null) => {
+    const id = 'toast-' + Date.now() + Math.random().toString(36).substr(2, 9);
+    set((state) => ({
+      toasts: [...state.toasts, { id, message, type, description, txSig }]
+    }));
+    // Auto-remove standard toasts after 6s (loading toasts persist until updated)
+    if (type !== 'loading') {
+      setTimeout(() => {
+        get().removeToast(id);
+      }, 6000);
+    }
+    return id;
+  },
+
+  removeToast: (id) => {
+    set((state) => ({
+      toasts: state.toasts.filter((t) => t.id !== id)
+    }));
+  },
+
+  updateToast: (id, updates) => {
+    set((state) => ({
+      toasts: state.toasts.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    }));
+    // If changed to a non-loading state, auto-remove after 6s
+    if (updates.type && updates.type !== 'loading') {
+      setTimeout(() => {
+        get().removeToast(id);
+      }, 6000);
+    }
+  },
 
   addActivity: (activity) => {
     set((state) => ({
@@ -435,7 +536,7 @@ export const useAppState = create<AppState>((set, get) => ({
 
   fetchRooms: async () => {
     try {
-      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const indexerApi = INDEXER_URL;
       const res = await fetchWithTimeout(`${indexerApi}/api/rooms?status=all&limit=50`, {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
@@ -554,7 +655,7 @@ export const useAppState = create<AppState>((set, get) => ({
     // Run indexer API fetch and on-chain fetch in parallel to prevent sequential blocking lag!
     const indexerFetch = (async () => {
       try {
-        const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+        const indexerApi = INDEXER_URL;
         const res = await fetchWithTimeout(`${indexerApi}/api/rooms/${roomId}`, {}, 3000);
         const json = await res.json();
         if (json.success && json.data) {
@@ -670,7 +771,7 @@ export const useAppState = create<AppState>((set, get) => ({
 
   fetchLeaderboard: async () => {
     try {
-      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const indexerApi = INDEXER_URL;
       const res = await fetchWithTimeout(`${indexerApi}/api/leaderboard?sortBy=profit&limit=50`, {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
@@ -726,12 +827,18 @@ export const useAppState = create<AppState>((set, get) => ({
   createRoom: async (room: Room, isSetPrice?: boolean) => {
     const { wallet, setTransactionLoading, setTransactionError } = get();
     if (!wallet || !wallet.publicKey) {
-      alert("PLEASE ENLIST YOUR WALLET TO THE PLATFORM CONFIG!");
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
       return;
     }
     
     setTransactionLoading(true);
     setTransactionError(null);
+    
+    const toastId = get().addToast(
+      'DEPLOYING ARENA',
+      'loading',
+      `Staging battlefield room for ${room.token.symbol}...`
+    );
     
     try {
       const tokenMintStr = room.token.address;
@@ -739,7 +846,7 @@ export const useAppState = create<AppState>((set, get) => ({
       let livePriceUsd: string | undefined = room.openingPrice ? String(room.openingPrice) : undefined;
       
       // Phase 3.4: Validate minimum liquidity & age via indexer
-      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const indexerApi = INDEXER_URL;
       try {
         const valRes = await fetchWithTimeout(`${indexerApi}/api/rooms/validate?mint=${tokenMintStr}`, {}, 3000);
         if (valRes.ok) {
@@ -816,7 +923,7 @@ export const useAppState = create<AppState>((set, get) => ({
         
         // Trigger self-healing sync on indexer
         try {
-          const indexerUrl = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+          const indexerUrl = INDEXER_URL;
           await fetch(`${indexerUrl}/api/rooms/${roomPda.toBase58()}`);
         } catch (syncErr) {
           console.warn("Failed to trigger self-healing sync on indexer:", syncErr);
@@ -825,6 +932,12 @@ export const useAppState = create<AppState>((set, get) => ({
         // Force refreshing the rooms list in the background
         await get().fetchRooms();
         
+        get().updateToast(toastId, {
+          type: 'success',
+          message: 'ARENA ALREADY ACTIVE',
+          description: `Active battlefield room found at ${roomPda.toBase58().substring(0, 8)}...`
+        });
+
         return {
           tx: null,
           roomPda: roomPda.toBase58(),
@@ -848,6 +961,8 @@ export const useAppState = create<AppState>((set, get) => ({
         }
       }
 
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
+
       const tx = await (program.methods as any)
         .createRoom(
           tokenMintPubkey,
@@ -868,7 +983,7 @@ export const useAppState = create<AppState>((set, get) => ({
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
         ])
         .rpc({ skipPreflight: true });
         
@@ -904,6 +1019,14 @@ export const useAppState = create<AppState>((set, get) => ({
       
       // Force refreshing the rooms list in the background
       get().fetchRooms();
+
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'ARENA STAGED SUCCESSFULLY',
+        description: `Battlefield room deployed for ${room.token.symbol}.`,
+        txSig: tx
+      });
+
       return {
         tx,
         roomPda: roomPda.toBase58(),
@@ -912,7 +1035,14 @@ export const useAppState = create<AppState>((set, get) => ({
     } catch (err: any) {
       console.error("Failed to create room on-chain:", err);
       setTransactionError(err.message || String(err));
-      handleRpcError("deploy mission", err);
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'DEPLOY MISSION FAILED',
+        description: cleanErr
+      });
+      
       throw err;
     } finally {
       setTransactionLoading(false);
@@ -922,13 +1052,22 @@ export const useAppState = create<AppState>((set, get) => ({
   placeBet: async (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => {
     const { wallet, setTransactionLoading, setTransactionError } = get();
     if (!wallet || !wallet.publicKey) {
-      alert("PLEASE ENLIST YOUR WALLET TO CHARGE ENEMY LINES!");
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
       return;
     }
     
     setTransactionLoading(true);
     setTransactionError(null);
     
+    const roomObj = get().rooms.find((r) => r.id === roomId);
+    const assetSym = roomObj?.token?.symbol || 'UNKNOWN';
+
+    const toastId = get().addToast(
+      'CHARGING ENEMY LINES',
+      'loading',
+      `Deploying ${amount} SOL on ${side.toUpperCase()} for ${assetSym}...`
+    );
+
     try {
       const program = getAnchorProgram(wallet);
       const roomPda = new PublicKey(roomId);
@@ -936,6 +1075,8 @@ export const useAppState = create<AppState>((set, get) => ({
       const betPda = getBetPda(roomPda, wallet.publicKey, side);
       const configPda = getPlatformConfigPda();
       
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
+
       const tx = await (program.methods as any)
         .placeBet(
           side === 'moon' ? { moon: {} } : { jeet: {} },
@@ -951,7 +1092,7 @@ export const useAppState = create<AppState>((set, get) => ({
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 150_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
         ])
         .rpc({ skipPreflight: true });
         
@@ -1002,11 +1143,25 @@ export const useAppState = create<AppState>((set, get) => ({
         openingPrice
       });
       
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'BATTLE POSITION SECURED',
+        description: `Staked ${amount} SOL on ${side.toUpperCase()}.`,
+        txSig: tx
+      });
+
       return tx;
     } catch (err: any) {
       console.error("Failed to place bet on-chain:", err);
       setTransactionError(err.message || String(err));
-      handleRpcError("battle order", err);
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'BATTLE ORDER FLUNKED',
+        description: cleanErr
+      });
+      
       throw err;
     } finally {
       setTransactionLoading(false);
@@ -1015,10 +1170,19 @@ export const useAppState = create<AppState>((set, get) => ({
 
   claimWinnings: async (roomId: string) => {
     const { wallet, setTransactionLoading, setTransactionError } = get();
-    if (!wallet || !wallet.publicKey) return;
+    if (!wallet || !wallet.publicKey) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
+      return;
+    }
     
     setTransactionLoading(true);
     setTransactionError(null);
+    
+    const toastId = get().addToast(
+      'RECOVERING SPOILS',
+      'loading',
+      'Securing spoils from prediction arena vault...'
+    );
     
     try {
       const rooms = get().rooms;
@@ -1026,7 +1190,7 @@ export const useAppState = create<AppState>((set, get) => ({
       
       if (room && room.status === 'active' && room.expiry <= Date.now()) {
         console.log(`Room is active but expired. Triggering on-demand settlement first for room ${roomId}...`);
-        const indexerUrl = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+        const indexerUrl = INDEXER_URL;
         const settleRes = await fetch(`${indexerUrl}/api/rooms/${roomId}/settle`, {
           method: 'POST',
         });
@@ -1091,7 +1255,7 @@ export const useAppState = create<AppState>((set, get) => ({
         }
       }
 
-      const betPda = getBetPda(roomPda, wallet.publicKey, claimSide);
+      const betPda = getBetPda(roomPda, wallet.publicKey, claimSide as 'moon' | 'jeet');
 
       const remainingAccounts = [];
       const userState = get().user;
@@ -1130,6 +1294,8 @@ export const useAppState = create<AppState>((set, get) => ({
         }
       }
       
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
+
       const tx = await (program.methods as any)
         .claimWinnings()
         .accounts({
@@ -1144,7 +1310,7 @@ export const useAppState = create<AppState>((set, get) => ({
         .remainingAccounts(remainingAccounts)
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 180_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
         ])
         .rpc({ skipPreflight: true });
         
@@ -1185,11 +1351,25 @@ export const useAppState = create<AppState>((set, get) => ({
         }
       }, 2000);
       
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'WAR BOOTY SECURED',
+        description: 'Spoils successfully routed to your vault.',
+        txSig: tx
+      });
+
       return tx;
     } catch (err: any) {
       console.error("Failed to claim winnings on-chain:", err);
       setTransactionError(err.message || String(err));
-      handleRpcError("booty secure retrieval", err);
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'RETRIEVAL OPERATION FAILED',
+        description: cleanErr
+      });
+      
       throw err;
     } finally {
       setTransactionLoading(false);
@@ -1199,17 +1379,25 @@ export const useAppState = create<AppState>((set, get) => ({
   claimReferralRewardsOnChain: async () => {
     const { wallet, setTransactionLoading, setTransactionError } = get();
     if (!wallet || !wallet.publicKey) {
-      alert("PLEASE ENLIST YOUR WALLET TO CLAIM REFERRAL REWARDS!");
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
       return;
     }
 
     setTransactionLoading(true);
     setTransactionError(null);
 
+    const toastId = get().addToast(
+      'CLAIMING REFERRAL REWARDS',
+      'loading',
+      'Retrieving commission spoils from referral vault...'
+    );
+
     try {
       const program = getAnchorProgram(wallet);
       const referralStatePda = getReferralStatePda(wallet.publicKey);
       const vaultPda = getVaultPda();
+
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
 
       const tx = await (program.methods as any)
         .claimReferralRewards()
@@ -1221,7 +1409,7 @@ export const useAppState = create<AppState>((set, get) => ({
         })
         .preInstructions([
           ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 2_000_000 })
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
         ])
         .rpc({ skipPreflight: true });
 
@@ -1238,11 +1426,25 @@ export const useAppState = create<AppState>((set, get) => ({
       await get().fetchBalance();
       await get().refreshProfile();
 
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'COMMISSION SECURED',
+        description: 'Referral commission spoils successfully transferred.',
+        txSig: tx
+      });
+
       return tx;
     } catch (err: any) {
       console.error("Failed to claim referral rewards on-chain:", err);
       setTransactionError(err.message || String(err));
-      handleRpcError("referral booty retrieval", err);
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'REWARDS RETRIEVAL FAILED',
+        description: cleanErr
+      });
+      
       throw err;
     } finally {
       setTransactionLoading(false);
@@ -1301,7 +1503,7 @@ export const useAppState = create<AppState>((set, get) => ({
       try {
         const program = getAnchorProgram(null as any);
         const referralStatePda = getReferralStatePda(new PublicKey(address));
-        const account = await program.account.referralState.fetch(referralStatePda);
+        const account = await (program.account as any).referralState.fetch(referralStatePda);
         if (account) {
           const unclaimed = (account.unclaimedRewards as any).toNumber();
           const claimed = (account.claimedRewards as any).toNumber();
@@ -1312,7 +1514,7 @@ export const useAppState = create<AppState>((set, get) => ({
       }
       
       try {
-        const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+        const indexerApi = INDEXER_URL;
         const res = await fetchWithTimeout(`${indexerApi}/api/profile/${address}`, {}, 3000);
         const json = await res.json();
         if (json.success && json.data) {
@@ -1354,7 +1556,7 @@ export const useAppState = create<AppState>((set, get) => ({
         if (cachedRef && cachedRef !== address && cachedRef !== referralCode) {
           console.log(`Auto-linking referrer ${cachedRef} for wallet ${address}...`);
           try {
-            const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+            const indexerApi = INDEXER_URL;
             await fetchWithTimeout(`${indexerApi}/api/profile/update`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -1408,7 +1610,7 @@ export const useAppState = create<AppState>((set, get) => ({
     }
 
     try {
-      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const indexerApi = INDEXER_URL;
       const res = await fetchWithTimeout(`${indexerApi}/api/profile/update`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1454,7 +1656,7 @@ export const useAppState = create<AppState>((set, get) => ({
     try {
       const program = getAnchorProgram(null as any);
       const referralStatePda = getReferralStatePda(new PublicKey(address));
-      const account = await program.account.referralState.fetch(referralStatePda);
+      const account = await (program.account as any).referralState.fetch(referralStatePda);
       if (account) {
         const unclaimed = (account.unclaimedRewards as any).toNumber();
         const claimed = (account.claimedRewards as any).toNumber();
@@ -1465,7 +1667,7 @@ export const useAppState = create<AppState>((set, get) => ({
     }
 
     try {
-      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const indexerApi = INDEXER_URL;
       const res = await fetchWithTimeout(`${indexerApi}/api/profile/${address}`, {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
@@ -1519,7 +1721,7 @@ export const useAppState = create<AppState>((set, get) => ({
 
   fetchRoomChats: async (roomId: string) => {
     try {
-      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const indexerApi = INDEXER_URL;
       const res = await fetch(`${indexerApi}/api/rooms/${roomId}/chats`);
       if (res.ok) {
         const json = await res.json();
@@ -1543,7 +1745,7 @@ export const useAppState = create<AppState>((set, get) => ({
 
   sendRoomChat: async (roomId: string, side: 'moon' | 'jeet' | 'all', user: string, message: string) => {
     try {
-      const indexerApi = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+      const indexerApi = INDEXER_URL;
       await fetch(`${indexerApi}/api/rooms/${roomId}/chats`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

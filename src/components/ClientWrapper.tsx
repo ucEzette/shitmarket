@@ -8,7 +8,9 @@ import { Footer } from './Footer';
 import { WalletAdapterBridge } from './WalletAdapterBridge';
 import { MemePopup, PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from './MemeAssets';
 import { ShareCardModal } from './ShareCardModal';
-import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins, Briefcase } from 'lucide-react';
+import { ComplianceModal } from './ComplianceModal';
+import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins, Briefcase, Info, X, ExternalLink } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -184,7 +186,7 @@ export const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | '
 };
 
 export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { tickTimers, fullDegenMode, setFullDegenMode, rooms, user, isPaused } = useAppState();
+  const { tickTimers, fullDegenMode, setFullDegenMode, rooms, user, isPaused, toasts, removeToast } = useAppState();
   
   // Real-time synchronization store actions
   const addRoom = useAppState((s) => s.addRoom);
@@ -382,6 +384,14 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
         console.log('Tactical WebSocket link established with COMMAND HQ on port 3002.');
         socket.send(JSON.stringify({ type: 'subscribe_global' }));
         
+        // Keep-alive heartbeat pings every 20 seconds to prevent idle timeout
+        const keepAliveInterval = setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'ping' }));
+          }
+        }, 20000);
+        (socket as any).keepAliveInterval = keepAliveInterval;
+
         // Resubscribe to all existing active rooms
         subscribedRoomsRef.current.clear();
         rooms.forEach((r) => {
@@ -543,6 +553,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       };
 
       socket.onclose = () => {
+        if ((socket as any).keepAliveInterval) {
+          clearInterval((socket as any).keepAliveInterval);
+        }
         console.warn('Tactical WebSocket link severed. Retrying connection in 3 seconds...');
         reconnectTimeout = setTimeout(connect, 3000);
       };
@@ -557,6 +570,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return () => {
       if (socket) {
+        if ((socket as any).keepAliveInterval) {
+          clearInterval((socket as any).keepAliveInterval);
+        }
         socket.onclose = null;
         socket.close();
       }
@@ -645,6 +661,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       
       {/* Wallet Adapter Bridge - syncs Solana wallet to Zustand state */}
       <WalletAdapterBridge />
+
+      {/* Compliance Risk & Exclusions Onboarding */}
+      <ComplianceModal />
       
 
 
@@ -722,6 +741,94 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
 
       {/* Shareable Wager Card Telemetry Modal */}
       <ShareCardModal />
+
+      {/* Floating Toast Notification Tray */}
+      <div className="fixed top-12 right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((toast) => {
+            let borderColor = 'border-trench-sandbag';
+            let textColor = 'text-white';
+            let glowColor = '';
+            let Icon = null;
+
+            if (toast.type === 'loading') {
+              borderColor = 'border-moon-gold bg-trench-black/90';
+              textColor = 'text-moon-gold';
+              glowColor = 'shadow-[0_0_15px_rgba(218,165,32,0.25)]';
+              Icon = <Loader2 size={16} className="animate-spin text-moon-gold shrink-0" />;
+            } else if (toast.type === 'success') {
+              borderColor = 'border-neon-moon bg-trench-black/90';
+              textColor = 'text-neon-moon';
+              glowColor = 'shadow-[0_0_15px_rgba(57,255,20,0.25)]';
+              Icon = <Sparkles size={16} className="text-neon-moon shrink-0" />;
+            } else if (toast.type === 'error') {
+              borderColor = 'border-jeet-red bg-trench-black/90';
+              textColor = 'text-jeet-red';
+              glowColor = 'shadow-[0_0_15px_rgba(255,7,58,0.25)]';
+              Icon = <Radiation size={16} className="text-jeet-red shrink-0 animate-pulse" />;
+            } else {
+              borderColor = 'border-trench-sandbag bg-trench-black/90';
+              textColor = 'text-white';
+              Icon = <Info size={16} className="text-trench-gasmask shrink-0" />;
+            }
+
+            return (
+              <motion.div
+                key={toast.id}
+                initial={{ opacity: 0, x: 100, scale: 0.9 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                exit={{ opacity: 0, x: 100, scale: 0.9 }}
+                transition={{ type: 'spring', damping: 20, stiffness: 200 }}
+                className={`pointer-events-auto p-4 border-2 rounded shadow-2xl relative overflow-hidden flex flex-col gap-1 scanlines ${borderColor} ${glowColor}`}
+              >
+                {/* Top Row: Icon + Title + Close Button */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    {Icon}
+                    <span className={`font-staatliches tracking-wide uppercase text-sm font-bold ${textColor}`}>
+                      {toast.message}
+                    </span>
+                  </div>
+                  {toast.type !== 'loading' && (
+                    <button 
+                      onClick={() => removeToast(toast.id)}
+                      className="text-trench-gasmask hover:text-white transition-colors cursor-pointer"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Description */}
+                {toast.description && (
+                  <p className="font-mono text-[9px] text-trench-gasmask uppercase font-bold leading-relaxed pl-6">
+                    {toast.description}
+                  </p>
+                )}
+
+                {/* Transaction Link */}
+                {toast.txSig && (
+                  <div className="pl-6 mt-1 flex items-center">
+                    <a
+                      href={
+                        (typeof window !== 'undefined' && window.location.hostname === 'localhost')
+                          ? `https://explorer.solana.com/tx/${toast.txSig}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`
+                          : `https://solscan.io/tx/${toast.txSig}?cluster=devnet`
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-[9px] text-[#00FFFF] hover:underline font-bold"
+                    >
+                      <span>VERIFY ON SOLSCAN</span>
+                      <ExternalLink size={8} />
+                    </a>
+                  </div>
+                )}
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };

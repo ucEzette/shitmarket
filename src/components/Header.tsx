@@ -1,14 +1,15 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useAppState } from '@/store/useAppState';
 import { PepePortrait, PEPE_ASSETS } from './MemeAssets';
-import { LogOut, Loader2, Coins } from 'lucide-react';
+import { LogOut, Loader2, Coins, Settings, X } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
+import { connection } from '@/utils/solanaClient';
 
 const navItems = [
   { label: 'WAR ROOM', href: '/rooms' },
@@ -17,6 +18,282 @@ const navItems = [
   { label: 'PARLAYS', href: '/parlays' },
   { label: 'LEADERBOARD', href: '/leaderboard' },
 ];
+
+export const HeaderSettings: React.FC = () => {
+  const { settings, updateSettings } = useAppState();
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const [estimatedFees, setEstimatedFees] = useState<{ low: number; medium: number; high: number; turbo: number } | null>(null);
+  const [congestionStatus, setCongestionStatus] = useState<'LOW' | 'NORMAL' | 'CONGESTED' | 'CRITICAL'>('NORMAL');
+  const [isFetchingFees, setIsFetchingFees] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleToggle = () => setIsOpen(!isOpen);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    const fetchFees = async () => {
+      setIsFetchingFees(true);
+      try {
+        const recentFees = await connection.getRecentPrioritizationFees();
+        if (!active) return;
+        if (recentFees && recentFees.length > 0) {
+          const sorted = recentFees.map(f => f.prioritizationFee).sort((a, b) => b - a);
+          const maxFee = sorted[0] || 0;
+          const avgFee = sorted.reduce((sum, f) => sum + f, 0) / sorted.length;
+          
+          const estLow = Math.max(5_000, Math.round(avgFee * 0.5));
+          const estMed = Math.max(50_000, Math.round(avgFee));
+          const estHigh = Math.max(250_000, Math.round(avgFee * 2));
+          const estTurbo = Math.max(2_000_000, Math.round(maxFee * 1.5));
+          
+          setEstimatedFees({
+            low: estLow,
+            medium: estMed,
+            high: estHigh,
+            turbo: estTurbo
+          });
+          
+          if (maxFee > 5_000_000) {
+            setCongestionStatus('CRITICAL');
+          } else if (maxFee > 1_000_000) {
+            setCongestionStatus('CONGESTED');
+          } else if (avgFee > 50_000) {
+            setCongestionStatus('NORMAL');
+          } else {
+            setCongestionStatus('LOW');
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch live priority fees:", err);
+      } finally {
+        if (active) setIsFetchingFees(false);
+      }
+    };
+    fetchFees();
+    return () => { active = false; };
+  }, [isOpen]);
+
+  const getPriorityLabel = (key: string) => {
+    if (!estimatedFees || key === 'custom') {
+      if (key === 'low') return 'LOW';
+      if (key === 'medium') return 'MED';
+      if (key === 'high') return 'HIGH';
+      if (key === 'turbo') return 'TURBO';
+      return 'CUSTOM';
+    }
+    const val = estimatedFees[key as keyof typeof estimatedFees];
+    let displayVal = '';
+    if (val >= 1_000_000) {
+      displayVal = `${(val / 1_000_000).toFixed(1)}M`;
+    } else if (val >= 1_000) {
+      displayVal = `${(val / 1_000).toFixed(0)}K`;
+    } else {
+      displayVal = `${val}`;
+    }
+    return `${key.toUpperCase()} (${displayVal})`;
+  };
+
+  const getSlippageWarning = (slip: number) => {
+    if (slip < 0.5) {
+      return {
+        type: 'warning',
+        text: 'LOW SLIPPAGE: BET MIGHT FAIL DURING HIGH VOLATILITY.'
+      };
+    }
+    if (slip > 10.0) {
+      return {
+        type: 'danger',
+        text: 'HIGH SLIPPAGE: EXPOSES WAGER TO SANDWICH ATTACK FRONTRUNS.'
+      };
+    }
+    return null;
+  };
+
+  const priorityPresets = [
+    { label: getPriorityLabel('low'), value: 'low' },
+    { label: getPriorityLabel('medium'), value: 'medium' },
+    { label: getPriorityLabel('high'), value: 'high' },
+    { label: getPriorityLabel('turbo'), value: 'turbo' },
+    { label: getPriorityLabel('custom'), value: 'custom' }
+  ];
+
+  const slippagePresets = [
+    { label: '0.5%', value: 0.5 },
+    { label: '1.0%', value: 1.0 },
+    { label: '3.0%', value: 3.0 },
+    { label: 'CUSTOM', value: 'custom' }
+  ];
+
+  const [customFeeVal, setCustomFeeVal] = useState(settings.customPriorityFee.toString());
+  const [customSlipVal, setCustomSlipVal] = useState(settings.slippage.toString());
+  const [isCustomSlip, setIsCustomSlip] = useState(![0.5, 1.0, 3.0].includes(settings.slippage));
+
+  const handlePrioritySelect = (type: any) => {
+    updateSettings({ priorityFeeType: type });
+  };
+
+  const handleSlippageSelect = (val: any) => {
+    if (val === 'custom') {
+      setIsCustomSlip(true);
+    } else {
+      setIsCustomSlip(false);
+      updateSettings({ slippage: val });
+    }
+  };
+
+  const handleCustomFeeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCustomFeeVal(val);
+    const num = parseInt(val);
+    if (!isNaN(num) && num >= 0) {
+      updateSettings({ customPriorityFee: num });
+    }
+  };
+
+  const handleCustomSlipChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setCustomSlipVal(val);
+    const num = parseFloat(val);
+    if (!isNaN(num) && num >= 0 && num <= 100) {
+      updateSettings({ slippage: num });
+    }
+  };
+
+  return (
+    <div className="relative shrink-0 flex items-center" ref={dropdownRef}>
+      <button 
+        onClick={handleToggle}
+        className="p-1 bg-trench-black border border-trench-sandbag/40 rounded hover:bg-trench-mud transition-all flex items-center justify-center cursor-pointer"
+        title="TACTICAL CONFIG"
+      >
+        <Settings size={14} className={`text-trench-gasmask ${isOpen ? 'rotate-45 text-neon-moon' : ''} transition-all`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-8 mt-2 w-72 bg-trench-black border-4 border-trench-sandbag rounded shadow-2xl z-[9999] p-4 scanlines">
+          <div className="flex justify-between items-center border-b border-trench-sandbag/45 pb-2 mb-3">
+            <span className="font-staatliches tracking-wider text-neon-moon text-lg uppercase font-bold">TACTICAL CONTROLS</span>
+            <button onClick={() => setIsOpen(false)} className="text-trench-gasmask hover:text-white cursor-pointer">
+              <X size={16} />
+            </button>
+          </div>
+
+          <div className="space-y-4 font-mono text-[10px] text-white">
+            {/* Solana Congestion Widget */}
+            <div className="flex justify-between items-center bg-trench-mud border border-trench-sandbag/30 rounded p-1.5 mb-2">
+              <span className="text-[8px] text-trench-gasmask uppercase font-bold">SOLANA CONGESTION:</span>
+              <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                congestionStatus === 'LOW' ? 'bg-green-500/20 text-green-400' :
+                congestionStatus === 'NORMAL' ? 'bg-blue-500/20 text-blue-400' :
+                congestionStatus === 'CONGESTED' ? 'bg-yellow-500/20 text-yellow-400' :
+                'bg-red-500/20 text-red-400 animate-pulse'
+              }`}>
+                {congestionStatus} {isFetchingFees && '🔄'}
+              </span>
+            </div>
+
+            {/* Priority Fee Section */}
+            <div>
+              <span className="font-bold uppercase tracking-wider text-trench-gasmask block mb-2 text-[8px]">AMMUNITION SPEED (PRIORITY FEE)</span>
+              <div className="grid grid-cols-5 gap-1">
+                {priorityPresets.map((preset) => {
+                  const isActive = settings.priorityFeeType === preset.value;
+                  return (
+                    <button
+                      key={preset.value}
+                      onClick={() => handlePrioritySelect(preset.value)}
+                      className={`py-1 rounded text-[6.5px] border font-bold uppercase transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)]'
+                          : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {settings.priorityFeeType === 'custom' && (
+                <div className="mt-2 flex items-center gap-2 bg-trench-mud border border-trench-sandbag/40 rounded p-1.5">
+                  <span className="text-[8px] text-trench-gasmask uppercase font-bold shrink-0">Micro-lamports:</span>
+                  <input
+                    type="number"
+                    value={customFeeVal}
+                    onChange={handleCustomFeeChange}
+                    className="flex-1 min-w-0 bg-black text-neon-moon font-mono text-[10px] px-1 py-0.5 border border-trench-sandbag rounded focus:outline-none focus:border-neon-moon"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Slippage Tolerance Section */}
+            <div>
+              <span className="font-bold uppercase tracking-wider text-trench-gasmask block mb-2 text-[8px]">TARGET VARIANCE (SLIPPAGE LIMIT)</span>
+              <div className="grid grid-cols-4 gap-1">
+                {slippagePresets.map((preset) => {
+                  const isActive = preset.value === 'custom' ? isCustomSlip : (!isCustomSlip && settings.slippage === preset.value);
+                  return (
+                    <button
+                      key={String(preset.value)}
+                      onClick={() => handleSlippageSelect(preset.value)}
+                      className={`py-1 rounded text-[7px] border font-bold uppercase transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)]'
+                          : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {isCustomSlip && (
+                <div className="mt-2 flex items-center gap-2 bg-trench-mud border border-trench-sandbag/40 rounded p-1.5">
+                  <span className="text-[8px] text-trench-gasmask uppercase font-bold shrink-0">Max Slippage %:</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={customSlipVal}
+                    onChange={handleCustomSlipChange}
+                    className="flex-1 min-w-0 bg-black text-neon-moon font-mono text-[10px] px-1 py-0.5 border border-trench-sandbag rounded focus:outline-none focus:border-neon-moon"
+                  />
+                </div>
+              )}
+              {/* Slippage Warning Alert Box */}
+              {getSlippageWarning(settings.slippage) && (
+                <div className={`mt-2 p-1.5 rounded border text-[7px] font-bold leading-normal uppercase ${
+                  getSlippageWarning(settings.slippage)?.type === 'danger'
+                    ? 'bg-red-500/10 border-red-500/40 text-red-400 shadow-[0_0_6px_rgba(239,68,68,0.15)]'
+                    : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400 shadow-[0_0_6px_rgba(234,179,8,0.15)]'
+                }`}>
+                  {getSlippageWarning(settings.slippage)?.text}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 border-t border-trench-sandbag/30 text-[8px] text-trench-gasmask uppercase leading-relaxed font-bold">
+              Config adjustments persist locally on this terminal console deck.
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const Header: React.FC<{
   isRoomPage?: boolean;
@@ -91,6 +368,9 @@ export const Header: React.FC<{
             <div className="flex items-center gap-1 bg-black border border-trench-sandbag/50 rounded p-0.5">
               {/* Notification Bell */}
               <NotificationBell />
+
+              {/* Settings Dropdown */}
+              <HeaderSettings />
 
               {/* Ammo Display */}
               <div className="flex items-center gap-1 px-1.5 py-0.5 bg-trench-mud border border-trench-sandbag/40 rounded-sm">

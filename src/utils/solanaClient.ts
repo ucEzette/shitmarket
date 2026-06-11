@@ -7,7 +7,59 @@ export const PROGRAM_ID = new PublicKey(idlJson.address);
 export const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8899' : 'https://api.devnet.solana.com');
 
-export const connection = new Connection(RPC_ENDPOINT, 'confirmed');
+// Define redundant devnet RPC endpoints for frontend robustness
+const fallbackUrls = [
+  RPC_ENDPOINT,
+  process.env.NEXT_PUBLIC_SOLANA_BACKUP_RPC_URL || 'https://api.devnet.solana.com',
+  'https://devnet.helius-rpc.com/?api-key=3f6d76a7-0e6d-49f3-8b74-27ee34685ff4',
+  'https://api.devnet.solana.com'
+].filter((url, idx, self) => url && self.indexOf(url) === idx);
+
+let currentIndex = 0;
+let currentConnection = new Connection(fallbackUrls[0], 'confirmed');
+
+export const connection = new Proxy(currentConnection, {
+  get(target, prop, receiver) {
+    if (prop === 'rpcEndpoint') {
+      return fallbackUrls[currentIndex];
+    }
+    const value = Reflect.get(currentConnection, prop);
+    if (typeof value === 'function') {
+      return function (...args: any[]) {
+        const asyncMethods = [
+          'getAccountInfo', 'getBalance', 'getLatestBlockhash', 'confirmTransaction',
+          'sendRawTransaction', 'sendTransaction', 'simulateTransaction',
+          'getMinimumBalanceForRentExemption', 'getSlot', 'getTransaction',
+          'getParsedTransaction', 'getProgramAccounts', 'getTokenAccountBalance'
+        ];
+        
+        if (!asyncMethods.includes(String(prop))) {
+          return value.apply(currentConnection, args);
+        }
+        
+        return (async () => {
+          let attempts = 0;
+          const maxAttempts = fallbackUrls.length;
+          while (attempts < maxAttempts) {
+            try {
+              const activeFunc = Reflect.get(currentConnection, prop);
+              return await activeFunc.apply(currentConnection, args);
+            } catch (error: any) {
+              attempts++;
+              console.warn(`RPC Call [${String(prop)}] to ${fallbackUrls[currentIndex]} failed (attempt ${attempts}/${maxAttempts}):`, error);
+              if (attempts >= maxAttempts) {
+                throw error;
+              }
+              currentIndex = (currentIndex + 1) % fallbackUrls.length;
+              currentConnection = new Connection(fallbackUrls[currentIndex], 'confirmed');
+            }
+          }
+        })();
+      };
+    }
+    return value;
+  }
+}) as any as Connection;
 
 // Derivation seeds matching exactly Rust anchor constraints
 export const getPlatformConfigPda = (): PublicKey => {

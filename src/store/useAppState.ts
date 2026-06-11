@@ -1250,8 +1250,10 @@ export const useAppState = create<AppState>((set, get) => ({
   },
 
   connectWallet: () => {
-    // Left as a mock visual helper for sandbox mode, though standard Solana wallets connect via adapter components
-    console.log("Connect wallet action invoked");
+    console.log("Connect wallet action invoked via trigger-wallet-connection event");
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('trigger-wallet-connection'));
+    }
   },
 
   disconnectWallet: () => {

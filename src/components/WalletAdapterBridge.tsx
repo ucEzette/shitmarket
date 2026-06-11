@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { useAppState } from '@/store/useAppState';
 
 /**
@@ -14,10 +15,19 @@ import { useAppState } from '@/store/useAppState';
 export const WalletAdapterBridge: React.FC = () => {
   const wallet = useWallet();
   const { publicKey, connected, connecting, disconnecting } = wallet;
+  const { setVisible } = useWalletModal();
   const setWalletAddress = useAppState((s) => s.setWalletAddress);
   const setWallet = useAppState((s) => s.setWallet);
   const user = useAppState((s) => s.user);
   const prevConnected = useRef(false);
+
+  useEffect(() => {
+    const handleTriggerConnect = () => {
+      setVisible(true);
+    };
+    window.addEventListener('trigger-wallet-connection', handleTriggerConnect);
+    return () => window.removeEventListener('trigger-wallet-connection', handleTriggerConnect);
+  }, [setVisible]);
 
   useEffect(() => {
     if (connected && publicKey) {

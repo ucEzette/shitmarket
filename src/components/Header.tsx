@@ -12,6 +12,7 @@ import { NotificationBell } from './NotificationBell';
 
 const navItems = [
   { label: 'WAR ROOM', href: '/rooms' },
+  { label: 'PORTFOLIO', href: '/portfolio' },
   { label: 'DEPLOY', href: '/create-room' },
   { label: 'PARLAYS', href: '/parlays' },
   { label: 'LEADERBOARD', href: '/leaderboard' },

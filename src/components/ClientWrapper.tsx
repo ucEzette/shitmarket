@@ -8,7 +8,7 @@ import { Footer } from './Footer';
 import { WalletAdapterBridge } from './WalletAdapterBridge';
 import { MemePopup, PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from './MemeAssets';
 import { ShareCardModal } from './ShareCardModal';
-import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins } from 'lucide-react';
+import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins, Briefcase } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -264,6 +264,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const navItems = [
     { label: 'WAR ROOM', href: '/rooms', icon: List },
+    { label: 'PORTFOLIO', href: '/portfolio', icon: Briefcase },
     { label: 'DEPLOY', href: '/create-room', icon: Hammer },
     { label: 'PARLAYS', href: '/parlays', icon: Layers },
     { label: 'LEADERBOARD', href: '/leaderboard', icon: Trophy },

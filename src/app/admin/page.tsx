@@ -1,5 +1,5 @@
-import { INDEXER_URL } from "@/utils/config";
 'use client';
+import { INDEXER_URL } from "@/utils/config";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
@@ -300,7 +300,7 @@ export default function AdminDashboardPage() {
 
   // Client-Side CSV Export
   const exportLedgerCSV = () => {
-    synthSound('claim');
+    synthSound('victory');
     const flatRecords: any[] = [];
     unclaimedRooms.forEach(room => {
       room.unclaimedPayouts.forEach(p => {
@@ -338,7 +338,7 @@ export default function AdminDashboardPage() {
 
   // Client-Side JSON Export
   const exportLedgerJSON = () => {
-    synthSound('claim');
+    synthSound('victory');
     const blob = new Blob([JSON.stringify(unclaimedRooms, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -480,7 +480,7 @@ export default function AdminDashboardPage() {
         {/* Right Action: Wallet connection / Auth Override */}
         <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
           <button 
-            onClick={() => { synthSound('claim'); loadDashboardData(); }} 
+            onClick={() => { synthSound('victory'); loadDashboardData(); }} 
             disabled={loading}
             className="px-4 py-2.5 bg-trench-sandbag border border-trench-gasmask/30 rounded text-white font-staatliches text-sm tracking-wider uppercase hover:bg-trench-sandbag/70 hover:border-white transition-colors font-bold flex items-center gap-2"
           >

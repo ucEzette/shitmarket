@@ -1,5 +1,5 @@
-import { INDEXER_URL } from "@/utils/config";
 'use client';
+import { INDEXER_URL } from "@/utils/config";
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';

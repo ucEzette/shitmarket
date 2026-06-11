@@ -20,13 +20,18 @@ export const Footer: React.FC = () => {
       <div className="mx-auto max-w-full px-4 md:px-8 pt-4 flex flex-col md:flex-row items-center justify-between gap-6">
         {/* Info Column */}
         <div className="flex flex-col items-center md:items-start text-center md:text-left gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <img
               src="/pepes/logo-main.png"
               alt="ShitMarket"
               className="h-[28px] w-auto object-contain"
             />
-            <span className="font-staatliches text-lg text-neon-moon tracking-wider">
+            <span className="font-staatliches text-lg tracking-wider font-extrabold flex items-center select-none ml-1">
+              <span className="text-white">SHIT</span>
+              <span className="text-[#39ff14]">MARKET</span>
+              <span className="text-[#ff073a]">.</span>
+            </span>
+            <span className="font-staatliches text-lg text-neon-moon tracking-wider ml-1">
               • COMBAT HQ
             </span>
           </div>

@@ -236,15 +236,30 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
           synthSound(type);
         }
       };
+      (window as any).isAudioEnabled = audioEnabled;
+      window.dispatchEvent(new CustomEvent('audio-state-changed'));
     }
     return () => {
       if (typeof window !== 'undefined') {
         try {
           delete (window as any).playDAppSound;
+          delete (window as any).isAudioEnabled;
         } catch {}
       }
     };
   }, [audioEnabled]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleToggle = () => {
+        setAudioEnabled((prev) => !prev);
+      };
+      window.addEventListener('toggle-audio', handleToggle);
+      return () => {
+        window.removeEventListener('toggle-audio', handleToggle);
+      };
+    }
+  }, []);
 
   const navItems = [
     { label: 'TRENCHES', href: '/rooms', icon: List },

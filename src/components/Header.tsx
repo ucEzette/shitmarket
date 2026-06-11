@@ -37,12 +37,12 @@ export const Header: React.FC<{
   }, [disconnect, mockDisconnect]);
 
   return (
-    <header className="sticky top-0 z-[100] w-full border-b border-trench-sandbag/50 bg-black/95 px-2 h-10 sm:h-11 flex items-center" style={{ overflow: 'visible' }}>
+    <header className="sticky top-0 z-[100] w-full border-b border-trench-sandbag bg-black px-2 h-10 sm:h-11 flex items-center retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0" style={{ overflow: 'visible' }}>
       <div className="w-full mx-auto px-2 sm:px-4 flex flex-row items-center justify-between gap-2">
         {/* Left Aligned branding and navigation section */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group shrink-0">
+          <Link href="/" className="flex items-center gap-1 group shrink-0">
             <img
               src="/pepes/logo-main.png"
               alt="ShitMarket"
@@ -50,6 +50,11 @@ export const Header: React.FC<{
               loading="eager"
               decoding="sync"
             />
+            <span className="font-staatliches text-[13px] sm:text-base tracking-wider font-extrabold flex items-center select-none ml-1">
+              <span className="text-white">SHIT</span>
+              <span className="text-[#39ff14]">MARKET</span>
+              <span className="text-[#ff073a]">.</span>
+            </span>
           </Link>
 
           {/* Desktop Navigation Links */}

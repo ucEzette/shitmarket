@@ -9,6 +9,56 @@ import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } f
 import { synthSound } from '@/components/ClientWrapper';
 import { Search, Flame, Bomb, ArrowRight, UserPlus } from 'lucide-react';
 
+const SolanaIcon = ({ active }: { active: boolean }) => (
+  <svg className={`w-7 h-7 transition-all ${active ? 'opacity-100 filter drop-shadow-[0_0_8px_#14f195]' : 'opacity-40 hover:opacity-75'}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M4 4.5h16l-3.5 4h-16l3.5-4zM20 10.5H4l3.5 4h16l-3.5-4zM4 16.5h16l-3.5 4h-16l3.5-4z" fill="url(#solana-grad-page)" />
+    <defs>
+      <linearGradient id="solana-grad-page" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#9945FF" />
+        <stop offset="100%" stopColor="#14F195" />
+      </linearGradient>
+    </defs>
+  </svg>
+);
+
+const BaseIcon = ({ active }: { active: boolean }) => (
+  <svg className={`w-7 h-7 transition-all ${active ? 'opacity-100 text-[#0052FF] filter drop-shadow-[0_0_8px_#0052FF]' : 'text-white opacity-40 hover:opacity-75'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2.5L3.5 7.5v9l8.5 5 8.5-5v-9L12 2.5z" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M12 22.5V12.5M12 12.5L3.5 7.5M12 12.5l8.5-5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const AllNetworksIcon = ({ active }: { active: boolean }) => (
+  <svg className={`w-7 h-7 transition-all ${active ? 'opacity-100 filter drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]' : 'opacity-40 hover:opacity-75'}`} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="9" fill={active ? "#E2E8F0" : "#4A5568"} stroke={active ? "#FFFFFF" : "#718096"} strokeWidth="1.5" />
+    <rect x="5" y="11" width="14" height="2" rx="1" fill="#1A202C" />
+  </svg>
+);
+
+const EthereumIcon = ({ active }: { active: boolean }) => (
+  <div className="relative flex items-center justify-center">
+    <svg className={`w-7 h-7 transition-all ${active ? 'opacity-100 text-[#627EEA] filter drop-shadow-[0_0_8px_#627EEA]' : 'text-white opacity-40 hover:opacity-75'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L5 12l7 4 7-4-7-10z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 22l-7-6 7 2 7-2-7 6z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M12 2v14M5 12h14" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+    <span className="absolute -bottom-1 -right-2 bg-trench-black text-[7px] font-mono px-0.5 rounded border border-trench-sandbag/60 text-trench-gasmask scale-75 uppercase select-none font-bold">
+      beta
+    </span>
+  </div>
+);
+
+const formatExpiryUTC = (timestamp: number) => {
+  const d = new Date(timestamp);
+  const pad = (val: number) => String(val).padStart(2, '0');
+  const hours = pad(d.getUTCHours());
+  const mins = pad(d.getUTCMinutes());
+  const date = pad(d.getUTCDate());
+  const month = pad(d.getUTCMonth() + 1);
+  const year = d.getUTCFullYear();
+  return `${hours}:${mins} UTC ON ${date}/${month}/${year}`;
+};
+
 export default function RoomsPage() {
   const formatDuration = (mins: number) => {
     if (mins >= 43200) return `${Math.floor(mins/43200)} MONTH`;
@@ -30,6 +80,32 @@ export default function RoomsPage() {
   const [sortBiggest, setSortBiggest] = useState<'pot' | 'newest'>('pot');
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
   const [showSkeleton, setShowSkeleton] = useState(true);
+
+  const [quickAmountNew, setQuickAmountNew] = useState<number>(0.8);
+  const [quickAmountSoon, setQuickAmountSoon] = useState<number>(0.1);
+  const [quickAmountBiggest, setQuickAmountBiggest] = useState<number>(0.1);
+  const [audioEnabled, setAudioEnabled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setAudioEnabled(!!(window as any).isAudioEnabled);
+    }
+    const handleToggle = () => {
+      setAudioEnabled(!!(window as any).isAudioEnabled);
+    };
+    window.addEventListener('audio-state-changed', handleToggle);
+    return () => window.removeEventListener('audio-state-changed', handleToggle);
+  }, []);
+
+  const toggleAudio = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('toggle-audio'));
+    }
+  };
+
+  const [showGearNew, setShowGearNew] = useState(false);
+  const [showGearSoon, setShowGearSoon] = useState(false);
+  const [showGearBiggest, setShowGearBiggest] = useState(false);
 
   // Load fresh active rooms directly on mount
   useEffect(() => {
@@ -179,7 +255,7 @@ export default function RoomsPage() {
     synthSound('bet');
   };
 
-  const renderRoomCard = (room: Room) => {
+  const renderRoomCard = (room: Room, quickAmount: number) => {
     const isMoonLeading = room.moonPool > room.jeetPool;
     const totalPot = room.moonPool + room.jeetPool;
     const moonPercentage = totalPot > 0 ? (room.moonPool / totalPot) * 100 : 50;
@@ -209,8 +285,16 @@ export default function RoomsPage() {
               {formatDuration(room.duration)}
             </span>
           </div>
-          <div className={`text-[9px] font-mono font-bold bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 uppercase ${isSettled ? 'text-moon-gold' : 'text-neon-moon animate-pulse'}`}>
-            {timeText}
+          <div className="flex items-center gap-1.5">
+            {/* Small Chain Icon to indicate network */}
+            <div className="bg-trench-black p-0.5 rounded border border-trench-sandbag/30 flex items-center justify-center scale-[0.65] origin-right h-5 w-5">
+              {room.token.chainId === 'solana' && <SolanaIcon active={true} />}
+              {room.token.chainId === 'base' && <BaseIcon active={true} />}
+              {room.token.chainId === 'ethereum' && <EthereumIcon active={true} />}
+            </div>
+            <div className={`text-[9px] font-mono font-bold bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 uppercase ${isSettled ? 'text-moon-gold' : 'text-neon-moon animate-pulse'}`}>
+              {timeText}
+            </div>
           </div>
         </div>
 
@@ -264,15 +348,15 @@ export default function RoomsPage() {
         {/* Polymarket prediction target box */}
         <div className="bg-trench-black/40 border border-trench-sandbag/20 p-1.5 rounded mb-2 text-center font-mono text-[9px] leading-tight">
           <p className="text-white font-bold uppercase">
-            ENDS ABOVE ${formatPrice(room.openingPrice)}?
+            WILL {room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} END ABOVE ${formatPrice(room.openingPrice)} ON {formatExpiryUTC(room.expiry)}?
           </p>
         </div>
 
         {/* Pools Breakdown progress bar */}
         <div className="space-y-1 mb-2 font-mono text-[8px] font-bold">
-          <div className="flex justify-between">
-            <span className="text-neon-moon">🟢 {room.moonPool.toFixed(2)} SOL</span>
-            <span className="text-jeet-red">🔴 {room.jeetPool.toFixed(2)} SOL</span>
+          <div className="flex justify-between text-[9px]">
+            <span className="text-neon-moon uppercase">MOON POT: {room.moonPool.toFixed(2)} SOL</span>
+            <span className="text-jeet-red uppercase">JEET POT: {room.jeetPool.toFixed(2)} SOL</span>
           </div>
 
           {/* Dual Bar */}
@@ -292,16 +376,16 @@ export default function RoomsPage() {
         {!isSettled ? (
           <div className="grid grid-cols-2 gap-1.5 mt-auto">
             <button
-              onClick={(e) => handleQuickBet(e, room.id, 'moon', 0.01)}
-              className="retro-btn retro-btn-moon py-1 px-1 rounded font-staatliches text-xs tracking-wider uppercase text-center active:translate-y-0.5 transition-transform"
+              onClick={(e) => handleQuickBet(e, room.id, 'moon', quickAmount)}
+              className="retro-btn retro-btn-moon py-1.5 px-1 rounded font-staatliches text-xs tracking-wider uppercase text-center active:translate-y-0.5 transition-transform"
             >
-              MOON 0.01
+              MOON {quickAmount}
             </button>
             <button
-              onClick={(e) => handleQuickBet(e, room.id, 'jeet', 0.05)}
-              className="retro-btn retro-btn-jeet py-1 px-1 rounded font-staatliches text-xs tracking-wider uppercase text-center active:translate-y-0.5 transition-transform"
+              onClick={(e) => handleQuickBet(e, room.id, 'jeet', quickAmount)}
+              className="retro-btn retro-btn-jeet py-1.5 px-1 rounded font-staatliches text-xs tracking-wider uppercase text-center active:translate-y-0.5 transition-transform"
             >
-              JEET 0.05
+              JEET {quickAmount}
             </button>
           </div>
         ) : (
@@ -334,81 +418,38 @@ export default function RoomsPage() {
       
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-        <div className="flex items-center gap-4">
-          <PepePortrait src={PEPE_ASSETS.apeGeneral} size={56} glowColor="moon" animated className="rounded-lg" />
-          <div>
-            <h2 className="font-staatliches text-4xl text-white tracking-wider flex items-center gap-2 stencil-shadow">
-              <Flame className="text-neon-moon animate-pulse" />
-              THE WAR TABLE
-            </h2>
-            <p className="font-mono text-xs text-trench-gasmask uppercase font-bold mt-1">
-              Active prediction rooms. Stake ammo on Moon or Jeet before the timer bomb drops.
-            </p>
+        <div className="flex items-center gap-6">
+          <h2 className="font-staatliches text-4xl text-white tracking-wider font-bold">
+            Trenches
+          </h2>
+          {/* Network Selection Icons */}
+          <div className="flex items-center gap-3">
+            {(['solana', 'base', 'all', 'ethereum'] as const).map((net) => (
+              <button
+                key={net}
+                onClick={() => {
+                  setSelectedNetwork(net);
+                  synthSound('bet');
+                }}
+                className="focus:outline-none transition-transform active:scale-95"
+                title={`Network: ${net.toUpperCase()}`}
+              >
+                {net === 'solana' && <SolanaIcon active={selectedNetwork === 'solana'} />}
+                {net === 'base' && <BaseIcon active={selectedNetwork === 'base'} />}
+                {net === 'all' && <AllNetworksIcon active={selectedNetwork === 'all'} />}
+                {net === 'ethereum' && <EthereumIcon active={selectedNetwork === 'ethereum'} />}
+              </button>
+            ))}
           </div>
         </div>
 
         {/* Shovel Dig CTA */}
         <Link href="/create-room" className="w-full md:w-auto">
-          <button className="w-full py-2.5 px-6 font-staatliches text-xl tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all flex items-center justify-center gap-2 uppercase font-bold">
-            <PixelShovel size={20} />
+          <button className="w-full py-2 px-4 font-staatliches text-lg tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all flex items-center justify-center gap-2 uppercase font-bold">
+            <PixelShovel size={16} />
             <span>DIG NEW TRENCH</span>
           </button>
         </Link>
-      </div>
-
-      {/* Filter Panel (Network Selection and Live/Expired Toggle) */}
-      <div className="retro-panel p-3 rounded-xl mb-6 flex flex-col md:flex-row justify-between gap-4 items-center">
-        
-        {/* Network Selection Tabs */}
-        <div className="flex flex-wrap gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner w-full md:w-auto">
-          {(['all', 'solana', 'base', 'ethereum'] as const).map((net) => (
-            <button
-              key={net}
-              onClick={() => {
-                setSelectedNetwork(net);
-                synthSound('bet');
-              }}
-              className={`px-3 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
-                selectedNetwork === net
-                  ? 'bg-trench-sandbag text-neon-moon font-bold shadow-glow-moon'
-                  : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
-              }`}
-            >
-              {net === 'all' ? '🌐 All' : net === 'solana' ? '☀️ Solana' : net === 'base' ? '🔵 Base' : '🔷 Ethereum'}
-            </button>
-          ))}
-        </div>
-
-        {/* Live / Expired toggle */}
-        <div className="flex gap-1 bg-trench-black/80 p-1 border border-trench-sandbag rounded shadow-inner w-full md:w-auto">
-          <button
-            onClick={() => {
-              setFilter('ending');
-              synthSound('bet');
-            }}
-            className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
-              filter !== 'expired'
-                ? 'bg-trench-sandbag text-neon-moon font-bold shadow-glow-moon'
-                : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
-            }`}
-          >
-            🟢 Live Prediction Arenas
-          </button>
-          <button
-            onClick={() => {
-              setFilter('expired');
-              synthSound('bet');
-            }}
-            className={`px-4 py-1.5 font-staatliches text-xs tracking-wider uppercase transition-all rounded ${
-              filter === 'expired'
-                ? 'bg-trench-sandbag text-moon-gold font-bold shadow-glow-gold'
-                : 'text-trench-gasmask hover:text-white hover:bg-trench-mud/50'
-            }`}
-          >
-            💀 Expired Rooms
-          </button>
-        </div>
-
       </div>
 
       {/* 3-Column Dashboard View */}
@@ -416,51 +457,140 @@ export default function RoomsPage() {
         
         {/* Column 1: New */}
         <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 gap-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 relative">
+            <div className="flex items-center justify-between gap-1 flex-wrap lg:flex-nowrap">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-neon-moon shadow-[0_0_6px_#39ff14]" />
-                <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">NEW</h3>
+                <h3 className="font-staatliches text-lg tracking-wider text-white uppercase">NEW</h3>
               </div>
-              <div className="flex items-center gap-1.5">
+
+              {/* Search Pill */}
+              <div className="relative flex-1 min-w-[60px] max-w-[100px]">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchNew}
+                  onChange={(e) => setSearchNew(e.target.value)}
+                  className="w-full px-2 py-0.5 bg-trench-black/80 border border-trench-sandbag/40 text-white font-mono text-[9px] placeholder-trench-gasmask/60 rounded-full focus:border-neon-moon focus:outline-none uppercase font-bold text-center"
+                />
+              </div>
+
+              {/* Quick Bet Pill: ⚡ Amount SOL */}
+              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0">
+                <span className="text-neon-moon font-bold select-none">⚡</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={quickAmountNew}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setQuickAmountNew(isNaN(val) ? 0 : val);
+                  }}
+                  className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
+                />
+                <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
+              </div>
+
+              {/* Sound Toggle */}
+              <button
+                onClick={toggleAudio}
+                className="p-1 text-trench-gasmask hover:text-white rounded transition-all text-xs h-6 flex items-center justify-center shrink-0"
+                title={audioEnabled ? "Mute Battlefield Audio" : "Unmute Battlefield Audio"}
+              >
+                {audioEnabled ? '🔊' : '🔇'}
+              </button>
+
+              {/* Settings Gear Dropdown */}
+              <div className="relative">
                 <button
                   onClick={() => {
-                    setSortNew(prev => prev === 'newest' ? 'pot' : 'newest');
+                    setShowGearNew(prev => !prev);
                     synthSound('bet');
                   }}
-                  className="font-mono text-[9px] text-neon-moon bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 hover:border-neon-moon font-bold transition-all uppercase"
+                  className={`p-1 text-xs rounded transition-all h-6 flex items-center justify-center shrink-0 ${showGearNew ? 'text-neon-moon font-bold scale-110' : 'text-trench-gasmask hover:text-white'}`}
+                  title="Filter and Sort Settings"
                 >
-                  ⇅ {sortNew === 'newest' ? 'DATE' : 'POT'}
+                  ⚙
                 </button>
-                <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
-                  {newRooms.length} ROOMS
-                </span>
+                {showGearNew && (
+                  <div className="absolute right-0 top-7 z-30 w-44 bg-trench-black border-2 border-trench-sandbag rounded-lg p-3 shadow-glow-moon scanlines font-mono text-[10px] space-y-2.5">
+                    <div className="flex justify-between items-center border-b border-trench-sandbag/40 pb-1 mb-1">
+                      <span className="text-white font-bold uppercase">SETTINGS</span>
+                      <button onClick={() => setShowGearNew(false)} className="text-trench-gasmask hover:text-white font-bold">×</button>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-neon-moon font-bold uppercase block text-[9px]">SORT BY</span>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          onClick={() => {
+                            setSortNew('newest');
+                            synthSound('bet');
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
+                            sortNew === 'newest'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          DATE
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSortNew('pot');
+                            synthSound('bet');
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
+                            sortNew === 'pot'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          POT
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-neon-moon font-bold uppercase block text-[9px]">STATUS FILTER</span>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => {
+                            setFilter('ending');
+                            synthSound('bet');
+                          }}
+                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
+                            filter !== 'expired'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          🟢 LIVE ARENAS
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFilter('expired');
+                            synthSound('bet');
+                          }}
+                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
+                            filter === 'expired'
+                              ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          💀 EXPIRED ROOMS
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-            {/* Localized Search */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search symbol/address..."
-                value={searchNew}
-                onChange={(e) => setSearchNew(e.target.value)}
-                className="w-full pl-2 pr-8 py-1 bg-trench-black/60 border border-trench-sandbag/40 text-white font-mono text-[10px] placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none uppercase font-bold"
-              />
-              {searchNew && (
-                <button
-                  onClick={() => setSearchNew('')}
-                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-trench-gasmask hover:text-white font-mono text-[8px]"
-                >
-                  ×
-                </button>
-              )}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
             {showSkeleton ? (
               renderColumnSkeleton()
             ) : newRooms.length > 0 ? (
-              newRooms.map(renderRoomCard)
+              newRooms.map((room) => renderRoomCard(room, quickAmountNew))
             ) : (
               renderEmptyColumn()
             )}
@@ -469,51 +599,140 @@ export default function RoomsPage() {
 
         {/* Column 2: Ending Soon */}
         <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 gap-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 relative">
+            <div className="flex items-center justify-between gap-1 flex-wrap lg:flex-nowrap">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff073a]" />
-                <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">ENDING SOON</h3>
+                <h3 className="font-staatliches text-lg tracking-wider text-white uppercase">ENDING SOON</h3>
               </div>
-              <div className="flex items-center gap-1.5">
+
+              {/* Search Pill */}
+              <div className="relative flex-1 min-w-[60px] max-w-[100px]">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchSoon}
+                  onChange={(e) => setSearchSoon(e.target.value)}
+                  className="w-full px-2 py-0.5 bg-trench-black/80 border border-trench-sandbag/40 text-white font-mono text-[9px] placeholder-trench-gasmask/60 rounded-full focus:border-jeet-red focus:outline-none uppercase font-bold text-center"
+                />
+              </div>
+
+              {/* Quick Bet Pill: ⚡ Amount SOL */}
+              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0">
+                <span className="text-neon-moon font-bold select-none">⚡</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={quickAmountSoon}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setQuickAmountSoon(isNaN(val) ? 0 : val);
+                  }}
+                  className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
+                />
+                <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
+              </div>
+
+              {/* Sound Toggle */}
+              <button
+                onClick={toggleAudio}
+                className="p-1 text-trench-gasmask hover:text-white rounded transition-all text-xs h-6 flex items-center justify-center shrink-0"
+                title={audioEnabled ? "Mute Battlefield Audio" : "Unmute Battlefield Audio"}
+              >
+                {audioEnabled ? '🔊' : '🔇'}
+              </button>
+
+              {/* Settings Gear Dropdown */}
+              <div className="relative">
                 <button
                   onClick={() => {
-                    setSortSoon(prev => prev === 'expiry' ? 'pot' : 'expiry');
+                    setShowGearSoon(prev => !prev);
                     synthSound('bet');
                   }}
-                  className="font-mono text-[9px] text-jeet-red bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 hover:border-jeet-red font-bold transition-all uppercase"
+                  className={`p-1 text-xs rounded transition-all h-6 flex items-center justify-center shrink-0 ${showGearSoon ? 'text-neon-moon font-bold scale-110' : 'text-trench-gasmask hover:text-white'}`}
+                  title="Filter and Sort Settings"
                 >
-                  ⇅ {sortSoon === 'expiry' ? 'TIME' : 'POT'}
+                  ⚙
                 </button>
-                <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
-                  {endingSoonRooms.length} ROOMS
-                </span>
+                {showGearSoon && (
+                  <div className="absolute right-0 top-7 z-30 w-44 bg-trench-black border-2 border-trench-sandbag rounded-lg p-3 shadow-glow-moon scanlines font-mono text-[10px] space-y-2.5">
+                    <div className="flex justify-between items-center border-b border-trench-sandbag/40 pb-1 mb-1">
+                      <span className="text-white font-bold uppercase">SETTINGS</span>
+                      <button onClick={() => setShowGearSoon(false)} className="text-trench-gasmask hover:text-white font-bold">×</button>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-neon-moon font-bold uppercase block text-[9px]">SORT BY</span>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          onClick={() => {
+                            setSortSoon('expiry');
+                            synthSound('bet');
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
+                            sortSoon === 'expiry'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          TIME
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSortSoon('pot');
+                            synthSound('bet');
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
+                            sortSoon === 'pot'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          POT
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-neon-moon font-bold uppercase block text-[9px]">STATUS FILTER</span>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => {
+                            setFilter('ending');
+                            synthSound('bet');
+                          }}
+                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
+                            filter !== 'expired'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          🟢 LIVE ARENAS
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFilter('expired');
+                            synthSound('bet');
+                          }}
+                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
+                            filter === 'expired'
+                              ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          💀 EXPIRED ROOMS
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-            {/* Localized Search */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search symbol/address..."
-                value={searchSoon}
-                onChange={(e) => setSearchSoon(e.target.value)}
-                className="w-full pl-2 pr-8 py-1 bg-trench-black/60 border border-trench-sandbag/40 text-white font-mono text-[10px] placeholder-trench-gasmask/60 rounded focus:border-jeet-red focus:outline-none uppercase font-bold"
-              />
-              {searchSoon && (
-                <button
-                  onClick={() => setSearchSoon('')}
-                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-trench-gasmask hover:text-white font-mono text-[8px]"
-                >
-                  ×
-                </button>
-              )}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
             {showSkeleton ? (
               renderColumnSkeleton()
             ) : endingSoonRooms.length > 0 ? (
-              endingSoonRooms.map(renderRoomCard)
+              endingSoonRooms.map((room) => renderRoomCard(room, quickAmountSoon))
             ) : (
               renderEmptyColumn()
             )}
@@ -522,51 +741,140 @@ export default function RoomsPage() {
 
         {/* Column 3: Biggest Pot */}
         <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 gap-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 relative">
+            <div className="flex items-center justify-between gap-1 flex-wrap lg:flex-nowrap">
+              <div className="flex items-center gap-1.5 shrink-0">
                 <span className="w-2 h-2 rounded-full bg-moon-gold shadow-[0_0_6px_#ffd700]" />
-                <h3 className="font-staatliches text-xl tracking-wider text-white uppercase">BIGGEST POT</h3>
+                <h3 className="font-staatliches text-lg tracking-wider text-white uppercase">BIGGEST POT</h3>
               </div>
-              <div className="flex items-center gap-1.5">
+
+              {/* Search Pill */}
+              <div className="relative flex-1 min-w-[60px] max-w-[100px]">
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchBiggest}
+                  onChange={(e) => setSearchBiggest(e.target.value)}
+                  className="w-full px-2 py-0.5 bg-trench-black/80 border border-trench-sandbag/40 text-white font-mono text-[9px] placeholder-trench-gasmask/60 rounded-full focus:border-moon-gold focus:outline-none uppercase font-bold text-center"
+                />
+              </div>
+
+              {/* Quick Bet Pill: ⚡ Amount SOL */}
+              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0">
+                <span className="text-neon-moon font-bold select-none">⚡</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={quickAmountBiggest}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value);
+                    setQuickAmountBiggest(isNaN(val) ? 0 : val);
+                  }}
+                  className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
+                />
+                <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
+              </div>
+
+              {/* Sound Toggle */}
+              <button
+                onClick={toggleAudio}
+                className="p-1 text-trench-gasmask hover:text-white rounded transition-all text-xs h-6 flex items-center justify-center shrink-0"
+                title={audioEnabled ? "Mute Battlefield Audio" : "Unmute Battlefield Audio"}
+              >
+                {audioEnabled ? '🔊' : '🔇'}
+              </button>
+
+              {/* Settings Gear Dropdown */}
+              <div className="relative">
                 <button
                   onClick={() => {
-                    setSortBiggest(prev => prev === 'pot' ? 'newest' : 'pot');
+                    setShowGearBiggest(prev => !prev);
                     synthSound('bet');
                   }}
-                  className="font-mono text-[9px] text-moon-gold bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 hover:border-moon-gold font-bold transition-all uppercase"
+                  className={`p-1 text-xs rounded transition-all h-6 flex items-center justify-center shrink-0 ${showGearBiggest ? 'text-neon-moon font-bold scale-110' : 'text-trench-gasmask hover:text-white'}`}
+                  title="Filter and Sort Settings"
                 >
-                  ⇅ {sortBiggest === 'pot' ? 'POT' : 'DATE'}
+                  ⚙
                 </button>
-                <span className="font-mono text-[9px] text-trench-gasmask bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 font-bold">
-                  {biggestPotRooms.length} ROOMS
-                </span>
+                {showGearBiggest && (
+                  <div className="absolute right-0 top-7 z-30 w-44 bg-trench-black border-2 border-trench-sandbag rounded-lg p-3 shadow-glow-moon scanlines font-mono text-[10px] space-y-2.5">
+                    <div className="flex justify-between items-center border-b border-trench-sandbag/40 pb-1 mb-1">
+                      <span className="text-white font-bold uppercase">SETTINGS</span>
+                      <button onClick={() => setShowGearBiggest(false)} className="text-trench-gasmask hover:text-white font-bold">×</button>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-neon-moon font-bold uppercase block text-[9px]">SORT BY</span>
+                      <div className="grid grid-cols-2 gap-1">
+                        <button
+                          onClick={() => {
+                            setSortBiggest('pot');
+                            synthSound('bet');
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
+                            sortBiggest === 'pot'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          POT
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSortBiggest('newest');
+                            synthSound('bet');
+                          }}
+                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
+                            sortBiggest === 'newest'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          DATE
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-neon-moon font-bold uppercase block text-[9px]">STATUS FILTER</span>
+                      <div className="flex flex-col gap-1">
+                        <button
+                          onClick={() => {
+                            setFilter('ending');
+                            synthSound('bet');
+                          }}
+                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
+                            filter !== 'expired'
+                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          🟢 LIVE ARENAS
+                        </button>
+                        <button
+                          onClick={() => {
+                            setFilter('expired');
+                            synthSound('bet');
+                          }}
+                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
+                            filter === 'expired'
+                              ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
+                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
+                          }`}
+                        >
+                          💀 EXPIRED ROOMS
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-            {/* Localized Search */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Search symbol/address..."
-                value={searchBiggest}
-                onChange={(e) => setSearchBiggest(e.target.value)}
-                className="w-full pl-2 pr-8 py-1 bg-trench-black/60 border border-trench-sandbag/40 text-white font-mono text-[10px] placeholder-trench-gasmask/60 rounded focus:border-moon-gold focus:outline-none uppercase font-bold"
-              />
-              {searchBiggest && (
-                <button
-                  onClick={() => setSearchBiggest('')}
-                  className="absolute inset-y-0 right-0 pr-2 flex items-center text-trench-gasmask hover:text-white font-mono text-[8px]"
-                >
-                  ×
-                </button>
-              )}
             </div>
           </div>
           <div className="flex-1 overflow-y-auto pr-1 space-y-3 scrollbar-thin">
             {showSkeleton ? (
               renderColumnSkeleton()
             ) : biggestPotRooms.length > 0 ? (
-              biggestPotRooms.map(renderRoomCard)
+              biggestPotRooms.map((room) => renderRoomCard(room, quickAmountBiggest))
             ) : (
               renderEmptyColumn()
             )}

@@ -492,14 +492,6 @@ export default function RoomsPage() {
                 <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
               </div>
 
-              {/* Sound Toggle */}
-              <button
-                onClick={toggleAudio}
-                className="p-1 text-trench-gasmask hover:text-white rounded transition-all text-xs h-6 flex items-center justify-center shrink-0"
-                title={audioEnabled ? "Mute Battlefield Audio" : "Unmute Battlefield Audio"}
-              >
-                {audioEnabled ? '🔊' : '🔇'}
-              </button>
 
               {/* Settings Gear Dropdown */}
               <div className="relative">
@@ -634,14 +626,6 @@ export default function RoomsPage() {
                 <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
               </div>
 
-              {/* Sound Toggle */}
-              <button
-                onClick={toggleAudio}
-                className="p-1 text-trench-gasmask hover:text-white rounded transition-all text-xs h-6 flex items-center justify-center shrink-0"
-                title={audioEnabled ? "Mute Battlefield Audio" : "Unmute Battlefield Audio"}
-              >
-                {audioEnabled ? '🔊' : '🔇'}
-              </button>
 
               {/* Settings Gear Dropdown */}
               <div className="relative">
@@ -776,14 +760,6 @@ export default function RoomsPage() {
                 <span className="text-[9px] text-[#14F195] font-bold select-none">≡</span>
               </div>
 
-              {/* Sound Toggle */}
-              <button
-                onClick={toggleAudio}
-                className="p-1 text-trench-gasmask hover:text-white rounded transition-all text-xs h-6 flex items-center justify-center shrink-0"
-                title={audioEnabled ? "Mute Battlefield Audio" : "Unmute Battlefield Audio"}
-              >
-                {audioEnabled ? '🔊' : '🔇'}
-              </button>
 
               {/* Settings Gear Dropdown */}
               <div className="relative">

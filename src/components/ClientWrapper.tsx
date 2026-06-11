@@ -18,6 +18,7 @@ let globalAudioContext: any = null;
 
 export const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
   if (typeof window === 'undefined') return;
+  if (window.location.pathname !== '/') return;
   
   try {
     if (!globalAudioContext) {
@@ -644,33 +645,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       {/* Wallet Adapter Bridge - syncs Solana wallet to Zustand state */}
       <WalletAdapterBridge />
       
-      {/* Dynamic Soundboard Action Controller (Top-Right Floating Overlay) */}
-      <div className="fixed top-24 right-4 z-40">
-        <button
-          onClick={() => {
-            setAudioEnabled(!audioEnabled);
-            if (!audioEnabled) synthSound('bet'); // quick test beep
-          }}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded font-staatliches text-xs uppercase tracking-wider border-2 transition-all shadow-md ${
-            audioEnabled
-              ? 'bg-neon-moon/20 border-neon-moon text-neon-moon hover:bg-neon-moon/30 shadow-glow-moon'
-              : 'bg-trench-mud border-trench-sandbag text-trench-gasmask hover:text-white'
-          }`}
-          title="Battlefield Ambient Audio"
-        >
-          {audioEnabled ? (
-            <>
-              <Volume2 size={12} className="animate-bounce" />
-              <span>SOUNDS ACTIVE</span>
-            </>
-          ) : (
-            <>
-              <VolumeX size={12} />
-              <span>SOUNDS MUTED</span>
-            </>
-          )}
-        </button>
-      </div>
+
 
       {/* Easter Egg Overlay Notification Banner */}
       {showDegenBanner && (

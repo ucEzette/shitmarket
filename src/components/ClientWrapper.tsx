@@ -9,6 +9,7 @@ import { WalletAdapterBridge } from './WalletAdapterBridge';
 import { MemePopup, PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from './MemeAssets';
 import { ShareCardModal } from './ShareCardModal';
 import { ComplianceModal } from './ComplianceModal';
+import { CustomAlertModal } from './CustomAlertModal';
 import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins, Briefcase, Info, X, ExternalLink, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -664,6 +665,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
 
       {/* Compliance Risk & Exclusions Onboarding */}
       <ComplianceModal />
+      
+      {/* Custom Tactical Alert Modal */}
+      <CustomAlertModal />
       
 
 

@@ -157,6 +157,14 @@ export interface Toast {
   txSig?: string | null;
 }
 
+export interface AlertData {
+  message: string;
+  type?: 'error' | 'success' | 'warning' | 'info';
+  title?: string;
+  onConfirm?: () => void;
+  anchorRect?: { top: number; left: number; width: number; height: number };
+}
+
 export interface AppState {
   isPaused: boolean;
   rooms: Room[];
@@ -192,6 +200,11 @@ export interface AppState {
   addToast: (message: string, type: Toast['type'], description?: string, txSig?: string | null) => string;
   removeToast: (id: string) => void;
   updateToast: (id: string, updates: Partial<Omit<Toast, 'id'>>) => void;
+  
+  // Custom Alerts
+  customAlert: AlertData | null;
+  showAlert: (message: string, type?: AlertData['type'], title?: string, onConfirm?: () => void, anchorRect?: AlertData['anchorRect']) => void;
+  hideAlert: () => void;
   
   // Settings
   settings: {
@@ -503,6 +516,20 @@ export const useAppState = create<AppState>((set, get) => ({
     }));
   },
 
+  customAlert: null,
+  showAlert: (message, type = 'error', title = '', onConfirm = undefined, anchorRect = undefined) => {
+    set({
+      customAlert: { message, type, title, onConfirm, anchorRect }
+    });
+  },
+  hideAlert: () => {
+    const currentAlert = get().customAlert;
+    set({ customAlert: null });
+    if (currentAlert?.onConfirm) {
+      currentAlert.onConfirm();
+    }
+  },
+
   updateToast: (id, updates) => {
     set((state) => ({
       toasts: state.toasts.map((t) => (t.id === id ? { ...t, ...updates } : t))
@@ -655,21 +682,35 @@ export const useAppState = create<AppState>((set, get) => ({
     let indexerResult: Room | null = null;
     let onChainResult: Room | null = null;
 
-    // Run indexer API fetch and on-chain fetch in parallel to prevent sequential blocking lag!
-    const indexerFetch = (async () => {
+    // Run indexer API fetch
+    const indexerFetch = async () => {
       try {
         const indexerApi = INDEXER_URL;
         const res = await fetchWithTimeout(`${indexerApi}/api/rooms/${roomId}`, {}, 3000);
         const json = await res.json();
         if (json.success && json.data) {
           indexerResult = mapApiRoom(json.data);
+          // Optimistically update store with indexer result immediately
+          set((state) => {
+            const current = state.rooms.find((r) => r.id === roomId);
+            const merged = mergeRooms(current, indexerResult, null);
+            if (merged && (!current || !isRoomEqual(current, merged))) {
+              const exists = state.rooms.some((r) => r.id === roomId);
+              const newRooms = exists
+                ? state.rooms.map((r) => (r.id === roomId ? merged : r))
+                : [merged, ...state.rooms];
+              return { rooms: newRooms };
+            }
+            return {};
+          });
         }
       } catch (err) {
         console.warn(`Failed to fetch room ${roomId} from indexer API:`, err);
       }
-    })();
+    };
 
-    const onChainFetch = (async () => {
+    // Run on-chain fetch
+    const onChainFetch = async () => {
       try {
         const program = getAnchorProgram(null as any);
         const onChain = await withTimeout(
@@ -689,7 +730,6 @@ export const useAppState = create<AppState>((set, get) => ({
           }
 
           const current = get().rooms.find((r) => r.id === roomId);
-          
           let decodedName = current?.token?.name || 'Unknown Token';
           if (!current) {
             const rawNameBytes = onChain.tokenName as number[] | Uint8Array;
@@ -748,28 +788,32 @@ export const useAppState = create<AppState>((set, get) => ({
           }
 
           onChainResult = updatedRoom;
+
+          // Merge indexerResult, onChainResult, and current room state
+          set((state) => {
+            const current = state.rooms.find((r) => r.id === roomId);
+            const merged = mergeRooms(current, indexerResult, onChainResult);
+            if (merged && (!current || !isRoomEqual(current, merged))) {
+              const exists = state.rooms.some((r) => r.id === roomId);
+              const newRooms = exists
+                ? state.rooms.map((r) => (r.id === roomId ? merged : r))
+                : [merged, ...state.rooms];
+              return { rooms: newRooms };
+            }
+            return {};
+          });
         }
       } catch (e) {
         console.warn('Could not fetch or hydrate single on-chain room state in background:', e);
       }
-    })();
+    };
 
-    await Promise.all([indexerFetch, onChainFetch]);
+    // Run both indexer and on-chain fetches in parallel
+    const indexerPromise = indexerFetch();
+    const onChainPromise = onChainFetch();
 
-    const currentRoom = get().rooms.find((r) => r.id === roomId);
-    const merged = mergeRooms(currentRoom, indexerResult, onChainResult);
-    
-    if (merged) {
-      if (!currentRoom || !isRoomEqual(currentRoom, merged)) {
-        set((state) => {
-          const exists = state.rooms.some((r) => r.id === roomId);
-          const newRooms = exists
-            ? state.rooms.map((r) => (r.id === roomId ? merged : r))
-            : [merged, ...state.rooms];
-          return { rooms: newRooms };
-        });
-      }
-    }
+    // Await ONLY the indexer fetch (very fast) so that loading screens resolve immediately
+    await indexerPromise;
   },
 
   fetchLeaderboard: async () => {

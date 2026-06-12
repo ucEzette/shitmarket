@@ -1,6 +1,6 @@
 import express from 'express';
 import { prisma, prismaRead } from '../../db';
-import { getCachedRoom, cacheRoom, publishRoomUpdate } from '../../redis';
+import { getCachedRoom, getCachedRooms, cacheRoom, publishRoomUpdate } from '../../redis';
 import { logger } from '../../logger';
 import { validate, roomsQuerySchema, roomPubkeyParamSchema } from '../validation';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -10,8 +10,14 @@ import { settleRoomByPubkey } from '../../keeper/settlementKeeper';
 
 export const roomsRouter = express.Router();
 
+const tokenMetaCache = new Map<string, any>();
+
 // Helper to fetch token metadata from DexScreener
 async function fetchTokenMeta(mintAddress: string): Promise<any> {
+  if (tokenMetaCache.has(mintAddress)) {
+    return tokenMetaCache.get(mintAddress);
+  }
+
   try {
     const url = `${config.external.dexscreenerUrl}/tokens/${mintAddress}`;
     const response = await fetch(url);
@@ -20,7 +26,7 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
     const pairs: any[] = data?.pairs ?? [];
     if (!pairs.length) return {};
     const best = pairs.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
-    return {
+    const meta = {
       name: best.baseToken?.name,
       symbol: best.baseToken?.symbol,
       imageUrl: best.info?.imageUrl ?? undefined,
@@ -28,6 +34,8 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
       originalAddress: mintAddress,
       pairAddress: best.pairAddress,
     };
+    tokenMetaCache.set(mintAddress, meta);
+    return meta;
   } catch {
     return {};
   }
@@ -233,21 +241,20 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
       },
     });
 
-    // Overlay live pool data from Redis where available
-    const enriched = await Promise.all(
-      rooms.map(async (room) => {
-        const cached = await getCachedRoom(room.roomPubkey);
-        return {
-          ...room,
-          openingPrice: room.openingPrice.toString(),
-          totalPool: room.totalPool.toString(),
-          priceFeed: room.priceFeed,
-          creator: room.creator,
-          moonPool: cached?.moonPool ?? null,
-          jeetPool: cached?.jeetPool ?? null,
-        };
-      })
-    );
+    // Overlay live pool data from Redis where available in a single pipelined call
+    const cachedData = await getCachedRooms(rooms.map(r => r.roomPubkey));
+    const enriched = rooms.map((room, idx) => {
+      const cached = cachedData[idx];
+      return {
+        ...room,
+        openingPrice: room.openingPrice.toString(),
+        totalPool: room.totalPool.toString(),
+        priceFeed: room.priceFeed,
+        creator: room.creator,
+        moonPool: cached?.moonPool ?? null,
+        jeetPool: cached?.jeetPool ?? null,
+      };
+    });
 
     return res.json({ success: true, data: enriched });
   } catch (err: any) {

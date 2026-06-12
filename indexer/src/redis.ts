@@ -46,6 +46,21 @@ export async function getCachedRoom(roomPubkey: string): Promise<Record<string, 
   return Object.keys(data).length > 0 ? data : null;
 }
 
+export async function getCachedRooms(roomPubkeys: string[]): Promise<(Record<string, string> | null)[]> {
+  if (roomPubkeys.length === 0) return [];
+  const pipeline = redis.pipeline();
+  roomPubkeys.forEach(pubkey => {
+    pipeline.hgetall(`room:${pubkey}`);
+  });
+  const results = await pipeline.exec();
+  if (!results) return roomPubkeys.map(() => null);
+
+  return results.map(([err, data]) => {
+    if (err || !data || Object.keys(data as object).length === 0) return null;
+    return data as Record<string, string>;
+  });
+}
+
 export async function publishRoomUpdate(roomPubkey: string, payload: object): Promise<void> {
   await redis.publish('room_updates', JSON.stringify({ roomPubkey, ...payload }));
 }

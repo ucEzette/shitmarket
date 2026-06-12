@@ -28,7 +28,7 @@ anchor build --no-idl
 
 # 3. Deploy program
 echo "Deploying Anchor program to Devnet..."
-anchor deploy --provider.cluster devnet
+anchor deploy
 echo "================================================="
 echo "CONTRACT DEPLOY SUCCESSFUL!"
 echo "================================================="

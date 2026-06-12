@@ -395,28 +395,30 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
 
     const winningPool = isDraw ? totalPool : winningBets.reduce((sum, b) => sum + b.amount, BigInt(0));
 
-    // Compute and store individual payouts
+    // Compute and store individual payouts in a transaction-ready format
+    const payoutOps = [];
     for (const bet of winningBets) {
       if (winningPool === BigInt(0)) continue;
       const payout = (bet.amount * payoutPool) / winningPool;
 
-      const existingPayout = await prisma.payout.findFirst({
-        where: { roomPubkey, userPubkey: bet.userPubkey },
-      });
-      if (existingPayout) {
-        await prisma.payout.update({
-          where: { id: existingPayout.id },
-          data: { amount: payout },
-        });
-      } else {
-        await prisma.payout.create({
-          data: {
+      payoutOps.push(
+        prisma.payout.upsert({
+          where: {
+            roomPubkey_userPubkey: {
+              roomPubkey,
+              userPubkey: bet.userPubkey,
+            },
+          },
+          create: {
             roomPubkey,
             userPubkey: bet.userPubkey,
             amount: payout,
           },
-        });
-      }
+          update: {
+            amount: payout,
+          },
+        })
+      );
     }
 
     // Update losers' stats (none in a Draw!)
@@ -424,8 +426,8 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
       ? [] 
       : await prisma.bet.findMany({ where: { roomPubkey, side: winner === 'moon' ? 'jeet' : 'moon' } });
 
-    for (const bet of losingBets) {
-      await prisma.userProfile.upsert({
+    const loserOps = losingBets.map(bet =>
+      prisma.userProfile.upsert({
         where: { userPubkey: bet.userPubkey },
         create: {
           userPubkey: bet.userPubkey,
@@ -436,12 +438,14 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
           losses: { increment: 1 },
           profit: { decrement: bet.amount },
         },
-      });
-      await updateLeaderboard(bet.userPubkey, -bet.amount);
-    }
+      })
+    );
+
+    // Run loser leaderboard updates in parallel via Redis
+    await Promise.all(losingBets.map(bet => updateLeaderboard(bet.userPubkey, -bet.amount)));
 
     // Mark room settled in DB (including twapFinalPrice)
-    await prisma.room.update({
+    const roomUpdateOp = prisma.room.update({
       where: { roomPubkey },
       data: {
         status: 'settled',
@@ -451,6 +455,13 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
         platformFee,
       },
     });
+
+    // Execute all database updates atomically inside a transaction
+    await prisma.$transaction([
+      ...payoutOps,
+      ...loserOps,
+      roomUpdateOp,
+    ]);
 
     // Update Redis cache
     await cacheRoom(roomPubkey, {
@@ -562,14 +573,24 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
         const referralIxs: anchor.web3.TransactionInstruction[] = [];
         const referralPayoutData: { referrer: string; invitee: string; betAmount: bigint; rewardAmount: bigint }[] = [];
 
-        for (const bet of roomBets) {
-          const bettorProfile = await prisma.userProfile.findUnique({
-            where: { userPubkey: bet.userPubkey },
-            select: { referredBy: true }
-          });
+        // Batch fetch all bettor profiles in a single query to prevent N+1 queries in loops
+        const bettorPubkeys = Array.from(new Set(roomBets.map(b => b.userPubkey)));
+        const profiles = await prisma.userProfile.findMany({
+          where: { userPubkey: { in: bettorPubkeys } },
+          select: { userPubkey: true, referredBy: true }
+        });
+        const referralMap = new Map<string, string>();
+        for (const p of profiles) {
+          if (p.referredBy) {
+            referralMap.set(p.userPubkey, p.referredBy);
+          }
+        }
 
-          if (bettorProfile && bettorProfile.referredBy) {
-            const referrerWallet = new PublicKey(bettorProfile.referredBy);
+        for (const bet of roomBets) {
+          const referredBy = referralMap.get(bet.userPubkey);
+
+          if (referredBy) {
+            const referrerWallet = new PublicKey(referredBy);
             
             // Referrer gets 0.1% of bet amount (1/1000 of lamports)
             const betAmount = BigInt(bet.amount);
@@ -583,7 +604,7 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
               });
               referralIxs.push(ix);
               referralPayoutData.push({
-                referrer: bettorProfile.referredBy,
+                referrer: referredBy,
                 invitee: bet.userPubkey,
                 betAmount,
                 rewardAmount
@@ -612,18 +633,17 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
 
             logger.info({ msg: 'Referral payout batch confirmed on-chain', txSig, count: batchIxs.length });
 
-            for (const item of batchData) {
-              await prisma.referralPayout.create({
-                data: {
-                  referrer: item.referrer,
-                  invitee: item.invitee,
-                  roomPubkey,
-                  betAmount: item.betAmount,
-                  rewardAmount: item.rewardAmount,
-                  txSig,
-                }
-              });
-            }
+            // Batch database insertions using createMany
+            await prisma.referralPayout.createMany({
+              data: batchData.map(item => ({
+                referrer: item.referrer,
+                invitee: item.invitee,
+                roomPubkey,
+                betAmount: item.betAmount,
+                rewardAmount: item.rewardAmount,
+                txSig,
+              }))
+            });
           }
         }
       } catch (refErr: any) {
@@ -784,31 +804,32 @@ async function handleRoomVoided(event: RoomVoidedEvent): Promise<void> {
     // In a voided room, everyone wins (i.e. receives full refund)
     const winningBets = await prisma.bet.findMany({ where: { roomPubkey } });
 
-    // Compute and store individual payouts (100% refund of bet amount)
+    // Compute and store individual payouts (100% refund of bet amount) inside a transaction-ready format
+    const payoutOps = [];
     for (const bet of winningBets) {
       const payout = bet.amount;
-
-      const existingPayout = await prisma.payout.findFirst({
-        where: { roomPubkey, userPubkey: bet.userPubkey },
-      });
-      if (existingPayout) {
-        await prisma.payout.update({
-          where: { id: existingPayout.id },
-          data: { amount: payout },
-        });
-      } else {
-        await prisma.payout.create({
-          data: {
+      payoutOps.push(
+        prisma.payout.upsert({
+          where: {
+            roomPubkey_userPubkey: {
+              roomPubkey,
+              userPubkey: bet.userPubkey,
+            },
+          },
+          create: {
             roomPubkey,
             userPubkey: bet.userPubkey,
             amount: payout,
           },
-        });
-      }
+          update: {
+            amount: payout,
+          },
+        })
+      );
     }
 
     // Mark room settled in DB as draw (representing void refund path)
-    await prisma.room.update({
+    const roomUpdateOp = prisma.room.update({
       where: { roomPubkey },
       data: {
         status: 'settled',
@@ -816,6 +837,12 @@ async function handleRoomVoided(event: RoomVoidedEvent): Promise<void> {
         platformFee,
       },
     });
+
+    // Execute database updates inside a transaction
+    await prisma.$transaction([
+      ...payoutOps,
+      roomUpdateOp,
+    ]);
 
     // Update Redis cache
     await cacheRoom(roomPubkey, {

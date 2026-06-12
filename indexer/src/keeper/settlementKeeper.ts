@@ -72,6 +72,7 @@ export function extractErrorMessage(err: any): string {
 
 let activeConnection: Connection | null = null;
 let activeProgram: anchor.Program | null = null;
+let cachedTreasury: PublicKey | null = null;
 
 function loadKeeperKeypair(): Keypair {
   const raw = config.solana.keeperPrivateKey;
@@ -153,26 +154,20 @@ async function settleRoom(
     const configPda = deriveConfigPda(programId);
     const escrowPda = deriveEscrowPda(roomPubkey, programId);
 
-    // Fetch config to get treasury pubkey
-    let treasury: PublicKey;
-    try {
-      const accountInfo = await connection.getAccountInfo(configPda);
-      if (!accountInfo) {
-        throw new Error('PlatformConfig account not found');
+    // Fetch config's treasury account to pass as 'vault' (what the deployed program expects)
+    let treasuryPubkey: PublicKey;
+    if (cachedTreasury) {
+      treasuryPubkey = cachedTreasury;
+    } else {
+      try {
+        const configAccount: any = await (program.account as any).platformConfig.fetch(configPda);
+        cachedTreasury = configAccount.treasury;
+        treasuryPubkey = configAccount.treasury;
+      } catch (err: any) {
+        logger.error({ msg: 'Failed to fetch platformConfig for treasury', err: err?.message });
+        // Fallback to keeper.publicKey if fetch fails (e.g. devnet IDL size mismatch)
+        treasuryPubkey = keeper.publicKey;
       }
-      let data = accountInfo.data;
-      const expectedLen = 162;
-      if (data.length < expectedLen) {
-        const padded = Buffer.alloc(expectedLen);
-        data.copy(padded);
-        data = padded;
-      }
-      const configAccount = program.coder.accounts.decode('platformConfig', data);
-      treasury = configAccount.treasury;
-    } catch (err: any) {
-      logger.error({ msg: 'Failed to fetch platform config', err: err?.message });
-      await release();
-      throw err;
     }
 
     // Resolve Pyth feed ID (defaults to on-chain SystemProgram sentinel to bypass reverts for custom tokens)
@@ -277,7 +272,7 @@ async function settleRoom(
       const accounts: Record<string, PublicKey> = {
         room: roomPubkey,
         escrow: escrowPda,
-        treasury,
+        vault: treasuryPubkey,
         priceFeed: new PublicKey(pythFeedId),
         switchboardFeed: switchboardFeedStr
           ? new PublicKey(switchboardFeedStr)

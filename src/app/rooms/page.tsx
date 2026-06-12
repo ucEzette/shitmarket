@@ -82,7 +82,7 @@ export default function RoomsPage() {
   };
 
   const router = useRouter();
-  const { rooms, roomsLoaded, fetchRooms, user, placeBet, connectWallet } = useAppState();
+  const { rooms, roomsLoaded, fetchRooms, user, placeBet, connectWallet, addToast } = useAppState();
   const [filterNew, setFilterNew] = useState<'ending' | 'expired'>('ending');
   const [filterSoon, setFilterSoon] = useState<'ending' | 'expired'>('ending');
   const [filterBiggest, setFilterBiggest] = useState<'ending' | 'expired'>('ending');
@@ -417,7 +417,7 @@ export default function RoomsPage() {
               onClick={(e) => {
                 e.stopPropagation();
                 navigator.clipboard.writeText(room.token.address);
-                alert("CONTRACT COPIED!");
+                addToast("CONTRACT COPIED!", 'success');
               }}
               className="font-mono text-[8px] text-trench-gasmask hover:text-white transition-colors cursor-pointer select-all truncate block max-w-[140px]"
               title="Click to copy CA"
@@ -469,7 +469,7 @@ export default function RoomsPage() {
               onClick={(e) => handleQuickBet(e, room.id, 'jeet', quickAmount)}
               className="uiverse-btn uiverse-btn-sm uiverse-btn-jeet font-staatliches tracking-wider"
             >
-              <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
+              <img src="/pepes/jeet-skeleton.png" className="btn-icon object-contain" alt="Pepe" />
               <span className="now">JEET</span>
               <span className="play !whitespace-nowrap">JEET {quickAmount}</span>
             </button>

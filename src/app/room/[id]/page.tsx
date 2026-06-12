@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppState, Room, ChatMessage, formatCashtag, formatPrice } from '@/store/useAppState';
+import { INDEXER_URL } from '@/utils/config';
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
 import { HeaderPanel } from '@/components/ui/HeaderPanel';
@@ -111,7 +112,8 @@ export default function RoomDetailPage() {
   const { 
     rooms, user, chatMessages, placeBet, claimWinnings, 
     addMessage, connectWallet, isTransactionLoading, 
-    fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile
+    fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile,
+    showAlert, addToast
   } = useAppState();
 
   const room = rooms.find((r) => r.id === roomId);
@@ -212,31 +214,57 @@ export default function RoomDetailPage() {
     "[CHAD SQUAD] Parachute division waiting for deployment orders."
   ]);
 
+  // Local room bets state
+  const [roomBets, setRoomBets] = useState<any[]>([]);
+
+  // Function to fetch room bets
+  const fetchRoomBets = useCallback(async () => {
+    try {
+      const res = await fetch(`${INDEXER_URL}/api/rooms/${roomId}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.data && json.data.bets) {
+          const mapped = json.data.bets.map((b: any) => ({
+            id: b.id,
+            user: b.userPubkey,
+            side: b.side,
+            amount: Number(b.amount) / 1e9,
+            timestamp: new Date(b.createdAt).getTime(),
+          })).sort((a: any, b: any) => b.timestamp - a.timestamp);
+          setRoomBets(mapped);
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch room bets:', err);
+    }
+  }, [roomId]);
+
   // Synchronize room details from indexer API and chain on mount & periodically
   useEffect(() => {
     let active = true;
-    setIsLoading(true);
-    Promise.all([
-      fetchSingleRoom(roomId),
-      fetchRoomChats(roomId),
-      refreshProfile()
-    ]).then(() => {
-      if (active) setIsLoading(false);
-    }).catch(() => {
+
+    // Await ONLY the critical room metadata load to unblock the page layout as fast as possible
+    fetchSingleRoom(roomId).finally(() => {
       if (active) setIsLoading(false);
     });
+
+    // Hydrate secondary components (chats, profile stats, bet transactions) concurrently in background
+    fetchRoomChats(roomId);
+    refreshProfile();
+    fetchRoomBets();
 
     const interval = setInterval(() => {
       fetchSingleRoom(roomId);
       fetchRoomChats(roomId);
       refreshProfile();
+      fetchRoomBets();
     }, 5000);
 
     return () => {
       active = false;
       clearInterval(interval);
     };
-  }, [roomId, fetchSingleRoom, refreshProfile]);
+  }, [roomId, fetchSingleRoom, refreshProfile, fetchRoomBets]);
 
   // Poll DexScreener for live token price updating every 5 seconds
   useEffect(() => {
@@ -382,7 +410,7 @@ export default function RoomDetailPage() {
   const hasBetOnMoon = userSidesChosen.includes('moon');
   const hasBetOnJeet = userSidesChosen.includes('jeet');
 
-  const handleCharge = () => {
+  const handleCharge = (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!user || !user.wallet) {
       connectWallet();
       synthSound('bet');
@@ -390,7 +418,8 @@ export default function RoomDetailPage() {
     }
 
     if (user.balance < stakeAmount) {
-      alert('INSUFFICIENT AMMO SOL IN WALLET!');
+      const rect = e?.currentTarget.getBoundingClientRect();
+      showAlert('INSUFFICIENT AMMO SOL IN WALLET!', 'error', 'INSUFFICIENT AMMO', undefined, rect);
       return;
     }
 
@@ -448,7 +477,11 @@ export default function RoomDetailPage() {
       setBattleLogs((prev) => [...prev, `[IMPACT CONFIRMED] Shell detonated on opposing faction trenches!`]);
     }, 800);
 
-    placeBet(room.id, selectedSide, stakeAmount);
+    placeBet(room.id, selectedSide, stakeAmount).then(() => {
+      fetchRoomBets();
+    }).catch((err) => {
+      console.error('Failed to place bet:', err);
+    });
   };
 
   const handleClaim = () => {
@@ -464,13 +497,15 @@ export default function RoomDetailPage() {
     setBattleLogs((prev) => [...prev, `[BOOTY DISPATCHED] User claimed on-chain winnings/refund!`]);
   };
 
-  const handleSendChat = (e: React.FormEvent) => {
+  const handleSendChat = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
     // Restrict broadcasting to active bettors inside this room sector only
     if (!user || !user.wallet || userBetsInRoom.length === 0) {
-      alert("SIGNAL INTRUSION DETECTED: BROADCAST DENIED! ONLY ENLISTED SOLDIER BECTORS WHO HAVE STAKED SOL ON A SIDE IN THIS SECTOR TRENCH ARE AUTHORIZED TO TRANSMIT RADIO SIGNALS.");
+      const submitBtn = e.currentTarget.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+      const rect = submitBtn ? submitBtn.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
+      showAlert("SIGNAL INTRUSION DETECTED: BROADCAST DENIED! ONLY ENLISTED SOLDIER BETTORS WHO HAVE STAKED SOL ON A SIDE IN THIS SECTOR TRENCH ARE AUTHORIZED TO TRANSMIT RADIO SIGNALS.", 'error', 'SIGNAL INTRUSION', undefined, rect);
       return;
     }
 
@@ -884,7 +919,7 @@ export default function RoomDetailPage() {
                 <StableDexChart 
                   key={`dexscreener-${room.id}`}
                   chainId={room.token.chainId}
-                  pairAddress={room.token.pairAddress}
+                  pairAddress={room.token.pairAddress || ''}
                   tokenAddress={room.token.address}
                 />
               ) : (
@@ -990,7 +1025,7 @@ export default function RoomDetailPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       navigator.clipboard.writeText(room.token.address);
-                      alert("CONTRACT ADDRESS COPIED TO CLIPBOARD!");
+                      addToast("CONTRACT ADDRESS COPIED TO CLIPBOARD!", 'success');
                     }}
                     className="text-neon-moon hover:text-white ml-1 font-bold font-staatliches text-[10px] tracking-wider uppercase bg-trench-black border border-neon-moon/40 px-1 rounded active:scale-95 transition-transform"
                   >
@@ -1288,9 +1323,9 @@ export default function RoomDetailPage() {
                       selectedSide === 'jeet'
                         ? 'shadow-glow-jeet border-jeet-red animate-pulse'
                         : 'opacity-70 hover:opacity-100'
-                    }`}
+                     }`}
                   >
-                    <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
+                    <img src="/pepes/jeet-skeleton.png" className="btn-icon object-contain" alt="Pepe" />
                     <span className="now">JEET</span>
                     <span className="play">BET JEET 💀</span>
                   </button>
@@ -1416,95 +1451,7 @@ export default function RoomDetailPage() {
 
         </section>
 
-        {/* ACTIVE TACTICAL LIMIT ORDERS & LOCKED MARKET POSITIONS */}
-        <div className="lg:col-span-12 bg-[#050803] border-4 border-trench-sandbag p-5 rounded-lg shadow-2xl relative scanlines min-w-0 w-full overflow-hidden space-y-6">
-          {/* Decorative Corner Screws */}
-          <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-          <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-          <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
 
-          {/* wagers full width list */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-lg font-bold uppercase border-b border-trench-sandbag/40 pb-2">
-              <Swords className="w-5 h-5 text-neon-moon animate-pulse" />
-              <span>⚔️ YOUR LOCKED MARKET POSITIONS ({userBetsInRoom.length})</span>
-            </div>
-
-            {userBetsInRoom.length > 0 ? (
-              <div className="overflow-x-auto w-full">
-                <table className="w-full text-left font-mono text-xs uppercase">
-                  <thead>
-                    <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[10px] font-bold">
-                      <th className="py-2.5 px-3">SIDE</th>
-                      <th className="py-2.5 px-3">AMOUNT</th>
-                      <th className="py-2.5 px-3">ENTRY</th>
-                      <th className="py-2.5 px-3">CURRENT</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {userBetsInRoom.map((bet) => {
-                      const entryPrice = openingPriceSafe || 0;
-                      const currentSpotPrice = livePrice || openingPriceSafe || 0;
-                      
-                      const FEE_RATE = 0.0125; // 1.25% platform fee to match on-chain bps
-                      let pnlPercent = 0;
-                      let pnlSol = 0;
-                      let isProfit = false;
-
-                      if (entryPrice > 0 && currentSpotPrice !== entryPrice) {
-                        const isMoonWinning = currentSpotPrice > entryPrice;
-                        const isUserWinning = (bet.side === 'moon' && isMoonWinning) || (bet.side === 'jeet' && !isMoonWinning);
-                        
-                        if (isUserWinning) {
-                          const winningPool = isMoonWinning ? moonPoolSafe : jeetPoolSafe;
-                          const losingPool = isMoonWinning ? jeetPoolSafe : moonPoolSafe;
-                          
-                          if (winningPool > 0) {
-                            pnlPercent = ((losingPool / winningPool) * (1 - FEE_RATE) - FEE_RATE) * 100;
-                            pnlSol = bet.amount * (pnlPercent / 100);
-                          }
-                          isProfit = pnlPercent >= 0;
-                        } else {
-                          // User is losing, loss is 100% of the bet amount
-                          pnlPercent = -100;
-                          pnlSol = -bet.amount;
-                          isProfit = false;
-                        }
-                      } else {
-                        // No price change or entry price not set
-                        pnlPercent = 0;
-                        pnlSol = 0;
-                        isProfit = true;
-                      }
-
-                      return (
-                        <tr key={bet.id} className="border-b border-trench-sandbag/20 hover:bg-trench-mud/30 transition-colors">
-                          <td className="py-3 px-3 font-bold">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-staatliches ${
-                              bet.side === 'moon' 
-                                ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/30 shadow-glow-moon' 
-                                : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/30 shadow-glow-jeet'
-                            }`}>
-                              {bet.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-white font-bold">{bet.amount.toFixed(2)} SOL</td>
-                          <td className="py-3 px-3 text-gray-300 font-bold">${formatPrice(entryPrice)}</td>
-                          <td className="py-3 px-3 text-gray-300 font-bold">${formatPrice(currentSpotPrice)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-6 text-trench-gasmask font-mono text-xs font-bold uppercase leading-relaxed">
-                📢 NO LOCKED POSITIONS IN THIS SECTOR. STAKE SOL TO ENTER COMBAT.
-              </div>
-            )}
-          </div>
-        </div>
 
       </main>
 
@@ -1615,41 +1562,135 @@ export default function RoomDetailPage() {
           </form>
         </div>
 
-        {/* Right Bottom Bar: Battle Command Intelligence Log (Live feed of actions) */}
-        <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
-          <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm border-b border-trench-sandbag pb-1.5 mb-2 font-bold uppercase">
-            <Terminal className="w-4 h-4 text-yellow-500" />
-            <span>&gt;_ BATTLE COMMAND INTELLIGENCE LOG</span>
+        {/* Right column: Bet History & Locked Market Positions stacked */}
+        <div className="flex flex-col gap-4 w-full">
+          {/* Bet History */}
+          <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
+            <div className="flex items-center justify-between border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
+              <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-xs sm:text-sm font-bold uppercase">
+                <Terminal className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
+                <span>&gt;_ BET HISTORY (ALL SECTOR TRANS)</span>
+              </div>
+              <span className="text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">LATEST {roomBets.length} ACTIONS</span>
+            </div>
+
+            <div 
+              className="flex-1 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px] select-text scrollbar"
+            >
+              {roomBets.length > 0 ? (
+                roomBets.map((bet) => {
+                  const formattedUser = bet.user.slice(0, 4) + '...' + bet.user.slice(-4);
+                  const isMoon = bet.side === 'moon';
+                  const colorClass = isMoon ? 'text-[#16A34A] glow-moon' : 'text-jeet-red glow-jeet';
+                  const timeString = new Date(bet.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+                  return (
+                    <div key={bet.id} className="flex items-center justify-between font-bold uppercase hover:bg-trench-mud/20 px-1 py-0.5 rounded transition-colors">
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className={isMoon ? 'animate-pulse' : ''}>
+                          {isMoon ? '🚀' : '💀'}
+                        </span>
+                        <span className="text-trench-gasmask">[{formattedUser}]</span>
+                        <span className={`${colorClass} font-extrabold tracking-wide`}>
+                          {isMoon ? 'MOON' : 'JEET'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-white font-bold">{bet.amount.toFixed(2)} SOL</span>
+                        <span className="text-trench-gasmask/70 text-[8px] sm:text-[9px]">{timeString}</span>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="flex gap-1.5 items-center justify-center h-full text-trench-gasmask/50 font-bold uppercase animate-pulse">
+                  <span>⚔️ AWAITING DEPLOYMENTS ON THIS CHANNEL...</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div 
-            ref={battleLogScrollRef}
-            className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px] text-lime-400 select-text leading-tight scrollbar"
-          >
-            {battleLogs.map((log, index) => (
-              <div key={index} className="flex gap-1.5 items-start font-bold uppercase">
-                <span>⚔️</span>
-                <span>{log}</span>
-              </div>
-            ))}
-            
-            {/* Conditional Room Status Logs */}
-            {isSettled ? (
-              <div className="flex gap-1.5 items-start text-yellow-400 font-bold uppercase">
-                <span>⚔️</span>
-                <span>[BATTLE OVER] Arena resolved. Faction {room.winner?.toUpperCase()} emerged victorious!</span>
-              </div>
-            ) : room.expiry <= Date.now() ? (
-              <div className="flex gap-1.5 items-start text-yellow-500 font-bold uppercase animate-pulse">
-                <span>⚔️</span>
-                <span>[EXPIRY REACHED] Arena expired. Resolving block oracle parameters...</span>
-              </div>
-            ) : (
-              <div className="flex gap-1.5 items-start text-gray-500 font-bold uppercase animate-pulse">
-                <span>⚔️</span>
-                <span>[TRENCH ACTIVE] Combatants locked in duel. Awaiting block resolution timers.</span>
-              </div>
-            )}
+          {/* Locked Market Positions */}
+          <div className="retro-panel p-2 sm:p-3 min-h-[13rem] flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
+            <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-xs sm:text-sm font-bold uppercase border-b border-trench-sandbag/40 pb-1.5 mb-2">
+              <Swords className="w-3.5 h-3.5 text-neon-moon animate-pulse" />
+              <span>⚔️ YOUR LOCKED MARKET POSITIONS ({userBetsInRoom.length})</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto scrollbar">
+              {userBetsInRoom.length > 0 ? (
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left font-mono text-[10px] uppercase">
+                    <thead>
+                      <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[9px] font-bold">
+                        <th className="py-1.5 px-2">SIDE</th>
+                        <th className="py-1.5 px-2">AMOUNT</th>
+                        <th className="py-1.5 px-2">ENTRY</th>
+                        <th className="py-1.5 px-2">CURRENT</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {userBetsInRoom.map((bet) => {
+                        const entryPrice = openingPriceSafe || 0;
+                        const currentSpotPrice = livePrice || openingPriceSafe || 0;
+                        
+                        const FEE_RATE = 0.0125; // 1.25% platform fee to match on-chain bps
+                        let pnlPercent = 0;
+                        let pnlSol = 0;
+                        let isProfit = false;
+
+                        if (entryPrice > 0 && currentSpotPrice !== entryPrice) {
+                          const isMoonWinning = currentSpotPrice > entryPrice;
+                          const isUserWinning = (bet.side === 'moon' && isMoonWinning) || (bet.side === 'jeet' && !isMoonWinning);
+                          
+                          if (isUserWinning) {
+                            const winningPool = isMoonWinning ? moonPoolSafe : jeetPoolSafe;
+                            const losingPool = isMoonWinning ? jeetPoolSafe : moonPoolSafe;
+                            
+                            if (winningPool > 0) {
+                              pnlPercent = ((losingPool / winningPool) * (1 - FEE_RATE) - FEE_RATE) * 100;
+                              pnlSol = bet.amount * (pnlPercent / 100);
+                            }
+                            isProfit = pnlPercent >= 0;
+                          } else {
+                            // User is losing, loss is 100% of the bet amount
+                            pnlPercent = -100;
+                            pnlSol = -bet.amount;
+                            isProfit = false;
+                          }
+                        } else {
+                          // No price change or entry price not set
+                          pnlPercent = 0;
+                          pnlSol = 0;
+                          isProfit = true;
+                        }
+
+                        return (
+                          <tr key={bet.id} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
+                            <td className="py-2 px-2 font-bold">
+                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-staatliches ${
+                                bet.side === 'moon' 
+                                  ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/20 shadow-glow-moon' 
+                                  : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/20 shadow-glow-jeet'
+                              }`}>
+                                {bet.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
+                              </span>
+                            </td>
+                            <td className="py-2 px-2 text-white font-bold">{bet.amount.toFixed(2)} SOL</td>
+                            <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(entryPrice)}</td>
+                            <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(currentSpotPrice)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full py-6 text-center text-trench-gasmask/50 font-mono text-[9px] font-bold uppercase leading-relaxed">
+                  📢 NO LOCKED POSITIONS IN THIS SECTOR. STAKE SOL TO ENTER COMBAT.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

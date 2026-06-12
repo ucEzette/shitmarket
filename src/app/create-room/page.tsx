@@ -20,7 +20,7 @@ const MOCK_TOKENS = [
 
 export default function CreateRoomPage() {
   const router = useRouter();
-  const { createRoom, user, connectWallet, placeBet, isTransactionLoading, wallet } = useAppState();
+  const { createRoom, user, connectWallet, placeBet, isTransactionLoading, wallet, showAlert } = useAppState();
 
   // On mount: if the user refreshes the page after a room was just created,
   // redirect them straight to the new room instead of showing the form again.
@@ -58,9 +58,10 @@ export default function CreateRoomPage() {
     rawPriceUsd?: number;
   } | null>(null);
 
-  const handleScan = async () => {
+  const handleScan = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = e?.currentTarget.getBoundingClientRect();
     if (!contractAddress.trim()) {
-      alert('ENTER A VALID TOKEN CONTRACT ADDRESS!');
+      showAlert('ENTER A VALID TOKEN CONTRACT ADDRESS!', 'error', 'SCAN ERROR', undefined, rect);
       return;
     }
 
@@ -110,7 +111,7 @@ export default function CreateRoomPage() {
           if (valRes.ok) {
             const valData = await valRes.json();
             if (!valData.valid) {
-              alert(`TOKEN SECURITY SCREENING FAILED: ${valData.reason}`);
+              showAlert(`TOKEN SECURITY SCREENING FAILED: ${valData.reason}`, 'error', 'SECURITY EXCLUSION', undefined, rect);
               setTokenInfo(null);
               return;
             }
@@ -138,50 +139,55 @@ export default function CreateRoomPage() {
         
         synthSound('victory');
       } else {
-        alert('NO PAIRS FOUND ON DEXSCREENER FOR THIS ADDRESS!');
+        showAlert('NO PAIRS FOUND ON DEXSCREENER FOR THIS ADDRESS!', 'warning', 'NO TRADING PAIRS', undefined, rect);
       }
     } catch (e: any) {
       clearTimeout(timeoutId);
       console.error(e);
       if (e.name === 'AbortError') {
-        alert('API SCAN TIMED OUT. SECURE SATELLITE CONNECTION AND TRY AGAIN!');
+        showAlert('API SCAN TIMED OUT. SECURE SATELLITE CONNECTION AND TRY AGAIN!', 'warning', 'SCAN TIMEOUT', undefined, rect);
       } else {
-        alert('ERROR FETCHING FROM DEXSCREENER!');
+        showAlert('ERROR FETCHING FROM DEXSCREENER!', 'error', 'SCAN ERROR', undefined, rect);
       }
     } finally {
       setScanning(false);
     }
   };
 
-  const handleLaunch = async (e: React.FormEvent) => {
+  const handleLaunch = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = e.currentTarget;
+    const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+    const rect = submitBtn ? submitBtn.getBoundingClientRect() : form.getBoundingClientRect();
+
     if (!tokenInfo) {
-      alert('MUST SCAN A VALID TOKENS CONTRACT FIRST!');
+      showAlert('MUST SCAN A VALID TOKENS CONTRACT FIRST!', 'warning', 'ACTION BLOCKED', undefined, rect);
       return;
     }
 
     // Connect wallet if trying to launch
     if (!wallet || !wallet.publicKey) {
-      alert('PLEASE CONNECT YOUR SOLANA WALLET TO DEPLOY THIS ARENA!');
-      connectWallet();
+      showAlert('PLEASE CONNECT YOUR SOLANA WALLET TO DEPLOY THIS ARENA!', 'warning', 'WALLET REQUISITE', () => {
+        connectWallet();
+      }, rect);
       return;
     }
 
     // Deduct user seed amount if applicable
     if (seedAmount < 0.01) {
-      alert('MINIMUM ARENA INITIAL SEEDING IS 0.01 SOL!');
+      showAlert('MINIMUM ARENA INITIAL SEEDING IS 0.01 SOL!', 'warning', 'VALIDATION ERROR', undefined, rect);
       return;
     }
 
     if (user) {
       if (user.balance < seedAmount) {
-        alert('INSUFFICIENT AMMO SOL TO SEED THIS ROOM!');
+        showAlert('INSUFFICIENT AMMO SOL TO SEED THIS ROOM!', 'error', 'INSUFFICIENT FUNDS', undefined, rect);
         return;
       }
     }
 
     if (duration < 1 || duration > 525600) {
-      alert('BATTLE DURATION MUST BE BETWEEN 1 MINUTE AND 525,600 MINUTES (1 YEAR)!');
+      showAlert('BATTLE DURATION MUST BE BETWEEN 1 MINUTE AND 525,600 MINUTES (1 YEAR)!', 'warning', 'VALIDATION ERROR', undefined, rect);
       return;
     }
 
@@ -233,7 +239,7 @@ export default function CreateRoomPage() {
       
       synthSound('explosion');
       if (res && res.alreadyExists) {
-        alert("COMMAND HQ DETECTED THAT A PREDICTION ARENA ALREADY EXISTS FOR THIS TOKEN! REDIRECTING YOU TO THE ON-CHAIN ARENA...");
+        showAlert("COMMAND HQ DETECTED THAT A PREDICTION ARENA ALREADY EXISTS FOR THIS TOKEN! REDIRECTING YOU TO THE ON-CHAIN ARENA...", 'info', 'ARENA FOUND', undefined, rect);
       }
       
       // If the bet succeeded, the ShareCardModal is open and will route the user to `/room/${res.roomPda}` upon close.
@@ -299,7 +305,7 @@ export default function CreateRoomPage() {
               />
               <button
                 type="button"
-                onClick={handleScan}
+                onClick={(e) => handleScan(e)}
                 disabled={scanning || !contractAddress.trim()}
                 className="px-5 bg-trench-sandbag hover:bg-trench-gasmask font-staatliches text-lg text-white border border-trench-sandbag/80 active:translate-y-0.5 rounded transition-all flex items-center justify-center gap-1.5 shrink-0"
               >

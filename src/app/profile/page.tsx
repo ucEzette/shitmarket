@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Award, Zap, TrendingUp, TrendingDown, RefreshCw, X, Play, Edit2, Camera, AlertTriangle, Save, Loader2, Copy, Check, Users, Coins, ExternalLink } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user, connectWallet, updateProfile, claimReferralRewardsOnChain } = useAppState();
+  const { user, connectWallet, updateProfile, claimReferralRewardsOnChain, showAlert } = useAppState();
   const [replayBet, setReplayBet] = useState<{
     token: string;
     side: 'moon' | 'jeet';
@@ -735,11 +735,12 @@ export default function ProfilePage() {
                   </div>
 
                   <button
-                    onClick={async () => {
+                    onClick={async (e) => {
                       const unclaimedAmt = user.unclaimedReferralRewards || 0;
                       if (unclaimedAmt <= 0) {
                         synthSound('defeat');
-                        alert("NO UNCLAIMED COMMISSIONS TO RETRIEVE!");
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        showAlert("NO UNCLAIMED COMMISSIONS TO RETRIEVE!", 'warning', 'CLAIM DENIED', undefined, rect);
                         return;
                       }
                       setIsClaiming(true);

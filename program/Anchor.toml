@@ -15,7 +15,7 @@ shitmarket = "2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "https://devnet.helius-rpc.com/?api-key=cce2e7d9-5846-4ac4-9a83-0252eb8e8b71"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

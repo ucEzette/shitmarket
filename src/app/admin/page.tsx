@@ -87,7 +87,7 @@ interface SystemHealth {
 
 export default function AdminDashboardPage() {
   const { publicKey, signMessage } = useWallet();
-  const { user, connectWallet } = useAppState();
+  const { user, connectWallet, showAlert } = useAppState();
 
   const [activeTab, setActiveTab] = useState<'stats' | 'sweeper' | 'config' | 'ledger' | 'monitor'>('stats');
   
@@ -208,7 +208,7 @@ export default function AdminDashboardPage() {
   }, [loadDashboardData, indexerUrl]);
 
   // Handle single room sweep on-chain
-  const handleSweepRoom = async (roomPubkey: string) => {
+  const handleSweepRoom = async (roomPubkey: string, e?: React.MouseEvent<HTMLButtonElement>) => {
     synthSound('bet');
     setActionLoading(`sweep-${roomPubkey}`);
     setAuthError(null);
@@ -222,7 +222,8 @@ export default function AdminDashboardPage() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        alert(`🎉 SWEEP SUCCESSFUL!\nTx Signature: ${data.tx}\nRecovered: ${data.balanceSweptSOL.toFixed(4)} SOL`);
+        const rect = e?.currentTarget.getBoundingClientRect();
+        showAlert(`SWEEP SUCCESSFUL!\n\nTx Signature: ${data.tx}\n\nRecovered: ${data.balanceSweptSOL.toFixed(4)} SOL`, 'success', 'SWEEP SUCCESS', undefined, rect);
         loadDashboardData();
       } else {
         setAuthError(data.error || 'Failed to execute sweep on-chain.');
@@ -236,7 +237,7 @@ export default function AdminDashboardPage() {
   };
 
   // Handle sweep all eligible escrows
-  const handleSweepAll = async () => {
+  const handleSweepAll = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     synthSound('bet');
     setActionLoading('sweep-all');
     setAuthError(null);
@@ -249,7 +250,8 @@ export default function AdminDashboardPage() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        alert(`🧹 BULK SWEEP COMPLETE!\nSwept Count: ${data.sweptCount}\nRecovered: ${data.totalSOLSwept.toFixed(4)} SOL`);
+        const rect = e?.currentTarget.getBoundingClientRect();
+        showAlert(`BULK SWEEP COMPLETE!\n\nSwept Count: ${data.sweptCount}\n\nRecovered: ${data.totalSOLSwept.toFixed(4)} SOL`, 'success', 'BULK SWEEP SUCCESS', undefined, rect);
         loadDashboardData();
       } else {
         setAuthError(data.error || 'Bulk sweep action failed.');
@@ -263,7 +265,7 @@ export default function AdminDashboardPage() {
   };
 
   // Handle on-chain PlatformConfig updates
-  const handleUpdateConfig = async (e: React.FormEvent) => {
+  const handleUpdateConfig = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     synthSound('bet');
     setActionLoading('update-config');
@@ -285,7 +287,10 @@ export default function AdminDashboardPage() {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        alert(`✅ CONFIGURATION UPDATED ON-CHAIN!\nTx Signature: ${data.tx}`);
+        const form = e.currentTarget;
+        const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement | null;
+        const rect = submitBtn ? submitBtn.getBoundingClientRect() : form.getBoundingClientRect();
+        showAlert(`CONFIGURATION UPDATED ON-CHAIN!\n\nTx Signature: ${data.tx}`, 'success', 'CONFIG SYNCED', undefined, rect);
         loadDashboardData();
       } else {
         setAuthError(data.error || 'Failed to update configuration.');
@@ -299,7 +304,7 @@ export default function AdminDashboardPage() {
   };
 
   // Client-Side CSV Export
-  const exportLedgerCSV = () => {
+  const exportLedgerCSV = (e?: React.MouseEvent<HTMLButtonElement>) => {
     synthSound('victory');
     const flatRecords: any[] = [];
     unclaimedRooms.forEach(room => {
@@ -317,7 +322,8 @@ export default function AdminDashboardPage() {
     });
 
     if (flatRecords.length === 0) {
-      alert("No unclaimed records found to export.");
+      const rect = e?.currentTarget.getBoundingClientRect();
+      showAlert("No unclaimed records found to export.", 'warning', 'EXPORT FAILED', undefined, rect);
       return;
     }
 
@@ -812,7 +818,7 @@ export default function AdminDashboardPage() {
                             {/* Action Sweep button */}
                             <td className="py-4 px-4 text-right">
                               <button
-                                onClick={() => handleSweepRoom(room.roomPubkey)}
+                                onClick={(e) => handleSweepRoom(room.roomPubkey, e)}
                                 disabled={isSweeping || !room.isEligibleForSweep}
                                 className="px-3 py-1.5 bg-neon-moon hover:bg-green-600 disabled:opacity-40 disabled:hover:bg-neon-moon text-black font-staatliches text-xs tracking-wider uppercase rounded transition-colors font-bold flex items-center gap-1.5 ml-auto"
                               >

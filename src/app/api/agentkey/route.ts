@@ -291,87 +291,102 @@ const FALLBACK_DATA = {
   intelligenceReport: 'Meme coin super cycle narrative dominates. Solana meme tokens seeing highest volume since March. AI agent tokens gaining traction. Market neutral with bullish bias on high-volume meme pairs.'
 };
 
-export async function GET() {
+// Memory cache state
+let cachedData: any = null;
+let cacheTimestamp = 0;
+let isFetching = false;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Helper: prepare and execute a discovered endpoint
+async function prepareAndExecute(apiKey: string, candidate: string | null, fallbackWrapper: string, fallbackParams: any) {
+  if (!candidate) {
+    try {
+      return await executeTool(apiKey, fallbackWrapper, fallbackParams);
+    } catch (e) {
+      return null;
+    }
+  }
+  const activeCandidate = candidate as string;
+  const desc = await describeTool(apiKey, activeCandidate);
+  let wrapperName = fallbackWrapper;
+  let paramsForExec = fallbackParams;
+  try {
+    if (desc) {
+      const execAs = (desc.execute_as) || (desc.result && desc.result.execute_as) || (desc.describe && desc.describe.execute_as) || null;
+      if (execAs && execAs.name) {
+        wrapperName = execAs.name;
+        paramsForExec = execAs.params || execAs.params_template || fallbackParams;
+      } else {
+        if (/twitter|social/i.test(activeCandidate)) {
+          wrapperName = 'agentkey_social';
+          paramsForExec = { path: activeCandidate, params: {} };
+        } else if (/crypto|token|market|price|ticker/i.test(activeCandidate)) {
+          wrapperName = 'agentkey_crypto';
+          paramsForExec = { path: activeCandidate, params: {} };
+        } else if (activeCandidate.startsWith('agentkey_')) {
+          wrapperName = activeCandidate;
+          paramsForExec = fallbackParams;
+        } else {
+          wrapperName = 'agentkey_search';
+          paramsForExec = { query: activeCandidate, type: 'news', num: 5 };
+        }
+      }
+    }
+  } catch (e) {
+    // ignore and use fallback
+  }
+
+  if (wrapperName === 'agentkey_social' && (!paramsForExec || typeof paramsForExec !== 'object' || !paramsForExec.path)) {
+    paramsForExec = { path: activeCandidate, params: {} };
+  }
+
+  try {
+    const execRes = await executeTool(apiKey, wrapperName, paramsForExec);
+    return execRes;
+  } catch (e) {
+    try {
+      const execRes2 = await executeTool(apiKey, activeCandidate, fallbackParams);
+      return execRes2;
+    } catch (e2) {
+      return null;
+    }
+  }
+}
+
+async function refreshCacheInBackground() {
+  if (isFetching) return;
+  isFetching = true;
   try {
     const apiKey = readKeyFromEnvOrFile();
-    if (!apiKey) return NextResponse.json(FALLBACK_DATA);
+    if (!apiKey) {
+      cachedData = FALLBACK_DATA;
+      cacheTimestamp = Date.now();
+      return;
+    }
 
     // basic health check - list_tools is free
     const listResp = await sendRpc(apiKey, 'list_tools', {});
-    if (!listResp) return NextResponse.json(FALLBACK_DATA);
+    if (!listResp) {
+      cachedData = FALLBACK_DATA;
+      cacheTimestamp = Date.now();
+      return;
+    }
 
     // Discover endpoints (find_tools is also free)
     const twitterCandidate = await findCandidate(apiKey, 'twitter trending cashtags', ['social/twitter', 'social']);
     const cryptoCandidate = await findCandidate(apiKey, 'crypto top tickers', ['crypto', 'crypto/market', 'crypto/token', 'token']);
     const newsCandidate = await findCandidate(apiKey, 'web3 news latest', ['search', 'news', 'web']);
 
-    // Helper: prepare and execute a discovered endpoint
-    async function prepareAndExecute(candidate: string | null, fallbackWrapper: string, fallbackParams: any) {
-      const activeApiKey = apiKey as string;
-      if (!candidate) {
-        try {
-          return await executeTool(activeApiKey, fallbackWrapper, fallbackParams);
-        } catch (e) {
-          return null;
-        }
-      }
-      const activeCandidate = candidate as string;
-      const desc = await describeTool(activeApiKey, activeCandidate);
-      let wrapperName = fallbackWrapper;
-      let paramsForExec = fallbackParams;
-      try {
-        if (desc) {
-          const execAs = (desc.execute_as) || (desc.result && desc.result.execute_as) || (desc.describe && desc.describe.execute_as) || null;
-          if (execAs && execAs.name) {
-            wrapperName = execAs.name;
-            paramsForExec = execAs.params || execAs.params_template || fallbackParams;
-          } else {
-            if (/twitter|social/i.test(activeCandidate)) {
-              wrapperName = 'agentkey_social';
-              paramsForExec = { path: activeCandidate, params: {} };
-            } else if (/crypto|token|market|price|ticker/i.test(activeCandidate)) {
-              wrapperName = 'agentkey_crypto';
-              paramsForExec = { path: activeCandidate, params: {} };
-            } else if (activeCandidate.startsWith('agentkey_')) {
-              wrapperName = activeCandidate;
-              paramsForExec = fallbackParams;
-            } else {
-              wrapperName = 'agentkey_search';
-              paramsForExec = { query: activeCandidate, type: 'news', num: 5 };
-            }
-          }
-        }
-      } catch (e) {
-        // ignore and use fallback
-      }
-
-      if (wrapperName === 'agentkey_social' && (!paramsForExec || typeof paramsForExec !== 'object' || !paramsForExec.path)) {
-        paramsForExec = { path: activeCandidate, params: {} };
-      }
-
-      try {
-        const execRes = await executeTool(activeApiKey, wrapperName, paramsForExec);
-        return execRes;
-      } catch (e) {
-        try {
-          const execRes2 = await executeTool(activeApiKey, activeCandidate, fallbackParams);
-          return execRes2;
-        } catch (e2) {
-          return null;
-        }
-      }
-    }
-
     // Execute twitter trending
-    const twitterExec = await prepareAndExecute(twitterCandidate, 'agentkey_social', { path: 'social/twitter/web/fetch_trending', params: {} });
+    const twitterExec = await prepareAndExecute(apiKey, twitterCandidate, 'agentkey_social', { path: 'social/twitter/web/fetch_trending', params: {} });
     const twitterArray = twitterExec ? (findFirstArray(twitterExec) || findFirstArray(twitterExec.result) || findFirstArray(twitterExec.data) || []) : [];
 
     // Execute crypto tickers
-    const cryptoExec = await prepareAndExecute(cryptoCandidate, 'agentkey_crypto', { type: 'cmc_quotes', limit: 10 });
+    const cryptoExec = await prepareAndExecute(apiKey, cryptoCandidate, 'agentkey_crypto', { type: 'cmc_quotes', limit: 10 });
     const cryptoArray = cryptoExec ? (findFirstArray(cryptoExec) || findFirstArray(cryptoExec.result) || findFirstArray(cryptoExec.data) || []) : [];
 
     // Execute news/search for intelligence report and hype topics
-    const newsExec = await prepareAndExecute(newsCandidate, 'agentkey_search', { query: 'web3 news', type: 'news', num: 5 });
+    const newsExec = await prepareAndExecute(apiKey, newsCandidate, 'agentkey_search', { query: 'web3 news', type: 'news', num: 5 });
     const newsArray = newsExec ? (findFirstArray(newsExec) || findFirstArray(newsExec.result) || findFirstArray(newsExec.data) || []) : [];
 
     // Try to map real data; fall back to demo if empty
@@ -415,11 +430,30 @@ export async function GET() {
       intelligenceReport = FALLBACK_DATA.intelligenceReport;
     }
 
-    return NextResponse.json({ trendingCashtags, hypeTopics, intelligenceReport });
+    cachedData = { trendingCashtags, hypeTopics, intelligenceReport };
+    cacheTimestamp = Date.now();
   } catch (err: any) {
-    console.error('AgentKey API error:', err);
-    // Always return fallback on error so the UI section populates
-    return NextResponse.json(FALLBACK_DATA);
+    console.error('Background AgentKey cache refresh error:', err);
+    if (!cachedData) {
+      cachedData = FALLBACK_DATA;
+    }
+  } finally {
+    isFetching = false;
   }
+}
+
+export async function GET() {
+  const now = Date.now();
+  const needsRefresh = !cachedData || (now - cacheTimestamp > CACHE_TTL_MS);
+
+  if (needsRefresh) {
+    if (!cachedData) {
+      cachedData = FALLBACK_DATA;
+    }
+    // Fire and forget asynchronously
+    refreshCacheInBackground();
+  }
+
+  return NextResponse.json(cachedData);
 }
 

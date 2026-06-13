@@ -2,7 +2,7 @@
 import { INDEXER_URL } from "@/utils/config";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWalletContext } from '@/components/WalletProvider';
 import { useAppState } from '@/store/useAppState';
 import { PixelShovel, PixelGasMask } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
@@ -86,7 +86,7 @@ interface SystemHealth {
 }
 
 export default function AdminDashboardPage() {
-  const { publicKey, signMessage } = useWallet();
+  const { activeWalletPublicKey: publicKey, signMessage } = useWalletContext();
   const { user, connectWallet, showAlert } = useAppState();
 
   const [activeTab, setActiveTab] = useState<'stats' | 'sweeper' | 'config' | 'ledger' | 'monitor'>('stats');

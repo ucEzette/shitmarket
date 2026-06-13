@@ -6,6 +6,7 @@ import { FloatingPepe } from './FloatingPepe';
 import { Header } from './Header';
 import { Footer } from './Footer';
 import { WalletAdapterBridge } from './WalletAdapterBridge';
+import { WalletSelectionModal } from './WalletSelectionModal';
 import { MemePopup, PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from './MemeAssets';
 import { ShareCardModal } from './ShareCardModal';
 import { ComplianceModal } from './ComplianceModal';
@@ -662,6 +663,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       
       {/* Wallet Adapter Bridge - syncs Solana wallet to Zustand state */}
       <WalletAdapterBridge />
+
+      {/* Wallet Selection Modal Onboarding */}
+      <WalletSelectionModal />
 
       {/* Compliance Risk & Exclusions Onboarding */}
       <ComplianceModal />

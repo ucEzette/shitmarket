@@ -3,8 +3,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { useWalletContext } from './WalletProvider';
+import { WalletPanel } from './WalletPanel';
 import { useAppState } from '@/store/useAppState';
 import { PepePortrait, PEPE_ASSETS } from './MemeAssets';
 import { LogOut, Loader2, Coins, Settings, X } from 'lucide-react';
@@ -300,23 +300,33 @@ export const Header: React.FC<{
   onMenuToggle?: () => void;
 }> = ({ isRoomPage, onMenuToggle }) => {
   const pathname = usePathname();
-  const { user, disconnectWallet: mockDisconnect } = useAppState();
-  const { publicKey, connected, connecting: walletConnecting, disconnect } = useWallet();
-  const { setVisible } = useWalletModal();
-  const [connecting, setConnecting] = useState(false);
+  const { user } = useAppState();
+  const { walletType, activeWalletAddress, balance, setIsModalOpen, disconnect } = useWalletContext();
+  const [showWalletPanel, setShowWalletPanel] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close WalletPanel
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(event.target as Node)) {
+        setShowWalletPanel(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleConnect = useCallback(() => {
-    setVisible(true);
-  }, [setVisible]);
+    setIsModalOpen(true);
+  }, [setIsModalOpen]);
 
   const handleDisconnect = useCallback(() => {
     disconnect().catch(() => {});
-    mockDisconnect();
-  }, [disconnect, mockDisconnect]);
+  }, [disconnect]);
 
   return (
     <header className="sticky top-0 z-[100] w-full border-b border-trench-sandbag bg-black px-2 h-10 sm:h-11 flex items-center retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0" style={{ overflow: 'visible' }}>
-      <div className="w-full mx-auto px-2 sm:px-4 flex flex-row items-center justify-between gap-2">
+      <div className="w-full mx-auto px-2 sm:px-4 flex flex-row items-center justify-between gap-2 relative animate-fadeIn" style={{ overflow: 'visible' }}>
         {/* Left Aligned branding and navigation section */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
           {/* Logo */}
@@ -364,7 +374,7 @@ export const Header: React.FC<{
             </button>
           </Link>
           
-          {user && user.wallet ? (
+          {activeWalletAddress ? (
             <div className="flex items-center gap-1 bg-black border border-trench-sandbag/50 rounded p-0.5">
               {/* Notification Bell */}
               <NotificationBell />
@@ -372,22 +382,25 @@ export const Header: React.FC<{
               {/* Settings Dropdown */}
               <HeaderSettings />
 
-              {/* Ammo Display */}
-              <div className="flex items-center gap-1 px-1.5 py-0.5 bg-trench-mud border border-trench-sandbag/40 rounded-sm">
-                <Coins size={9} className="text-moon-gold" />
+              {/* Ammo Display (Click toggles WalletPanel) */}
+              <button
+                onClick={() => setShowWalletPanel(!showWalletPanel)}
+                className="flex items-center gap-1 px-1.5 py-0.5 bg-trench-mud hover:bg-trench-mud/85 border border-trench-sandbag/40 rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+              >
+                <Coins size={9} className="text-moon-gold font-bold" />
                 <span className="font-mono text-[8px] sm:text-[9px] font-bold text-moon-gold">
-                  <span className="hidden sm:inline">AMMO: </span><span className="glow-gold font-bold">{user.balance.toFixed(2)} SOL</span>
+                  <span className="hidden sm:inline">AMMO: </span><span className="glow-gold font-bold">{balance.toFixed(2)} SOL</span>
                 </span>
-              </div>
+              </button>
 
               {/* Connected wallet profile image linking to profile */}
               <Link
                 href="/profile"
                 className="block shrink-0 transition-transform hover:scale-105"
-                title={`Trench Pass: ${user.username || user.wallet.substring(0, 6)}`}
+                title={`Trench Pass: ${user?.username || activeWalletAddress.substring(0, 6)}`}
               >
                 <PepePortrait
-                  src={user.avatarUrl || PEPE_ASSETS.fewUnderstand}
+                  src={user?.avatarUrl || PEPE_ASSETS.fewUnderstand}
                   size={20}
                   glowColor="moon"
                   className="rounded-full"
@@ -398,7 +411,7 @@ export const Header: React.FC<{
               <button
                 onClick={handleDisconnect}
                 title="RESERVE FORCES (DISCONNECT)"
-                className="p-0.5 text-trench-gasmask hover:text-white hover:bg-red-500/20 transition-all rounded border border-trench-sandbag/40 bg-trench-black"
+                className="p-0.5 text-trench-gasmask hover:text-white hover:bg-red-500/20 transition-all rounded border border-trench-sandbag/40 bg-trench-black cursor-pointer"
               >
                 <LogOut size={10} />
               </button>
@@ -406,23 +419,20 @@ export const Header: React.FC<{
           ) : (
             <button
               onClick={handleConnect}
-              disabled={connecting}
-              className="relative flex items-center gap-0.5 px-2 py-0.5 sm:px-3 sm:py-1 font-staatliches text-[10px] sm:text-xs tracking-wider uppercase text-black active:translate-y-0.5 transition-all rounded font-bold retro-btn retro-btn-moon"
+              className="relative flex items-center gap-0.5 px-2 py-0.5 sm:px-3 sm:py-1 font-staatliches text-[10px] sm:text-xs tracking-wider uppercase text-black active:translate-y-0.5 transition-all rounded font-bold retro-btn retro-btn-moon cursor-pointer"
             >
-              {connecting ? (
-                <>
-                  <Loader2 size={8} className="animate-spin text-white sm:size-[10px]" />
-                  <span>Helmetting...</span>
-                </>
-              ) : (
-                <>
-                  <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={11} loading="eager" className="rounded-full animate-bounce sm:size-[13px]" />
-                  <span>CONNECT</span>
-                </>
-              )}
+              <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={11} loading="eager" className="rounded-full animate-bounce sm:size-[13px]" />
+              <span>ENTER THE TRENCHES</span>
             </button>
           )}
         </div>
+
+        {/* Dropdown WalletPanel */}
+        {showWalletPanel && activeWalletAddress && (
+          <div ref={panelRef} className="absolute right-4 top-10 z-[1000] w-72">
+            <WalletPanel onClose={() => setShowWalletPanel(false)} />
+          </div>
+        )}
       </div>
     </header>
   );

@@ -1015,10 +1015,10 @@ export default function RoomDetailPage() {
             </div>
 
             {/* Coin Briefing Text */}
-            <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed uppercase border-l-4 border-l-neon-moon">
+            <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed border-l-4 border-l-neon-moon">
               <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
-                <span className="text-neon-moon font-bold">COIN INTEL BRIEF:</span>
-                <span className="text-trench-gasmask">MINT ADDR:</span>
+                <span className="text-neon-moon font-bold uppercase">COIN INTEL BRIEF:</span>
+                <span className="text-trench-gasmask uppercase">MINT ADDR:</span>
                 <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full min-w-0">
                   <span className="truncate min-w-0">{room.token.address}</span>
                   <button 
@@ -1033,15 +1033,17 @@ export default function RoomDetailPage() {
                   </button>
                 </span>
               </div>
+              <div className="uppercase">
               {room.token.symbol === 'PEPE' ? (
                 <span>🐸 Pepe the frog, standard infantry memecoin. Plunged into the bearish mud after local high listings, currently fighting for bullish recovery inside the SOL arena. Highly volatile.</span>
               ) : room.token.symbol === 'WIF' ? (
                 <span>🐕 Soldier Dogwifhat, holding the line with a standard-issue wool cap. Defending the bullish support trench with high-morale community reinforcement.</span>
               ) : room.token.symbol === 'JEET' ? (
-                <span>💀 Breadline Skeleton. Dev rugged early on, leaving the jeets to pick up the pieces. Volatility is critical, expect sudden explosive action.</span>
+                <span>📉 The ultimate paperhands avatar. A mascot for those who take profit at the first sign of green. Usually found dumping on early believers.</span>
               ) : (
-                <span>📊 Operation targeting {formatCashtag(room.token.symbol)} (${room.token.name}). Active token index synced in real time via DEXSCREENER. Factions are competing to influence the TWAP before deployment countdown expires.</span>
+                <span>📊 Operation targeting ${room.token.symbol} ({room.token.name}). Active token index synced in real time via DexScreener. Factions are competing to influence the TWAP before deployment countdown expires.</span>
               )}
+              </div>
             </div>
           </div>
 

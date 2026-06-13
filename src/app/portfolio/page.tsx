@@ -9,6 +9,10 @@ import {
   Activity, Check, Copy, Award, Zap, Coins, Users, Radio, X, Loader2, ArrowRight 
 } from 'lucide-react';
 import Link from 'next/link';
+import PortfolioWallets from './PortfolioWallets';
+import { useWalletContext } from '@/components/WalletProvider';
+import { connection } from '@/utils/solanaClient';
+import { PublicKey } from '@solana/web3.js';
 
 interface ChartPoint {
   x: number;
@@ -252,15 +256,48 @@ const PNLChart: React.FC<{
 
 export default function PortfolioPage() {
   const { user, rooms, roomsLoaded, fetchRooms, refreshProfile, connectWallet } = useAppState();
-  const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'performance' | 'orders'>('positions');
+  const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'performance' | 'orders' | 'wallets'>('wallets');
   const [currency, setCurrency] = useState<'SOL' | 'USD'>('USD');
   const [copiedWallet, setCopiedWallet] = useState(false);
   const [livePrices, setLivePrices] = useState<{ [address: string]: number }>({});
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+  const walletContext = useWalletContext();
+  const [totalAmmoBalance, setTotalAmmoBalance] = useState<number | null>(null);
 
   // Conversion rate (mock: 1 SOL = $150.00 USD)
   const SOL_USD_RATE = 150.0;
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchTotalBalance = async () => {
+      try {
+        let total = 0;
+        const walletsToFetch = [...walletContext.embeddedWallets];
+        if (walletContext.activeWalletAddress && walletContext.walletType !== 'embedded') {
+          if (!walletsToFetch.find(w => w.address === walletContext.activeWalletAddress)) {
+            walletsToFetch.push({ address: walletContext.activeWalletAddress } as any);
+          }
+        }
+        
+        for (const wallet of walletsToFetch) {
+          try {
+            const bal = await connection.getBalance(new PublicKey(wallet.address));
+            total += bal / 1e9;
+          } catch (e) {
+            console.error("Failed to fetch balance for", wallet.address, e);
+          }
+        }
+        if (isMounted) setTotalAmmoBalance(total);
+      } catch (err) {
+        console.error("Error fetching total ammo balance", err);
+      }
+    };
+    
+    fetchTotalBalance();
+    const interval = setInterval(fetchTotalBalance, 15000); // 15s refresh
+    return () => { isMounted = false; clearInterval(interval); };
+  }, [walletContext.embeddedWallets, walletContext.activeWalletAddress, walletContext.walletType]);
 
   // Poll database rooms and profile on mount & periodically
   useEffect(() => {
@@ -556,7 +593,7 @@ export default function PortfolioPage() {
           <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">AMMO BALANCE</span>
           <div className="flex items-baseline gap-1 mt-1">
             <span className="font-staatliches text-2xl text-white block leading-none">
-              {formatVal(user.balance)}
+              {formatVal(totalAmmoBalance !== null ? totalAmmoBalance : user.balance)}
             </span>
           </div>
           <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block mt-1.5 leading-none">
@@ -605,15 +642,15 @@ export default function PortfolioPage() {
 
       </div>
 
-      {/* Tabs list (Overview, Open Positions, Performance, Trades, Open Orders) */}
       <div className="border-b border-trench-sandbag/40 mb-6 flex flex-wrap gap-2 relative z-10">
-        {(['positions', 'overview', 'performance', 'trades', 'orders'] as const).map((tab) => {
+        {(['positions', 'overview', 'performance', 'trades', 'orders', 'wallets'] as const).map((tab) => {
           let label = '';
           if (tab === 'positions') label = `OPEN POSITIONS (${openPositions.length})`;
           else if (tab === 'overview') label = 'OVERVIEW';
           else if (tab === 'performance') label = 'PERFORMANCE';
           else if (tab === 'trades') label = 'TRADES';
           else if (tab === 'orders') label = 'OPEN ORDERS (0)';
+          else if (tab === 'wallets') label = 'WALLETS';
 
           const isActive = activeTab === tab;
 
@@ -1004,6 +1041,11 @@ export default function PortfolioPage() {
             <p>No Open Orders recorded</p>
             <p className="mt-1.5 text-[10px] text-trench-gasmask/60">Limit orders or pending room triggers will display here.</p>
           </div>
+        )}
+
+        {/* TAB 6: WALLETS */}
+        {activeTab === 'wallets' && (
+          <PortfolioWallets />
         )}
 
       </div>

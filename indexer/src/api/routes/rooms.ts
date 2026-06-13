@@ -1,6 +1,8 @@
 import express from 'express';
+import axios from 'axios';
 import { prisma, prismaRead } from '../../db';
 import { getCachedRoom, getCachedRooms, cacheRoom, publishRoomUpdate } from '../../redis';
+import { redis } from '../../redis';
 import { logger } from '../../logger';
 import { validate, roomsQuerySchema, roomPubkeyParamSchema } from '../validation';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -19,10 +21,41 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
   }
 
   try {
-    const url = `${config.external.dexscreenerUrl}/tokens/${mintAddress}`;
-    const response = await fetch(url);
-    if (!response.ok) return {};
-    const data: any = await response.json();
+    const cached = await redis.get(`tokenmeta:${mintAddress}`);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      tokenMetaCache.set(mintAddress, parsed);
+      return parsed;
+    }
+  } catch (err) {
+    logger.warn({ msg: 'Failed to read tokenmeta from redis', err });
+  }
+
+  try {
+    let lookupAddress = mintAddress;
+    let isEvm = false;
+    try {
+      const pubkey = new PublicKey(mintAddress);
+      const buffer = pubkey.toBuffer();
+      let evmCheck = true;
+      for (let i = 20; i < 32; i++) {
+        if (buffer[i] !== 0) {
+          evmCheck = false;
+          break;
+        }
+      }
+      if (evmCheck) {
+        lookupAddress = '0x' + buffer.slice(0, 20).toString('hex');
+        isEvm = true;
+      }
+    } catch {
+      if (mintAddress.startsWith('0x')) {
+        isEvm = true;
+      }
+    }
+
+    const url = `${config.external.dexscreenerUrl}/tokens/${lookupAddress}`;
+    const { data } = await axios.get(url, { timeout: 5000 });
     const pairs: any[] = data?.pairs ?? [];
     if (!pairs.length) return {};
     const best = pairs.sort((a, b) => (b.liquidity?.usd ?? 0) - (a.liquidity?.usd ?? 0))[0];
@@ -30,13 +63,17 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
       name: best.baseToken?.name,
       symbol: best.baseToken?.symbol,
       imageUrl: best.info?.imageUrl ?? undefined,
-      chainId: best.chainId ?? 'solana',
-      originalAddress: mintAddress,
+      chainId: best.chainId ?? (isEvm ? 'monad' : 'solana'),
+      originalAddress: lookupAddress,
       pairAddress: best.pairAddress,
     };
-    tokenMetaCache.set(mintAddress, meta);
+    if (meta.symbol) {
+      tokenMetaCache.set(mintAddress, meta);
+      await redis.set(`tokenmeta:${mintAddress}`, JSON.stringify(meta), 'EX', 86400).catch(() => {});
+    }
     return meta;
-  } catch {
+  } catch (err: any) {
+    logger.error({ msg: 'fetchTokenMeta failed in rooms route', mintAddress, err: err?.message });
     return {};
   }
 }

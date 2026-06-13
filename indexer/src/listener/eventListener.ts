@@ -204,7 +204,29 @@ async function fetchTokenMeta(mintAddress: string): Promise<TokenMeta> {
       return JSON.parse(cached);
     }
 
-    const url = `${config.external.dexscreenerUrl}/tokens/${mintAddress}`;
+    let lookupAddress = mintAddress;
+    let isEvm = false;
+    try {
+      const pubkey = new PublicKey(mintAddress);
+      const buffer = pubkey.toBuffer();
+      let evmCheck = true;
+      for (let i = 20; i < 32; i++) {
+        if (buffer[i] !== 0) {
+          evmCheck = false;
+          break;
+        }
+      }
+      if (evmCheck) {
+        lookupAddress = '0x' + buffer.slice(0, 20).toString('hex');
+        isEvm = true;
+      }
+    } catch {
+      if (mintAddress.startsWith('0x')) {
+        isEvm = true;
+      }
+    }
+
+    const url = `${config.external.dexscreenerUrl}/tokens/${lookupAddress}`;
     const { data } = await axios.get(url, { timeout: 5000 });
     const pairs: any[] = data?.pairs ?? [];
     if (!pairs.length) return {};
@@ -214,13 +236,13 @@ async function fetchTokenMeta(mintAddress: string): Promise<TokenMeta> {
       name: best.baseToken?.name,
       symbol: best.baseToken?.symbol,
       imageUrl: best.info?.imageUrl ?? undefined,
-      chainId: best.chainId ?? 'solana',
-      originalAddress: mintAddress,
+      chainId: best.chainId ?? (isEvm ? 'monad' : 'solana'),
+      originalAddress: lookupAddress,
       priceUsd: best.priceUsd ? best.priceUsd : undefined,
       pairAddress: best.pairAddress,
     };
 
-    await redis.set(`tokenmeta:${mintAddress}`, JSON.stringify(meta), 'EX', 3600); // 1 hour cache
+    await redis.set(`tokenmeta:${mintAddress}`, JSON.stringify(meta), 'EX', 86400); // 24 hour cache
     return meta;
   } catch (err: any) {
     logger.warn({ msg: 'fetchTokenMeta failed', mintAddress, err: err?.message });
@@ -262,6 +284,11 @@ async function handleRoomCreated(event: RoomCreatedEvent): Promise<void> {
       update: {
         priceFeed: event.priceFeed.toBase58(),
         creator: event.creator.toBase58(),
+        tokenName: meta.name ?? event.tokenName,
+        tokenSymbol: meta.symbol,
+        tokenImageUrl: meta.imageUrl,
+        chainId: meta.chainId ?? 'solana',
+        originalAddress: meta.originalAddress ?? tokenMint,
       },
     });
 

@@ -82,6 +82,7 @@ model UserProfile {
   updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
   reputation   Reputation?
+  activities   Activity[]
 
   @@map("user_profiles")
 }
@@ -176,3 +177,20 @@ model ChatMessage {
   @@map("chat_messages")
 }
 
+// ─── Activity Log (Notifications) ──────────────────────────────────────────
+
+model Activity {
+  id         String   @id @default(uuid()) @db.Uuid
+  userPubkey String   @map("user_pubkey") @db.VarChar(44)
+  type       String   @db.VarChar(20)
+  title      String   @db.VarChar(100)
+  message    String   @db.VarChar(500)
+  link       String?  @db.VarChar(200)
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user       UserProfile @relation(fields: [userPubkey], references: [userPubkey])
+
+  @@index([userPubkey, createdAt])
+  @@map("activities")
+}

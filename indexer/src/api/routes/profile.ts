@@ -167,6 +167,13 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
       won: b.room.status === 'settled' && b.side === b.room.winner,
     }));
 
+    // Fetch activities
+    const activities = await prisma.activity.findMany({
+      where: { userPubkey: wallet },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+
     return res.json({
       success: true,
       data: {
@@ -181,6 +188,10 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
           rewardAmount: p.rewardAmount.toString(),
         })),
         bets,
+        activities: activities.map(a => ({
+          ...a,
+          timestamp: new Date(a.createdAt).getTime(),
+        })),
         winStreak,
         longestWinStreak,
         biggestBet: biggestBet.toString(),
@@ -275,5 +286,54 @@ profileRouter.post('/update', async (req, res) => {
   } catch (err: any) {
     logger.error({ msg: 'POST /api/profile/update error', err: err?.message });
     return res.status(500).json({ success: false, error: err?.message || 'Internal server error' });
+  }
+});
+
+// ── POST /api/profile/activities ─────────────────────────────────────────────
+
+profileRouter.post('/activities', async (req, res) => {
+  try {
+    const { userPubkey, type, title, message, link } = req.body;
+
+    if (!userPubkey || !type || !title || !message) {
+      return res.status(400).json({ success: false, error: 'Missing required activity fields' });
+    }
+
+    const activity = await prisma.activity.create({
+      data: {
+        userPubkey,
+        type,
+        title,
+        message,
+        link,
+      }
+    });
+
+    return res.json({ success: true, data: activity });
+  } catch (err: any) {
+    logger.error({ msg: 'POST /api/profile/activities error', err: err?.message });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/profile/activities/read ────────────────────────────────────────
+
+profileRouter.post('/activities/read', async (req, res) => {
+  try {
+    const { userPubkey } = req.body;
+
+    if (!userPubkey) {
+      return res.status(400).json({ success: false, error: 'userPubkey is required' });
+    }
+
+    await prisma.activity.updateMany({
+      where: { userPubkey, read: false },
+      data: { read: true }
+    });
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    logger.error({ msg: 'POST /api/profile/activities/read error', err: err?.message });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

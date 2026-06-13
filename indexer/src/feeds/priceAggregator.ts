@@ -14,6 +14,7 @@
  */
 
 import axios from 'axios';
+import { PublicKey } from '@solana/web3.js';
 import { config } from '../config';
 import { logger } from '../logger';
 
@@ -38,11 +39,32 @@ export interface PriceSample {
   timestamp: number;  // unix seconds
 }
 
+function getLookupAddress(tokenMint: string): string {
+  try {
+    const pubkey = new PublicKey(tokenMint);
+    const buffer = pubkey.toBuffer();
+    let isEvm = true;
+    for (let i = 20; i < 32; i++) {
+      if (buffer[i] !== 0) {
+        isEvm = false;
+        break;
+      }
+    }
+    if (isEvm) {
+      return '0x' + buffer.slice(0, 20).toString('hex');
+    }
+  } catch {
+    // Already an EVM address or invalid Solana public key
+  }
+  return tokenMint;
+}
+
 // ─── Internal fetch helpers ───────────────────────────────────────────────────
 
 async function fetchDexScreener(tokenMint: string): Promise<number | null> {
   try {
-    const url = `${config.external.dexscreenerUrl}/tokens/${tokenMint}`;
+    const lookupAddress = getLookupAddress(tokenMint);
+    const url = `${config.external.dexscreenerUrl}/tokens/${lookupAddress}`;
     const { data } = await axios.get(url, { 
       timeout: 5000,
       headers: {
@@ -68,7 +90,8 @@ async function fetchDexScreener(tokenMint: string): Promise<number | null> {
 async function fetchBirdeye(tokenMint: string): Promise<number | null> {
   if (!config.external.birdeyeApiKey) return null;
   try {
-    const url = `https://public-api.birdeye.so/defi/price?address=${tokenMint}`;
+    const lookupAddress = getLookupAddress(tokenMint);
+    const url = `https://public-api.birdeye.so/defi/price?address=${lookupAddress}`;
     const { data } = await axios.get(url, {
       timeout: 5000,
       headers: { 'X-API-KEY': config.external.birdeyeApiKey },
@@ -131,7 +154,8 @@ async function fetchPythRest(priceFeedId: string): Promise<number | null> {
  */
 async function fetchJupiter(tokenMint: string): Promise<number | null> {
   try {
-    const url = `${config.external.jupiterPriceUrl}?ids=${tokenMint}`;
+    const lookupAddress = getLookupAddress(tokenMint);
+    const url = `${config.external.jupiterPriceUrl}?ids=${lookupAddress}`;
     const { data } = await axios.get(url, { 
       timeout: 5000,
       headers: {
@@ -139,7 +163,7 @@ async function fetchJupiter(tokenMint: string): Promise<number | null> {
         "Accept": "application/json"
       }
     });
-    const priceData = data?.data?.[tokenMint];
+    const priceData = data?.data?.[lookupAddress];
     if (!priceData) return null;
 
     const priceUsd = parseFloat(priceData.price);

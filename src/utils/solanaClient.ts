@@ -2,17 +2,18 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import idlJson from './idl.json';
 
-// Automatically target local validator in development, fallback to Devnet or environment overrides
+// Always use the env-provided RPC. Never fall back to a local validator — it won't be running in prod/dev.
 export const PROGRAM_ID = new PublicKey(idlJson.address);
-export const RPC_ENDPOINT = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 
-  (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8899' : 'https://api.devnet.solana.com');
+export const RPC_ENDPOINT =
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+  'https://api.devnet.solana.com';
 
-// Define redundant devnet RPC endpoints for frontend robustness
+// Redundant devnet RPC endpoints for frontend resilience
 const fallbackUrls = [
   RPC_ENDPOINT,
-  process.env.NEXT_PUBLIC_SOLANA_BACKUP_RPC_URL || 'https://api.devnet.solana.com',
+  process.env.NEXT_PUBLIC_SOLANA_BACKUP_RPC_URL || '',
   'https://devnet.helius-rpc.com/?api-key=3f6d76a7-0e6d-49f3-8b74-27ee34685ff4',
-  'https://api.devnet.solana.com'
+  'https://api.devnet.solana.com',
 ].filter((url, idx, self) => url && self.indexOf(url) === idx);
 
 let currentIndex = 0;
@@ -31,7 +32,8 @@ export const connection = new Proxy(currentConnection, {
           'sendRawTransaction', 'sendTransaction', 'simulateTransaction',
           'getMinimumBalanceForRentExemption', 'getSlot', 'getTransaction',
           'getParsedTransaction', 'getProgramAccounts', 'getTokenAccountBalance',
-          'getMultipleAccountsInfo', 'getRecentPrioritizationFees'
+          'getMultipleAccountsInfo', 'getRecentPrioritizationFees',
+          'getTokenSupply', 'getTokenLargestAccounts',
         ];
         
         if (!asyncMethods.includes(String(prop))) {

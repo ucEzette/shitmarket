@@ -38,9 +38,10 @@ export const metadata: Metadata = {
   description: "Pure PvP predictions for meme coins. Bet Moon or Jeet on 5, 15, or 60-minute rooms. Rug-free, adrenaline-packed crypto betting.",
   icons: {
     icon: [
-      { url: "/pepes/screen1.png", sizes: "any", type: "image/png" },
+      { url: "/pepes/logo-main.png", sizes: "288x285", type: "image/png" },
     ],
-    apple: [{ url: "/pepes/screen1.png", sizes: "180x180", type: "image/png" }],
+    shortcut: [{ url: "/pepes/logo-main.png", sizes: "288x285", type: "image/png" }],
+    apple: [{ url: "/pepes/logo-main.png", sizes: "288x285", type: "image/png" }],
   },
   openGraph: {
     title: "ShitMarket | Degen Meme Coin PvP Prediction Markets",

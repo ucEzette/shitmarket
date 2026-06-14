@@ -128,10 +128,18 @@ function HomeContent() {
             initial={{ y: -30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
-            className="font-staatliches text-4xl sm:text-6xl md:text-7xl leading-none text-white tracking-widest text-center mb-10 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
+            className="font-staatliches text-4xl sm:text-6xl md:text-7xl leading-none text-white tracking-widest text-center mb-4 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
           >
             PICK A SIDE. <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-moon to-emerald-400">BET THE TRENCH.</span>
           </motion.h1>
+          <motion.h2
+            initial={{ y: -10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.7, ease: 'easeOut', delay: 0.1 }}
+            className="text-sm sm:text-base md:text-lg font-mono uppercase tracking-[0.35em] text-trench-sandbag/80 text-center mb-10"
+          >
+            pvp memecoin prediction market
+          </motion.h2>
 
           {/* Centered Premium Dynamic Battle Arena Splitscreen Card */}
           <motion.div

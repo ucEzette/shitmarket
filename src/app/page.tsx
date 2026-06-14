@@ -136,7 +136,7 @@ function HomeContent() {
             initial={{ y: -10, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.7, ease: 'easeOut', delay: 0.1 }}
-            className="text-sm sm:text-base md:text-lg font-mono uppercase tracking-[0.35em] text-trench-sandbag/80 text-center mb-10"
+            className="text-sm sm:text-base md:text-lg font-mono uppercase tracking-[0.35em] text-white text-center mb-10"
           >
             pvp memecoin prediction market
           </motion.h2>

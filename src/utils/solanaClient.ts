@@ -2,19 +2,24 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import idlJson from './idl.json';
 
+const programIdString = process.env.NEXT_PUBLIC_PROGRAM_ID || idlJson.address;
+if (process.env.NEXT_PUBLIC_PROGRAM_ID && idlJson.address !== process.env.NEXT_PUBLIC_PROGRAM_ID) {
+  (idlJson as any).address = process.env.NEXT_PUBLIC_PROGRAM_ID;
+}
+
 // Always use the env-provided RPC. Never fall back to a local validator — it won't be running in prod/dev.
-export const PROGRAM_ID = new PublicKey(idlJson.address);
+export const PROGRAM_ID = new PublicKey(programIdString);
 export const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
   'https://api.devnet.solana.com';
 
-// Redundant devnet RPC endpoints for frontend resilience
+// Only use env-configured RPC endpoints. Never hardcode API keys here.
 const fallbackUrls = [
   RPC_ENDPOINT,
   process.env.NEXT_PUBLIC_SOLANA_BACKUP_RPC_URL || '',
-  'https://devnet.helius-rpc.com/?api-key=3f6d76a7-0e6d-49f3-8b74-27ee34685ff4',
   'https://api.devnet.solana.com',
 ].filter((url, idx, self) => url && self.indexOf(url) === idx);
+
 
 let currentIndex = 0;
 let currentConnection = new Connection(fallbackUrls[0], 'confirmed');
@@ -124,7 +129,12 @@ export const getAnchorProgram = (walletAdapter: any): anchor.Program<any> => {
     }
   );
   
-  return new anchor.Program(idlJson as any, provider);
+  const idlWithAddress = {
+    ...idlJson,
+    address: PROGRAM_ID.toBase58(),
+  };
+
+  return new anchor.Program(idlWithAddress as any, provider);
 };
 
 export const getVaultPda = (): PublicKey => {

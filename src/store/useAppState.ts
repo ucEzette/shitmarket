@@ -1334,77 +1334,202 @@ export const useAppState = create<AppState>()(
     );
     
     try {
-      const rooms = get().rooms;
-      const room = rooms.find((r) => r.id === roomId);
-      
-      if (room && room.status === 'active' && room.expiry <= Date.now()) {
-        console.log(`Room is active but expired. Triggering on-demand settlement first for room ${roomId}...`);
-        const indexerUrl = INDEXER_URL;
-        const settleRes = await fetch(`${indexerUrl}/api/rooms/${roomId}/settle`, {
-          method: 'POST',
-        });
-        if (!settleRes.ok) {
-          const errData = await settleRes.json().catch(() => ({}));
-          throw new Error(errData.error || `Settlement request failed with status ${settleRes.status}`);
-        }
-        const settleJson = await settleRes.json();
-        console.log(`On-demand settlement completed! txSig: ${settleJson.txSig}`);
-        
-        if (settleJson.txSig) {
-          console.log(`Waiting for settlement transaction ${settleJson.txSig} to confirm...`);
-          try {
-            const latestBlockhash = await connection.getLatestBlockhash();
-            await connection.confirmTransaction({
-              signature: settleJson.txSig,
-              blockhash: latestBlockhash.blockhash,
-              lastValidBlockHeight: latestBlockhash.lastValidBlockHeight
-            }, 'confirmed');
-            console.log(`Settlement transaction confirmed on-chain.`);
-          } catch (confirmErr) {
-            console.warn("Failed to confirm settlement transaction, proceeding anyway", confirmErr);
-          }
-        }
-        
-        // Wait a moment (1500ms) for the indexer event listener to sync DB
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        
-        // Refresh rooms to update frontend state
-        await get().fetchRooms();
-      }
-
+      // ── Step 1: Init program early (needed for on-chain status check) ─────────
       const program = getAnchorProgram(wallet);
       const roomPda = new PublicKey(roomId);
       const escrowPda = getEscrowPda(roomPda);
-      
       const [configPda] = PublicKey.findProgramAddressSync(
         [Buffer.from('platform_config')],
         program.programId
       );
+
+      // ── Step 2: Fetch fresh room state ────────────────────────────────────────
+      // Strategy: check on-chain first (authoritative), then indexer, then local state.
+      // This prevents claiming against an unsettled room even when indexer is down.
+
+      // 2a. On-chain room account — the true source of truth
+      let onChainSettled = false;
+      let onChainWinner: string | null = null;
+      try {
+        const onChainRoom: any = await (program.account as any).room.fetch(roomPda);
+        const statusKey = Object.keys(onChainRoom.status ?? {})[0] ?? 'active';
+        onChainSettled = statusKey === 'settled';
+        if (onChainRoom.winner) {
+          const winnerKey = Object.keys(onChainRoom.winner)[0];
+          onChainWinner = winnerKey === 'moon' ? 'moon' : winnerKey === 'jeet' ? 'jeet' : 'draw';
+        }
+        console.log(`On-chain room status: ${statusKey}, winner: ${onChainWinner ?? 'none'}`);
+      } catch (e) {
+        console.warn('Could not fetch on-chain room status (RPC may be slow):', e);
+      }
+
+      // 2b. Indexer / local state — used for expiry and winner metadata
+      let freshRoomData: any = null;
+      try {
+        const roomFetchRes = await fetch(`${INDEXER_URL}/api/rooms/${roomId}`);
+        if (roomFetchRes.ok) {
+          const roomFetchJson = await roomFetchRes.json();
+          freshRoomData = roomFetchJson?.data ?? null;
+        }
+      } catch (e) {
+        console.warn('Indexer unreachable, using local state:', e);
+      }
+
+      const localRoom = get().rooms.find((r) => r.id === roomId);
+      const roomExpiry: number = freshRoomData?.expiry
+        ? new Date(freshRoomData.expiry).getTime()
+        : (localRoom?.expiry ?? 0);
+      const roomWinner: string | null = onChainWinner ?? freshRoomData?.winner ?? localRoom?.winner ?? null;
+
+      // ── Step 3: Settle the room if needed ────────────────────────────────────
+      // Use on-chain status as the authoritative check. If on-chain is already settled,
+      // skip straight to claiming. If not, trigger settlement and poll until confirmed.
+      const isExpired = roomExpiry <= Date.now();
+      const needsSettle = !onChainSettled; // trust on-chain, not indexer DB
+
+      if (needsSettle) {
+        if (!isExpired) {
+          throw new Error('Room has not expired yet. You can claim after it ends.');
+        }
+
+        console.log(`Room ${roomId} not settled on-chain — triggering settlement...`);
+
+        // Kick off settlement via indexer keeper
+        try {
+          const settleRes = await fetch(`${INDEXER_URL}/api/rooms/${roomId}/settle`, {
+            method: 'POST',
+          });
+          const settleJson = await settleRes.json().catch(() => ({}));
+          console.log(`Settle response: ${settleRes.status}`, settleJson);
+
+          const settleError =
+            settleJson?.error ||
+            (settleRes.statusText && settleRes.statusText !== 'OK' ? settleRes.statusText : null) ||
+            `HTTP ${settleRes.status}`;
+
+          if (!settleRes.ok || settleJson?.success === false) {
+            if (typeof settleError === 'string' && settleError.toLowerCase().includes('already settled')) {
+              console.log('On-demand settlement reports room already settled, continuing to poll on-chain.');
+            } else {
+              throw new Error(`Settlement request failed: ${settleError}`);
+            }
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith('Settlement request failed:')) {
+            throw e;
+          }
+
+          console.warn('Indexer settle endpoint unreachable:', e);
+          throw new Error(
+            'The indexer is not running. Please ensure the indexer (npm start) is running, then try again.'
+          );
+        }
+
+        get().updateToast(toastId, {
+          type: 'loading',
+          message: 'SETTLING ROOM',
+          description: 'Waiting for settlement to confirm on-chain...',
+        });
+
+        // Poll: check on-chain status every 3s (not indexer DB — on-chain is truth)
+        const startTime = Date.now();
+        const TIMEOUT_MS = 60_000;
+        let settled = false;
+
+        while (Date.now() - startTime < TIMEOUT_MS) {
+          await new Promise(r => setTimeout(r, 3000));
+          try {
+            const pollRoom: any = await (program.account as any).room.fetch(roomPda);
+            const pollStatusKey = Object.keys(pollRoom.status ?? {})[0] ?? 'active';
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            console.log(`Settlement on-chain poll: ${pollStatusKey} (${elapsed}s elapsed)`);
+            if (pollStatusKey === 'settled') {
+              settled = true;
+              // Update winner from on-chain data
+              if (pollRoom.winner) {
+                const wKey = Object.keys(pollRoom.winner)[0];
+                onChainWinner = wKey === 'moon' ? 'moon' : wKey === 'jeet' ? 'jeet' : 'draw';
+              }
+              break;
+            }
+          } catch (pollErr) {
+            console.warn('On-chain poll error:', pollErr);
+            // Fall back to indexer poll
+            try {
+              const pollRes = await fetch(`${INDEXER_URL}/api/rooms/${roomId}`);
+              if (pollRes.ok) {
+                const pollJson = await pollRes.json();
+                const pollStatus = pollJson?.data?.status ?? '';
+                if (pollStatus === 'settled') { settled = true; break; }
+              }
+            } catch { /* ignore */ }
+          }
+        }
+
+        if (!settled) {
+          throw new Error(
+            'Room settlement timed out. The keeper may be busy or the indexer may be down. Please try again in a moment.'
+          );
+        }
+
+        await get().fetchRooms();
+        get().updateToast(toastId, {
+          type: 'loading',
+          message: 'RECOVERING SPOILS',
+          description: 'Room settled on-chain! Processing your claim...',
+        });
+      }
+
+
+
+      // ── Step 4: Determine which side to claim on ──────────────────────────
+      // For voided (winner='draw') and draw rooms the user claims their OWN bet side.
+      // Priority: (1) local user bet record → (2) on-chain PDA existence → (3) winner (non-draw only)
+      let claimSide: 'moon' | 'jeet' | null = null;
       
-      let claimSide = room?.winner === 'moon' ? 'moon' : 'jeet';
-      
+      // First, try to find the user's unclaimed bet in local state
       const userBet = get().user?.bets.find((b) => b.roomId === roomId && !b.claimed);
-      if (userBet) {
+      if (userBet && (userBet.side === 'moon' || userBet.side === 'jeet')) {
         claimSide = userBet.side;
+        console.log(`ClaimSide from user bet record: ${claimSide}`);
       } else {
+        // Check on-chain which bet PDA actually exists for this wallet
         try {
           const moonBetPda = getBetPda(roomPda, wallet.publicKey, 'moon');
           const moonInfo = await connection.getAccountInfo(moonBetPda);
           if (moonInfo) {
             claimSide = 'moon';
+            console.log('ClaimSide from on-chain moon PDA');
           } else {
             const jeetBetPda = getBetPda(roomPda, wallet.publicKey, 'jeet');
             const jeetInfo = await connection.getAccountInfo(jeetBetPda);
             if (jeetInfo) {
               claimSide = 'jeet';
+              console.log('ClaimSide from on-chain jeet PDA');
             }
           }
         } catch (e) {
-          console.warn("Failed to check bet PDAs on-chain, falling back to default side derivation", e);
+          console.warn('Failed PDA check for claim side:', e);
         }
       }
 
-      const betPda = getBetPda(roomPda, wallet.publicKey, claimSide as 'moon' | 'jeet');
+      // If we still couldn't determine the claim side, try via room winner
+      // (only for non-draw/non-void rooms — draw/void rooms require on-chain PDA lookup)
+      if (!claimSide) {
+        if (roomWinner && roomWinner !== 'draw' && roomWinner !== null) {
+          claimSide = roomWinner as 'moon' | 'jeet';
+          console.log(`ClaimSide from room winner: ${claimSide}`);
+        } else {
+          // For draw/void rooms, we must have a claim side from the bet or PDA.
+          // If we can't find it, throw an error rather than guessing 'moon'.
+          throw new Error(
+            'Could not determine your bet side for this draw/voided room. ' +
+            'This may happen if the RPC is unreachable. Please try again.'
+          );
+        }
+      }
+
+      const betPda = getBetPda(roomPda, wallet.publicKey, claimSide);
 
       const remainingAccounts = [];
       const userState = get().user;
@@ -1499,8 +1624,9 @@ export const useAppState = create<AppState>()(
         link: `/room/${roomId}`
       });
 
-      // Reload balance and user stats
+      // Reload balance and room state so the UI reflects the claim immediately
       await get().fetchBalance();
+      await get().fetchRooms();
 
       // In the background, refresh the profile/balance after 2 seconds to sync with the database
       setTimeout(() => {

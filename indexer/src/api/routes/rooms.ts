@@ -387,9 +387,14 @@ roomsRouter.post('/:pubkey/settle', validate(roomPubkeyParamSchema, 'params'), a
     const result = await settleRoomByPubkey(pubkey);
     if (result.success) {
       return res.json({ success: true, txSig: result.txSig });
-    } else {
-      return res.status(400).json({ success: false, error: result.error });
     }
+
+    const lowerError = (result.error ?? '').toLowerCase();
+    if (lowerError.includes('already settled')) {
+      return res.json({ success: true, txSig: result.txSig, info: result.error });
+    }
+
+    return res.status(400).json({ success: false, error: result.error });
   } catch (err: any) {
     logger.error({ msg: 'POST /api/rooms/:pubkey/settle error', err: err?.message });
     return res.status(500).json({ success: false, error: 'Internal server error' });

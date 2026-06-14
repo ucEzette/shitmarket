@@ -16,6 +16,8 @@ import { prisma, prismaRead } from '../db';
 import { redis } from '../redis';
 import type { RpcCircuitBreaker } from '../solana/rpcCircuitBreaker';
 import { sentryErrorHandler, captureError } from '../sentry';
+import { getSettlementKeeperStatus } from '../keeper/settlementKeeper';
+import { getEventListenerStatus } from '../listener/eventListener';
 
 // ─── Health check helpers ──────────────────────────────────────────────────────
 
@@ -130,7 +132,15 @@ export function createApiServer(circuitBreaker?: RpcCircuitBreaker): express.App
       checkReplicaDb(),
     ]);
 
-    const allOk = db.status === 'ok' && rds.status === 'ok' && rpcResult.status === 'ok';
+    const keeperStatus = getSettlementKeeperStatus();
+    const eventListenerStatus = getEventListenerStatus();
+
+    const allOk =
+      db.status === 'ok' &&
+      rds.status === 'ok' &&
+      rpcResult.status === 'ok' &&
+      keeperStatus.isRunning &&
+      eventListenerStatus.isRunning;
 
     res.status(allOk ? 200 : 503).json({
       status: allOk ? 'ok' : 'degraded',
@@ -141,6 +151,8 @@ export function createApiServer(circuitBreaker?: RpcCircuitBreaker): express.App
         databaseReplica: replicaDb,
         redis: rds,
         solanaRpc: rpcResult,
+        settlementKeeper: keeperStatus,
+        eventListener: eventListenerStatus,
       },
     });
   });

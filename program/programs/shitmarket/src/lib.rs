@@ -9,7 +9,7 @@ use error::ShitMarketError;
 use price::{calc_payout, calc_platform_fee, compute_ema};
 use pyth::load_price_feed_price;
 
-declare_id!("2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ");
+declare_id!("ByNq6kkYAPWPkHSimJPL6nhkeP7xFKHkstZRQcdLLH1B");
 
 // ─────────────────────────────────────────────
 //  CONSTANTS
@@ -420,11 +420,15 @@ pub struct SettleRoom<'info> {
     )]
     pub escrow: UncheckedAccount<'info>,
 
-    /// CHECK: Vault PDA holding platform fees
+    /// CHECK: Vault PDA holding platform fees.
+    /// The vault is created automatically on first settlement if it does not exist.
     #[account(
         mut,
         seeds = [b"vault"],
-        bump
+        bump,
+        init_if_needed,
+        payer = keeper,
+        space = 0
     )]
     pub vault: UncheckedAccount<'info>,
 
@@ -896,15 +900,10 @@ pub mod shitmarket {
         require!(room.status == RoomStatus::Active, ShitMarketError::RoomAlreadySettled);
         require!(room.is_expired(now), ShitMarketError::RoomNotExpired);
 
-        // Phase 3.4: Minimum liquidity check
-        let total_pool = room.total_pool()?;
-        require!(
-            total_pool >= ctx.accounts.config.minimum_liquidity,
-            ShitMarketError::InsufficientLiquidity
-        );
-
         // ── ONE-SIDED ROOM VOID: if nobody bet the opposing side, void the room.
         //    All bettors get full refunds — no price oracle needed, no platform fee.
+        //    This check MUST come before the minimum liquidity check so that
+        //    one-sided rooms (even with tiny pools) always settle correctly.
         let is_one_sided = room.moon_pool == 0 || room.jeet_pool == 0;
         if is_one_sided {
             room.status = RoomStatus::Settled;
@@ -912,6 +911,7 @@ pub mod shitmarket {
             room.final_price = room.opening_price; // unchanged — no actual contest
             room.twap_final_price = room.opening_price;
 
+            let total_pool = room.total_pool()?;
             emit!(RoomVoided {
                 room: room_key,
                 total_refund_pool: total_pool,
@@ -925,6 +925,13 @@ pub mod shitmarket {
             );
             return Ok(());
         }
+
+        // Phase 3.4: Minimum liquidity check — only applies to two-sided rooms
+        let total_pool = room.total_pool()?;
+        require!(
+            total_pool >= ctx.accounts.config.minimum_liquidity,
+            ShitMarketError::InsufficientLiquidity
+        );
 
         // Phase 3.1: Multi-oracle — validate Pyth feed
         require!(ctx.accounts.price_feed.key() == room.price_feed, ShitMarketError::InvalidPythFeed);

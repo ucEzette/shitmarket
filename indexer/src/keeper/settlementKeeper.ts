@@ -74,6 +74,32 @@ let activeConnection: Connection | null = null;
 let activeProgram: anchor.Program | null = null;
 let cachedTreasury: PublicKey | null = null;
 
+interface SettlementKeeperStatus {
+  isRunning: boolean;
+  lastSweepAt: string | null;
+  lastSweepDurationMs: number | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  lastError: string | null;
+  lastRoomCount: number;
+  lastResult: 'idle' | 'success' | 'failure';
+}
+
+const settlementKeeperStatus: SettlementKeeperStatus = {
+  isRunning: false,
+  lastSweepAt: null,
+  lastSweepDurationMs: null,
+  lastSuccessAt: null,
+  lastFailureAt: null,
+  lastError: null,
+  lastRoomCount: 0,
+  lastResult: 'idle',
+};
+
+export function getSettlementKeeperStatus(): SettlementKeeperStatus {
+  return { ...settlementKeeperStatus };
+}
+
 function loadKeeperKeypair(): Keypair {
   const raw = config.solana.keeperPrivateKey;
   try {
@@ -106,12 +132,40 @@ function deriveEscrowPda(room: PublicKey, programId: PublicKey): PublicKey {
   return pda;
 }
 
+function deriveVaultPda(programId: PublicKey): PublicKey {
+  const [pda] = PublicKey.findProgramAddressSync([
+    Buffer.from('vault'),
+  ], programId);
+  return pda;
+}
+
 function deriveConfigPda(programId: PublicKey): PublicKey {
   const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from('platform_config')],
     programId
   );
   return pda;
+}
+
+function getRoomStatusFromAccount(roomAccount: any): string {
+  return Object.keys(roomAccount.status ?? {})[0] ?? 'active';
+}
+
+function getWinnerFromRoomAccount(roomAccount: any): 'moon' | 'jeet' | 'draw' | null {
+  const winnerKey = Object.keys(roomAccount.winner ?? {})[0];
+  if (winnerKey === 'moon') return 'moon';
+  if (winnerKey === 'jeet') return 'jeet';
+  if (winnerKey === 'draw') return 'draw';
+  return null;
+}
+
+function parseOptionalBigInt(value: any): bigint | null {
+  if (value === null || value === undefined) return null;
+  try {
+    return BigInt(value.toString());
+  } catch {
+    return null;
+  }
 }
 
 // ─── Core settlement logic ────────────────────────────────────────────────────
@@ -153,20 +207,41 @@ async function settleRoom(
     // Derive PDAs
     const configPda = deriveConfigPda(programId);
     const escrowPda = deriveEscrowPda(roomPubkey, programId);
+    const vaultPda = deriveVaultPda(programId);
 
-    // Fetch config's treasury account to pass as 'vault' (what the deployed program expects)
-    let treasuryPubkey: PublicKey;
-    if (cachedTreasury) {
-      treasuryPubkey = cachedTreasury;
+    // Validate vault PDA before sending settle_room, to catch any obvious program ID / account mismatch.
+    const vaultInfo = await connection.getAccountInfo(vaultPda);
+    if (!vaultInfo) {
+      logger.warn({
+        msg: 'Vault PDA does not exist on-chain yet. The program may create it implicitly during first settlement.',
+        vault: vaultPda.toBase58(),
+        programId: programId.toBase58(),
+      });
+    } else if (
+      !vaultInfo.owner.equals(SystemProgram.programId) &&
+      !vaultInfo.owner.equals(programId)
+    ) {
+      throw new Error(
+        `Vault PDA owner mismatch: expected ${SystemProgram.programId.toBase58()} or ${programId.toBase58()}, got ${vaultInfo.owner.toBase58()}. ` +
+        'The vault account must be either a system account or derived for this program ID.'
+      );
     } else {
+      logger.info({
+        msg: 'Validated existing vault PDA for settle_room',
+        vault: vaultPda.toBase58(),
+        vaultOwner: vaultInfo.owner.toBase58(),
+        programId: programId.toBase58(),
+      });
+    }
+
+    // The on-chain settle_room instruction expects the vault PDA itself, not the configured treasury wallet.
+    // The vault PDA may be created lazily by the first settlement transaction.
+    if (!cachedTreasury) {
       try {
         const configAccount: any = await (program.account as any).platformConfig.fetch(configPda);
         cachedTreasury = configAccount.treasury;
-        treasuryPubkey = configAccount.treasury;
       } catch (err: any) {
         logger.error({ msg: 'Failed to fetch platformConfig for treasury', err: err?.message });
-        // Fallback to keeper.publicKey if fetch fails (e.g. devnet IDL size mismatch)
-        treasuryPubkey = keeper.publicKey;
       }
     }
 
@@ -198,7 +273,7 @@ async function settleRoom(
       timestamp: Math.floor(s.createdAt.getTime() / 1000),
     }));
 
-    // Fetch room account from blockchain to check pools
+    // Fetch room account from blockchain to check pools and on-chain status
     let roomAccount: any;
     try {
       roomAccount = await (program.account as any).room.fetch(roomPubkey);
@@ -206,6 +281,37 @@ async function settleRoom(
       logger.error({ msg: 'Failed to fetch room account from blockchain', room: roomPubkeyStr, err: err?.message });
       await release();
       throw err;
+    }
+
+    const roomStatus = getRoomStatusFromAccount(roomAccount);
+    if (roomStatus === 'settled' || roomStatus === 'cancelled') {
+      const onChainWinner = getWinnerFromRoomAccount(roomAccount);
+      const finalPrice = parseOptionalBigInt(roomAccount.finalPrice);
+      const twapFinalPrice = parseOptionalBigInt(roomAccount.twapFinalPrice);
+      const platformFee = parseOptionalBigInt(roomAccount.platformFee);
+
+      const updateData: any = {
+        status: roomStatus === 'cancelled' ? 'cancelled' : 'settled',
+      };
+      if (onChainWinner) updateData.winner = onChainWinner;
+      if (finalPrice !== null) updateData.finalPrice = finalPrice;
+      if (twapFinalPrice !== null) updateData.twapFinalPrice = twapFinalPrice;
+      if (platformFee !== null) updateData.platformFee = platformFee;
+
+      await prisma.room.update({
+        where: { roomPubkey: roomPubkeyStr },
+        data: updateData,
+      }).catch(() => {});
+
+      logger.info({
+        msg: 'Room already settled on-chain before keeper submission — syncing DB',
+        room: roomPubkeyStr,
+        roomStatus,
+        onChainWinner,
+      });
+
+      await release();
+      return 'already_settled';
     }
 
     const isOneSided = roomAccount.moonPool.isZero() || roomAccount.jeetPool.isZero();
@@ -272,7 +378,7 @@ async function settleRoom(
       const accounts: Record<string, PublicKey> = {
         room: roomPubkey,
         escrow: escrowPda,
-        vault: treasuryPubkey,
+        vault: vaultPda,
         priceFeed: new PublicKey(pythFeedId),
         switchboardFeed: switchboardFeedStr
           ? new PublicKey(switchboardFeedStr)
@@ -375,17 +481,41 @@ async function settleRoom(
       return txSig;
     } catch (err: any) {
       const msg = extractErrorMessage(err);
-      // Gracefully handle already-settled or not-active or low-liquidity rooms (race condition, stale DB state, or failed minimum liquidity requirement)
-      if (msg.includes('RoomAlreadySettled') || msg.includes('6002') ||
-          msg.includes('RoomNotActive') || msg.includes('6000') || msg.includes('0x1770') ||
-          msg.includes('InsufficientLiquidity') || msg.includes('6022') || msg.includes('0x1786')) {
-        logger.info({ msg: 'Room already settled/inactive/under-liquidity on-chain — marking settled in DB', room: roomPubkeyStr, error: msg });
-        // Mark as settled in DB to prevent future attempts
+      // Gracefully handle already-settled or not-active rooms (race condition, stale DB state)
+      // IMPORTANT: Do NOT mark rooms as 'settled' in DB if the on-chain error is
+      // InsufficientLiquidity — the room is still 'active' on-chain and the minimum
+      // liquidity may be met later (e.g. a keeper with a different feed, or a manual
+      // intervention). Marking it as 'settled' in DB creates an unrecoverable desync
+      // where users see a settled room in the UI but can never claim their funds.
+      if (msg.includes('RoomAlreadySettled') || msg.includes('6002')) {
+        logger.info({ msg: 'Room already settled on-chain — marking settled in DB', room: roomPubkeyStr, error: msg });
+        // Best-effort DB update
         await prisma.room.update({
           where: { roomPubkey: roomPubkeyStr },
           data: { status: 'settled' },
-        }).catch(() => {}); // Best-effort
+        }).catch(() => {});
         return 'already_settled';
+      }
+      
+      if (msg.includes('RoomNotActive') || msg.includes('6000') || msg.includes('0x1770')) {
+        logger.info({ msg: 'Room not active on-chain — skipping', room: roomPubkeyStr, error: msg });
+        return 'not_active';
+      }
+
+      if (msg.includes('AccountOwnedByWrongProgram') || msg.includes('0xbbf') || msg.includes('3007')) {
+        // Room belongs to an old program deployment — mark as settled in DB so the keeper stops retrying it.
+        logger.warn({ msg: 'Room owned by a different program (old deployment) — marking settled in DB to stop retries', room: roomPubkeyStr });
+        await prisma.room.update({
+          where: { roomPubkey: roomPubkeyStr },
+          data: { status: 'settled' },
+        }).catch(() => {});
+        return 'wrong_program';
+      }
+      
+      if (msg.includes('InsufficientLiquidity') || msg.includes('6022') || msg.includes('0x1786')) {
+        logger.info({ msg: 'Room insufficient liquidity on-chain — NOT marking as settled. Room remains active for retry.', room: roomPubkeyStr, error: msg });
+        // DO NOT update DB status — let the keeper retry on the next tick
+        return 'insufficient_liquidity';
       } else {
         logger.error({ msg: 'settle_room failed', room: roomPubkeyStr, err: msg });
         keeperFailureTotal.inc();
@@ -420,11 +550,19 @@ export function startSettlementKeeper(
     config.solana.rpcUrl.includes('devnet') ||
     config.solana.rpcUrl.includes('localhost') ||
     config.solana.rpcUrl.includes('127.0.0.1');
-  const cronExpr = isDevnet ? '*/10 * * * * *' : '*/3 * * * * *';
-  const intervalLabel = isDevnet ? '10 seconds' : '3 seconds';
+  const cronExpr = isDevnet ? '*/10 * * * * *' : '*/2 * * * * *';
+  const intervalLabel = isDevnet ? '10 seconds' : '2 seconds';
+
+  settlementKeeperStatus.isRunning = true;
 
   // Run every N seconds
   const task = cron.schedule(cronExpr, async () => {
+    const tickStart = Date.now();
+    settlementKeeperStatus.lastSweepAt = new Date().toISOString();
+    settlementKeeperStatus.lastRoomCount = 0;
+    settlementKeeperStatus.lastError = null;
+    settlementKeeperStatus.lastResult = 'idle';
+
     let expiredRooms: {
       roomPubkey: string;
       tokenMint: string;
@@ -450,19 +588,32 @@ export function startSettlementKeeper(
         },
         take: 10, // Process up to 10 rooms per tick to avoid thundering herd
       });
+
+      settlementKeeperStatus.lastRoomCount = expiredRooms.length;
+
+      if (expiredRooms.length === 0) {
+        settlementKeeperStatus.lastSweepDurationMs = Date.now() - tickStart;
+        settlementKeeperStatus.lastResult = 'success';
+        return;
+      }
+
+      logger.info({ msg: 'Keeper found expired rooms', count: expiredRooms.length });
+
+      // Settle concurrently but with a small cap
+      await Promise.allSettled(
+        expiredRooms.map((room) => settleRoom(program, connection, keeper, room))
+      );
+
+      settlementKeeperStatus.lastSuccessAt = new Date().toISOString();
+      settlementKeeperStatus.lastResult = 'success';
     } catch (err: any) {
-      logger.error({ msg: 'Keeper DB query failed', err: err?.message });
-      return;
+      settlementKeeperStatus.lastFailureAt = new Date().toISOString();
+      settlementKeeperStatus.lastError = err?.message ?? String(err);
+      settlementKeeperStatus.lastResult = 'failure';
+      logger.error({ msg: 'Settlement keeper tick failed', err: err?.message, stack: err?.stack });
+    } finally {
+      settlementKeeperStatus.lastSweepDurationMs = Date.now() - tickStart;
     }
-
-    if (expiredRooms.length === 0) return;
-
-    logger.info({ msg: 'Keeper found expired rooms', count: expiredRooms.length });
-
-    // Settle concurrently but with a small cap
-    await Promise.allSettled(
-      expiredRooms.map((room) => settleRoom(program, connection, keeper, room))
-    );
   });
 
   logger.info(`Settlement keeper started — running every ${intervalLabel}`);
@@ -486,14 +637,6 @@ export async function settleRoomByPubkey(pubkeyStr: string): Promise<{ success: 
 
     if (!roomRecord) {
       return { success: false, error: 'Room not found in database' };
-    }
-
-    if (roomRecord.status === 'settled') {
-      return { success: true, error: 'Room is already settled' };
-    }
-
-    if (roomRecord.expiry > new Date()) {
-      return { success: false, error: 'Room has not expired yet' };
     }
 
     let connection = activeConnection;
@@ -539,6 +682,44 @@ export async function settleRoomByPubkey(pubkeyStr: string): Promise<{ success: 
       normalizeIdl(idlWithAddress);
       
       program = new anchor.Program(idlWithAddress as anchor.Idl, provider);
+    }
+
+    if (roomRecord.status !== 'settled' && roomRecord.expiry > new Date()) {
+      try {
+        const roomPubkey = new PublicKey(pubkeyStr);
+        const onChainRoom: any = await (program.account as any).room.fetch(roomPubkey);
+        const onChainStatus = Object.keys(onChainRoom.status ?? {})[0] ?? 'active';
+        if (onChainStatus === 'settled' || onChainStatus === 'cancelled') {
+          const winnerKey = Object.keys(onChainRoom.winner ?? {})[0];
+          const winner = winnerKey === 'moon' ? 'moon' : winnerKey === 'jeet' ? 'jeet' : 'draw';
+          const finalPrice = parseOptionalBigInt(onChainRoom.finalPrice);
+          const twapFinalPrice = parseOptionalBigInt(onChainRoom.twapFinalPrice);
+          const platformFee = parseOptionalBigInt(onChainRoom.platformFee);
+
+          const updateData: any = {
+            status: onChainStatus === 'cancelled' ? 'cancelled' : 'settled',
+          };
+          if (winner) updateData.winner = winner;
+          if (finalPrice !== null) updateData.finalPrice = finalPrice;
+          if (twapFinalPrice !== null) updateData.twapFinalPrice = twapFinalPrice;
+          if (platformFee !== null) updateData.platformFee = platformFee;
+
+          await prisma.room.update({
+            where: { roomPubkey: pubkeyStr },
+            data: updateData,
+          }).catch(() => {});
+
+          return { success: true, error: 'Room has already settled on-chain and database was synced' };
+        }
+      } catch (err: any) {
+        logger.warn({ msg: 'Failed to reconcile on-chain room status during on-demand settlement', pubkeyStr, err: err?.message });
+      }
+
+      return { success: false, error: 'Room has not expired yet' };
+    }
+
+    if (roomRecord.status === 'settled') {
+      return { success: true, error: 'Room is already settled' };
     }
 
     const keeper = loadKeeperKeypair();

@@ -612,7 +612,8 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
     ];
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase();
+      const key = String(e.key || '').toLowerCase();
+      if (!key) return;
       const newProgress = [...konamiProgress, key];
 
       // Check if current progress matches sequence so far

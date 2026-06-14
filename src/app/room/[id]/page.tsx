@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAppState, Room, ChatMessage, formatCashtag, formatPrice } from '@/store/useAppState';
@@ -16,48 +16,21 @@ import * as Slider from '@radix-ui/react-slider';
 import confetti from 'canvas-confetti';
 
 // 1. Stable, Static, and Dynamic Memoized DexScreener Iframe Chart Component
-// Encapsulates local loading states internally to prevent parent state updates or callback prop changes,
-// guaranteeing that the chart remains perfectly stable and never flashes or reloads on periodic state poll updates!
-const StableDexChart = React.memo(({ chainId, pairAddress, tokenAddress }: { chainId: string; pairAddress: string; tokenAddress: string }) => {
+// Uses the smallest possible chart-only pair embed, lazy mounts only when visible, and stays stable across unrelated parent renders.
+const StableDexChart = React.memo(({ chainId, pairAddress }: { chainId: string; pairAddress: string }) => {
   const [localLoading, setLocalLoading] = useState(true);
-  
-  // Track the actual active loaded pair to prevent loading empty strings or reloading on parent ticks
-  const [activePair, setActivePair] = useState<{ chainId: string; pairAddress: string; tokenAddress: string } | null>(null);
-
-  // Update active pair ONLY when we receive a valid, non-empty pair address!
-  useEffect(() => {
-    if (chainId && (pairAddress || tokenAddress)) {
-      if (!activePair || activePair.pairAddress !== pairAddress || activePair.tokenAddress !== tokenAddress || activePair.chainId !== chainId) {
-        setActivePair({ chainId, pairAddress: pairAddress || '', tokenAddress: tokenAddress || '' });
-        setLocalLoading(true);
-      }
-    }
-  }, [chainId, pairAddress, tokenAddress, activePair]);
-
-  // If we don't have a valid active pair yet, show a loader
-  if (!activePair) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] pt-12 z-10 animate-pulse">
-        <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
-        <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
-          WAITING FOR MARKET TELEMETRY...
-        </span>
-      </div>
-    );
-  }
-
-  const isSolana = activePair.chainId.toLowerCase() === 'solana';
-  const iframeSrc = isSolana && activePair.tokenAddress
-    ? `https://birdeye.so/tv-widget/${activePair.tokenAddress}?chain=solana&theme=dark`
-    : `https://dexscreener.com/${activePair.chainId}/${activePair.pairAddress}?embed=1&theme=dark&info=0&trades=0`;
+  const iframeSrc = useMemo(
+    () => `https://dexscreener.com/${chainId}/${pairAddress}?embed=1&theme=dark`,
+    [chainId, pairAddress]
+  );
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative bg-black">
       {localLoading && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#070c04] z-10 animate-pulse pt-12">
           <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
           <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
-            CONNECTING TO TELEMETRY STREAM...
+            LOADING CHART...
           </span>
         </div>
       )}
@@ -65,18 +38,55 @@ const StableDexChart = React.memo(({ chainId, pairAddress, tokenAddress }: { cha
         className="w-full h-full border-none"
         src={iframeSrc}
         title="Token Chart Widget"
+        loading="lazy"
+        referrerPolicy="no-referrer"
         onLoad={() => setLocalLoading(false)}
-      ></iframe>
+      />
     </div>
   );
 }, (prevProps, nextProps) => {
-  if (prevProps.chainId !== nextProps.chainId) return false;
-  if (prevProps.tokenAddress !== nextProps.tokenAddress) return false;
-  if (prevProps.pairAddress !== nextProps.pairAddress) return false;
-  return true;
+  return prevProps.chainId === nextProps.chainId && prevProps.pairAddress === nextProps.pairAddress;
 });
 
 StableDexChart.displayName = 'StableDexChart';
+
+const LazyDexChart = ({ chainId, pairAddress }: { chainId: string; pairAddress: string }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldRender(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '250px', threshold: 0.1 }
+    );
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="w-full h-full">
+      {shouldRender ? (
+        <StableDexChart chainId={chainId} pairAddress={pairAddress} />
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] text-center px-4">
+          <Loader2 size={28} className="animate-spin text-neon-moon mb-3" />
+          <span className="font-mono text-[10px] text-trench-gasmask uppercase tracking-widest">
+            PREPARING CHART VIEW...
+          </span>
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface MortarProjectile {
   id: number;
@@ -484,17 +494,26 @@ export default function RoomDetailPage() {
     });
   };
 
-  const handleClaim = () => {
+  const handleClaim = async () => {
     if (!user) return;
-    claimWinnings(room.id);
-    synthSound('victory');
-    confetti({
-      particleCount: 150,
-      spread: 70,
-      origin: { y: 0.8 },
-      colors: ['#FFD700', '#16A34A']
-    });
-    setBattleLogs((prev) => [...prev, `[BOOTY DISPATCHED] User claimed on-chain winnings/refund!`]);
+    try {
+      await claimWinnings(room.id);
+      synthSound('victory');
+      confetti({
+        particleCount: 150,
+        spread: 70,
+        origin: { y: 0.8 },
+        colors: ['#FFD700', '#16A34A']
+      });
+      setBattleLogs((prev) => [...prev, `[BOOTY DISPATCHED] User claimed on-chain winnings/refund!`]);
+    } catch (err: any) {
+      console.error('Claim failed:', err);
+      showAlert(
+        err?.message || 'CLAIM FAILED — Transaction rejected. Please try again.',
+        'error',
+        'CLAIM FAILED'
+      );
+    }
   };
 
   const handleSendChat = (e: React.FormEvent<HTMLFormElement>) => {
@@ -915,12 +934,10 @@ export default function RoomDetailPage() {
               {/* Memoized Stable chart iframe. Specifying a unique React Key forces React to reuse 
                   the existing DOM node instead of rebuilding it on parent wagers state updates,
                   completely resolving any iframe flashing/flickering! */}
-              {room.token.chainId && (room.token.pairAddress || room.token.address) ? (
-                <StableDexChart 
-                  key={`dexscreener-${room.id}`}
+              {room.token.chainId && room.token.pairAddress ? (
+                <LazyDexChart
                   chainId={room.token.chainId}
-                  pairAddress={room.token.pairAddress || ''}
-                  tokenAddress={room.token.address}
+                  pairAddress={room.token.pairAddress}
                 />
               ) : (
                 <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] pt-12 z-10 animate-pulse">
@@ -1413,7 +1430,7 @@ export default function RoomDetailPage() {
               <button
                 onClick={handleCharge}
                 disabled={isTransactionLoading}
-                className="w-full py-4 text-center font-staatliches text-2xl uppercase tracking-widest text-black rounded border-2 border-yellow-300 border-b-4 border-yellow-700 bg-yellow-400 hover:bg-yellow-500 active:translate-y-0.5 transition-all relative overflow-hidden group shadow-lg font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.3)] disabled:bg-trench-sandbag disabled:border-trench-sandbag disabled:text-trench-gasmask hatch-pattern"
+                className="w-full py-4 text-center font-staatliches text-2xl uppercase tracking-widest text-black rounded border-2 border-yellow-700 border-b-4 bg-yellow-400 hover:bg-yellow-500 active:translate-y-0.5 transition-all relative overflow-hidden group font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.3)] disabled:bg-trench-sandbag disabled:border-trench-sandbag disabled:text-trench-gasmask hatch-pattern"
               >
                 {isTransactionLoading ? (
                   <Loader2 className="animate-spin text-black shrink-0" size={20} />

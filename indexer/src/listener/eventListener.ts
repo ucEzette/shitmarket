@@ -31,6 +31,24 @@ let activeConnection: Connection | null = null;
 let activeProgram: anchor.Program | null = null;
 let keeperKeypair: Keypair | null = null;
 
+interface EventListenerStatus {
+  isRunning: boolean;
+  lastEventReceivedAt: string | null;
+  lastEventProcessedAt: string | null;
+  lastError: string | null;
+}
+
+const eventListenerStatus: EventListenerStatus = {
+  isRunning: false,
+  lastEventReceivedAt: null,
+  lastEventProcessedAt: null,
+  lastError: null,
+};
+
+export function getEventListenerStatus(): EventListenerStatus {
+  return { ...eventListenerStatus };
+}
+
 function getKeeperKeypair(): Keypair {
   if (keeperKeypair) return keeperKeypair;
   const raw = config.solana.keeperPrivateKey;
@@ -514,80 +532,18 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
 
     logger.info({ msg: 'RoomSettled processed', roomPubkey, winner, finalPrice: finalPrice.toString(), twapFinalPrice: twapFinalPrice.toString() });
 
-    // ─── Automatic Winner Payout Distribution ───
-    if (winningBets.length > 0 && activeConnection) {
-      logger.info({ msg: 'Triggering automatic on-chain payouts for winners', roomPubkey, winnersCount: winningBets.length });
-      try {
-        const keeper = getKeeperKeypair();
-        const program = getProgram(activeConnection);
-        const instructions: anchor.web3.TransactionInstruction[] = [];
-        
-        for (const bet of winningBets) {
-          const winnerPubkey = new PublicKey(bet.userPubkey);
-          const [escrowPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from('escrow'), event.room.toBuffer()],
-            program.programId
-          );
-          const sideByte = bet.side === 'moon' ? 0 : 1;
-          const [betPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from('bet'), event.room.toBuffer(), winnerPubkey.toBuffer(), Buffer.from([sideByte])],
-            program.programId
-          );
-          
-          const ix = await program.methods
-            .claimWinnings()
-            .accounts({
-              room: event.room,
-              escrow: escrowPda,
-              bet: betPda,
-              user: winnerPubkey,
-              payer: keeper.publicKey,
-              systemProgram: anchor.web3.SystemProgram.programId,
-            })
-            .instruction();
-            
-          instructions.push(ix);
-        }
-        
-        // Batch instructions into transactions of at most 5 claims to avoid transaction size limits
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < instructions.length; i += BATCH_SIZE) {
-          const batch = instructions.slice(i, i + BATCH_SIZE);
-          const tx = new anchor.web3.Transaction();
-          
-          // Add Compute Budget limit & Priority Fee instructions to guarantee inclusion in congested blocks
-          const modifyComputeBudget = anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({ 
-            units: 150000 * batch.length // 150k compute budget per instruction is extremely safe
-          });
-          const addPriorityFee = anchor.web3.ComputeBudgetProgram.setComputeUnitPrice({ 
-            microLamports: 50000 
-          });
-          
-          tx.add(modifyComputeBudget);
-          tx.add(addPriorityFee);
-          tx.add(...batch);
-          
-          const txSig = await anchor.web3.sendAndConfirmTransaction(
-            activeConnection,
-            tx,
-            [keeper],
-            { commitment: 'confirmed', skipPreflight: true }
-          );
-          logger.info({
-            msg: 'Automatic payout batch confirmed on-chain',
-            roomPubkey,
-            txSig,
-            winnersCount: batch.length,
-          });
-        }
-      } catch (payoutErr: any) {
-        logger.error({
-          msg: 'Automatic payout distribution failed',
-          roomPubkey,
-          err: payoutErr?.message || String(payoutErr),
-        });
-      }
-    }
+    // ═══════════════════════════════════════════════════════════════
+    // Automatic payouts REMOVED — users must manually claim their
+    // winnings/refunds via the frontend "Claim" button.
+    //
+    // Reasoning:
+    // 1. Prevents escrow drain from race conditions (keeper auto-claim
+    //    + user manual claim both attempting to pay the same bet).
+    // 2. Saves compute units and RPC costs for the keeper.
+    // 3. Avoids issues where the keeper lacks the correct referral
+    //    accounts to pass as remaining_accounts to claimWinnings.
+    // 4. Users get a better UX by claiming on their own terms.
+    // ═══════════════════════════════════════════════════════════════
 
     // ─── Automatic Referral Payouts (0.1% reward) ───
     if (activeConnection) {
@@ -891,80 +847,15 @@ async function handleRoomVoided(event: RoomVoidedEvent): Promise<void> {
 
     logger.info({ msg: 'RoomVoided processed successfully', roomPubkey });
 
-    // ─── Automatic Winner Payout Distribution ───
-    if (winningBets.length > 0 && activeConnection) {
-      logger.info({ msg: 'Triggering automatic on-chain payouts for voided refunds', roomPubkey, winnersCount: winningBets.length });
-      try {
-        const keeper = getKeeperKeypair();
-        const program = getProgram(activeConnection);
-        const instructions: anchor.web3.TransactionInstruction[] = [];
-        
-        for (const bet of winningBets) {
-          const winnerPubkey = new PublicKey(bet.userPubkey);
-          const [escrowPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from('escrow'), event.room.toBuffer()],
-            program.programId
-          );
-          const sideByte = bet.side === 'moon' ? 0 : 1;
-          const [betPda] = PublicKey.findProgramAddressSync(
-            [Buffer.from('bet'), event.room.toBuffer(), winnerPubkey.toBuffer(), Buffer.from([sideByte])],
-            program.programId
-          );
-          
-          const ix = await program.methods
-            .claimWinnings()
-            .accounts({
-              room: event.room,
-              escrow: escrowPda,
-              bet: betPda,
-              user: winnerPubkey,
-              payer: keeper.publicKey,
-              systemProgram: anchor.web3.SystemProgram.programId,
-            })
-            .instruction();
-            
-          instructions.push(ix);
-        }
-        
-        // Batch instructions into transactions of at most 5 claims to avoid transaction size limits
-        const BATCH_SIZE = 5;
-        for (let i = 0; i < instructions.length; i += BATCH_SIZE) {
-          const batch = instructions.slice(i, i + BATCH_SIZE);
-          const tx = new anchor.web3.Transaction();
-          
-          // Add Compute Budget limit & Priority Fee instructions to guarantee inclusion in congested blocks
-          const modifyComputeBudget = anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({ 
-            units: 150000 * batch.length
-          });
-          const addPriorityFee = anchor.web3.ComputeBudgetProgram.setComputeUnitPrice({ 
-            microLamports: 50000 
-          });
-          
-          tx.add(modifyComputeBudget);
-          tx.add(addPriorityFee);
-          tx.add(...batch);
-          
-          const txSig = await anchor.web3.sendAndConfirmTransaction(
-            activeConnection,
-            tx,
-            [keeper],
-            { commitment: 'confirmed', skipPreflight: true }
-          );
-          logger.info({
-            msg: 'Automatic void refund batch confirmed on-chain',
-            roomPubkey,
-            txSig,
-            winnersCount: batch.length,
-          });
-        }
-      } catch (payoutErr: any) {
-        logger.error({
-          msg: 'Automatic void refund payout distribution failed',
-          roomPubkey,
-          err: payoutErr?.message || String(payoutErr),
-        });
-      }
-    }
+    // ═══════════════════════════════════════════════════════════════
+    // Automatic void refund payouts REMOVED — users must manually
+    // claim their void refunds via the frontend "Claim" button.
+    //
+    // Reasoning is the same as for RoomSettled auto-payouts:
+    // prevents escrow drain from race conditions and avoids
+    // referral account issues when the keeper claims on behalf
+    // of users.
+    // ═══════════════════════════════════════════════════════════════
   } finally {
     end();
   }
@@ -1097,14 +988,18 @@ export function startEventListener(
   eventParser: anchor.EventParser
 ): void {
   activeConnection = connection;
+  eventListenerStatus.isRunning = true;
   const programId = new PublicKey(config.solana.programId);
 
   subscriptionId = connection.onLogs(
     programId,
     async (logs: Logs) => {
       const { signature, logs: logLines, err } = logs;
+      eventListenerStatus.lastEventReceivedAt = new Date().toISOString();
+      eventListenerStatus.lastError = null;
 
       if (err) {
+        eventListenerStatus.lastError = String(err);
         logger.warn({ msg: 'Log with error skipped', signature, err });
         return;
       }
@@ -1112,6 +1007,7 @@ export function startEventListener(
       // Idempotency guard
       if (await isAlreadyProcessed(signature)) {
         logger.debug({ msg: 'Duplicate tx skipped', signature });
+        eventListenerStatus.lastEventProcessedAt = new Date().toISOString();
         return;
       }
 
@@ -1121,7 +1017,9 @@ export function startEventListener(
         if (events.length > 0) {
           await processParsedEvents(events, signature);
         }
+        eventListenerStatus.lastEventProcessedAt = new Date().toISOString();
       } catch (err: any) {
+        eventListenerStatus.lastError = err?.message ?? String(err);
         logger.error({ msg: 'Event processing error', signature, err: err?.message, stack: err?.stack });
       }
     },

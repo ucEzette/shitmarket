@@ -1765,7 +1765,8 @@ export const useAppState = create<AppState>()(
   disconnectWallet: () => {
     set(() => ({
       user: null,
-      wallet: null
+      wallet: null,
+      activityLog: []
     }));
   },
 
@@ -1898,6 +1899,17 @@ export const useAppState = create<AppState>()(
         }
       }
       
+      const currentWalletAddress = typeof get().wallet === 'string'
+        ? get().wallet
+        : get().wallet?.publicKey?.toBase58?.() || get().user?.wallet || null;
+      const sameWallet = currentWalletAddress === address;
+      const mergedActivities = sameWallet
+        ? [
+            ...activities,
+            ...get().activityLog.filter((local) => !activities.some((remote) => remote.id === local.id))
+          ]
+        : activities;
+
       set({
         user: {
           wallet: address,
@@ -1914,12 +1926,14 @@ export const useAppState = create<AppState>()(
           referralEarnings,
           referralPayouts,
           unclaimedReferralRewards,
-        }
+        },
+        activityLog: mergedActivities.sort((a, b) => b.timestamp - a.timestamp),
       });
     } else {
       set({
         user: null,
         wallet: null,
+        activityLog: [],
       });
     }
   },

@@ -510,6 +510,22 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
                 const userBet = currentUser.bets.find(b => b.roomId === roomPubkey);
                 if (userBet) {
                   const won = userBet.side === data.winner;
+                  const settlementTitle = data.winner === 'draw'
+                    ? `ROOM ${roomPubkey.substring(0, 8)} SETTLED` 
+                    : won 
+                      ? `VICTORY: ${userBet.side.toUpperCase()} WON` 
+                      : `DEFEAT: ${userBet.side.toUpperCase()} LOST`;
+                  const settlementMessage = data.winner === 'draw'
+                    ? `Room ${roomPubkey.substring(0, 8)} ended in a draw. Your ${userBet.side.toUpperCase()} bet is being settled.`
+                    : `Room ${roomPubkey.substring(0, 8)} settled ${data.winner.toUpperCase()}. Your ${userBet.side.toUpperCase()} bet ${won ? 'won' : 'lost'}.`;
+
+                  useAppState.getState().addActivity({
+                    type: 'settlement',
+                    title: settlementTitle,
+                    message: settlementMessage,
+                    link: `/room/${roomPubkey}`,
+                  });
+
                   if (won) {
                     confetti({
                       particleCount: 150,
@@ -520,7 +536,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
                     if (audioEnabledRef.current) {
                       setTimeout(() => synthSound('victory'), 300);
                     }
-                  } else {
+                  } else if (data.winner !== 'draw') {
                     if (audioEnabledRef.current) {
                       setTimeout(() => synthSound('defeat'), 300);
                     }

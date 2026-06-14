@@ -102,6 +102,7 @@ export interface Room {
   finalTWAP?: number;
   finalPrice?: number;
   twapFinalPrice?: number;
+  lastSyncedAt?: number;
 }
 
 export interface UserProfile {
@@ -311,6 +312,7 @@ export const mapApiRoom = (apiRoom: any): Room => {
     finalTWAP: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
     finalPrice: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
     twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e12 : undefined,
+    lastSyncedAt: Date.now(),
   };
 };
 
@@ -392,6 +394,11 @@ function mergeRooms(currentRoom: Room | undefined, indexerRoom: Room | null, onC
     openingPrice,
     finalPrice,
     twapFinalPrice,
+    lastSyncedAt: Math.max(
+      base.lastSyncedAt || 0,
+      indexerRoom?.lastSyncedAt || 0,
+      onChainRoom?.lastSyncedAt || 0
+    ) || undefined,
   };
 }
 
@@ -618,11 +625,13 @@ export const useAppState = create<AppState>()(
       const json = await res.json();
       if (json.success && json.data) {
         const mapped = json.data.map(mapApiRoom);
-
-        // Industry Standard Fast-Path: Render indexer data immediately!
         const currentRooms = get().rooms;
-        const missingRooms = currentRooms.filter(cr => !mapped.some((mr: Room) => mr.id === cr.id));
-        set({ rooms: [...mapped, ...missingRooms], roomsLoaded: true });
+        const mergedRooms = mapped.map((newRoom: Room) => {
+          const current = currentRooms.find((r) => r.id === newRoom.id);
+          return mergeRooms(current, newRoom, null) || newRoom;
+        });
+        const missingRooms = currentRooms.filter((cr) => !mapped.some((mr: Room) => mr.id === cr.id));
+        set({ rooms: [...mergedRooms, ...missingRooms], roomsLoaded: true });
 
         // Hydrate on-chain state asynchronously in the background so it doesn't block UI rendering!
         (async () => {
@@ -635,30 +644,35 @@ export const useAppState = create<AppState>()(
               'On-chain room fetch timed out'
             ) as any[];
 
-            const hydrated = get().rooms.map((room: Room) => {
-              const apiIndex = mapped.findIndex((m: Room) => m.id === room.id);
-              if (apiIndex === -1) return room;
-              const onChain = onChainRooms[apiIndex];
-              if (onChain) {
-                const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
-                let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
-                if (onChain.winner) {
-                  const wKey = Object.keys(onChain.winner)[0].toLowerCase();
-                  if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
-                    winnerStr = wKey;
-                  }
-                }
-                return {
-                  ...room,
-                  moonPool: onChain.moonPool.toNumber() / 1e9,
-                  jeetPool: onChain.jeetPool.toNumber() / 1e9,
-                  status: statusStr,
-                  winner: winnerStr,
-                  expiry: onChain.expiryTimestamp.toNumber() * 1000,
-                  duration: onChain.durationMinutes,
-                };
+            const onChainById = new Map<string, any>();
+            mapped.forEach((room: Room, index: number) => {
+              if (onChainRooms[index]) {
+                onChainById.set(room.id, onChainRooms[index]);
               }
-              return room;
+            });
+
+            const hydrated = get().rooms.map((room: Room) => {
+              const onChain = onChainById.get(room.id);
+              if (!onChain) return room;
+              const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
+              let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
+              if (onChain.winner) {
+                const wKey = Object.keys(onChain.winner)[0].toLowerCase();
+                if (wKey === 'moon' || wKey === 'jeet' || wKey === 'draw') {
+                  winnerStr = wKey;
+                }
+              }
+              const onChainRoom: Room = {
+                ...room,
+                moonPool: onChain.moonPool.toNumber() / 1e9,
+                jeetPool: onChain.jeetPool.toNumber() / 1e9,
+                status: statusStr,
+                winner: winnerStr,
+                expiry: onChain.expiryTimestamp.toNumber() * 1000,
+                duration: onChain.durationMinutes,
+                lastSyncedAt: Date.now(),
+              };
+              return mergeRooms(room, null, onChainRoom) || room;
             });
             set({ rooms: hydrated });
           } catch (e) {
@@ -836,6 +850,7 @@ export const useAppState = create<AppState>()(
             openingPrice: onChain.openingPrice.toNumber() === 0 ? undefined : onChain.openingPrice.toNumber() / 1e12,
             finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e12 : undefined,
             twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e12 : undefined,
+            lastSyncedAt: Date.now(),
           };
 
           if (!updatedRoom.token.icon || !updatedRoom.token.icon.startsWith('http') || !updatedRoom.token.pairAddress || updatedRoom.token.pairAddress === '') {
@@ -2067,7 +2082,9 @@ export const useAppState = create<AppState>()(
     console.log(`Keeper event settleRoom triggered for room ${roomId} with winner ${winner}`);
     set((state) => ({
       rooms: state.rooms.map((r) =>
-        r.id === roomId ? { ...r, status: 'settled', winner } : r
+        r.id === roomId && (r.status !== 'settled' || r.winner !== winner)
+          ? { ...r, status: 'settled', winner }
+          : r
       ),
     }));
   },
@@ -2081,9 +2098,11 @@ export const useAppState = create<AppState>()(
 
   updateRoomPools: (roomId: string, moonPool: number, jeetPool: number) => {
     set((state) => ({
-      rooms: state.rooms.map((r) =>
-        r.id === roomId ? { ...r, moonPool, jeetPool } : r
-      ),
+      rooms: state.rooms.map((r) => {
+        if (r.id !== roomId) return r;
+        if (Math.abs(r.moonPool - moonPool) < 1e-9 && Math.abs(r.jeetPool - jeetPool) < 1e-9) return r;
+        return { ...r, moonPool, jeetPool };
+      }),
     }));
   },
 

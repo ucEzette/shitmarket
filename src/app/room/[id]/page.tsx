@@ -112,6 +112,19 @@ const formatDuration = (mins: number) => {
   return `${mins} MINS`;
 };
 
+const formatRelativeTime = (timestamp: number) => {
+  const diffMs = Date.now() - timestamp;
+  if (diffMs < 0) return 'just now';
+  const diffSeconds = Math.floor(diffMs / 1000);
+  if (diffSeconds < 60) return `${diffSeconds}s ago`;
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes}m ago`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  return `${diffDays}d ago`;
+};
+
 
 
 export default function RoomDetailPage() {
@@ -152,6 +165,7 @@ export default function RoomDetailPage() {
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [watchlistedIds, setWatchlistedIds] = useState<string[]>([]);
+  const lastSyncedLabel = room?.lastSyncedAt ? formatRelativeTime(room.lastSyncedAt) : 'syncing...';
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -870,10 +884,15 @@ export default function RoomDetailPage() {
                 </h2>
               </div>
               
-              <div className="shrink-0 flex items-center gap-2 bg-[#0d140a] border border-[#2c3d25] px-4 py-2 rounded">
-                <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
-                <span className="font-mono text-xs text-white uppercase font-bold tracking-widest">
-                  {isRoomSettling || (room && room.status === 'settled') ? 'RESOLVED' : 'ACTIVE'}
+              <div className="shrink-0 flex flex-col gap-1 bg-[#0d140a] border border-[#2c3d25] px-4 py-2 rounded">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
+                  <span className="font-mono text-xs text-white uppercase font-bold tracking-widest">
+                    {isRoomSettling || (room && room.status === 'settled') ? 'RESOLVED' : 'ACTIVE'}
+                  </span>
+                </div>
+                <span className="font-mono text-[9px] text-trench-gasmask uppercase tracking-wider">
+                  Last synced {lastSyncedLabel}
                 </span>
               </div>
             </div>

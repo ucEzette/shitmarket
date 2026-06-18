@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useWalletContext } from './WalletProvider';
 import { useAppState } from '@/store/useAppState';
+import { usePrivy } from '@privy-io/react-auth';
 
 /**
  * WalletAdapterBridge syncs the unified custom wallet state
@@ -12,9 +13,11 @@ export const WalletAdapterBridge: React.FC = () => {
   const {
     activeWalletAddress,
     sendTransaction,
-    setIsModalOpen
+    setIsModalOpen,
+    isImportedWalletLocked
   } = useWalletContext();
 
+  const { login } = usePrivy();
   const setWalletAddress = useAppState((s) => s.setWalletAddress);
   const setSendTransaction = useAppState((s) => s.setSendTransaction);
 
@@ -37,11 +40,15 @@ export const WalletAdapterBridge: React.FC = () => {
   // Listen to custom connect wallet triggers across the app
   useEffect(() => {
     const handleTriggerConnect = () => {
-      setIsModalOpen(true);
+      if (isImportedWalletLocked) {
+        setIsModalOpen(true);
+      } else {
+        login();
+      }
     };
     window.addEventListener('trigger-wallet-connection', handleTriggerConnect);
     return () => window.removeEventListener('trigger-wallet-connection', handleTriggerConnect);
-  }, [setIsModalOpen]);
+  }, [setIsModalOpen, isImportedWalletLocked, login]);
 
   return null; // This is a non-visual bridge component
 };

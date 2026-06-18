@@ -10,6 +10,7 @@ import { PepePortrait, PEPE_ASSETS } from './MemeAssets';
 import { LogOut, Loader2, Coins, Settings, X } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { connection } from '@/utils/solanaClient';
+import { usePrivy } from '@privy-io/react-auth';
 
 const navItems = [
   { label: 'WAR ROOM', href: '/rooms' },
@@ -301,7 +302,8 @@ export const Header: React.FC<{
 }> = ({ isRoomPage, onMenuToggle }) => {
   const pathname = usePathname();
   const { user } = useAppState();
-  const { walletType, activeWalletAddress, balance, setIsModalOpen, disconnect } = useWalletContext();
+  const { walletType, activeWalletAddress, balance, setIsModalOpen, isImportedWalletLocked, disconnect } = useWalletContext();
+  const { login } = usePrivy();
   const [showWalletPanel, setShowWalletPanel] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -317,8 +319,12 @@ export const Header: React.FC<{
   }, []);
 
   const handleConnect = useCallback(() => {
-    setIsModalOpen(true);
-  }, [setIsModalOpen]);
+    if (isImportedWalletLocked) {
+      setIsModalOpen(true);
+    } else {
+      login();
+    }
+  }, [isImportedWalletLocked, setIsModalOpen, login]);
 
   const handleDisconnect = useCallback(() => {
     disconnect().catch(() => {});

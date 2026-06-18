@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
-import { useWallets as useSolanaWallets, useCreateWallet } from '@privy-io/react-auth/solana';
+import { useWallets as useSolanaWallets, useCreateWallet, toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
 import { Connection, PublicKey, Keypair, Transaction } from '@solana/web3.js';
 import * as bip39 from 'bip39';
 import { derivePath } from 'ed25519-hd-key';
@@ -130,6 +130,18 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Trigger flags to prevent duplicate calls
   const [hasTriggeredWalletCreation, setHasTriggeredWalletCreation] = useState(false);
   const [hasTriggeredExternalConnect, setHasTriggeredExternalConnect] = useState(false);
+
+  // Suppress Privy "Captcha failed" unhandled runtime errors
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (event.reason?.message?.includes('Captcha failed')) {
+        event.preventDefault();
+        console.warn('Suppressed Privy Captcha failed error:', event.reason);
+      }
+    };
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+  }, []);
 
   const [activeEmbeddedWalletAddress, setActiveEmbeddedWalletAddress] = useState<string | null>(null);
 
@@ -424,12 +436,14 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       localStorage.setItem('shitmarket_wallet_type', 'embedded');
       setWalletType('embedded');
-      setIsModalOpen(false);
       if (!privy.authenticated) {
-        await privy.login();
+        // Run login without awaiting to let the UI breathe and prevent Captcha failures
+        privy.login();
       }
+      setTimeout(() => setIsModalOpen(false), 500);
     } catch (e) {
       console.error("Privy login failed:", e);
+      setIsModalOpen(false);
     }
   };
 
@@ -437,12 +451,13 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       localStorage.setItem('shitmarket_wallet_type', 'external');
       setWalletType('external');
-      setIsModalOpen(false);
       if (!privy.authenticated) {
-        await privy.login();
+        privy.connectWallet();
       }
+      setTimeout(() => setIsModalOpen(false), 500);
     } catch (e) {
       console.error("Privy external wallet login failed:", e);
+      setIsModalOpen(false);
     }
   };
 
@@ -676,12 +691,20 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 };
 
+const solanaConnectors = toSolanaWalletConnectors({
+  shouldAutoConnect: true,
+});
+
 export const SolanaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || "clux31x800000000000000000"}
       config={{
-        loginMethods: ['email', 'google', 'twitter', 'discord', 'wallet'],
+        externalWallets: {
+          solana: {
+            connectors: solanaConnectors,
+          },
+        },
         embeddedWallets: {
           solana: {
             createOnLogin: 'users-without-wallets',

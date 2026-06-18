@@ -16,6 +16,7 @@ if (!diagnostics_channel.tracingChannel) {
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  reactStrictMode: false,
   eslint: {
     ignoreDuringBuilds: true,
   },

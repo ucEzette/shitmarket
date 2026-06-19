@@ -141,7 +141,7 @@ export default function RoomsPage() {
   const [sortSoon, setSortSoon] = useState<'expiry' | 'pot'>('expiry');
   const [sortBiggest, setSortBiggest] = useState<'pot' | 'newest'>('pot');
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
-  const [showSkeleton, setShowSkeleton] = useState(true);
+  const [showSkeleton, setShowSkeleton] = useState(!roomsLoaded);
 
   const [quickAmountNew, setQuickAmountNew] = useState<number>(0.8);
   const [quickAmountSoon, setQuickAmountSoon] = useState<number>(0.1);

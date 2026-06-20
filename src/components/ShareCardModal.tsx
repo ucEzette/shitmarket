@@ -123,223 +123,195 @@ export const ShareCardModal: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Reset transform and clear
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, 1200, 630);
+
     const { roomId, side, tokenSymbol, duration, amount, isNewRoom, expiry, openingPrice } = shareCardData;
     const isMoon = side === 'moon';
+    const primaryColor = isMoon ? '#39FF14' : '#FF073A';
+    const secondaryColor = isMoon ? 'rgba(57, 255, 20, 0.08)' : 'rgba(255, 7, 58, 0.08)';
 
-    // 1. Draw Background Gradient (Premium neutral dark charcoal-black, no green background tint)
-    const grad = ctx.createRadialGradient(600, 315, 50, 600, 315, 700);
-    grad.addColorStop(0, '#111318'); // dark charcoal
-    grad.addColorStop(1, '#07080b'); // rich black
+    // 1. Draw Deep Space Background Gradient
+    const grad = ctx.createLinearGradient(0, 0, 1200, 630);
+    grad.addColorStop(0, '#0A0C10');
+    grad.addColorStop(1, '#030406');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 1200, 630);
 
-    // 2. Draw CRT Grid Overlay
-    ctx.strokeStyle = isMoon ? 'rgba(57, 255, 20, 0.035)' : 'rgba(255, 7, 58, 0.035)';
-    ctx.lineWidth = 1;
-    for (let x = 0; x < 1200; x += 30) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, 630);
-      ctx.stroke();
-    }
-    for (let y = 0; y < 630; y += 30) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(1200, y);
-      ctx.stroke();
+    // 2. High-Tech Dot Grid
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+    for (let x = 0; x < 1200; x += 20) {
+      for (let y = 0; y < 630; y += 20) {
+        ctx.beginPath();
+        ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
-    // 3. Draw Outer Neon Border
-    ctx.strokeStyle = isMoon ? '#39FF14' : '#FF073A';
+    // 3. Glowing Outer Frame
+    ctx.shadowColor = primaryColor;
+    ctx.shadowBlur = 20;
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 4;
+    ctx.strokeRect(30, 30, 1140, 570);
+    ctx.shadowBlur = 0;
+
+    // High-contrast Corner Accents
+    const cl = 40; // corner length
     ctx.lineWidth = 8;
-    ctx.strokeRect(20, 20, 1160, 590);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.shadowColor = '#FFFFFF';
+    ctx.shadowBlur = 15;
+    const corners = [
+      [[30, 30 + cl], [30, 30], [30 + cl, 30]], // TL
+      [[1170 - cl, 30], [1170, 30], [1170, 30 + cl]], // TR
+      [[30, 600 - cl], [30, 600], [30 + cl, 600]], // BL
+      [[1170 - cl, 600], [1170, 600], [1170, 600 - cl]] // BR
+    ];
+    corners.forEach(pts => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      ctx.lineTo(pts[1][0], pts[1][1]);
+      ctx.lineTo(pts[2][0], pts[2][1]);
+      ctx.stroke();
+    });
+    ctx.shadowBlur = 0;
 
-    // Draw Inner border
-    ctx.strokeStyle = isMoon ? 'rgba(57, 255, 20, 0.3)' : 'rgba(255, 7, 58, 0.3)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(32, 32, 1136, 566);
-
-    // 4. Draw Glow behind Meme Image
-    const glowGrad = ctx.createRadialGradient(930, 290, 50, 930, 290, 250);
-    glowGrad.addColorStop(0, isMoon ? 'rgba(57, 255, 20, 0.12)' : 'rgba(255, 7, 58, 0.12)');
+    // 4. Intense Backglow for Image
+    const glowX = 850, glowY = 270;
+    const glowGrad = ctx.createRadialGradient(glowX, glowY, 50, glowX, glowY, 300);
+    glowGrad.addColorStop(0, isMoon ? 'rgba(57, 255, 20, 0.4)' : 'rgba(255, 7, 58, 0.4)');
     glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = glowGrad;
-    ctx.beginPath();
-    ctx.arc(930, 290, 250, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(500, 0, 700, 540);
 
-    // 5. Draw Meme Image (with rounded corners)
+    // 5. Meme Image with sharp corners and glow
+    const imgX = 680, imgY = 70, imgW = 440, imgH = 440, imgR = 24;
     if (memeImg) {
       ctx.save();
       ctx.beginPath();
-      
-      // Draw rounded rectangle clip path
-      const rx = 740, ry = 100, rw = 380, rh = 380, radius = 24;
-      ctx.moveTo(rx + radius, ry);
-      ctx.lineTo(rx + rw - radius, ry);
-      ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + radius);
-      ctx.lineTo(rx + rw, ry + rh - radius);
-      ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - radius, ry + rh);
-      ctx.lineTo(rx + radius, ry + rh);
-      ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - radius);
-      ctx.lineTo(rx, ry + radius);
-      ctx.quadraticCurveTo(rx, ry, rx + radius, ry);
+      ctx.moveTo(imgX + imgR, imgY);
+      ctx.lineTo(imgX + imgW - imgR, imgY);
+      ctx.quadraticCurveTo(imgX + imgW, imgY, imgX + imgW, imgY + imgR);
+      ctx.lineTo(imgX + imgW, imgY + imgH - imgR);
+      ctx.quadraticCurveTo(imgX + imgW, imgY + imgH, imgX + imgW - imgR, imgY + imgH);
+      ctx.lineTo(imgX + imgR, imgY + imgH);
+      ctx.quadraticCurveTo(imgX, imgY + imgH, imgX, imgY + imgH - imgR);
+      ctx.lineTo(imgX, imgY + imgR);
+      ctx.quadraticCurveTo(imgX, imgY, imgX + imgR, imgY);
       ctx.closePath();
+      
+      // Add heavy neon glow behind the image explicitly
+      ctx.shadowColor = primaryColor;
+      ctx.shadowBlur = 40;
+      ctx.fill(); // Fills the background to cast shadow
+      
       ctx.clip();
-
-      ctx.drawImage(memeImg, rx, ry, rw, rh);
+      ctx.drawImage(memeImg, imgX, imgY, imgW, imgH);
       ctx.restore();
 
-      // Image Neon Border Outlining
-      ctx.strokeStyle = isMoon ? '#39FF14' : '#FF073A';
-      ctx.lineWidth = 4;
+      // Sharp Neon Image Border
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(imgX + imgR, imgY);
+      ctx.lineTo(imgX + imgW - imgR, imgY);
+      ctx.quadraticCurveTo(imgX + imgW, imgY, imgX + imgW, imgY + imgR);
+      ctx.lineTo(imgX + imgW, imgY + imgH - imgR);
+      ctx.quadraticCurveTo(imgX + imgW, imgY + imgH, imgX + imgW - imgR, imgY + imgH);
+      ctx.lineTo(imgX + imgR, imgY + imgH);
+      ctx.quadraticCurveTo(imgX, imgY + imgH, imgX, imgY + imgH - imgR);
+      ctx.lineTo(imgX, imgY + imgR);
+      ctx.quadraticCurveTo(imgX, imgY, imgX + imgR, imgY);
+      ctx.closePath();
+      ctx.strokeStyle = primaryColor;
+      ctx.lineWidth = 6;
       ctx.stroke();
+      ctx.restore();
     }
 
-    // 6. Draw Text telemetries
-    // Sub-header details
-    ctx.fillStyle = '#8c9e88';
-    ctx.font = 'bold 18px "JetBrains Mono", monospace';
-    ctx.fillText('SHITMARKET PvP TELEMETRY // INTEL REPORT', 70, 75);
+    // 6. Typography
+    ctx.fillStyle = '#8B9BAA';
+    ctx.font = 'bold 20px "JetBrains Mono", monospace';
+    ctx.fillText('⚡ SHITMARKET TACTICAL INTEL', 80, 85);
 
-    // Main header Action (using clean industry standard Apple/system font!)
+    // Main header
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 36px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-    if (isNewRoom) {
-      ctx.fillText('NEW ARENA DEPLOYED!', 70, 140);
-    } else {
-      ctx.fillText('WAR ORDER BROADCASTED!', 70, 140);
-    }
+    ctx.font = '900 48px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    ctx.shadowColor = '#FFFFFF';
+    ctx.shadowBlur = 10;
+    ctx.fillText(isNewRoom ? 'NEW ARENA SECURED' : 'WAR ORDER DEPLOYED', 80, 145);
+    ctx.shadowBlur = 0;
 
-    // Ticker ($TKN) (using clean system font)
-    ctx.fillStyle = isMoon ? '#39FF14' : '#FF073A';
-    ctx.font = '800 68px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    // Ticker ($TKN) with Massive Neon Glow
+    ctx.fillStyle = primaryColor;
+    ctx.font = '900 96px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    ctx.shadowColor = primaryColor;
+    ctx.shadowBlur = 30;
     const tickerText = tokenSymbol.startsWith('$') ? tokenSymbol.toUpperCase() : `$${tokenSymbol.toUpperCase()}`;
-    ctx.fillText(tickerText, 70, 230);
+    ctx.fillText(tickerText, 76, 245);
+    ctx.shadowBlur = 0;
 
-    // Alliance stance (prevent overlap by measuring label and placing value dynamically)
+    // Alliance stance
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 20px "JetBrains Mono", monospace';
+    ctx.font = 'bold 24px "JetBrains Mono", monospace';
     const allianceLabel = 'ALLIANCE: ';
-    ctx.fillText(allianceLabel, 70, 295);
-    const labelWidth = ctx.measureText(allianceLabel).width;
+    ctx.fillText(allianceLabel, 80, 310);
+    const labelW = ctx.measureText(allianceLabel).width;
 
-    ctx.fillStyle = isMoon ? '#39FF14' : '#FF073A';
-    ctx.font = 'bold 28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(isMoon ? 'MOON ARMY 🚀' : 'JEET SQUAD 💀', 70 + labelWidth, 295);
+    ctx.fillStyle = primaryColor;
+    ctx.font = '900 32px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+    ctx.fillText(isMoon ? 'MOON SQUAD 🚀' : 'JEET CARTEL 💀', 80 + labelW, 312);
 
-    // Stats Layout with Detonation expiry date/time
-    ctx.fillStyle = '#e4ece3';
-    ctx.font = 'bold 20px "JetBrains Mono", monospace';
+    // 7. Sharp Stats Glass Panel
+    const statsY = 350;
+    ctx.fillStyle = secondaryColor;
+    ctx.fillRect(80, statsY, 560, 150);
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(80, statsY, 560, 150);
+
+    const LINE = 32;
+    let lineY = statsY + 36;
+    const leftPad = 100;
     const durationStr = formatDurationText(duration);
     const expiryStr = formatExactExpiry(expiry);
 
-    // ─── Stats block — tight 26px line spacing so everything clears the footer ───
-    // Footer banner sits at y=542. Description box (80px) + separator needs to fit above it.
-    // Hard cap: splitY ≤ 455 so descBoxY+80 ≤ 535, safely above 542.
-    const LINE = 26; // tight line height
-    let lineY = isNewRoom ? 325 : 315;
-
-    if (!isNewRoom) {
-      ctx.fillStyle = '#e4ece3';
+    // Helper for key-value rendering inside stats box
+    const drawStat = (key: string, value: string, isAccent = false) => {
+      ctx.fillStyle = '#A0AAB5';
       ctx.font = 'bold 18px "JetBrains Mono", monospace';
-      ctx.fillText(`STAKE AMOUNT : ${amount.toFixed(2)} SOL`, 70, lineY);
+      ctx.fillText(key, leftPad, lineY);
+      const kWidth = ctx.measureText('ROUND DURATION: ').width; // uniform alignment
+
+      ctx.fillStyle = isAccent ? primaryColor : '#FFFFFF';
+      ctx.font = 'bold 20px "JetBrains Mono", monospace';
+      ctx.fillText(value, leftPad + kWidth, lineY);
       lineY += LINE;
-    }
-
-    if (openingPrice !== undefined && openingPrice > 0) {
-      // Entry price label in neutral + value in accent
-      ctx.fillStyle = '#e4ece3';
-      ctx.font = 'bold 18px "JetBrains Mono", monospace';
-      ctx.fillText('ENTRY PRICE  : ', 70, lineY);
-      const epLabelW = ctx.measureText('ENTRY PRICE  : ').width;
-      ctx.fillStyle = isMoon ? '#39FF14' : '#FF073A';
-      ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-      ctx.fillText(formatPriceForDisplay(openingPrice), 70 + epLabelW, lineY);
-      lineY += LINE - 2;
-      // Direction sub-label
-      ctx.fillStyle = '#8c9e88';
-      ctx.font = 'bold 13px "JetBrains Mono", monospace';
-      ctx.fillText(isMoon ? '↑ WILL END ABOVE THIS PRICE' : '↓ WILL DUMP BELOW THIS PRICE', 70, lineY);
-      lineY += LINE;
-    }
-
-    ctx.fillStyle = '#e4ece3';
-    ctx.font = 'bold 18px "JetBrains Mono", monospace';
-    ctx.fillText(`ROUND LENGTH : ${durationStr}`, 70, lineY);
-    lineY += LINE;
-    ctx.fillText(`DETONATION   : ${expiryStr}`, 70, lineY);
-
-    // Cap splitY so desc box + footer never overlap
-    const splitY = Math.min(lineY + 18, 455);
-
-    // Horizontal Split separator line
-    ctx.strokeStyle = isMoon ? 'rgba(57, 255, 20, 0.15)' : 'rgba(255, 7, 58, 0.15)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(70, splitY);
-    ctx.lineTo(680, splitY);
-    ctx.stroke();
-
-    // 7. Funny description box — fixed height 80px, always ends at or before y=535
-    const descBoxY = splitY + 8;
-    const descBoxH = 80;
-    ctx.fillStyle = isMoon ? 'rgba(57, 255, 20, 0.04)' : 'rgba(255, 7, 58, 0.04)';
-    ctx.fillRect(70, descBoxY, 610, descBoxH);
-    ctx.strokeStyle = isMoon ? 'rgba(57, 255, 20, 0.15)' : 'rgba(255, 7, 58, 0.15)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(70, descBoxY, 610, descBoxH);
-
-    // Render customized funny text — up to 3 lines, centred in the box
-    const funnyText = getFunnyQuote(side, tokenSymbol, durationStr, roomId);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 14px "JetBrains Mono", monospace';
-
-    // Wrapping helper
-    const wrapText = (text: string, maxWidth: number) => {
-      const words = text.split(' ');
-      const lines: string[] = [];
-      let cur = '';
-      for (const w of words) {
-        const test = cur + w + ' ';
-        if (ctx.measureText(test).width < maxWidth) {
-          cur = test;
-        } else {
-          lines.push(cur.trim());
-          cur = w + ' ';
-        }
-      }
-      lines.push(cur.trim());
-      return lines;
     };
 
-    const funnyLines = wrapText(funnyText, 570);
-    // Centre the text lines vertically within the box
-    const maxLines = 3;
-    const lineH = 20;
-    const textBlockH = Math.min(funnyLines.length, maxLines) * lineH;
-    let startY = descBoxY + (descBoxH - textBlockH) / 2 + lineH - 4;
-    funnyLines.slice(0, maxLines).forEach((line) => {
-      ctx.fillText(line, 90, startY);
-      startY += lineH;
-    });
+    if (!isNewRoom) drawStat('STAKE AMOUNT  : ', `${amount.toFixed(2)} SOL`, true);
+    if (openingPrice) drawStat('ENTRY PRICE   : ', formatPriceForDisplay(openingPrice), true);
+    drawStat('ROUND DURATION: ', durationStr);
+    drawStat('DETONATION AT : ', expiryStr);
 
-    // 8. Referral Footer Banner Box
-    ctx.fillStyle = isMoon ? 'rgba(57, 255, 20, 0.08)' : 'rgba(255, 7, 58, 0.08)';
-    ctx.fillRect(36, 542, 1128, 48);
-    
-    ctx.strokeStyle = isMoon ? '#39FF14' : '#FF073A';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(36, 542, 1128, 48);
+    // 8. Bottom Action Banner
+    const footerY = 530;
+    ctx.fillStyle = primaryColor;
+    ctx.shadowColor = primaryColor;
+    ctx.shadowBlur = 20;
+    ctx.fillRect(30, footerY, 1140, 70);
+    ctx.shadowBlur = 0;
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '400 18px "JetBrains Mono", monospace';
-    ctx.fillText('ENLIST ON THE FRONT LINES:', 56, 572);
+    ctx.fillStyle = '#000000';
+    ctx.font = '900 24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+    const ctaText = 'ENLIST ON THE FRONT LINES ➔';
+    ctx.fillText(ctaText, 80, footerY + 44);
 
-    ctx.fillStyle = isMoon ? '#39FF14' : '#FF073A';
-    ctx.font = 'bold 18px "JetBrains Mono", monospace';
-    ctx.fillText(referralLink, 345, 572);
+    ctx.fillStyle = 'rgba(0,0,0,0.7)';
+    ctx.font = 'bold 22px "JetBrains Mono", monospace';
+    const ctaW = ctx.measureText(ctaText).width;
+    ctx.fillText(referralLink, 80 + ctaW + 20, footerY + 43);
 
   }, [shareCardData, generating, memeImg, referralLink, referralCode, fontsLoaded]);
 

@@ -233,7 +233,7 @@ function HomeContent() {
         </div>
       </div>
 
-      {/* 2.5 AGENTKEY ALPHA ZONE */}
+      {/* 2.5 ALPHA ZONE */}
       <section className="mx-auto max-w-7xl w-full px-4 pt-12 pb-4">
         <AgentKeyAlphaZone />
       </section>

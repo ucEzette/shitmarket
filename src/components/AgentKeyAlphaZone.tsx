@@ -74,9 +74,12 @@ export function AgentKeyAlphaZone() {
             </div>
           </div>
           <div>
-            <h3 className="font-staatliches text-2xl tracking-wider text-white flex items-center gap-2">
-              AGENTKEY ALPHA ZONE
-              {isScanning && <RefreshCw size={14} className="animate-spin text-neon-moon" />}
+            <h3 className="font-staatliches text-2xl tracking-wider text-white flex flex-wrap items-baseline gap-2">
+              <span>ALPHA ZONE</span>
+              <span className="font-mono text-[10px] text-trench-gasmask font-bold tracking-wider uppercase">
+                powered by agentkey
+              </span>
+              {isScanning && <RefreshCw size={12} className="animate-spin text-neon-moon self-center" />}
             </h3>
             <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold tracking-widest flex items-center gap-1.5">
               <Activity size={10} className="text-neon-moon" /> LIVE SIGNAL INTERCEPT

@@ -425,10 +425,10 @@ export const Header: React.FC<{
           ) : (
             <button
               onClick={handleConnect}
-              className="relative flex items-center gap-0.5 px-2 py-0.5 sm:px-3 sm:py-1 font-staatliches text-[10px] sm:text-xs tracking-wider uppercase text-black active:translate-y-0.5 transition-all rounded font-bold retro-btn retro-btn-moon cursor-pointer"
+              className="relative flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1 font-staatliches text-[10px] sm:text-xs tracking-wider uppercase text-black active:translate-y-0.5 transition-all rounded font-bold retro-btn retro-btn-moon cursor-pointer"
             >
               <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={11} loading="eager" className="rounded-full animate-bounce sm:size-[13px]" />
-              <span>ENTER THE TRENCHES</span>
+              <span>SIGN IN / SIGN UP</span>
             </button>
           )}
         </div>

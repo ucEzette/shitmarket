@@ -105,6 +105,11 @@ export interface WalletContextType {
   createAdditionalWallet: () => Promise<void>;
   isImportedWalletLocked: boolean;
   exportImportedWallet: () => string | null;
+  externalWallets: any[];
+  activeExternalWallet: any;
+  setActiveExternalWalletAddress: (address: string) => void;
+  setWalletType: (type: 'embedded' | 'imported' | 'external' | null) => void;
+  linkExternalWallet: () => void;
 }
 
 export const WalletContext = createContext<WalletContextType | null>(null);
@@ -143,7 +148,40 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
   }, []);
 
-  const [activeEmbeddedWalletAddress, setActiveEmbeddedWalletAddress] = useState<string | null>(null);
+  const [activeEmbeddedWalletAddress, setActiveEmbeddedWalletAddress] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('shitmarket_active_embedded_address');
+    }
+    return null;
+  });
+  const [activeExternalWalletAddress, setActiveExternalWalletAddress] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('shitmarket_active_external_address');
+    }
+    return null;
+  });
+
+  const linkExternalWallet = () => {
+    if (privy.authenticated) {
+      privy.connectWallet();
+    }
+  };
+
+  useEffect(() => {
+    if (activeEmbeddedWalletAddress) {
+      localStorage.setItem('shitmarket_active_embedded_address', activeEmbeddedWalletAddress);
+    } else {
+      localStorage.removeItem('shitmarket_active_embedded_address');
+    }
+  }, [activeEmbeddedWalletAddress]);
+
+  useEffect(() => {
+    if (activeExternalWalletAddress) {
+      localStorage.setItem('shitmarket_active_external_address', activeExternalWalletAddress);
+    } else {
+      localStorage.removeItem('shitmarket_active_external_address');
+    }
+  }, [activeExternalWalletAddress]);
 
   const embeddedWallets = useMemo(() => {
     return privySolanaWallets.filter((w: any) => {
@@ -171,8 +209,11 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [embeddedWallets, activeEmbeddedWalletAddress]);
 
   const activeExternalWallet = useMemo(() => {
+    if (activeExternalWalletAddress) {
+      return externalWallets.find((w: any) => w.address === activeExternalWalletAddress) || externalWallets[0];
+    }
     return externalWallets[0];
-  }, [externalWallets]);
+  }, [externalWallets, activeExternalWalletAddress]);
 
   const activeWalletAddress = useMemo(() => {
     if (walletType === 'embedded' && activeEmbeddedWallet) {
@@ -684,6 +725,11 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         createAdditionalWallet,
         isImportedWalletLocked,
         exportImportedWallet,
+        externalWallets,
+        activeExternalWallet,
+        setActiveExternalWalletAddress,
+        setWalletType,
+        linkExternalWallet,
       }}
     >
       {children}
@@ -700,6 +746,10 @@ export const SolanaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || "clux31x800000000000000000"}
       config={{
+        appearance: {
+          walletChainType: 'ethereum-and-solana',
+          walletList: ['phantom', 'metamask', 'coinbase_wallet', 'okx_wallet', 'solflare', 'detected_wallets'],
+        },
         externalWallets: {
           solana: {
             connectors: solanaConnectors,

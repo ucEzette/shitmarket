@@ -254,29 +254,55 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
       whereClause.creator = creator;
     }
 
-    const rooms = await prismaRead.room.findMany({
-      where: whereClause,
-      orderBy,
-      take: limit,
-      select: {
-        roomPubkey: true,
-        tokenMint: true,
-        priceFeed: true,
-        tokenName: true,
-        tokenSymbol: true,
-        tokenImageUrl: true,
-        duration: true,
-        openingPrice: true,
-        expiry: true,
-        status: true,
-        winner: true,
-        totalPool: true,
-        createdAt: true,
-        chainId: true,
-        originalAddress: true,
-        creator: true,
-      },
-    });
+    let rooms: any[] | null = null;
+    const cacheKey = `rooms:list:${status}:${filter}:${limit}:${creator || 'all'}`;
+    
+    try {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        rooms = JSON.parse(cached);
+      }
+    } catch (err) {
+      logger.warn({ msg: 'Failed to read rooms query cache from Redis', err });
+    }
+
+    if (!rooms) {
+      const dbRooms = await prismaRead.room.findMany({
+        where: whereClause,
+        orderBy,
+        take: limit,
+        select: {
+          roomPubkey: true,
+          tokenMint: true,
+          priceFeed: true,
+          tokenName: true,
+          tokenSymbol: true,
+          tokenImageUrl: true,
+          duration: true,
+          openingPrice: true,
+          expiry: true,
+          status: true,
+          winner: true,
+          totalPool: true,
+          createdAt: true,
+          chainId: true,
+          originalAddress: true,
+          creator: true,
+        },
+      });
+
+      rooms = dbRooms.map(r => ({
+        ...r,
+        openingPrice: r.openingPrice.toString(),
+        totalPool: r.totalPool.toString(),
+      }));
+
+      try {
+        await redis.set(cacheKey, JSON.stringify(rooms), 'EX', 5); // 5 seconds cache TTL
+      } catch (err) {
+        logger.warn({ msg: 'Failed to write rooms query cache to Redis', err });
+      }
+    }
 
     // Overlay live pool data from Redis where available in a single pipelined call
     const cachedData = await getCachedRooms(rooms.map(r => r.roomPubkey));
@@ -284,8 +310,6 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
       const cached = cachedData[idx];
       return {
         ...room,
-        openingPrice: room.openingPrice.toString(),
-        totalPool: room.totalPool.toString(),
         priceFeed: room.priceFeed,
         creator: room.creator,
         moonPool: cached?.moonPool ?? null,

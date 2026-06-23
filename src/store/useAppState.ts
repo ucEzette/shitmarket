@@ -636,8 +636,11 @@ export const useAppState = create<AppState>()(
         // Hydrate on-chain state asynchronously in the background so it doesn't block UI rendering!
         (async () => {
           try {
+            const activeRooms = mapped.filter((r: Room) => r.status === 'active');
+            if (activeRooms.length === 0) return;
+
             const program = getAnchorProgram(null as any);
-            const pubkeys = mapped.map((r: Room) => new PublicKey(r.id));
+            const pubkeys = activeRooms.map((r: Room) => new PublicKey(r.id));
             const onChainRooms = await withTimeout(
               (program.account as any).room.fetchMultiple(pubkeys),
               3000,
@@ -645,7 +648,7 @@ export const useAppState = create<AppState>()(
             ) as any[];
 
             const onChainById = new Map<string, any>();
-            mapped.forEach((room: Room, index: number) => {
+            activeRooms.forEach((room: Room, index: number) => {
               if (onChainRooms[index]) {
                 onChainById.set(room.id, onChainRooms[index]);
               }

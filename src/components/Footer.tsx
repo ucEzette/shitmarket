@@ -57,6 +57,15 @@ export const Footer: React.FC = () => {
             RECRUIT CHANNELS:
           </span>
           <div className="flex items-center gap-2">
+            {/* Mobile App Coming Soon Status */}
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-trench-mud border border-trench-sandbag/60 rounded font-mono text-[9.5px] font-bold text-trench-gasmask shadow-inner select-none">
+              <span>MOBILE CLIENT:</span>
+              <span className="text-neon-moon flex items-center gap-1">
+                COMING SOON
+                <span className="w-1.5 h-1.5 rounded-full bg-neon-moon animate-pulse" />
+              </span>
+            </div>
+
             <a
               href="https://x.com/shitmarketlol"
               target="_blank"

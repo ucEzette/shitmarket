@@ -10,7 +10,7 @@ import { PEPE_ASSETS, DegenQuoteBanner, PepePortrait, WarPropaganda, MascotRow }
 import { AgentKeyAlphaZone } from '@/components/AgentKeyAlphaZone';
 import { IntroScreen } from '@/components/IntroScreen';
 import { FloatingCoins } from '@/components/FloatingCoins';
-import { Flame, ShieldAlert, Award, ArrowUpRight, Zap, Target, Users, Swords, Skull, Rocket } from 'lucide-react';
+import { Flame, ShieldAlert, Award, ArrowUpRight, Zap, Target, Users, Swords, Skull, Rocket, Smartphone, Bell } from 'lucide-react';
 
 function HomeContent() {
   const { leaderboard, isPaused } = useAppState();
@@ -373,6 +373,86 @@ function HomeContent() {
           </div>
         </div>
 
+      </section>
+
+      {/* 4.5 MOBILE APP COMING SOON */}
+      <section className="mx-auto max-w-7xl w-full px-4 py-6">
+        <div className="premium-glass-card p-6 md:p-8 rounded-[24px] relative shadow-2xl border border-white/10 overflow-hidden group">
+          {/* Header Badge */}
+          <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-black/60 backdrop-blur-md border border-white/15 text-white px-6 py-1.5 rounded-full font-mono text-[10px] tracking-widest shadow-lg uppercase font-bold z-10 flex items-center gap-1.5">
+            <Smartphone size={10} className="text-neon-moon" />
+            <span>MOBILE OPERATIONS HQ</span>
+          </div>
+
+          {/* Glowing background effects */}
+          <div className="absolute -right-24 -bottom-24 w-96 h-96 bg-neon-moon/10 rounded-full blur-[80px] pointer-events-none group-hover:bg-neon-moon/15 transition-all duration-700" />
+          <div className="absolute -left-24 -top-24 w-96 h-96 bg-jeet-red/5 rounded-full blur-[80px] pointer-events-none" />
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
+            {/* Text description (Left Column) */}
+            <div className="lg:col-span-7 space-y-4 text-center lg:text-left">
+              <h3 className="font-staatliches text-3xl sm:text-4xl text-white tracking-wider uppercase leading-none">
+                SHITMARKET <span className="text-neon-moon">MOBILE CLIENT</span>
+              </h3>
+              <p className="font-mono text-xs sm:text-sm text-trench-gasmask leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                Deploy, monitor, and bet on meme trenches directly from your pocket. The upcoming ShitMarket mobile application brings decentralized PvP warfare to iOS and Android with premium UI, instant execution, and zero compromise.
+              </p>
+              
+              {/* Feature Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 text-left">
+                <div className="bg-trench-black/45 border border-trench-sandbag/40 rounded-xl p-3 hover:border-neon-moon/55 transition-all duration-300">
+                  <span className="font-staatliches text-sm text-neon-moon block mb-1 flex items-center gap-1">
+                    <Zap size={12} /> NATIVE SPEED
+                  </span>
+                  <span className="font-mono text-[10px] text-trench-gasmask/90 leading-normal block">
+                    Zero-lag React Native core engineered for real-time Solana indexing.
+                  </span>
+                </div>
+                <div className="bg-trench-black/45 border border-trench-sandbag/40 rounded-xl p-3 hover:border-neon-moon/55 transition-all duration-300">
+                  <span className="font-staatliches text-sm text-moon-gold block mb-1 flex items-center gap-1">
+                    <Bell size={12} /> COMMS FEED
+                  </span>
+                  <span className="font-mono text-[10px] text-trench-gasmask/90 leading-normal block">
+                    Push alerts for target settlements, parlay triggers, and new arenas.
+                  </span>
+                </div>
+                <div className="bg-trench-black/45 border border-trench-sandbag/40 rounded-xl p-3 hover:border-neon-moon/55 transition-all duration-300">
+                  <span className="font-staatliches text-sm text-jeet-red block mb-1 flex items-center gap-1">
+                    <ShieldAlert size={12} /> BIO SECURITY
+                  </span>
+                  <span className="font-mono text-[10px] text-trench-gasmask/90 leading-normal block">
+                    Biometric authentication and local key encryption for bulletproof security.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Badges Image (Right Column) */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center gap-4 text-center">
+              <div className="bg-trench-mud border border-trench-sandbag/40 rounded-full px-4 py-1.5 shadow-md">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-neon-moon animate-pulse" />
+                  <span className="font-mono text-[10px] text-neon-moon font-extrabold uppercase tracking-widest">
+                    DEPLOYMENT IN PROGRESS • COMING SOON
+                  </span>
+                </div>
+              </div>
+
+              {/* Badge container with stylish glass wrap */}
+              <div className="p-2 bg-trench-black border-2 border-trench-sandbag rounded-xl shadow-2xl overflow-hidden max-w-sm relative group/badge">
+                <div className="absolute inset-0 bg-gradient-to-tr from-neon-moon/10 to-transparent opacity-0 group-hover/badge:opacity-100 transition-opacity duration-500 pointer-events-none" />
+                <img
+                  src="/pepes/app_store_badges.png"
+                  alt="Download ShitMarket mobile on Google Play & App Store - Coming Soon"
+                  className="w-full h-auto object-contain rounded-md relative z-10 hover:scale-[1.02] transition-transform duration-300"
+                />
+              </div>
+              <span className="font-mono text-[9px] text-trench-gasmask uppercase font-semibold">
+                compatible with ios 15+ and android 10+
+              </span>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* 5. WAR PROPAGANDA GALLERY */}

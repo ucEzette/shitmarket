@@ -1,0 +1,1546 @@
+{
+  "address": "ByNq6kkYAPWPkHSimJPL6nhkeP7xFKHkstZRQcdLLH1B",
+  "metadata": {
+    "name": "shitmarket",
+    "version": "0.1.0",
+    "spec": "1.0.0"
+  },
+  "instructions": [
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury"
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "platformFeeBps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "createRoom",
+      "discriminator": [
+        130,
+        166,
+        32,
+        2,
+        247,
+        120,
+        178,
+        53
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "creator",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "priceFeed"
+        },
+        {
+          "name": "switchboardFeed"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "tokenMint",
+          "type": "pubkey"
+        },
+        {
+          "name": "tokenName",
+          "type": "string"
+        },
+        {
+          "name": "durationMinutes",
+          "type": "u32"
+        },
+        {
+          "name": "switchboardFeed",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "openingPriceParam",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "nonce",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "placeBet",
+      "discriminator": [
+        222,
+        62,
+        67,
+        220,
+        63,
+        166,
+        126,
+        33
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "bet",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "Side"
+            }
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "settleRoom",
+      "discriminator": [
+        179,
+        107,
+        121,
+        5,
+        100,
+        162,
+        27,
+        104
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "priceFeed"
+        },
+        {
+          "name": "switchboardFeed"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "keeper",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "finalPriceParam",
+          "type": {
+            "option": "i64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "claimWinnings",
+      "discriminator": [
+        161,
+        215,
+        24,
+        59,
+        14,
+        236,
+        242,
+        221
+      ],
+      "accounts": [
+        {
+          "name": "room"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "bet",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "sweepEscrow",
+      "discriminator": [
+        199,
+        250,
+        50,
+        208,
+        176,
+        209,
+        42,
+        120
+      ],
+      "accounts": [
+        {
+          "name": "room"
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "receiver",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "updateConfig",
+      "discriminator": [
+        29,
+        158,
+        252,
+        191,
+        10,
+        83,
+        219,
+        99
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        },
+        {
+          "name": "newTreasury",
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "newFeeBps",
+          "type": {
+            "option": "u16"
+          }
+        },
+        {
+          "name": "newTreasury",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "newKeeper",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "newMinimumLiquidity",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "newTwapWindow",
+          "type": {
+            "option": "i64"
+          }
+        },
+        {
+          "name": "newCoolingOff",
+          "type": {
+            "option": "i64"
+          }
+        }
+      ]
+    },
+    {
+      "name": "pause",
+      "discriminator": [
+        211,
+        22,
+        221,
+        251,
+        74,
+        121,
+        193,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "unpause",
+      "discriminator": [
+        169,
+        144,
+        4,
+        38,
+        10,
+        141,
+        188,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "signer": true
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "recordTwap",
+      "discriminator": [
+        129,
+        39,
+        109,
+        182,
+        81,
+        91,
+        111,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "priceFeed"
+        },
+        {
+          "name": "keeper",
+          "signer": true
+        },
+        {
+          "name": "config"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "createLimitOrder",
+      "discriminator": [
+        76,
+        161,
+        70,
+        122,
+        82,
+        20,
+        142,
+        75
+      ],
+      "accounts": [
+        {
+          "name": "limitOrder",
+          "writable": true
+        },
+        {
+          "name": "room"
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "Side"
+            }
+          }
+        },
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "limitPrice",
+          "type": "i64"
+        },
+        {
+          "name": "triggerDirection",
+          "type": "u8"
+        },
+        {
+          "name": "nonce",
+          "type": "u8"
+        },
+        {
+          "name": "maxSlippageBps",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "executeLimitOrder",
+      "discriminator": [
+        52,
+        33,
+        60,
+        30,
+        47,
+        100,
+        40,
+        22
+      ],
+      "accounts": [
+        {
+          "name": "limitOrder",
+          "writable": true
+        },
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "bet",
+          "writable": true
+        },
+        {
+          "name": "priceFeed"
+        },
+        {
+          "name": "relayer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "user",
+          "writable": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancelLimitOrder",
+      "discriminator": [
+        132,
+        156,
+        132,
+        31,
+        67,
+        40,
+        232,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "limitOrder",
+          "writable": true
+        },
+        {
+          "name": "room"
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "registerReferral",
+      "discriminator": [
+        158,
+        196,
+        134,
+        102,
+        193,
+        102,
+        184,
+        86
+      ],
+      "accounts": [
+        {
+          "name": "userReferral",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "referrer",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "claimReferralRewards",
+      "discriminator": [
+        23,
+        112,
+        76,
+        162,
+        157,
+        106,
+        203,
+        246
+      ],
+      "accounts": [
+        {
+          "name": "referralState",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "referrer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "withdrawVaultFees",
+      "discriminator": [
+        0,
+        106,
+        215,
+        159,
+        19,
+        234,
+        247,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "config"
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "treasury",
+          "writable": true
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "platformConfig",
+      "discriminator": [
+        160,
+        78,
+        128,
+        0,
+        248,
+        83,
+        230,
+        160
+      ]
+    },
+    {
+      "name": "room",
+      "discriminator": [
+        156,
+        199,
+        67,
+        27,
+        222,
+        23,
+        185,
+        94
+      ]
+    },
+    {
+      "name": "bet",
+      "discriminator": [
+        147,
+        23,
+        35,
+        59,
+        15,
+        75,
+        155,
+        32
+      ]
+    },
+    {
+      "name": "limitOrder",
+      "discriminator": [
+        137,
+        183,
+        212,
+        91,
+        115,
+        29,
+        141,
+        227
+      ]
+    },
+    {
+      "name": "userReferral",
+      "discriminator": [
+        60,
+        72,
+        219,
+        164,
+        122,
+        102,
+        170,
+        140
+      ]
+    },
+    {
+      "name": "referralState",
+      "discriminator": [
+        172,
+        61,
+        132,
+        107,
+        85,
+        145,
+        97,
+        166
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "RoomCreated",
+      "discriminator": [
+        9,
+        177,
+        128,
+        166,
+        26,
+        19,
+        14,
+        243
+      ]
+    },
+    {
+      "name": "BetPlaced",
+      "discriminator": [
+        88,
+        88,
+        145,
+        226,
+        126,
+        206,
+        32,
+        0
+      ]
+    },
+    {
+      "name": "RoomSettled",
+      "discriminator": [
+        139,
+        64,
+        121,
+        102,
+        137,
+        174,
+        165,
+        105
+      ]
+    },
+    {
+      "name": "WinningsClaimed",
+      "discriminator": [
+        187,
+        184,
+        29,
+        196,
+        54,
+        117,
+        70,
+        150
+      ]
+    },
+    {
+      "name": "PlatformPaused",
+      "discriminator": [
+        110,
+        72,
+        152,
+        13,
+        0,
+        222,
+        149,
+        129
+      ]
+    },
+    {
+      "name": "EscrowSwept",
+      "discriminator": [
+        183,
+        123,
+        76,
+        75,
+        208,
+        119,
+        180,
+        208
+      ]
+    },
+    {
+      "name": "RoomActivated",
+      "discriminator": [
+        135,
+        55,
+        162,
+        248,
+        181,
+        65,
+        252,
+        152
+      ]
+    },
+    {
+      "name": "ReferralRegistered",
+      "discriminator": [
+        210,
+        150,
+        27,
+        227,
+        209,
+        161,
+        7,
+        232
+      ]
+    },
+    {
+      "name": "ReferralRewardAccrued",
+      "discriminator": [
+        35,
+        254,
+        111,
+        153,
+        235,
+        117,
+        73,
+        73
+      ]
+    },
+    {
+      "name": "ReferralRewardsClaimed",
+      "discriminator": [
+        178,
+        107,
+        76,
+        169,
+        252,
+        154,
+        45,
+        235
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "You are not authorized to perform this action."
+    },
+    {
+      "code": 6001,
+      "name": "UnauthorizedKeeper",
+      "msg": "Only the keeper is authorized to settle."
+    },
+    {
+      "code": 6002,
+      "name": "RoomNotActive",
+      "msg": "This room is not currently active."
+    },
+    {
+      "code": 6003,
+      "name": "RoomExpired",
+      "msg": "This room has expired."
+    },
+    {
+      "code": 6004,
+      "name": "RoomNotSettled",
+      "msg": "This room is not yet settled."
+    },
+    {
+      "code": 6005,
+      "name": "AlreadyClaimed",
+      "msg": "Winnings have already been claimed."
+    },
+    {
+      "code": 6006,
+      "name": "NotAWinner",
+      "msg": "Your side did not win the prediction battle."
+    },
+    {
+      "code": 6007,
+      "name": "SideMismatch",
+      "msg": "Cannot place bet on a different side than existing bet."
+    },
+    {
+      "code": 6008,
+      "name": "InvalidDuration",
+      "msg": "Invalid battle duration."
+    },
+    {
+      "code": 6009,
+      "name": "ZeroBetAmount",
+      "msg": "Bet amount must be greater than zero."
+    },
+    {
+      "code": 6011,
+      "name": "PlatformPaused",
+      "msg": "The platform is currently paused."
+    },
+    {
+      "code": 6012,
+      "name": "Underflow",
+      "msg": "Arithmetic underflow occurred."
+    },
+    {
+      "code": 6013,
+      "name": "Overflow",
+      "msg": "Arithmetic overflow occurred."
+    }
+  ],
+  "types": [
+    {
+      "name": "Side",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Moon"
+          },
+          {
+            "name": "Jeet"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Settled"
+          },
+          {
+            "name": "Pending"
+          }
+        ]
+      }
+    },
+    {
+      "name": "platformConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "keeper",
+            "type": "pubkey"
+          },
+          {
+            "name": "platformFeeBps",
+            "type": "u16"
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "minimumLiquidity",
+            "type": "u64"
+          },
+          {
+            "name": "twapWindowSeconds",
+            "type": "i64"
+          },
+          {
+            "name": "coolingOffSeconds",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "room",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tokenMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenName",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "priceFeed",
+            "type": "pubkey"
+          },
+          {
+            "name": "switchboardFeed",
+            "type": "pubkey"
+          },
+          {
+            "name": "openingPrice",
+            "type": "i64"
+          },
+          {
+            "name": "openingTimestamp",
+            "type": "i64"
+          },
+          {
+            "name": "durationMinutes",
+            "type": "u32"
+          },
+          {
+            "name": "expiryTimestamp",
+            "type": "i64"
+          },
+          {
+            "name": "moonPool",
+            "type": "u64"
+          },
+          {
+            "name": "jeetPool",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "RoomStatus"
+              }
+            }
+          },
+          {
+            "name": "winner",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "Side"
+                }
+              }
+            }
+          },
+          {
+            "name": "finalPrice",
+            "type": "i64"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "twapSamplesCt",
+            "type": "u8"
+          },
+          {
+            "name": "twapSamples",
+            "type": {
+              "array": [
+                "i64",
+                5
+              ]
+            }
+          },
+          {
+            "name": "twapSampleTimestamps",
+            "type": {
+              "array": [
+                "i64",
+                5
+              ]
+            }
+          },
+          {
+            "name": "twapFinalPrice",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "bet",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "claimed",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "creator",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenName",
+            "type": "string"
+          },
+          {
+            "name": "priceFeed",
+            "type": "pubkey"
+          },
+          {
+            "name": "openingPrice",
+            "type": "i64"
+          },
+          {
+            "name": "durationMinutes",
+            "type": "u32"
+          },
+          {
+            "name": "expiryTimestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BetPlaced",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "side",
+            "type": "u8"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "moonPool",
+            "type": "u64"
+          },
+          {
+            "name": "jeetPool",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomSettled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "winner",
+            "type": "u8"
+          },
+          {
+            "name": "openingPrice",
+            "type": "i64"
+          },
+          {
+            "name": "finalPrice",
+            "type": "i64"
+          },
+          {
+            "name": "twapFinalPrice",
+            "type": "i64"
+          },
+          {
+            "name": "totalPool",
+            "type": "u64"
+          },
+          {
+            "name": "platformFee",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WinningsClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlatformPaused",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "paused",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReputationUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier",
+            "type": "u8"
+          },
+          {
+            "name": "totalBets",
+            "type": "u64"
+          },
+          {
+            "name": "totalWins",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EscrowSwept",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "receiver",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "limitOrder",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "side",
+            "type": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "limitPrice",
+            "type": "i64"
+          },
+          {
+            "name": "triggerDirection",
+            "type": "u8"
+          },
+          {
+            "name": "nonce",
+            "type": "u8"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "maxSlippageBps",
+            "type": "u16"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomActivated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "openingPrice",
+            "type": "i64"
+          },
+          {
+            "name": "expiryTimestamp",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserReferral",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "referrer",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReferralState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "referrer",
+            "type": "pubkey"
+          },
+          {
+            "name": "unclaimedRewards",
+            "type": "u64"
+          },
+          {
+            "name": "claimedRewards",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReferralRegistered",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "referrer",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReferralRewardAccrued",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "referrer",
+            "type": "pubkey"
+          },
+          {
+            "name": "invitee",
+            "type": "pubkey"
+          },
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "rewardAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReferralRewardsClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "referrer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

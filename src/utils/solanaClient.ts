@@ -145,6 +145,14 @@ export const getVaultPda = (): PublicKey => {
   return pda;
 };
 
+export const getListingPda = (bet: PublicKey): PublicKey => {
+  const [pda] = PublicKey.findProgramAddressSync(
+    [Buffer.from('listing'), bet.toBuffer()],
+    PROGRAM_ID
+  );
+  return pda;
+};
+
 export const getUserReferralPda = (user: PublicKey): PublicKey => {
   const [pda] = PublicKey.findProgramAddressSync(
     [Buffer.from('user_referral'), user.toBuffer()],

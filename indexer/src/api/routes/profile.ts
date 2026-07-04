@@ -2,14 +2,97 @@ import express from 'express';
 import { prisma, prismaRead } from '../../db';
 import { logger } from '../../logger';
 import { validate, walletParamSchema } from '../validation';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { config } from '../../config';
 
 export const profileRouter = express.Router();
+
+// Parse custom borsh layout of Bet PDA (115 bytes)
+function parseBet(data: Buffer) {
+  if (data.length < 115) return null;
+  try {
+    const room = new PublicKey(data.subarray(8, 40)).toBase58();
+    const user = new PublicKey(data.subarray(40, 72)).toBase58();
+    const currentOwner = new PublicKey(data.subarray(72, 104)).toBase58();
+    const side = data[104] === 0 ? 'moon' : 'jeet';
+    const amount = data.readBigUInt64LE(105);
+    const claimed = data[113] !== 0;
+    return { room, user, currentOwner, side, amount, claimed };
+  } catch (e: any) {
+    logger.error({ msg: 'Failed to parse on-chain bet data buffer', err: e.message });
+    return null;
+  }
+}
 
 // ── GET /api/profile/:wallet ───────────────────────────────────────────────────
 
 profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req, res) => {
   try {
     const { wallet } = req.params;
+
+    // Self-healing: Fetch on-chain bets for this wallet as current owner and sync with database
+    try {
+      const connection = new Connection(config.solana.rpcUrl, 'confirmed');
+      const programId = new PublicKey(config.solana.programId);
+      const onChainAccounts = await connection.getProgramAccounts(programId, {
+        filters: [
+          { dataSize: 115 },
+          { memcmp: { offset: 72, bytes: wallet } }
+        ]
+      });
+
+      for (const acc of onChainAccounts) {
+        const parsed = parseBet(acc.account.data);
+        if (parsed) {
+          let dbBet = await prisma.bet.findFirst({
+            where: {
+              roomPubkey: parsed.room,
+              userPubkey: wallet,
+              side: parsed.side
+            }
+          });
+
+          if (!dbBet && parsed.user !== wallet) {
+            // Find the bet under original bettor key that hasn't been updated to buyer yet
+            dbBet = await prisma.bet.findFirst({
+              where: {
+                roomPubkey: parsed.room,
+                userPubkey: parsed.user,
+                side: parsed.side
+              }
+            });
+          }
+
+          if (dbBet) {
+            if (dbBet.userPubkey !== wallet || dbBet.amount !== parsed.amount || dbBet.claimed !== parsed.claimed) {
+              await prisma.bet.update({
+                where: { id: dbBet.id },
+                data: {
+                  userPubkey: wallet,
+                  amount: parsed.amount,
+                  claimed: parsed.claimed
+                }
+              });
+              logger.info({ msg: 'Self-healed / synced bet in database', betId: dbBet.id, wallet, amount: parsed.amount.toString() });
+            }
+          } else {
+            const newBet = await prisma.bet.create({
+              data: {
+                roomPubkey: parsed.room,
+                userPubkey: wallet,
+                side: parsed.side,
+                amount: parsed.amount,
+                claimed: parsed.claimed,
+                txSig: 'onchain-sync'
+              }
+            });
+            logger.info({ msg: 'Self-healed / created missing bet in database', betId: newBet.id, wallet, amount: parsed.amount.toString() });
+          }
+        }
+      }
+    } catch (err: any) {
+      logger.warn({ msg: 'Self-healing on-chain bets sync failed', err: err.message });
+    }
 
     let profile = await prisma.userProfile.findUnique({
       where: { userPubkey: wallet },

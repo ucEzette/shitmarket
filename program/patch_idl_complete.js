@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 const idlPaths = [
   path.join(__dirname, '../src/utils/idl.json'),
+  path.join(__dirname, '../src/utils/shitmarket_idl.json'),
   path.join(__dirname, '../indexer/src/utils/idl.json'),
   path.join(__dirname, 'target/idl/shitmarket.json')
 ];
@@ -121,6 +122,63 @@ const newInstructions = [
     ],
     args: [
       { name: "amount", type: "u64" }
+    ]
+  },
+  {
+    name: "listPosition",
+    rustName: "list_position",
+    accounts: [
+      { name: "room" },
+      { name: "bet", writable: true },
+      { name: "listing", writable: true },
+      { name: "config" },
+      { name: "seller", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: [
+      { name: "price", type: "u64" }
+    ]
+  },
+  {
+    name: "cancelListing",
+    rustName: "cancel_listing",
+    accounts: [
+      { name: "bet", writable: true },
+      { name: "listing", writable: true },
+      { name: "seller", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: []
+  },
+  {
+    name: "buyPosition",
+    rustName: "buy_position",
+    accounts: [
+      { name: "room" },
+      { name: "bet", writable: true },
+      { name: "listing", writable: true },
+      { name: "seller", writable: true },
+      { name: "vault", writable: true },
+      { name: "config" },
+      { name: "buyer", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: []
+  },
+  {
+    name: "migrateBet",
+    rustName: "migrate_bet",
+    accounts: [
+      { name: "bet", writable: true },
+      { name: "room" },
+      { name: "user", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: [
+      {
+        name: "side",
+        type: { defined: { name: "Side" } }
+      }
     ]
   }
 ];
@@ -307,6 +365,120 @@ const referralRewardsClaimedEvent = { name: "ReferralRewardsClaimed", discrimina
   if (existingIdx >= 0) idl.events[existingIdx] = e;
   else idl.events.push(e);
 });
+
+// 3.11. Add Listing Account Type and Listing Account definition
+const listingType = {
+  name: "Listing",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "room", type: "pubkey" },
+      { name: "bet", type: "pubkey" },
+      { name: "seller", type: "pubkey" },
+      { name: "price", type: "u64" },
+      { name: "bump", type: "u8" }
+    ]
+  }
+};
+const existingListingTypeIdx = idl.types.findIndex(t => t.name === listingType.name);
+if (existingListingTypeIdx >= 0) {
+  idl.types[existingListingTypeIdx] = listingType;
+} else {
+  idl.types.push(listingType);
+}
+
+const listingAccount = {
+  name: "listing",
+  discriminator: getAccountDiscriminator("Listing")
+};
+const existingListingAccountIdx = idl.accounts.findIndex(a => a.name === listingAccount.name);
+if (existingListingAccountIdx >= 0) {
+  idl.accounts[existingListingAccountIdx] = listingAccount;
+} else {
+  idl.accounts.push(listingAccount);
+}
+
+// 3.12. Add Secondary Market Event Types and Events
+const positionListedType = {
+  name: "PositionListed",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "room", type: "pubkey" },
+      { name: "bet", type: "pubkey" },
+      { name: "seller", type: "pubkey" },
+      { name: "price", type: "u64" }
+    ]
+  }
+};
+const positionPurchasedType = {
+  name: "PositionPurchased",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "room", type: "pubkey" },
+      { name: "bet", type: "pubkey" },
+      { name: "seller", type: "pubkey" },
+      { name: "buyer", type: "pubkey" },
+      { name: "price", type: "u64" }
+    ]
+  }
+};
+const listingCancelledType = {
+  name: "ListingCancelled",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "room", type: "pubkey" },
+      { name: "bet", type: "pubkey" },
+      { name: "seller", type: "pubkey" }
+    ]
+  }
+};
+[positionListedType, positionPurchasedType, listingCancelledType].forEach(t => {
+  const existingIdx = idl.types.findIndex(item => item.name === t.name);
+  if (existingIdx >= 0) idl.types[existingIdx] = t;
+  else idl.types.push(t);
+});
+
+const positionListedEvent = { name: "PositionListed", discriminator: getEventDiscriminator("PositionListed") };
+const positionPurchasedEvent = { name: "PositionPurchased", discriminator: getEventDiscriminator("PositionPurchased") };
+const listingCancelledEvent = { name: "ListingCancelled", discriminator: getEventDiscriminator("ListingCancelled") };
+[positionListedEvent, positionPurchasedEvent, listingCancelledEvent].forEach(e => {
+  const existingIdx = idl.events.findIndex(item => item.name === e.name);
+  if (existingIdx >= 0) idl.events[existingIdx] = e;
+  else idl.events.push(e);
+});
+
+// 3.13. Patch claimWinnings accounts to include originalBettor
+const claimWinningsInstr = idl.instructions.find(i => i.name === 'claimWinnings');
+if (claimWinningsInstr) {
+  claimWinningsInstr.accounts = [
+    { name: "room" },
+    { name: "config" },
+    { name: "escrow", writable: true },
+    { name: "bet", writable: true },
+    { name: "originalBettor" },
+    { name: "user", writable: true },
+    { name: "payer", writable: true, signer: true },
+    { name: "systemProgram" }
+  ];
+}
+
+// 3.14. Update Bet type to include currentOwner field
+const betType = idl.types.find(t => t.name === "Bet" || t.name === "bet");
+if (betType && betType.type && betType.type.fields) {
+  const hasCurrentOwner = betType.type.fields.some(f => f.name === "currentOwner");
+  if (!hasCurrentOwner) {
+    // Insert currentOwner after user
+    const userIdx = betType.type.fields.findIndex(f => f.name === "user");
+    if (userIdx >= 0) {
+      betType.type.fields.splice(userIdx + 1, 0, { name: "currentOwner", type: "pubkey" });
+    } else {
+      betType.type.fields.push({ name: "currentOwner", type: "pubkey" });
+    }
+  }
+}
 
 // 4. Save patched IDL back to all destinations
 idlPaths.forEach(p => {

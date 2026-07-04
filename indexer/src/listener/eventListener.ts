@@ -203,6 +203,27 @@ interface ReferralRewardsClaimedEvent {
   amount: anchor.BN;
 }
 
+interface PositionListedEvent {
+  room: anchor.web3.PublicKey;
+  bet: anchor.web3.PublicKey;
+  seller: anchor.web3.PublicKey;
+  price: anchor.BN;
+}
+
+interface PositionPurchasedEvent {
+  room: anchor.web3.PublicKey;
+  bet: anchor.web3.PublicKey;
+  seller: anchor.web3.PublicKey;
+  buyer: anchor.web3.PublicKey;
+  price: anchor.BN;
+}
+
+interface ListingCancelledEvent {
+  room: anchor.web3.PublicKey;
+  bet: anchor.web3.PublicKey;
+  seller: anchor.web3.PublicKey;
+}
+
 // ─── Token metadata fetch ─────────────────────────────────────────────────────
 
 interface TokenMeta {
@@ -932,6 +953,121 @@ async function handleReferralRewardsClaimed(event: ReferralRewardsClaimedEvent, 
   }
 }
 
+async function handlePositionListed(event: PositionListedEvent): Promise<void> {
+  try {
+    const roomPubkey = event.room.toBase58();
+    const sellerPubkey = event.seller.toBase58();
+    const price = BigInt(event.price.toString());
+
+    await prisma.activity.create({
+      data: {
+        userPubkey: sellerPubkey,
+        type: 'bet',
+        title: 'POSITION LISTED',
+        message: `You listed your position in room ${roomPubkey.substring(0, 4)} for ${(Number(price) / 1e9).toFixed(4)} SOL.`,
+        link: `/room/${roomPubkey}`
+      }
+    });
+
+    logger.info({ msg: 'PositionListed processed', room: roomPubkey, seller: sellerPubkey, price: price.toString() });
+  } catch (err: any) {
+    logger.error({ msg: 'PositionListed failed', err: err.message });
+  }
+}
+
+async function handlePositionPurchased(event: PositionPurchasedEvent): Promise<void> {
+  try {
+    const roomPubkey = event.room.toBase58();
+    const sellerPubkey = event.seller.toBase58();
+    const buyerPubkey = event.buyer.toBase58();
+    const price = BigInt(event.price.toString());
+
+    const bet = await prisma.bet.findFirst({
+      where: { roomPubkey, userPubkey: sellerPubkey, claimed: false }
+    });
+
+    if (bet) {
+      const existingBuyerBet = await prisma.bet.findFirst({
+        where: { roomPubkey, userPubkey: buyerPubkey, side: bet.side, claimed: false }
+      });
+
+      if (existingBuyerBet) {
+        await prisma.$transaction([
+          prisma.bet.update({
+            where: { id: existingBuyerBet.id },
+            data: { amount: existingBuyerBet.amount + bet.amount }
+          }),
+          prisma.bet.delete({
+            where: { id: bet.id }
+          })
+        ]);
+      } else {
+        await prisma.bet.update({
+          where: { id: bet.id },
+          data: { userPubkey: buyerPubkey }
+        });
+      }
+
+      await prisma.userProfile.upsert({
+        where: { userPubkey: buyerPubkey },
+        create: { userPubkey: buyerPubkey, totalBets: 1 },
+        update: { totalBets: { increment: 1 } }
+      });
+
+      await prisma.activity.createMany({
+        data: [
+          {
+            userPubkey: sellerPubkey,
+            type: 'settlement',
+            title: 'POSITION SOLD',
+            message: `Your position in room ${roomPubkey.substring(0, 4)} was sold for ${(Number(price) / 1e9).toFixed(4)} SOL.`,
+            link: `/room/${roomPubkey}`
+          },
+          {
+            userPubkey: buyerPubkey,
+            type: 'bet',
+            title: 'POSITION ACQUIRED',
+            message: `You acquired a position in room ${roomPubkey.substring(0, 4)} for ${(Number(price) / 1e9).toFixed(4)} SOL.`,
+            link: `/room/${roomPubkey}`
+          }
+        ]
+      });
+
+      await publishRoomUpdate(roomPubkey, {
+        type: 'PositionPurchased',
+        seller: sellerPubkey,
+        buyer: buyerPubkey,
+        price: price.toString()
+      });
+    }
+
+    logger.info({ msg: 'PositionPurchased processed', room: roomPubkey, seller: sellerPubkey, buyer: buyerPubkey, price: price.toString() });
+  } catch (err: any) {
+    logger.error({ msg: 'PositionPurchased failed', err: err.message });
+  }
+}
+
+async function handleListingCancelled(event: ListingCancelledEvent): Promise<void> {
+  try {
+    const roomPubkey = event.room.toBase58();
+    const sellerPubkey = event.seller.toBase58();
+
+    await prisma.activity.create({
+      data: {
+        userPubkey: sellerPubkey,
+        type: 'bet',
+        title: 'LISTING CANCELLED',
+        message: `You cancelled your position listing in room ${roomPubkey.substring(0, 4)}.`,
+        link: `/room/${roomPubkey}`
+      }
+    });
+
+    logger.info({ msg: 'ListingCancelled processed', room: roomPubkey, seller: sellerPubkey });
+  } catch (err: any) {
+    logger.error({ msg: 'ListingCancelled failed', err: err.message });
+  }
+}
+
 let subscriptionId: number | null = null;
 
 export async function processParsedEvents(events: any[], signature: string): Promise<void> {
@@ -974,6 +1110,15 @@ export async function processParsedEvents(events: any[], signature: string): Pro
         break;
       case 'ReferralRewardsClaimed':
         await handleReferralRewardsClaimed(event.data as ReferralRewardsClaimedEvent, signature);
+        break;
+      case 'PositionListed':
+        await handlePositionListed(event.data as PositionListedEvent);
+        break;
+      case 'PositionPurchased':
+        await handlePositionPurchased(event.data as PositionPurchasedEvent);
+        break;
+      case 'ListingCancelled':
+        await handleListingCancelled(event.data as ListingCancelledEvent);
         break;
       default:
         logger.warn({ msg: 'Unknown event', name: event.name });

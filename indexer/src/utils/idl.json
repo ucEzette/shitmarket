@@ -1,5 +1,5 @@
 {
-  "address": "2zW7Fj9tpVGqJ2FAMVfNY2WqkX8mH3xxV9KrfAzQjWpJ",
+  "address": "ByNq6kkYAPWPkHSimJPL6nhkeP7xFKHkstZRQcdLLH1B",
   "metadata": {
     "name": "shitmarket",
     "version": "0.1.0",
@@ -242,6 +242,9 @@
         {
           "name": "bet",
           "writable": true
+        },
+        {
+          "name": "originalBettor"
         },
         {
           "name": "user",
@@ -684,6 +687,167 @@
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "listPosition",
+      "discriminator": [
+        252,
+        73,
+        186,
+        182,
+        15,
+        2,
+        202,
+        83
+      ],
+      "accounts": [
+        {
+          "name": "room"
+        },
+        {
+          "name": "bet",
+          "writable": true
+        },
+        {
+          "name": "listing",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "price",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "cancelListing",
+      "discriminator": [
+        41,
+        183,
+        50,
+        232,
+        230,
+        233,
+        157,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "bet",
+          "writable": true
+        },
+        {
+          "name": "listing",
+          "writable": true
+        },
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "buyPosition",
+      "discriminator": [
+        210,
+        108,
+        108,
+        28,
+        10,
+        46,
+        226,
+        137
+      ],
+      "accounts": [
+        {
+          "name": "room"
+        },
+        {
+          "name": "bet",
+          "writable": true
+        },
+        {
+          "name": "listing",
+          "writable": true
+        },
+        {
+          "name": "seller",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "migrateBet",
+      "discriminator": [
+        119,
+        223,
+        245,
+        39,
+        86,
+        157,
+        242,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "bet",
+          "writable": true
+        },
+        {
+          "name": "room"
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "side",
+          "type": {
+            "defined": {
+              "name": "Side"
+            }
+          }
+        }
+      ]
     }
   ],
   "accounts": [
@@ -763,6 +927,19 @@
         145,
         97,
         166
+      ]
+    },
+    {
+      "name": "listing",
+      "discriminator": [
+        218,
+        32,
+        50,
+        73,
+        43,
+        134,
+        26,
+        58
       ]
     }
   ],
@@ -895,6 +1072,45 @@
         154,
         45,
         235
+      ]
+    },
+    {
+      "name": "PositionListed",
+      "discriminator": [
+        182,
+        248,
+        5,
+        32,
+        220,
+        197,
+        216,
+        164
+      ]
+    },
+    {
+      "name": "PositionPurchased",
+      "discriminator": [
+        1,
+        2,
+        222,
+        10,
+        69,
+        24,
+        127,
+        80
+      ]
+    },
+    {
+      "name": "ListingCancelled",
+      "discriminator": [
+        11,
+        46,
+        163,
+        10,
+        103,
+        80,
+        139,
+        194
       ]
     }
   ],
@@ -1161,6 +1377,10 @@
           },
           {
             "name": "user",
+            "type": "pubkey"
+          },
+          {
+            "name": "currentOwner",
             "type": "pubkey"
           },
           {
@@ -1538,6 +1758,106 @@
           {
             "name": "amount",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Listing",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "bet",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionListed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "bet",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PositionPurchased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "bet",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListingCancelled",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "bet",
+            "type": "pubkey"
+          },
+          {
+            "name": "seller",
+            "type": "pubkey"
           }
         ]
       }

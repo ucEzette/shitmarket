@@ -13,6 +13,7 @@ import {
   getVaultPda,
   getUserReferralPda,
   getReferralStatePda,
+  getListingPda,
 } from '@/utils/solanaClient';
 export const formatCashtag = (sym: string) => {
   if (!sym) return '';
@@ -57,12 +58,23 @@ export function formatPrice(price: number | string | undefined | null): string {
 export interface Bet {
   id: string;
   roomId: string;
-  user: string; // wallet address
+  user: string; // original bettor wallet address
+  currentOwner?: string; // current owner wallet address
   side: 'moon' | 'jeet';
   amount: number; // SOL
   claimed: boolean;
   timestamp: number;
   txSig?: string | null;
+}
+
+export interface Listing {
+  pubkey: string;
+  room: string;
+  bet: string;
+  seller: string;
+  price: number; // SOL
+  side?: 'moon' | 'jeet';
+  amount?: number; // SOL
 }
 
 export interface Activity {
@@ -171,6 +183,7 @@ export interface AppState {
   isPaused: boolean;
   rooms: Room[];
   roomsLoaded: boolean;
+  listings: Listing[];
   user: UserProfile | null;
   leaderboard: {
     moon: LeaderboardEntry[];
@@ -249,6 +262,12 @@ export interface AppState {
   fetchBalance: () => Promise<void>;
   updateProfile: (username: string | null, avatarUrl: string | null, referredBy?: string | null) => Promise<{ success: boolean; error?: string }>;
   refreshProfile: () => Promise<void>;
+  
+  // Secondary Market Actions
+  fetchRoomListings: (roomId: string) => Promise<void>;
+  listPosition: (roomPubkey: string, betPubkey: string, priceSol: number) => Promise<string>;
+  cancelListing: (listingPubkey: string, betPubkey: string) => Promise<string>;
+  buyPosition: (roomPubkey: string, listingPubkey: string, betPubkey: string, seller: string, originalBettor: string) => Promise<string>;
   
   // Real-time synchronization actions
   addRoom: (room: Room) => void;
@@ -458,6 +477,7 @@ export const useAppState = create<AppState>()(
     (set, get) => ({
   rooms: [],
   roomsLoaded: false,
+  listings: [],
   isPaused: false,
   user: null,
   leaderboard: {
@@ -1238,6 +1258,31 @@ export const useAppState = create<AppState>()(
       const configPda = getPlatformConfigPda();
       
       const priorityFeeValue = getPriorityFeePrice(get().settings);
+      
+      const preInstructions: any[] = [
+        ComputeBudgetProgram.setComputeUnitLimit({ units: 280_000 }), // increased compute units limit to allow for potential reallocation/migration
+        ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
+      ];
+
+      // Dynamic On-Chain Migration: check if bet account has legacy size (83 bytes)
+      try {
+        const betAccountInfo = await connection.getAccountInfo(betPda);
+        if (betAccountInfo && betAccountInfo.data.length === 83) {
+          console.log(`[Migration] Legacy 83-byte bet account detected at ${betPda.toBase58()}. Prepending migrate_bet...`);
+          const migrateIx = await (program.methods as any)
+            .migrateBet(side === 'moon' ? { moon: {} } : { jeet: {} })
+            .accounts({
+              bet: betPda,
+              room: roomPda,
+              user: wallet.publicKey,
+              systemProgram: SystemProgram.programId,
+            })
+            .instruction();
+          preInstructions.push(migrateIx);
+        }
+      } catch (err) {
+        console.warn("[Migration] Could not query bet account info for migration check:", err);
+      }
 
       const txObj = await (program.methods as any)
         .placeBet(
@@ -1252,10 +1297,7 @@ export const useAppState = create<AppState>()(
           config: configPda,
           systemProgram: SystemProgram.programId,
         })
-        .preInstructions([
-          ComputeBudgetProgram.setComputeUnitLimit({ units: 150_000 }),
-          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
-        ])
+        .preInstructions(preInstructions)
         .transaction();
         
       if (!sendTransaction) {
@@ -1500,54 +1542,52 @@ export const useAppState = create<AppState>()(
 
 
 
-      // ── Step 4: Determine which side to claim on ──────────────────────────
-      // For voided (winner='draw') and draw rooms the user claims their OWN bet side.
-      // Priority: (1) local user bet record → (2) on-chain PDA existence → (3) winner (non-draw only)
+      // ── Step 4: Determine which side and PDA to claim on ──────────────────
+      let betPda: PublicKey | null = null;
+      let originalBettor: PublicKey = wallet.publicKey;
       let claimSide: 'moon' | 'jeet' | null = null;
-      
-      // First, try to find the user's unclaimed bet in local state
-      const userBet = get().user?.bets.find((b) => b.roomId === roomId && !b.claimed);
-      if (userBet && (userBet.side === 'moon' || userBet.side === 'jeet')) {
-        claimSide = userBet.side;
-        console.log(`ClaimSide from user bet record: ${claimSide}`);
-      } else {
-        // Check on-chain which bet PDA actually exists for this wallet
-        try {
-          const moonBetPda = getBetPda(roomPda, wallet.publicKey, 'moon');
-          const moonInfo = await connection.getAccountInfo(moonBetPda);
-          if (moonInfo) {
-            claimSide = 'moon';
-            console.log('ClaimSide from on-chain moon PDA');
-          } else {
-            const jeetBetPda = getBetPda(roomPda, wallet.publicKey, 'jeet');
-            const jeetInfo = await connection.getAccountInfo(jeetBetPda);
-            if (jeetInfo) {
-              claimSide = 'jeet';
-              console.log('ClaimSide from on-chain jeet PDA');
-            }
-          }
-        } catch (e) {
-          console.warn('Failed PDA check for claim side:', e);
+
+      try {
+        const userBets = await connection.getProgramAccounts(program.programId, {
+          filters: [
+            { dataSize: 115 }, // Bet::LEN
+            { memcmp: { offset: 8, bytes: roomPda.toBase58() } },
+            { memcmp: { offset: 72, bytes: wallet.publicKey.toBase58() } }
+          ]
+        });
+
+        const activeBetAcc = userBets.find(acc => {
+          const decoded = (program.coder.accounts as any).decode('Bet', acc.account.data);
+          return !decoded.claimed;
+        }) || userBets[0];
+
+        if (activeBetAcc) {
+          betPda = activeBetAcc.pubkey;
+          const decoded = (program.coder.accounts as any).decode('Bet', activeBetAcc.account.data);
+          originalBettor = decoded.user;
+          claimSide = Object.keys(decoded.side)[0] as 'moon' | 'jeet';
+          console.log(`Resolved bet from on-chain: ${betPda.toBase58()}, original bettor: ${originalBettor.toBase58()}, side: ${claimSide}`);
         }
+      } catch (e) {
+        console.warn('Failed to query user bets from blockchain, falling back to local derivation:', e);
       }
 
-      // If we still couldn't determine the claim side, try via room winner
-      // (only for non-draw/non-void rooms — draw/void rooms require on-chain PDA lookup)
-      if (!claimSide) {
-        if (roomWinner && roomWinner !== 'draw' && roomWinner !== null) {
-          claimSide = roomWinner as 'moon' | 'jeet';
-          console.log(`ClaimSide from room winner: ${claimSide}`);
+      if (!betPda) {
+        const userBet = get().user?.bets.find((b) => b.roomId === roomId && !b.claimed);
+        if (userBet && (userBet.side === 'moon' || userBet.side === 'jeet')) {
+          claimSide = userBet.side;
         } else {
-          // For draw/void rooms, we must have a claim side from the bet or PDA.
-          // If we can't find it, throw an error rather than guessing 'moon'.
-          throw new Error(
-            'Could not determine your bet side for this draw/voided room. ' +
-            'This may happen if the RPC is unreachable. Please try again.'
-          );
+          if (roomWinner && roomWinner !== 'draw' && roomWinner !== null) {
+            claimSide = roomWinner as 'moon' | 'jeet';
+          } else {
+            throw new Error(
+              'Could not determine your bet side. Please try again.'
+            );
+          }
         }
+        betPda = getBetPda(roomPda, wallet.publicKey, claimSide!);
+        originalBettor = wallet.publicKey;
       }
-
-      const betPda = getBetPda(roomPda, wallet.publicKey, claimSide);
 
       const remainingAccounts = [];
       const userState = get().user;
@@ -1599,6 +1639,7 @@ export const useAppState = create<AppState>()(
           config: configPda,
           escrow: escrowPda,
           bet: betPda,
+          originalBettor: originalBettor,
           user: wallet.publicKey,
           payer: wallet.publicKey,
           systemProgram: SystemProgram.programId,
@@ -1638,7 +1679,7 @@ export const useAppState = create<AppState>()(
       get().addActivity({
         type: 'win',
         title: `BOOTY CLAIMED IN ROOM ${roomId.substring(0, 4)}`,
-        message: `Successfully recovered spoils from ${claimSide.toUpperCase()} victory.`,
+        message: `Successfully recovered spoils from ${claimSide!.toUpperCase()} victory.`,
         link: `/room/${roomId}`
       });
 
@@ -1752,6 +1793,357 @@ export const useAppState = create<AppState>()(
         description: cleanErr
       });
       
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  fetchRoomListings: async (roomId: string) => {
+    try {
+      const program = getAnchorProgram(null as any);
+      const roomPubkey = new PublicKey(roomId);
+
+      const listingAccounts = await connection.getProgramAccounts(program.programId, {
+        filters: [
+          { dataSize: 113 },
+          {
+            memcmp: {
+              offset: 8,
+              bytes: roomPubkey.toBase58(),
+            },
+          },
+        ],
+      });
+
+      const [betAccountsNew, betAccountsLegacy] = await Promise.all([
+        connection.getProgramAccounts(program.programId, {
+          filters: [
+            { dataSize: 115 },
+            {
+              memcmp: {
+                offset: 8,
+                bytes: roomPubkey.toBase58(),
+              },
+            },
+          ],
+        }),
+        connection.getProgramAccounts(program.programId, {
+          filters: [
+            { dataSize: 83 },
+            {
+              memcmp: {
+                offset: 8,
+                bytes: roomPubkey.toBase58(),
+              },
+            },
+          ],
+        })
+      ]);
+
+      const betMap = new Map<string, { side: 'moon' | 'jeet'; amount: number }>();
+      
+      betAccountsNew.forEach((acc) => {
+        try {
+          const decodedBet = (program.coder.accounts as any).decode('Bet', acc.account.data);
+          betMap.set(acc.pubkey.toBase58(), {
+            side: Object.keys(decodedBet.side)[0] as 'moon' | 'jeet',
+            amount: decodedBet.amount.toNumber() / 1e9,
+          });
+        } catch (err) {
+          console.warn('Failed to parse bet account:', acc.pubkey.toBase58(), err);
+        }
+      });
+
+      betAccountsLegacy.forEach((acc) => {
+        try {
+          const data = acc.account.data;
+          const sideByte = data[72];
+          const side = sideByte === 0 ? 'moon' : 'jeet';
+          const amountBN = new BN(data.subarray(73, 81), 'le');
+          const amount = amountBN.toNumber() / 1e9;
+          betMap.set(acc.pubkey.toBase58(), { side, amount });
+        } catch (err) {
+          console.warn('Failed to parse legacy bet account:', acc.pubkey.toBase58(), err);
+        }
+      });
+
+      const parsedListings: Listing[] = listingAccounts.map((acc) => {
+        const decoded = (program.coder.accounts as any).decode('Listing', acc.account.data);
+        const betDetails = betMap.get(decoded.bet.toBase58());
+        return {
+          pubkey: acc.pubkey.toBase58(),
+          room: decoded.room.toBase58(),
+          bet: decoded.bet.toBase58(),
+          seller: decoded.seller.toBase58(),
+          price: decoded.price.toNumber() / 1e9,
+          side: betDetails?.side || 'moon',
+          amount: betDetails?.amount || 0,
+        };
+      });
+
+      set({ listings: parsedListings });
+    } catch (e) {
+      console.error('Failed to fetch room listings:', e);
+    }
+  },
+
+  listPosition: async (roomPubkey: string, betPubkey: string, priceSol: number) => {
+    const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
+    if (!wallet || !wallet.publicKey) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
+      throw new Error("Wallet not connected");
+    }
+
+    setTransactionLoading(true);
+    setTransactionError(null);
+
+    const toastId = get().addToast(
+      'LISTING POSITION TICKET',
+      'loading',
+      `Listing bet position on Exit Trench for ${priceSol} SOL...`
+    );
+
+    try {
+      const program = getAnchorProgram(wallet);
+      const room = new PublicKey(roomPubkey);
+      const bet = new PublicKey(betPubkey);
+      const listingPda = getListingPda(bet);
+      const configPda = getPlatformConfigPda();
+
+      const priceLamports = new BN(Math.round(priceSol * 1e9));
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
+
+      const txObj = await (program.methods as any)
+        .listPosition(priceLamports)
+        .accounts({
+          room,
+          bet,
+          listing: listingPda,
+          config: configPda,
+          seller: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 150_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
+        ])
+        .transaction();
+
+      if (!sendTransaction) {
+        throw new Error("No transaction sender registered.");
+      }
+      const tx = await sendTransaction(txObj);
+
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'POSITION LISTED SUCCESSFULLY',
+        description: `Position ticket listed on secondary market for ${priceSol} SOL.`,
+        txSig: tx
+      });
+
+      // Optimistic Update: Fetch bet details directly and insert into listings array instantly
+      let side: 'moon' | 'jeet' = 'moon';
+      let amount = 0;
+      try {
+        const betAcc = await connection.getAccountInfo(bet);
+        if (betAcc) {
+          const decodedBet = (program.coder.accounts as any).decode('Bet', betAcc.data);
+          side = Object.keys(decodedBet.side)[0] as 'moon' | 'jeet';
+          amount = decodedBet.amount.toNumber() / 1e9;
+        }
+      } catch (err) {
+        console.warn("[Optimistic] Failed to fetch bet account info:", err);
+      }
+
+      const optListing: Listing = {
+        pubkey: listingPda.toBase58(),
+        room: roomPubkey,
+        bet: betPubkey,
+        seller: wallet.publicKey.toBase58(),
+        price: priceSol,
+        side,
+        amount,
+      };
+
+      set((state) => ({
+        listings: [...state.listings.filter((l) => l.pubkey !== optListing.pubkey), optListing],
+      }));
+
+      // Trigger background update
+      get().fetchRoomListings(roomPubkey);
+      return tx;
+    } catch (err: any) {
+      console.error("Failed to list position on-chain:", err);
+      setTransactionError(err.message || String(err));
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'LISTING OPERATION FAILED',
+        description: cleanErr
+      });
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  cancelListing: async (listingPubkey: string, betPubkey: string) => {
+    const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
+    if (!wallet || !wallet.publicKey) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
+      throw new Error("Wallet not connected");
+    }
+
+    setTransactionLoading(true);
+    setTransactionError(null);
+
+    const toastId = get().addToast(
+      'CANCELLING POSITION LISTING',
+      'loading',
+      'Removing position listing from Exit Trench...'
+    );
+
+    try {
+      const program = getAnchorProgram(wallet);
+      const listing = new PublicKey(listingPubkey);
+      const bet = new PublicKey(betPubkey);
+
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
+
+      const txObj = await (program.methods as any)
+        .cancelListing()
+        .accounts({
+          bet,
+          listing,
+          seller: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 100_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
+        ])
+        .transaction();
+
+      if (!sendTransaction) {
+        throw new Error("No transaction sender registered.");
+      }
+      const tx = await sendTransaction(txObj);
+
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'LISTING CANCELLED',
+        description: 'Position listing removed. Rent refund secured.',
+        txSig: tx
+      });
+
+      const targetListing = get().listings.find(l => l.pubkey === listingPubkey);
+      
+      // Optimistic Update: instantly remove from state
+      set((state) => ({
+        listings: state.listings.filter((l) => l.pubkey !== listingPubkey),
+      }));
+
+      if (targetListing) {
+        get().fetchRoomListings(targetListing.room);
+      }
+      return tx;
+    } catch (err: any) {
+      console.error("Failed to cancel listing on-chain:", err);
+      setTransactionError(err.message || String(err));
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'CANCELLATION FAILED',
+        description: cleanErr
+      });
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  buyPosition: async (roomPubkey: string, listingPubkey: string, betPubkey: string, seller: string, originalBettor: string) => {
+    const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
+    if (!wallet || !wallet.publicKey) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
+      throw new Error("Wallet not connected");
+    }
+
+    setTransactionLoading(true);
+    setTransactionError(null);
+
+    const toastId = get().addToast(
+      'PURCHASING POSITION TICKET',
+      'loading',
+      'Executing early exit position purchase trade...'
+    );
+
+    try {
+      const program = getAnchorProgram(wallet);
+      const room = new PublicKey(roomPubkey);
+      const listing = new PublicKey(listingPubkey);
+      const bet = new PublicKey(betPubkey);
+      const sellerPubkey = new PublicKey(seller);
+      const vaultPda = getVaultPda();
+      const configPda = getPlatformConfigPda();
+
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
+
+      const txObj = await (program.methods as any)
+        .buyPosition()
+        .accounts({
+          room,
+          bet,
+          listing,
+          seller: sellerPubkey,
+          vault: vaultPda,
+          config: configPda,
+          buyer: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 200_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
+        ])
+        .transaction();
+
+      if (!sendTransaction) {
+        throw new Error("No transaction sender registered.");
+      }
+      const tx = await sendTransaction(txObj);
+
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'POSITION SECURED',
+        description: 'Position ticket successfully acquired and transferred to your vault.',
+        txSig: tx
+      });
+
+      // Optimistic Update: instantly remove from state
+      set((state) => ({
+        listings: state.listings.filter((l) => l.pubkey !== listingPubkey),
+      }));
+
+      get().fetchBalance();
+      get().fetchRoomListings(roomPubkey);
+      get().fetchRooms();
+      if (wallet.publicKey) {
+        get().setWalletAddress(wallet.publicKey.toBase58());
+      }
+      return tx;
+    } catch (err: any) {
+      console.error("Failed to buy position on-chain:", err);
+      setTransactionError(err.message || String(err));
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'TRADE PURCHASE FAILED',
+        description: cleanErr
+      });
       throw err;
     } finally {
       setTransactionLoading(false);

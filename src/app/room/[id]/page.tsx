@@ -14,6 +14,10 @@ import {
 } from 'lucide-react';
 import * as Slider from '@radix-ui/react-slider';
 import confetti from 'canvas-confetti';
+import { PublicKey, SystemProgram } from '@solana/web3.js';
+import { getAnchorProgram, connection, getListingPda, getBetPda } from '@/utils/solanaClient';
+import { Listing } from '@/store/useAppState';
+import { BN } from '@coral-xyz/anchor';
 
 // 1. Stable, Static, and Dynamic Memoized DexScreener Iframe Chart Component
 // Uses the smallest possible chart-only pair embed, lazy mounts only when visible, and stays stable across unrelated parent renders.
@@ -136,7 +140,8 @@ export default function RoomDetailPage() {
     rooms, user, chatMessages, placeBet, claimWinnings, 
     addMessage, connectWallet, isTransactionLoading, 
     fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile,
-    showAlert, addToast
+    showAlert, addToast,
+    listings, fetchRoomListings, listPosition, cancelListing, buyPosition, wallet
   } = useAppState();
 
   const room = rooms.find((r) => r.id === roomId);
@@ -165,6 +170,9 @@ export default function RoomDetailPage() {
   const [livePrice, setLivePrice] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [watchlistedIds, setWatchlistedIds] = useState<string[]>([]);
+  const [onChainBets, setOnChainBets] = useState<any[]>([]);
+  const [selectedBetToList, setSelectedBetToList] = useState<any | null>(null);
+  const [askPriceInput, setAskPriceInput] = useState<string>('');
   const lastSyncedLabel = room?.lastSyncedAt ? formatRelativeTime(room.lastSyncedAt) : 'syncing...';
 
   useEffect(() => {
@@ -325,6 +333,83 @@ export default function RoomDetailPage() {
     const priceInterval = setInterval(fetchLivePrice, 5000);
     return () => clearInterval(priceInterval);
   }, [room?.token?.address, room?.token?.pairAddress, room?.token?.chainId, room?.status, room?.id]);
+
+  useEffect(() => {
+    if (room?.id) {
+      fetchRoomListings(room.id);
+    }
+  }, [room?.id]);
+
+  useEffect(() => {
+    const loadOnChainBets = async () => {
+      if (!wallet?.publicKey || !room?.id) {
+        setOnChainBets([]);
+        return;
+      }
+      try {
+        const program = getAnchorProgram(wallet);
+        const roomPda = new PublicKey(room.id);
+        const [newBets, legacyBets] = await Promise.all([
+          connection.getProgramAccounts(program.programId, {
+            filters: [
+              { dataSize: 115 }, // New Bet size
+              { memcmp: { offset: 8, bytes: roomPda.toBase58() } },
+              { memcmp: { offset: 72, bytes: wallet.publicKey.toBase58() } }
+            ]
+          }),
+          connection.getProgramAccounts(program.programId, {
+            filters: [
+              { dataSize: 83 }, // Legacy Bet size
+              { memcmp: { offset: 8, bytes: roomPda.toBase58() } },
+              { memcmp: { offset: 40, bytes: wallet.publicKey.toBase58() } }
+            ]
+          })
+        ]);
+
+        const parsedNew = newBets.map(acc => {
+          const decoded = (program.coder.accounts as any).decode('Bet', acc.account.data);
+          return {
+            pubkey: acc.pubkey.toBase58(),
+            roomId: decoded.room.toBase58(),
+            user: decoded.user.toBase58(),
+            currentOwner: decoded.currentOwner?.toBase58() || decoded.user.toBase58(),
+            side: Object.keys(decoded.side)[0] as 'moon' | 'jeet',
+            amount: decoded.amount.toNumber() / 1e9,
+            claimed: decoded.claimed,
+          };
+        });
+
+        const parsedLegacy = legacyBets.map(acc => {
+          const data = acc.account.data;
+          const room = new PublicKey(data.subarray(8, 40)).toBase58();
+          const user = new PublicKey(data.subarray(40, 72)).toBase58();
+          const sideByte = data[72];
+          const side = sideByte === 0 ? 'moon' : 'jeet';
+          const amountBN = new BN(data.subarray(73, 81), 'le');
+          const amount = amountBN.toNumber() / 1e9;
+          const claimed = data[81] === 1;
+
+          return {
+            pubkey: acc.pubkey.toBase58(),
+            roomId: room,
+            user,
+            currentOwner: user, // Seller is original owner
+            side,
+            amount,
+            claimed,
+          };
+        });
+
+        setOnChainBets([...parsedNew, ...parsedLegacy]);
+      } catch (err) {
+        console.warn('Failed to load on-chain bets:', err);
+      }
+    };
+
+    loadOnChainBets();
+    const interval = setInterval(loadOnChainBets, 10000);
+    return () => clearInterval(interval);
+  }, [wallet?.publicKey, room?.id, listings]);
 
   // Auto scroll chat list to bottom
   useEffect(() => {
@@ -1083,7 +1168,121 @@ export default function RoomDetailPage() {
             </div>
           </div>
 
+          {/* EXIT TRENCH MARKETPLACE PANEL */}
+          <div className="bg-trench-black border-2 border-trench-sandbag p-4 md:p-5 rounded-xl shadow-2xl relative overflow-hidden scanlines">
+            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+            
+            <div className="flex items-center justify-between border-b border-trench-sandbag pb-3 mb-4">
+              <div className="flex items-center gap-2 text-neon-moon font-staatliches text-lg sm:text-xl font-bold uppercase tracking-wider">
+                <span className="w-2.5 h-2.5 rounded-full bg-neon-moon animate-pulse shrink-0 shadow-glow-moon" />
+                <span>⚡ EXIT TRENCH POSITION MARKETPLACE</span>
+              </div>
+              <span className="font-mono text-[9px] font-bold text-trench-gasmask bg-trench-mud border border-[#1d3515] px-2 py-0.5 rounded uppercase">
+                TRADE FEE: 0.5%
+              </span>
+            </div>
 
+            <div className="font-mono text-[10px] text-trench-gasmask uppercase leading-relaxed mb-4 font-bold">
+              Secure discounted moon/jeet positions or liquidate wagers early before this battlefield sector resolves.
+            </div>
+
+            <div className="overflow-x-auto w-full">
+              {listings.length > 0 ? (
+                <table className="w-full text-left font-mono text-[10px] uppercase border-collapse">
+                  <thead>
+                    <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[9px] font-bold">
+                      <th className="py-2 px-2">SIDE</th>
+                      <th className="py-2 px-2">POSITION SIZE</th>
+                      <th className="py-2 px-2">ASK PRICE</th>
+                      <th className="py-2 px-2">DISCOUNT</th>
+                      <th className="py-2 px-2">SELLER</th>
+                      <th className="py-2 px-2 text-right">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {listings.map((listing) => {
+                      const size = listing.amount || 0;
+                      const price = listing.price || 0;
+                      const diff = size - price;
+                      const pct = size > 0 ? (diff / size) * 100 : 0;
+                      const isDiscount = pct > 0;
+                      
+                      const isUserListing = wallet?.publicKey && listing.seller === wallet.publicKey.toBase58();
+
+                      return (
+                        <tr key={listing.pubkey} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
+                          <td className="py-2.5 px-2 font-bold">
+                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-staatliches ${
+                              listing.side === 'moon' 
+                                ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/20 shadow-glow-moon' 
+                                : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/20 shadow-glow-jeet'
+                            }`}>
+                              {listing.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-2 text-white font-bold">{size.toFixed(2)} SOL</td>
+                          <td className="py-2.5 px-2 text-white font-bold">{price.toFixed(2)} SOL</td>
+                          <td className="py-2.5 px-2 font-bold">
+                            {pct === 0 ? (
+                              <span className="text-gray-400">0.0% (PAR)</span>
+                            ) : isDiscount ? (
+                              <span className="text-[#16A34A] font-bold shadow-glow-moon bg-[#16A34A]/10 border border-[#16A34A]/20 px-1 py-0.5 rounded text-[8px]">
+                                {pct.toFixed(1)}% OFF 🎁
+                              </span>
+                            ) : (
+                              <span className="text-yellow-500 font-bold bg-yellow-500/10 border border-yellow-500/20 px-1 py-0.5 rounded text-[8px]">
+                                +{Math.abs(pct).toFixed(1)}% PREM
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 text-gray-300 font-mono">
+                            {listing.seller.slice(0, 4)}...{listing.seller.slice(-4)}
+                          </td>
+                          <td className="py-2.5 px-2 text-right">
+                            {isUserListing ? (
+                              <button
+                                disabled={isTransactionLoading}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  synthSound('bet');
+                                  await cancelListing(listing.pubkey, listing.bet);
+                                }}
+                                className="px-3 py-1 bg-red-950/40 text-jeet-red hover:bg-jeet-red hover:text-white border border-jeet-red/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all"
+                              >
+                                CANCEL ASK
+                              </button>
+                            ) : (
+                              <button
+                                disabled={isTransactionLoading}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  synthSound('bet');
+                                  if (!wallet?.publicKey) {
+                                    connectWallet();
+                                    return;
+                                  }
+                                  await buyPosition(room.id, listing.pubkey, listing.bet, listing.seller, listing.seller);
+                                }}
+                                className="px-3 py-1 bg-neon-moon text-black hover:bg-[#15803d] hover:text-white border border-neon-moon/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all shadow-glow-moon active:scale-95"
+                              >
+                                ACQUIRE TICKET
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center text-trench-gasmask/60 font-mono text-[9px] font-bold uppercase leading-relaxed bg-[#050803] border border-trench-sandbag/20 rounded-lg p-4">
+                  📢 NO POSITION TICKET LISTINGS REPORTED IN THE EXIT TRENCH.
+                  <span className="text-gray-500 text-[8px] mt-1 normal-case font-medium">PLACED A BET? LIST IT FROM YOUR LOCKED POSITIONS PANEL AT THE FOOTER TO SELL IT EARLY.</span>
+                </div>
+              )}
+            </div>
+          </div>
 
         </section>
 
@@ -1665,61 +1864,102 @@ export default function RoomDetailPage() {
                         <th className="py-1.5 px-2">AMOUNT</th>
                         <th className="py-1.5 px-2">ENTRY</th>
                         <th className="py-1.5 px-2">CURRENT</th>
+                        <th className="py-1.5 px-2 text-right">ACTION</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {userBetsInRoom.map((bet) => {
-                        const entryPrice = openingPriceSafe || 0;
-                        const currentSpotPrice = livePrice || openingPriceSafe || 0;
-                        
-                        const FEE_RATE = 0.0125; // 1.25% platform fee to match on-chain bps
-                        let pnlPercent = 0;
-                        let pnlSol = 0;
-                        let isProfit = false;
+                      {(() => {
+                        const displayBets = onChainBets.length > 0 ? onChainBets : userBetsInRoom.map(b => ({
+                          id: b.id,
+                          pubkey: getBetPda(new PublicKey(room.id), new PublicKey(user?.wallet || wallet?.publicKey?.toBase58() || SystemProgram.programId.toBase58()), b.side).toBase58(),
+                          roomId: room.id,
+                          user: user?.wallet || wallet?.publicKey?.toBase58() || '',
+                          currentOwner: user?.wallet || wallet?.publicKey?.toBase58() || '',
+                          side: b.side,
+                          amount: b.amount,
+                          claimed: b.claimed
+                        }));
 
-                        if (entryPrice > 0 && currentSpotPrice !== entryPrice) {
-                          const isMoonWinning = currentSpotPrice > entryPrice;
-                          const isUserWinning = (bet.side === 'moon' && isMoonWinning) || (bet.side === 'jeet' && !isMoonWinning);
+                        return displayBets.map((bet) => {
+                          const entryPrice = openingPriceSafe || 0;
+                          const currentSpotPrice = livePrice || openingPriceSafe || 0;
                           
-                          if (isUserWinning) {
-                            const winningPool = isMoonWinning ? moonPoolSafe : jeetPoolSafe;
-                            const losingPool = isMoonWinning ? jeetPoolSafe : moonPoolSafe;
-                            
-                            if (winningPool > 0) {
-                              pnlPercent = ((losingPool / winningPool) * (1 - FEE_RATE) - FEE_RATE) * 100;
-                              pnlSol = bet.amount * (pnlPercent / 100);
-                            }
-                            isProfit = pnlPercent >= 0;
-                          } else {
-                            // User is losing, loss is 100% of the bet amount
-                            pnlPercent = -100;
-                            pnlSol = -bet.amount;
-                            isProfit = false;
-                          }
-                        } else {
-                          // No price change or entry price not set
-                          pnlPercent = 0;
-                          pnlSol = 0;
-                          isProfit = true;
-                        }
+                          const FEE_RATE = 0.0125;
+                          let pnlPercent = 0;
+                          let pnlSol = 0;
+                          let isProfit = false;
 
-                        return (
-                          <tr key={bet.id} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
-                            <td className="py-2 px-2 font-bold">
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-staatliches ${
-                                bet.side === 'moon' 
-                                  ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/20 shadow-glow-moon' 
-                                  : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/20 shadow-glow-jeet'
-                              }`}>
-                                {bet.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
-                              </span>
-                            </td>
-                            <td className="py-2 px-2 text-white font-bold">{bet.amount.toFixed(2)} SOL</td>
-                            <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(entryPrice)}</td>
-                            <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(currentSpotPrice)}</td>
-                          </tr>
-                        );
-                      })}
+                          if (entryPrice > 0 && currentSpotPrice !== entryPrice) {
+                            const isMoonWinning = currentSpotPrice > entryPrice;
+                            const isUserWinning = (bet.side === 'moon' && isMoonWinning) || (bet.side === 'jeet' && !isMoonWinning);
+                            
+                            if (isUserWinning) {
+                              const winningPool = isMoonWinning ? moonPoolSafe : jeetPoolSafe;
+                              const losingPool = isMoonWinning ? jeetPoolSafe : moonPoolSafe;
+                              
+                              if (winningPool > 0) {
+                                pnlPercent = ((losingPool / winningPool) * (1 - FEE_RATE) - FEE_RATE) * 100;
+                                pnlSol = bet.amount * (pnlPercent / 100);
+                              }
+                              isProfit = pnlPercent >= 0;
+                            } else {
+                              pnlPercent = -100;
+                              pnlSol = -bet.amount;
+                              isProfit = false;
+                            }
+                          }
+
+                          const activeListing = listings.find(l => l.bet === bet.pubkey);
+
+                          return (
+                            <tr key={bet.pubkey || bet.id} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
+                              <td className="py-2 px-2 font-bold">
+                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-staatliches ${
+                                  bet.side === 'moon' 
+                                    ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/20 shadow-glow-moon' 
+                                    : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/20 shadow-glow-jeet'
+                                }`}>
+                                  {bet.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
+                                </span>
+                              </td>
+                              <td className="py-2 px-2 text-white font-bold">{bet.amount.toFixed(2)} SOL</td>
+                              <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(entryPrice)}</td>
+                              <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(currentSpotPrice)}</td>
+                              <td className="py-2 px-2 text-right">
+                                {!isSettled && room.expiry > Date.now() ? (
+                                  activeListing ? (
+                                    <button
+                                      disabled={isTransactionLoading}
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        synthSound('bet');
+                                        await cancelListing(activeListing.pubkey, bet.pubkey);
+                                      }}
+                                      className="px-2 py-0.5 bg-red-950/40 text-jeet-red hover:bg-jeet-red hover:text-white border border-jeet-red/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all"
+                                    >
+                                      CANCEL ASK
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        console.log('[DEBUG] SELL TICKET clicked. Bet:', bet);
+                                        synthSound('bet');
+                                        setSelectedBetToList(bet);
+                                      }}
+                                      className="px-2 py-0.5 bg-green-950/40 text-neon-moon hover:bg-neon-moon hover:text-black border border-neon-moon/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all shadow-glow-moon"
+                                    >
+                                      SELL TICKET
+                                    </button>
+                                  )
+                                ) : (
+                                  <span className="text-trench-gasmask font-bold">LOCKED</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>
@@ -1737,6 +1977,107 @@ export default function RoomDetailPage() {
       <div className="my-8 max-w-7xl mx-auto w-full px-4">
         <PixelBarbedWire height={16} />
       </div>
+
+      {/* List Position Modal */}
+      {(() => {
+        if (!selectedBetToList) return null;
+        const betAmount = selectedBetToList.amount || 0;
+        const betSide = selectedBetToList.side || 'moon';
+        const betPubkey = selectedBetToList.pubkey || '';
+        return (
+          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[10000] flex items-center justify-center p-4 scanlines">
+            <div className="retro-panel max-w-sm w-full p-5 shadow-2xl relative overflow-hidden rounded-xl border-2 border-trench-sandbag bg-trench-black">
+              <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+              <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+              <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+              <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+
+              <h3 className="font-staatliches text-2xl text-white uppercase tracking-wider mb-2 text-center border-b border-trench-sandbag pb-2">
+                ⚡ LIST TICKET FOR SALE
+              </h3>
+              
+              <div className="space-y-4 font-mono text-xs uppercase text-trench-gasmask mt-4">
+                <div className="flex justify-between items-center bg-trench-mud p-2 rounded border border-[#1d3515]">
+                  <span>FACTION SIDE:</span>
+                  <span className={`px-1.5 py-0.5 rounded font-staatliches text-xs ${
+                    betSide === 'moon' 
+                      ? 'bg-neon-moon/10 text-neon-moon border border-neon-moon/20' 
+                      : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/20'
+                  }`}>
+                    {betSide === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center bg-trench-mud p-2 rounded border border-[#1d3515]">
+                  <span>STAKED COLLATERAL:</span>
+                  <span className="text-white font-bold">{betAmount.toFixed(2)} SOL</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-trench-gasmask">SET ASK PRICE (SOL)</label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.001"
+                      placeholder="e.g. 0.8"
+                      value={askPriceInput}
+                      onChange={(e) => setAskPriceInput(e.target.value)}
+                      className="w-full bg-black/60 border border-trench-sandbag p-2.5 rounded font-bold text-white focus:outline-none focus:border-neon-moon text-sm"
+                    />
+                    <span className="absolute right-3 top-2.5 font-bold text-trench-gasmask text-xs">SOL</span>
+                  </div>
+                </div>
+
+                {askPriceInput && !isNaN(Number(askPriceInput)) && Number(askPriceInput) > 0 && (
+                  <div className="p-2.5 bg-black/50 border border-dashed border-trench-sandbag/40 rounded text-center">
+                    {Number(askPriceInput) < betAmount ? (
+                      <span className="text-[#16A34A] font-bold">
+                        🎁 DISCOUNT: {((betAmount - Number(askPriceInput)) / betAmount * 100).toFixed(1)}% OFF
+                      </span>
+                    ) : Number(askPriceInput) > betAmount ? (
+                      <span className="text-yellow-500 font-bold">
+                        📈 PREMIUM: {((Number(askPriceInput) - betAmount) / betAmount * 100).toFixed(1)}% MARKUP
+                      </span>
+                    ) : (
+                      <span className="text-white font-bold">AT PAR VALUE</span>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setSelectedBetToList(null);
+                      setAskPriceInput('');
+                      synthSound('bet');
+                    }}
+                    className="flex-1 py-2 border border-trench-sandbag font-staatliches text-base text-trench-gasmask rounded hover:text-white transition-colors uppercase font-bold"
+                  >
+                    ABORT
+                  </button>
+                  <button
+                    disabled={!askPriceInput || isNaN(Number(askPriceInput)) || Number(askPriceInput) <= 0 || isTransactionLoading}
+                    onClick={async () => {
+                      try {
+                        synthSound('bet');
+                        await listPosition(room.id, betPubkey, Number(askPriceInput));
+                        setSelectedBetToList(null);
+                        setAskPriceInput('');
+                      } catch (e) {
+                        console.error(e);
+                      }
+                    }}
+                    className="flex-1 py-2 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-base text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold uppercase transition-all"
+                  >
+                    CONFIRM LISTING
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
     </div>
   );

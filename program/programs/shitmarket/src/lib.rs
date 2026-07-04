@@ -20,6 +20,7 @@ const SECONDS_PER_MINUTE: i64 = 60;
 const TOKEN_NAME_LEN: usize = 32;
 const MINIMUM_LIQUIDITY_SOL: u64 = 100_000_000; // 0.1 SOL minimum pool requirement
 const MAX_TWAP_SAMPLES: usize = 5; // number of price samples to store for TWAP
+const SECONDARY_FEE_BPS: u16 = 50; // 0.5% fee for secondary market trades
 
 
 // ─────────────────────────────────────────────
@@ -175,6 +176,8 @@ pub struct Bet {
     pub room: Pubkey,
     /// The bettor's wallet.
     pub user: Pubkey,
+    /// Current owner of the ticket (may differ after transfer).
+    pub current_owner: Pubkey,
     /// Which side this bet is on.
     pub side: Side,
     /// Total amount staked (lamports). Updated on repeat bets.
@@ -184,9 +187,32 @@ pub struct Bet {
     pub bump: u8,
 }
 
+// ─────────────────────────────────────────────
+//  LISTING PDA FOR SECONDARY MARKET
+// ─────────────────────────────────────────────
+
+#[account]
+pub struct Listing {
+    /// The room this listing belongs to.
+    pub room: Pubkey,
+    /// The bet this listing refers to.
+    pub bet: Pubkey,
+    /// The seller (current owner of the bet at listing time).
+    pub seller: Pubkey,
+    /// Price (lamports) the seller wants for the position.
+    pub price: u64,
+    /// Bump for PDA seeds.
+    pub bump: u8,
+}
+
+impl Listing {
+    // 8 discriminator + 32 room + 32 bet + 32 seller + 8 price + 1 bump
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 8 + 1;
+}
+
 impl Bet {
     // 8 + 32 + 32 + 1 + 8 + 1 + 1
-    pub const LEN: usize = 8 + 32 + 32 + 1 + 8 + 1 + 1;
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 1 + 8 + 1 + 1; // added current_owner Pubkey
 }
 
 
@@ -251,6 +277,30 @@ pub struct WinningsClaimed {
     pub room: Pubkey,
     pub user: Pubkey,
     pub amount: u64,
+}
+
+#[event]
+pub struct PositionListed {
+    pub room: Pubkey,
+    pub bet: Pubkey,
+    pub seller: Pubkey,
+    pub price: u64,
+}
+
+#[event]
+pub struct PositionPurchased {
+    pub room: Pubkey,
+    pub bet: Pubkey,
+    pub seller: Pubkey,
+    pub buyer: Pubkey,
+    pub price: u64,
+}
+
+#[event]
+pub struct ListingCancelled {
+    pub room: Pubkey,
+    pub bet: Pubkey,
+    pub seller: Pubkey,
 }
 
 /// Emitted when a room is voided (one-sided — no opposing bets).
@@ -423,7 +473,6 @@ pub struct SettleRoom<'info> {
     /// CHECK: Vault PDA holding platform fees.
     /// The vault is created automatically on first settlement if it does not exist.
     #[account(
-        mut,
         seeds = [b"vault"],
         bump,
         init_if_needed,
@@ -505,18 +554,24 @@ pub struct ClaimWinnings<'info> {
 
     #[account(
         mut,
+        realloc = Bet::LEN,
+        realloc::payer = payer,
+        realloc::zero = false,
         seeds = [
             b"bet", 
             room.key().as_ref(), 
-            user.key().as_ref(),
+            original_bettor.key().as_ref(),
             &[match bet.side { Side::Moon => 0, Side::Jeet => 1 }]
         ],
         bump = bet.bump,
-        constraint = bet.user == user.key() @ ShitMarketError::Unauthorized,
+        constraint = bet.current_owner == user.key() @ ShitMarketError::Unauthorized,
         constraint = !bet.claimed @ ShitMarketError::AlreadyClaimed,
         constraint = room.winner.is_none() || Some(bet.side) == room.winner @ ShitMarketError::SideMismatch
     )]
     pub bet: Account<'info, Bet>,
+
+    /// CHECK: Original bettor used for seed derivation
+    pub original_bettor: AccountInfo<'info>,
 
     /// CHECK: Recipient of the payout
     #[account(mut)]
@@ -651,6 +706,145 @@ pub struct WithdrawVaultFees<'info> {
 }
 
 
+
+#[derive(Accounts)]
+pub struct ListPosition<'info> {
+    #[account(
+        constraint = room.status == RoomStatus::Active @ ShitMarketError::RoomNotActive,
+        constraint = !room.is_expired(Clock::get()?.unix_timestamp) @ ShitMarketError::RoomExpired
+    )]
+    pub room: Account<'info, Room>,
+
+    #[account(
+        mut,
+        realloc = Bet::LEN,
+        realloc::payer = seller,
+        realloc::zero = false,
+        seeds = [
+            b"bet",
+            room.key().as_ref(),
+            bet.user.as_ref(),
+            &[match bet.side { Side::Moon => 0, Side::Jeet => 1 }]
+        ],
+        bump = bet.bump,
+        constraint = bet.current_owner == seller.key() @ ShitMarketError::Unauthorized,
+        constraint = !bet.claimed @ ShitMarketError::AlreadyClaimed,
+    )]
+    pub bet: Account<'info, Bet>,
+
+    #[account(
+        init,
+        payer = seller,
+        space = Listing::LEN,
+        seeds = [b"listing", bet.key().as_ref()],
+        bump
+    )]
+    pub listing: Account<'info, Listing>,
+
+    #[account(
+        seeds = [b"platform_config"],
+        bump
+    )]
+    pub config: Account<'info, PlatformConfig>,
+
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CancelListing<'info> {
+    #[account(
+        mut,
+        realloc = Bet::LEN,
+        realloc::payer = seller,
+        realloc::zero = false,
+        seeds = [
+            b"bet",
+            listing.room.as_ref(),
+            bet.user.as_ref(),
+            &[match bet.side { Side::Moon => 0, Side::Jeet => 1 }]
+        ],
+        bump = bet.bump,
+        constraint = bet.current_owner == seller.key() @ ShitMarketError::Unauthorized,
+    )]
+    pub bet: Account<'info, Bet>,
+
+    #[account(
+        mut,
+        close = seller,
+        seeds = [b"listing", bet.key().as_ref()],
+        bump = listing.bump,
+        constraint = listing.bet == bet.key() @ ShitMarketError::InvalidPDA,
+        constraint = listing.seller == seller.key() @ ShitMarketError::Unauthorized,
+    )]
+    pub listing: Account<'info, Listing>,
+
+    #[account(mut)]
+    pub seller: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct BuyPosition<'info> {
+    #[account(
+        constraint = room.status == RoomStatus::Active @ ShitMarketError::RoomNotActive,
+        constraint = !room.is_expired(Clock::get()?.unix_timestamp) @ ShitMarketError::RoomExpired
+    )]
+    pub room: Account<'info, Room>,
+
+    #[account(
+        mut,
+        realloc = Bet::LEN,
+        realloc::payer = buyer,
+        realloc::zero = false,
+        seeds = [
+            b"bet",
+            room.key().as_ref(),
+            bet.user.as_ref(),
+            &[match bet.side { Side::Moon => 0, Side::Jeet => 1 }]
+        ],
+        bump = bet.bump,
+        constraint = bet.current_owner == listing.seller @ ShitMarketError::Unauthorized,
+        constraint = !bet.claimed @ ShitMarketError::AlreadyClaimed,
+    )]
+    pub bet: Account<'info, Bet>,
+
+    #[account(
+        mut,
+        close = seller,
+        seeds = [b"listing", bet.key().as_ref()],
+        bump = listing.bump,
+        constraint = listing.bet == bet.key() @ ShitMarketError::InvalidPDA,
+        constraint = listing.seller == seller.key() @ ShitMarketError::Unauthorized,
+    )]
+    pub listing: Account<'info, Listing>,
+
+    /// CHECK: The seller receiving the payment
+    #[account(mut)]
+    pub seller: AccountInfo<'info>,
+
+    /// CHECK: Vault PDA collecting the platform trade fee
+    #[account(
+        mut,
+        seeds = [b"vault"],
+        bump
+    )]
+    pub vault: UncheckedAccount<'info>,
+
+    #[account(
+        seeds = [b"platform_config"],
+        bump
+    )]
+    pub config: Account<'info, PlatformConfig>,
+
+    #[account(mut)]
+    pub buyer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
 
 // ─────────────────────────────────────────────
 //  PROGRAM
@@ -826,6 +1020,7 @@ pub mod shitmarket {
             // First bet — initialise
             bet.room = room_key;
             bet.user = ctx.accounts.user.key();
+            bet.current_owner = ctx.accounts.user.key();
             bet.side = side;
             bet.claimed = false;
             bet.bump = ctx.bumps.bet;
@@ -1111,7 +1306,7 @@ pub mod shitmarket {
             let user_referral_info = &ctx.remaining_accounts[0];
             let referral_state_info = &ctx.remaining_accounts[1];
 
-            let user_key = ctx.accounts.user.key();
+            let user_key = bet.current_owner;
             let (expected_user_referral_pda, _) = Pubkey::find_program_address(
                 &[b"user_referral", user_key.as_ref()],
                 ctx.program_id
@@ -1227,11 +1422,11 @@ pub mod shitmarket {
 
         emit!(WinningsClaimed {
             room: ctx.accounts.room.key(),
-            user: ctx.accounts.user.key(),
+            user: bet.current_owner,
             amount: payout,
         });
 
-        msg!("Winnings claimed: {} lamports → {}", payout, ctx.accounts.user.key());
+        msg!("Winnings claimed: {} lamports → {}", payout, bet.current_owner);
         Ok(())
     }
 
@@ -1401,8 +1596,209 @@ pub mod shitmarket {
         Ok(())
     }
 
+    // ── secondary market ──────────────────────────────────────────────────
 
+    /// List a position for sale on the secondary market.
+    pub fn list_position(ctx: Context<ListPosition>, price: u64) -> Result<()> {
+        let config = &ctx.accounts.config;
+        require!(!config.paused, ShitMarketError::Paused);
+        require!(price > 0, ShitMarketError::ZeroBetAmount);
 
+        let listing = &mut ctx.accounts.listing;
+        listing.room = ctx.accounts.room.key();
+        listing.bet = ctx.accounts.bet.key();
+        listing.seller = ctx.accounts.seller.key();
+        listing.price = price;
+        listing.bump = ctx.bumps.listing;
 
+        emit!(PositionListed {
+            room: ctx.accounts.room.key(),
+            bet: ctx.accounts.bet.key(),
+            seller: ctx.accounts.seller.key(),
+            price,
+        });
+
+        msg!(
+            "Position listed: room={} bet={} seller={} price={}",
+            ctx.accounts.room.key(),
+            ctx.accounts.bet.key(),
+            ctx.accounts.seller.key(),
+            price
+        );
+
+        Ok(())
+    }
+
+    /// Cancel an active position listing.
+    pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {
+        emit!(ListingCancelled {
+            room: ctx.accounts.listing.room,
+            bet: ctx.accounts.bet.key(),
+            seller: ctx.accounts.seller.key(),
+        });
+
+        msg!(
+            "Listing cancelled: room={} bet={} seller={}",
+            ctx.accounts.listing.room,
+            ctx.accounts.bet.key(),
+            ctx.accounts.seller.key()
+        );
+
+        Ok(())
+    }
+
+    /// Purchase a listed position.
+    pub fn buy_position(ctx: Context<BuyPosition>) -> Result<()> {
+        let config = &ctx.accounts.config;
+        require!(!config.paused, ShitMarketError::Paused);
+
+        let price = ctx.accounts.listing.price;
+        let fee = price
+            .checked_mul(SECONDARY_FEE_BPS as u64)
+            .ok_or(ShitMarketError::Overflow)?
+            .checked_div(10000)
+            .ok_or(ShitMarketError::DivisionByZero)?;
+        
+        let seller_amount = price.checked_sub(fee).ok_or(ShitMarketError::Underflow)?;
+
+        // Transfer payment to seller
+        if seller_amount > 0 {
+            let transfer_to_seller_ix = anchor_lang::solana_program::system_instruction::transfer(
+                ctx.accounts.buyer.key,
+                ctx.accounts.seller.key,
+                seller_amount,
+            );
+            anchor_lang::solana_program::program::invoke(
+                &transfer_to_seller_ix,
+                &[
+                    ctx.accounts.buyer.to_account_info(),
+                    ctx.accounts.seller.to_account_info(),
+                    ctx.accounts.system_program.to_account_info(),
+                ],
+            )?;
+        }
+
+        // Transfer fee to vault
+        if fee > 0 {
+            let transfer_to_vault_ix = anchor_lang::solana_program::system_instruction::transfer(
+                ctx.accounts.buyer.key,
+                ctx.accounts.vault.key,
+                fee,
+            );
+            anchor_lang::solana_program::program::invoke(
+                &transfer_to_vault_ix,
+                &[
+                    ctx.accounts.buyer.to_account_info(),
+                    ctx.accounts.vault.to_account_info(),
+                    ctx.accounts.system_program.to_account_info(),
+                ],
+            )?;
+        }
+
+        // Update bet owner
+        let bet = &mut ctx.accounts.bet;
+        let old_owner = bet.current_owner;
+        bet.current_owner = ctx.accounts.buyer.key();
+
+        emit!(PositionPurchased {
+            room: ctx.accounts.room.key(),
+            bet: bet.key(),
+            seller: old_owner,
+            buyer: ctx.accounts.buyer.key(),
+            price,
+        });
+
+        msg!(
+            "Position purchased: room={} bet={} old_owner={} new_owner={} price={}",
+            ctx.accounts.room.key(),
+            bet.key(),
+            old_owner,
+            bet.current_owner,
+            price
+        );
+
+        Ok(())
+    }
+
+    /// Migrate an old 83-byte Bet PDA to the new 115-byte format (adding current_owner).
+    pub fn migrate_bet(ctx: Context<MigrateBet>, side: Side) -> Result<()> {
+        let bet_info = &ctx.accounts.bet;
+        let user = &ctx.accounts.user;
+        let system_program = &ctx.accounts.system_program;
+        
+        let old_len = bet_info.data_len();
+        if old_len == 83 {
+            msg!("Migrating bet PDA from 83 to 115 bytes...");
+            
+            // Rent calculation
+            let new_len = 115;
+            let rent = Rent::get()?;
+            let new_rent = rent.minimum_balance(new_len);
+            let old_rent = bet_info.lamports();
+            
+            if new_rent > old_rent {
+                let rent_diff = new_rent - old_rent;
+                // Transfer rent difference from user to bet account
+                let cpi_ctx = CpiContext::new(
+                    system_program.to_account_info(),
+                    system_program::Transfer {
+                        from: user.to_account_info(),
+                        to: bet_info.clone(),
+                    },
+                );
+                system_program::transfer(cpi_ctx, rent_diff)?;
+            }
+            
+            // Reallocate the account data size to 115 bytes
+            bet_info.realloc(new_len, false)?;
+            
+            // Read and shift the data
+            let mut data = bet_info.try_borrow_mut_data()?;
+            
+            // Shift the 11 trailing bytes (side, amount, claimed, bump) to make room for current_owner (32 bytes)
+            let mut trailing = [0u8; 11];
+            trailing.copy_from_slice(&data[72..83]);
+            
+            // Initialize current_owner as the original user's pubkey (offset 40 to 72)
+            let mut user_pubkey = [0u8; 32];
+            user_pubkey.copy_from_slice(&data[40..72]);
+            
+            // Write current_owner at offset 72
+            data[72..104].copy_from_slice(&user_pubkey);
+            
+            // Write the trailing 11 bytes at offset 104
+            data[104..115].copy_from_slice(&trailing);
+            
+            msg!("Migration complete!");
+        } else {
+            msg!("Bet PDA already migrated or uninitialized (size={})", old_len);
+        }
+        
+        Ok(())
+    }
+}
+
+#[derive(Accounts)]
+#[instruction(side: Side)]
+pub struct MigrateBet<'info> {
+    #[account(
+        mut,
+        seeds = [
+            b"bet",
+            room.key().as_ref(),
+            user.key().as_ref(),
+            &[match side { Side::Moon => 0, Side::Jeet => 1 }]
+        ],
+        bump
+    )]
+    /// CHECK: Manual reallocation / checks
+    pub bet: AccountInfo<'info>,
+
+    pub room: Account<'info, Room>,
+
+    #[account(mut)]
+    pub user: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
 }
 

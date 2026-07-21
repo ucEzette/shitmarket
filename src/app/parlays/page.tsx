@@ -18,7 +18,7 @@ interface LiveParlayLeg {
 
 export default function ParlaysPage() {
   const { rooms, roomsLoaded, user, connectWallet } = useAppState();
-  const activeRooms = rooms.filter((r) => r.status === 'active');
+  const activeRooms = rooms.filter((r) => r.status === 'active' && r.token && r.token.name && r.token.name !== 'Unknown Token' && r.token.symbol !== 'UNKNOWN' && r.token.symbol !== 'UNKNWN');
 
   const getLiveOdds = (room: Room, side: 'moon' | 'jeet'): number => {
     const moon = room.moonPool || 0.1;
@@ -179,7 +179,7 @@ export default function ParlaysPage() {
           {/* Simulated Training Deck Alert Banner */}
           <div className="mb-4 border border-yellow-500/40 bg-yellow-500/5 p-3 rounded text-[9px] font-mono text-yellow-500 uppercase font-bold tracking-wider animate-pulse flex items-center gap-2">
             <span>⚠️</span>
-            <span>SIMULATED TRAINING DECK: ATOMIC PARLAYS RUN IN MOCK ENVIRONMENT. MULTI-LEG PVP PREDICTIONS DO NOT EXECUTE ON-CHAIN TRANSACTIONS ON SOLANA MAINNET.</span>
+            <span>SIMULATED TRAINING DECK: ATOMIC PARLAYS RUN IN MOCK ENVIRONMENT. MULTI-LEG PVP PREDICTIONS DO NOT EXECUTE ON-CHAIN TRANSACTIONS ON MAINNET.</span>
           </div>
 
           {/* Warning badge */}

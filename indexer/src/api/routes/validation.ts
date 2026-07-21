@@ -48,16 +48,18 @@ validationRouter.get('/validate', async (req, res) => {
       });
     }
 
-    // Compute equivalent Solana Pubkey for EVM/non-base58 addresses
+    // Under EVM mode, keep the native hex address. For Solana, run pubkey conversion.
     let pubkeyStr = mint;
-    try {
-      new PublicKey(mint);
-    } catch {
-      let hex = mint.replace('0x', '');
-      if (hex.length % 2 !== 0) hex = '0' + hex;
-      const buffer = Buffer.alloc(32);
-      Buffer.from(hex, 'hex').copy(buffer, 0);
-      pubkeyStr = new PublicKey(buffer).toBase58();
+    if (process.env.CORE_CHAIN !== 'avalanche') {
+      try {
+        new PublicKey(mint);
+      } catch {
+        let hex = mint.replace('0x', '');
+        if (hex.length % 2 !== 0) hex = '0' + hex;
+        const buffer = Buffer.alloc(32);
+        Buffer.from(hex, 'hex').copy(buffer, 0);
+        pubkeyStr = new PublicKey(buffer).toBase58();
+      }
     }
 
     // Save metadata so eventListener can construct the Room later
@@ -89,14 +91,16 @@ validationRouter.post('/cache-meta', async (req, res) => {
     if (!mint) return res.status(400).json({ success: false });
 
     let pubkeyStr = mint;
-    try {
-      new PublicKey(mint);
-    } catch {
-      let hex = mint.replace('0x', '');
-      if (hex.length % 2 !== 0) hex = '0' + hex;
-      const buffer = Buffer.alloc(32);
-      Buffer.from(hex, 'hex').copy(buffer, 0);
-      pubkeyStr = new PublicKey(buffer).toBase58();
+    if (process.env.CORE_CHAIN !== 'avalanche') {
+      try {
+        new PublicKey(mint);
+      } catch {
+        let hex = mint.replace('0x', '');
+        if (hex.length % 2 !== 0) hex = '0' + hex;
+        const buffer = Buffer.alloc(32);
+        Buffer.from(hex, 'hex').copy(buffer, 0);
+        pubkeyStr = new PublicKey(buffer).toBase58();
+      }
     }
 
     await redis.set(`tokenmeta:${pubkeyStr}`, JSON.stringify({

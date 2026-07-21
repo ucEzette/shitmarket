@@ -9,6 +9,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import { config } from '../../config';
 import { settleRoomByPubkey } from '../../keeper/settlementKeeper';
+import { aggregatePrice } from '../../feeds/priceAggregator';
 
 export const roomsRouter = express.Router();
 
@@ -288,6 +289,15 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
           chainId: true,
           originalAddress: true,
           creator: true,
+          oracleAddress: true,
+          oracleFeeLamports: true,
+          settledAt: true,
+          disputeStatus: true,
+          resolutionCriteria: true,
+          disputedAt: true,
+          disputeChallenger: true,
+          disputeBond: true,
+          oracleLogs: true,
         },
       });
 
@@ -295,6 +305,8 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
         ...r,
         openingPrice: r.openingPrice.toString(),
         totalPool: r.totalPool.toString(),
+        oracleFeeLamports: r.oracleFeeLamports ? r.oracleFeeLamports.toString() : null,
+        disputeBond: r.disputeBond ? r.disputeBond.toString() : null,
       }));
 
       try {
@@ -376,6 +388,8 @@ roomsRouter.get('/:pubkey', validate(roomPubkeyParamSchema, 'params'), async (re
         twapFinalPrice: room.twapFinalPrice?.toString() ?? null,
         totalPool: room.totalPool.toString(),
         platformFee: room.platformFee.toString(),
+        oracleFeeLamports: room.oracleFeeLamports ? room.oracleFeeLamports.toString() : null,
+        disputeBond: room.disputeBond ? room.disputeBond.toString() : null,
         moonPool: cached?.moonPool ?? '0',
         jeetPool: cached?.jeetPool ?? '0',
         pairAddress: cached?.pairAddress || (await fetchTokenMeta(room.tokenMint)).pairAddress || '',
@@ -498,6 +512,34 @@ roomsRouter.post('/:pubkey/chats', validate(roomPubkeyParamSchema, 'params'), as
     return res.json({ success: true, data: chatData });
   } catch (err: any) {
     logger.error({ msg: 'POST /api/rooms/:pubkey/chats error', err: err?.message });
+    return res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ── GET /api/rooms/token-price/:mintAddress ──────────────────────────────────
+roomsRouter.get('/token-price/:mintAddress', async (req, res) => {
+  try {
+    const { mintAddress } = req.params;
+    const { pythFeedId } = req.query;
+    
+    // Compute aggregated price utilizing all connected oracles (DexScreener, Birdeye, Jupiter, Chainlink, Pyth)
+    const result = await aggregatePrice(
+      mintAddress, 
+      pythFeedId as string | undefined
+    );
+    
+    if (!result) {
+      return res.status(404).json({ success: false, error: 'Failed to aggregate price for token' });
+    }
+    
+    return res.json({
+      success: true,
+      priceUsd: parseFloat(result.priceUsd),
+      priceI64: result.priceI64,
+      sources: result.sources
+    });
+  } catch (err: any) {
+    logger.error({ msg: 'GET /api/rooms/token-price error', err: err?.message });
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });

@@ -53,7 +53,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
       'GIGA CHAD: "You don\'t buy the coin. You bet on its SOUL. Welcome to SHITMARKET.LOL"'
     ],
     3: [
-      'NARRATOR: "Introducing ShitMarket—the PvP prediction arena where you stake SOL on whether a meme coin pumps... or dumps."',
+      'NARRATOR: "Introducing ShitMarket—the permissionless PvP prediction arena where you stake USDC on whether a meme coin pumps... or dumps."',
       'NARRATOR: "If you\'re right, you eat the losers\' lunch. If you\'re wrong... well..."',
       'JEET SKELETON: "CALLED THE DUMP! GET REKT, NERD! HAHAHA!"',
       'PEPE: "Worth it. No rug. No gas war. Just pure, unadulterated gambling."'
@@ -71,7 +71,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
     ],
     6: [
       'NARRATOR: "Congratulations, Trench Veteran! You have bypassed the local highs, evaded the rug-pulls, and unlocked the Degen Immortality Certificate."',
-      'TERMINAL: "God Mode initialized. 1,000,000,000 artificial mock SOL has been credited to your wallet balance."',
+      'TERMINAL: "God Mode initialized. 1,000,000,000 artificial mock USDC has been credited to your wallet balance."',
       'CHAD BULL: "Now go forth, anon, bet the trenches, and show the jeets who owns the soul of the blockchain!"'
     ]
   };
@@ -371,7 +371,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
           <div className="flex items-center gap-2">
             <Skull className="w-5 h-5 text-red-500 animate-pulse" />
             <span className="font-staatliches text-lg sm:text-xl tracking-wider text-yellow-500 uppercase">
-              SOLANA DEGEN TRENCHES COMMS
+              PVP MEMECOIN TRENCHES COMMS
             </span>
           </div>
           
@@ -631,13 +631,13 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     <h3 className="font-staatliches text-xl text-green-500 flex items-center justify-center gap-2 uppercase">
                       MOON SIDE (BULLS)
                     </h3>
-                    <div className="text-gray-400 text-md font-mono my-3 font-bold">Pot: 4.88 SOL</div>
+                    <div className="text-gray-400 text-md font-mono my-3 font-bold">Pot: 488 USDC</div>
                     <button 
                       onClick={() => startPredictionBattle("MOON")}
                       disabled={scene3Ticking || scatFired}
                       className="w-full py-2 bg-green-600 hover:bg-green-500 disabled:opacity-40 text-black font-staatliches font-extrabold text-sm uppercase rounded transition-all"
                     >
-                      BET MOON 0.05 SOL
+                      BET MOON 50 USDC
                     </button>
                   </div>
 
@@ -648,13 +648,13 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     <h3 className="font-staatliches text-xl text-red-500 flex items-center justify-center gap-2 uppercase">
                       JEET SIDE (BEARS)
                     </h3>
-                    <div className="text-gray-400 text-md font-mono my-3 font-bold">Pot: 14.50 SOL</div>
+                    <div className="text-gray-400 text-md font-mono my-3 font-bold">Pot: 1450 USDC</div>
                     <button 
                       onClick={() => startPredictionBattle("JEET")}
                       disabled={scene3Ticking || scatFired}
                       className="w-full py-2 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-staatliches font-extrabold text-sm uppercase rounded transition-all"
                     >
-                      💀 BET JEET 2.0 SOL
+                      💀 BET JEET 200 USDC
                     </button>
                   </div>
 
@@ -909,7 +909,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     <li><strong className="text-green-500">RUG IMMUNITY:</strong> Enforced by Giga-Chad Bull. Any developer attempting to transfer liquidity to Dubai is immediately teleported to the breadline.</li>
                     <li><strong className="text-green-500">ANTI-PANIC SLEEP FILTER:</strong> Prevents jeetting at 3:00 AM on 5% minor dips.</li>
                     <li><strong className="text-green-500">FINANCIAL PROTECTION:</strong> Guaranteed protection from buying local high, selling local low, and listening to "influencer" calls on X.</li>
-                    <li><strong className="text-yellow-400">PORTFOLIO BALANCES:</strong> 1,000,000,000 artificial mock SOL credited. Standard use: flexing on social media. (Value: $0.00, Ego value: priceless).</li>
+                    <li><strong className="text-yellow-400">PORTFOLIO BALANCES:</strong> Free Testnet USDC credited on Avalanche C-Chain. (Use "+1K USDC" in top header or wallet panel to claim 1,000 free ammo tokens anytime).</li>
                   </ul>
                 </div>
               </motion.div>

@@ -3,10 +3,13 @@
 import React, { useState } from 'react';
 import { useWalletContext } from './WalletProvider';
 import { useExportWallet } from '@privy-io/react-auth/solana';
-import { Copy, Check, QrCode, LogOut, Key, Plus, ChevronDown, ShieldAlert, Sparkles, RefreshCw } from 'lucide-react';
+import { Copy, Check, QrCode, LogOut, Key, Plus, ChevronDown, ShieldAlert, Sparkles, RefreshCw, Coins } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAppState } from '@/store/useAppState';
 
 export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
+  const { user, mintTestnetUsdc } = useAppState();
+  const [isMintingUsdc, setIsMintingUsdc] = useState(false);
   const {
     walletType,
     activeWalletAddress,
@@ -110,7 +113,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
                 ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)] font-extrabold'
                 : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white disabled:opacity-30 disabled:cursor-not-allowed'
             }`}
-            title="Use Privy Embedded Solana Wallet"
+            title="Use Privy Embedded Wallet"
           >
             ⚡ Embedded
           </button>
@@ -124,7 +127,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
                   ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)] font-extrabold'
                   : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white'
               }`}
-              title="Use Connected External Wallet (e.g. Phantom)"
+              title="Use Connected External Wallet"
             >
               🔌 External
             </button>
@@ -132,7 +135,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
             <button
               onClick={linkExternalWallet}
               className="py-1 rounded text-[7px] border border-dashed border-neon-moon/30 hover:border-neon-moon/60 text-neon-moon bg-neon-moon/5 hover:bg-neon-moon/10 font-bold uppercase transition-all cursor-pointer"
-              title="Link External Solana Wallet"
+              title="Link External Wallet"
             >
               + Link Ext
             </button>
@@ -177,7 +180,28 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
 
         <div className="flex justify-between items-center border-t border-trench-sandbag/20 pt-2 text-xs">
           <span className="text-trench-gasmask uppercase text-[9px] font-bold">Balance:</span>
-          <span className="text-moon-gold font-bold glow-gold text-sm">{balance.toFixed(4)} SOL</span>
+          <div className="flex items-center gap-2">
+            <span className="text-moon-gold font-bold glow-gold text-sm">{(user?.balance ?? balance).toFixed(2)} {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
+            {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' && (
+              <button
+                type="button"
+                disabled={isMintingUsdc}
+                onClick={async () => {
+                  setIsMintingUsdc(true);
+                  try {
+                    await mintTestnetUsdc(1000);
+                  } finally {
+                    setIsMintingUsdc(false);
+                  }
+                }}
+                className="px-2 py-0.5 bg-neon-moon/20 border border-neon-moon/60 hover:bg-neon-moon text-neon-moon hover:text-black font-mono text-[9px] uppercase font-bold rounded transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                title="Mint 1,000 Free Testnet USDC on Avalanche Fuji"
+              >
+                {isMintingUsdc ? <RefreshCw size={10} className="animate-spin" /> : <Coins size={10} />}
+                <span>AIRDROP 1K USDC</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -331,7 +355,10 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
           </button>
         ) : (
           <button
-            onClick={disconnect}
+            onClick={async () => {
+              await disconnect();
+              if (onClose) onClose();
+            }}
             className="py-1.5 font-staatliches text-xs uppercase rounded cursor-pointer border border-red-500/50 hover:bg-red-500/10 text-red-400 flex items-center justify-center gap-1 transition-all"
           >
             <LogOut size={12} />
@@ -355,7 +382,10 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
       {/* Disconnect/LogOut for Embedded */}
       {walletType === 'embedded' && (
         <button
-          onClick={disconnect}
+          onClick={async () => {
+            await disconnect();
+            if (onClose) onClose();
+          }}
           className="w-full py-1.5 font-staatliches text-xs border border-red-500/40 hover:border-red-500/80 text-red-400 bg-red-500/5 hover:bg-red-500/10 rounded cursor-pointer flex items-center justify-center gap-1 transition-all uppercase"
         >
           <LogOut size={12} />
@@ -379,7 +409,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
               loading="lazy"
             />
             <span className="text-[7.5px] text-trench-gasmask text-center max-w-xs break-all leading-normal uppercase">
-              Send SOL or Devnet mock tokens to: <strong className="text-white font-bold select-all">{activeWalletAddress}</strong>
+              Send USDC or Testnet mock tokens to: <strong className="text-white font-bold select-all">{activeWalletAddress}</strong>
             </span>
           </motion.div>
         )}

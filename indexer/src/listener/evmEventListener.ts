@@ -299,7 +299,7 @@ async function pollEvmLogs() {
       jsonrpc: '2.0',
       id: 1,
       method: 'eth_blockNumber',
-      params: [],
+      params: [] as any[],
     };
     const { data: resBlock } = await axios.post(config.evm.rpcUrl, payload, { timeout: 3000 });
     const latestHex = resBlock?.result;

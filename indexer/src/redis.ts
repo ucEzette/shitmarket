@@ -53,9 +53,9 @@ export async function getCachedRooms(roomPubkeys: string[]): Promise<(Record<str
     pipeline.hgetall(`room:${pubkey}`);
   });
   const results = await pipeline.exec();
-  if (!results) return roomPubkeys.map(() => null);
+  if (!results) return roomPubkeys.map((): null => null);
 
-  return results.map(([err, data]) => {
+  return results.map(([err, data]): Record<string, string> | null => {
     if (err || !data || Object.keys(data as object).length === 0) return null;
     return data as Record<string, string>;
   });
@@ -107,8 +107,8 @@ export async function markProcessed(signature: string): Promise<void> {
   }
 
   await Promise.all([
-    redis.setex(`tx:${signature}`, TX_PROCESSED_TTL, '1').catch(err => logger.warn({ msg: 'Redis setex failed', err: err.message })),
-    prisma.processedTx.create({ data: { signature } }).catch(() => undefined),
+    redis.setex(`tx:${signature}`, TX_PROCESSED_TTL, '1').catch((err: any): void => { logger.warn({ msg: 'Redis setex failed', err: err.message }); }),
+    prisma.processedTx.create({ data: { signature } }).catch((): undefined => undefined),
   ]);
 }
 

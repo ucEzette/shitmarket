@@ -15,7 +15,7 @@ export default function RulesPage() {
       title: '1. PREEDICTIVE COMBAT ARENAS (ROOMS)',
       icon: Swords,
       color: 'border-neon-moon/40 text-neon-moon bg-neon-moon/5',
-      desc: 'Commanders construct prediction arenas by scanning and pasting any active Solana token contract address from DexScreener. Each room represents a localized PvP battlefield sector.'
+      desc: 'Commanders construct prediction arenas by scanning and pasting any active token contract address from DexScreener. Each room represents a localized PvP battlefield sector.'
     },
     {
       title: '2. INITIAL SEEDING (*REQUIRED)',

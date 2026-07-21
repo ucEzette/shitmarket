@@ -19,9 +19,17 @@ export const reservesRouter = express.Router();
 // In production, derive these dynamically from the program ID.
 const PLATFORM_CONFIG_SEED = 'platform_config';
 const ESCROW_SEED = 'escrow';
-const PROGRAM_ID = new PublicKey(config.solana.programId);
+let PROGRAM_ID: PublicKey | null = null;
+try {
+  if (config.solana.programId) {
+    PROGRAM_ID = new PublicKey(config.solana.programId);
+  }
+} catch (e) {
+  // Ignored in EVM mode
+}
 
 function derivePda(seeds: Buffer[]): PublicKey {
+  if (!PROGRAM_ID) throw new Error('PROGRAM_ID missing');
   const [pda] = PublicKey.findProgramAddressSync(seeds, PROGRAM_ID);
   return pda;
 }
@@ -94,6 +102,7 @@ reservesRouter.get('/', async (_req, res) => {
     for (const roomPubkey of allRoomPubkeys) {
       try {
         const roomPk = new PublicKey(roomPubkey);
+        if (!PROGRAM_ID) throw new Error('PROGRAM_ID missing');
         const [escrowPda] = PublicKey.findProgramAddressSync(
           [Buffer.from(ESCROW_SEED), roomPk.toBuffer()],
           PROGRAM_ID
@@ -119,6 +128,7 @@ reservesRouter.get('/', async (_req, res) => {
     // Platform config PDA balance (treasury)
     let platformConfigBalance = 0n;
     try {
+      if (!PROGRAM_ID) throw new Error('PROGRAM_ID missing');
       const [configPda] = PublicKey.findProgramAddressSync(
         [Buffer.from(PLATFORM_CONFIG_SEED)],
         PROGRAM_ID

@@ -17,7 +17,7 @@ export const config = {
     rpcUrl: optional('SOLANA_RPC_URL', 'https://api.devnet.solana.com'),
     secondaryRpcUrl: optional('SOLANA_SECONDARY_RPC_URL', ''),
     wsUrl: optional('SOLANA_WS_URL', 'wss://api.devnet.solana.com'),
-    programId: optional('PROGRAM_ID', ''),
+    programId: optional('PROGRAM_ID', '11111111111111111111111111111111'),
     keeperPrivateKey: optional('KEEPER_PRIVATE_KEY', ''),
     relayerPrivateKey: optional('RELAYER_PRIVATE_KEY', ''),
     aiOraclePrivateKey: optional('AI_ORACLE_PRIVATE_KEY', ''),

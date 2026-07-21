@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useAppState, Room, Bet, formatCashtag, formatPrice } from '@/store/useAppState';
+import { useAppState, Room, Bet, formatCashtag, formatPrice, publicClient } from '@/store/useAppState';
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
 import { 
@@ -11,8 +11,6 @@ import {
 import Link from 'next/link';
 import PortfolioWallets from './PortfolioWallets';
 import { useWalletContext } from '@/components/WalletProvider';
-import { connection } from '@/utils/solanaClient';
-import { PublicKey } from '@solana/web3.js';
 
 interface ChartPoint {
   x: number;
@@ -23,7 +21,7 @@ interface ChartPoint {
 
 const PNLChart: React.FC<{
   parsedPositions: any[];
-  currency: 'SOL' | 'USD';
+  currency: 'USDC' | 'USD';
   rate: number;
 }> = ({ parsedPositions, currency, rate }) => {
   const [hoveredPoint, setHoveredPoint] = useState<ChartPoint | null>(null);
@@ -257,7 +255,7 @@ const PNLChart: React.FC<{
 export default function PortfolioPage() {
   const { user, rooms, roomsLoaded, fetchRooms, refreshProfile, connectWallet } = useAppState();
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'performance' | 'orders' | 'wallets'>('wallets');
-  const [currency, setCurrency] = useState<'SOL' | 'USD'>('USD');
+  const [currency, setCurrency] = useState<'USDC' | 'USD'>('USD');
   const [copiedWallet, setCopiedWallet] = useState(false);
   const [livePrices, setLivePrices] = useState<{ [address: string]: number }>({});
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
@@ -265,8 +263,8 @@ export default function PortfolioPage() {
   const walletContext = useWalletContext();
   const [totalAmmoBalance, setTotalAmmoBalance] = useState<number | null>(null);
 
-  // Conversion rate (mock: 1 SOL = $150.00 USD)
-  const SOL_USD_RATE = 150.0;
+  // Conversion rate (1 USDC = $1.00 USD)
+  const USDC_USD_RATE = 1.0;
 
   useEffect(() => {
     let isMounted = true;
@@ -275,15 +273,28 @@ export default function PortfolioPage() {
         let total = 0;
         const walletsToFetch = [...walletContext.embeddedWallets];
         if (walletContext.activeWalletAddress && walletContext.walletType !== 'embedded') {
-          if (!walletsToFetch.find(w => w.address === walletContext.activeWalletAddress)) {
+          if (!walletsToFetch.find(w => w.address?.toLowerCase() === walletContext.activeWalletAddress?.toLowerCase())) {
             walletsToFetch.push({ address: walletContext.activeWalletAddress } as any);
           }
         }
         
+        const usdcContract = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
         for (const wallet of walletsToFetch) {
+          if (!wallet.address || !wallet.address.startsWith('0x')) continue;
           try {
-            const bal = await connection.getBalance(new PublicKey(wallet.address));
-            total += bal / 1e9;
+            const rawBal = await publicClient.readContract({
+              address: usdcContract,
+              abi: [{
+                type: 'function',
+                name: 'balanceOf',
+                inputs: [{ name: 'account', type: 'address' }],
+                outputs: [{ name: '', type: 'uint256' }],
+                stateMutability: 'view'
+              }] as const,
+              functionName: 'balanceOf',
+              args: [wallet.address as `0x${string}`]
+            });
+            total += Number(rawBal) / 1e6;
           } catch (e) {
             console.error("Failed to fetch balance for", wallet.address, e);
           }
@@ -435,11 +446,11 @@ export default function PortfolioPage() {
   // --- Calculations for Portfolio Assets ---
 
   // Helper to format currency
-  const formatVal = (solAmount: number) => {
+  const formatVal = (usdcAmount: number) => {
     if (currency === 'USD') {
-      return `$${(solAmount * SOL_USD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      return `$${(usdcAmount * USDC_USD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-    return `${solAmount.toFixed(3)} SOL`;
+    return `${usdcAmount.toFixed(2)} USDC`;
   };
 
   // Process all positions
@@ -563,14 +574,14 @@ export default function PortfolioPage() {
               USD
             </button>
             <button 
-              onClick={() => { setCurrency('SOL'); synthSound('bet'); }}
+              onClick={() => { setCurrency('USDC'); synthSound('bet'); }}
               className={`px-3 py-1 font-staatliches text-xs rounded transition-all ${
-                currency === 'SOL' 
+                currency === 'USDC' 
                   ? 'bg-neon-moon text-black font-extrabold shadow-glow-moon' 
                   : 'text-trench-gasmask hover:text-white'
               }`}
             >
-              SOL
+              USDC
             </button>
           </div>
 
@@ -802,7 +813,7 @@ export default function PortfolioPage() {
         {/* TAB 2: OVERVIEW STATS */}
         {activeTab === 'overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
-            <PNLChart parsedPositions={parsedPositions} currency={currency} rate={SOL_USD_RATE} />
+            <PNLChart parsedPositions={parsedPositions} currency={currency} rate={USDC_USD_RATE} />
             {/* Classification & Rank details */}
             <div className="bg-trench-mud/40 border-2 border-trench-sandbag/65 rounded-lg p-5 flex flex-col justify-between">
               <div>

@@ -107,6 +107,29 @@
           }
         },
         {
+          "name": "oracle",
+          "type": {
+            "option": "pubkey"
+          }
+        },
+        {
+          "name": "oracleFeeLamports",
+          "type": {
+            "option": "u64"
+          }
+        },
+        {
+          "name": "resolutionCriteria",
+          "type": {
+            "option": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        },
+        {
           "name": "nonce",
           "type": "u8"
         }
@@ -848,6 +871,99 @@
           }
         }
       ]
+    },
+    {
+      "name": "disputeRoom",
+      "discriminator": [
+        235,
+        37,
+        241,
+        67,
+        214,
+        212,
+        171,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "challenger",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "resolveDispute",
+      "discriminator": [
+        231,
+        6,
+        202,
+        6,
+        96,
+        103,
+        12,
+        230
+      ],
+      "accounts": [
+        {
+          "name": "room",
+          "writable": true
+        },
+        {
+          "name": "escrow",
+          "writable": true
+        },
+        {
+          "name": "challenger",
+          "writable": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "config"
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram"
+        }
+      ],
+      "args": [
+        {
+          "name": "winner",
+          "type": {
+            "option": {
+              "defined": {
+                "name": "Side"
+              }
+            }
+          }
+        },
+        {
+          "name": "overturned",
+          "type": "bool"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -1112,6 +1228,32 @@
         139,
         194
       ]
+    },
+    {
+      "name": "RoomDisputed",
+      "discriminator": [
+        175,
+        18,
+        78,
+        81,
+        2,
+        204,
+        54,
+        243
+      ]
+    },
+    {
+      "name": "DisputeResolved",
+      "discriminator": [
+        121,
+        64,
+        249,
+        153,
+        139,
+        128,
+        236,
+        187
+      ]
     }
   ],
   "errors": [
@@ -1209,6 +1351,9 @@
           },
           {
             "name": "Pending"
+          },
+          {
+            "name": "Disputed"
           }
         ]
       }
@@ -1362,6 +1507,31 @@
           {
             "name": "bump",
             "type": "u8"
+          },
+          {
+            "name": "oracle",
+            "type": "pubkey"
+          },
+          {
+            "name": "oracleFeeLamports",
+            "type": "u64"
+          },
+          {
+            "name": "settlementTimestamp",
+            "type": "i64"
+          },
+          {
+            "name": "disputeStatus",
+            "type": "u8"
+          },
+          {
+            "name": "resolutionCriteria",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
           }
         ]
       }
@@ -1858,6 +2028,46 @@
           {
             "name": "seller",
             "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RoomDisputed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "challenger",
+            "type": "pubkey"
+          },
+          {
+            "name": "disputeBond",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DisputeResolved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "room",
+            "type": "pubkey"
+          },
+          {
+            "name": "winner",
+            "type": "u8"
+          },
+          {
+            "name": "refundChallenger",
+            "type": "bool"
           }
         ]
       }

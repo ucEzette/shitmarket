@@ -140,6 +140,21 @@ interface RoomCreatedEvent {
   openingPrice: anchor.BN;
   durationMinutes: number;
   expiryTimestamp: anchor.BN;
+  oracle: anchor.web3.PublicKey;
+  oracleFeeLamports: anchor.BN;
+  resolutionCriteria: number[];
+}
+
+interface RoomDisputedEvent {
+  room: anchor.web3.PublicKey;
+  challenger: anchor.web3.PublicKey;
+  disputeBond: anchor.BN;
+}
+
+interface DisputeResolvedEvent {
+  room: anchor.web3.PublicKey;
+  winner: number;
+  refundChallenger: boolean;
 }
 
 
@@ -303,6 +318,10 @@ async function handleRoomCreated(event: RoomCreatedEvent): Promise<void> {
 
     const statusVal = 'active';
 
+    const criteriaBuf = Buffer.from(event.resolutionCriteria || []);
+    const nullIdx = criteriaBuf.indexOf(0);
+    const criteriaStr = criteriaBuf.toString('utf8', 0, nullIdx === -1 ? criteriaBuf.length : nullIdx).trim();
+
     await prisma.room.upsert({
       where: { roomPubkey },
       create: {
@@ -319,6 +338,9 @@ async function handleRoomCreated(event: RoomCreatedEvent): Promise<void> {
         expiry,
         status: statusVal,
         creator: event.creator.toBase58(),
+        oracleAddress: event.oracle.toBase58(),
+        oracleFeeLamports: BigInt(event.oracleFeeLamports.toString()),
+        resolutionCriteria: criteriaStr,
       },
       update: {
         priceFeed: event.priceFeed.toBase58(),
@@ -328,6 +350,9 @@ async function handleRoomCreated(event: RoomCreatedEvent): Promise<void> {
         tokenImageUrl: meta.imageUrl,
         chainId: meta.chainId ?? 'solana',
         originalAddress: meta.originalAddress ?? tokenMint,
+        oracleAddress: event.oracle.toBase58(),
+        oracleFeeLamports: BigInt(event.oracleFeeLamports.toString()),
+        resolutionCriteria: criteriaStr,
       },
     });
 
@@ -519,6 +544,7 @@ async function handleRoomSettled(event: RoomSettledEvent): Promise<void> {
         finalPrice,
         twapFinalPrice,
         platformFee,
+        settledAt: new Date(),
       },
     });
 
@@ -1068,6 +1094,113 @@ async function handleListingCancelled(event: ListingCancelledEvent): Promise<voi
   }
 }
 
+async function handleRoomDisputed(event: RoomDisputedEvent): Promise<void> {
+  try {
+    const roomPubkey = event.room.toBase58();
+    const challenger = event.challenger.toBase58();
+    const disputeBond = BigInt(event.disputeBond.toString());
+
+    await prisma.room.update({
+      where: { roomPubkey },
+      data: {
+        status: 'disputed',
+        disputedAt: new Date(),
+        disputeChallenger: challenger,
+        disputeBond: disputeBond,
+      },
+    });
+
+    await cacheRoom(roomPubkey, {
+      status: 'disputed',
+    });
+
+    await publishRoomUpdate(roomPubkey, {
+      type: 'RoomDisputed',
+      challenger,
+      disputeBond: disputeBond.toString(),
+    });
+
+    logger.info({ msg: 'RoomDisputed processed', roomPubkey, challenger });
+  } catch (err: any) {
+    logger.error({ msg: 'RoomDisputed failed', err: err.message });
+  }
+}
+
+async function handleDisputeResolved(event: DisputeResolvedEvent): Promise<void> {
+  try {
+    const roomPubkey = event.room.toBase58();
+    const isDraw = event.winner === 2;
+    const winner = isDraw ? 'draw' : (event.winner === 0 ? 'moon' : 'jeet');
+    const overturned = event.refundChallenger;
+
+    const room = await prisma.room.findUnique({
+      where: { roomPubkey },
+      include: { bets: true },
+    });
+
+    if (!room) return;
+
+    const totalPool = room.totalPool;
+    const platformFee = room.platformFee;
+    const oracleFee = room.oracleFeeLamports;
+    const payoutPool = totalPool - platformFee - oracleFee;
+
+    // Clear existing payouts so we can write the new resolved payouts
+    await prisma.payout.deleteMany({ where: { roomPubkey } });
+
+    const winningBets = isDraw 
+      ? room.bets 
+      : room.bets.filter(b => b.side === winner);
+
+    const winningPool = isDraw ? totalPool : winningBets.reduce((sum, b) => sum + b.amount, BigInt(0));
+
+    const payoutOps = [];
+    for (const bet of winningBets) {
+      if (winningPool === BigInt(0)) continue;
+      const payout = (bet.amount * payoutPool) / winningPool;
+
+      payoutOps.push(
+        prisma.payout.create({
+          data: {
+            roomPubkey,
+            userPubkey: bet.userPubkey,
+            amount: payout,
+          },
+        })
+      );
+    }
+
+    const roomUpdate = prisma.room.update({
+      where: { roomPubkey },
+      data: {
+        status: 'settled',
+        winner,
+        disputeStatus: overturned ? 1 : 0,
+      },
+    });
+
+    await prisma.$transaction([
+      roomUpdate,
+      ...payoutOps
+    ]);
+
+    await cacheRoom(roomPubkey, {
+      status: 'settled',
+      winner,
+    });
+
+    await publishRoomUpdate(roomPubkey, {
+      type: 'DisputeResolved',
+      winner,
+      overturned,
+    });
+
+    logger.info({ msg: 'DisputeResolved processed', roomPubkey, winner, overturned });
+  } catch (err: any) {
+    logger.error({ msg: 'DisputeResolved failed', err: err.message });
+  }
+}
+
 let subscriptionId: number | null = null;
 
 export async function processParsedEvents(events: any[], signature: string): Promise<void> {
@@ -1119,6 +1252,12 @@ export async function processParsedEvents(events: any[], signature: string): Pro
         break;
       case 'ListingCancelled':
         await handleListingCancelled(event.data as ListingCancelledEvent);
+        break;
+      case 'RoomDisputed':
+        await handleRoomDisputed(event.data as RoomDisputedEvent);
+        break;
+      case 'DisputeResolved':
+        await handleDisputeResolved(event.data as DisputeResolvedEvent);
         break;
       default:
         logger.warn({ msg: 'Unknown event', name: event.name });

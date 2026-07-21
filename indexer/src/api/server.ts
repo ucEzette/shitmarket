@@ -132,13 +132,14 @@ export function createApiServer(circuitBreaker?: RpcCircuitBreaker): express.App
       checkReplicaDb(),
     ]);
 
-    const keeperStatus = getSettlementKeeperStatus();
-    const eventListenerStatus = getEventListenerStatus();
+    const isEvm = config.coreChain === 'avalanche';
+    const keeperStatus = isEvm ? { isRunning: true } : getSettlementKeeperStatus();
+    const eventListenerStatus = isEvm ? { isRunning: true } : getEventListenerStatus();
 
     const allOk =
       db.status === 'ok' &&
       rds.status === 'ok' &&
-      rpcResult.status === 'ok' &&
+      (isEvm || rpcResult.status === 'ok') &&
       keeperStatus.isRunning &&
       eventListenerStatus.isRunning;
 

@@ -1,9 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
-import { useWallets as useSolanaWallets, useCreateWallet, toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
+import { PrivyProvider, usePrivy, useWallets as useEvmWallets, useCreateWallet as useCreateEvmWallet } from '@privy-io/react-auth';
+import { useWallets as useSolanaWallets, useCreateWallet as useCreateSolanaWallet, toSolanaWalletConnectors } from '@privy-io/react-auth/solana';
 import { Connection, PublicKey, Keypair, Transaction } from '@solana/web3.js';
+import { avalancheFuji } from 'viem/chains';
 import * as bip39 from 'bip39';
 import { derivePath } from 'ed25519-hd-key';
 import bs58 from 'bs58';
@@ -116,16 +117,27 @@ export const WalletContext = createContext<WalletContextType | null>(null);
 
 const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const privy = usePrivy();
+  const { wallets: privyEvmWallets } = useEvmWallets();
   const { wallets: privySolanaWallets } = useSolanaWallets();
-  const { createWallet } = useCreateWallet();
+  const { createWallet: createEvmWallet } = useCreateEvmWallet();
+  const { createWallet: createSolanaWallet } = useCreateSolanaWallet();
   const setZustandWallet = useAppState((s) => s.setWallet);
   const setZustandWalletAddress = useAppState((s) => s.setWalletAddress);
   const fetchBalance = useAppState((s) => s.fetchBalance);
+  const zustandUserBalance = useAppState((s) => s.user?.balance);
+
+  const isEvmMode = process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
 
   const [walletType, setWalletType] = useState<WalletContextType['walletType']>(null);
   const [activeWalletPublicKey, setActiveWalletPublicKey] = useState<PublicKey | null>(null);
   const [balance, setBalance] = useState<number>(0);
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (typeof zustandUserBalance === 'number') {
+      setBalance(zustandUserBalance);
+    }
+  }, [zustandUserBalance]);
   const [session, setSession] = useState<any | null>(null);
 
   // Imported wallet in-memory state
@@ -184,22 +196,32 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [activeExternalWalletAddress]);
 
   const embeddedWallets = useMemo(() => {
-    return privySolanaWallets.filter((w: any) => {
+    const rawWallets = isEvmMode ? privyEvmWallets : privySolanaWallets;
+    return rawWallets.filter((w: any) => {
       const linked = privy.user?.linkedAccounts.find(
-        (uw: any) => uw.type === 'wallet' && uw.address?.toLowerCase() === w.address.toLowerCase()
+        (uw: any) => uw.type === 'wallet' && uw.address?.toLowerCase() === w.address?.toLowerCase()
       ) as any;
       return linked?.connectorType === 'embedded' || linked?.walletClientType === 'privy';
     });
-  }, [privySolanaWallets, privy.user?.linkedAccounts]);
+  }, [isEvmMode, privyEvmWallets, privySolanaWallets, privy.user?.linkedAccounts]);
 
   const externalWallets = useMemo(() => {
-    return privySolanaWallets.filter((w: any) => {
+    const rawWallets = isEvmMode ? privyEvmWallets : privySolanaWallets;
+    return rawWallets.filter((w: any) => {
       const linked = privy.user?.linkedAccounts.find(
-        (uw: any) => uw.type === 'wallet' && uw.address?.toLowerCase() === w.address.toLowerCase()
+        (uw: any) => uw.type === 'wallet' && uw.address?.toLowerCase() === w.address?.toLowerCase()
       ) as any;
       return linked?.connectorType !== 'embedded' && linked?.walletClientType !== 'privy';
     });
-  }, [privySolanaWallets, privy.user?.linkedAccounts]);
+  }, [isEvmMode, privyEvmWallets, privySolanaWallets, privy.user?.linkedAccounts]);
+
+  const activeEvmWallet = useMemo(() => {
+    if (!privyEvmWallets || privyEvmWallets.length === 0) return null;
+    if (activeEmbeddedWalletAddress) {
+      return privyEvmWallets.find((w: any) => w.address?.toLowerCase() === activeEmbeddedWalletAddress.toLowerCase()) || privyEvmWallets[0];
+    }
+    return privyEvmWallets[0];
+  }, [privyEvmWallets, activeEmbeddedWalletAddress]);
 
   const activeEmbeddedWallet = useMemo(() => {
     if (activeEmbeddedWalletAddress) {
@@ -216,24 +238,43 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [externalWallets, activeExternalWalletAddress]);
 
   const activeWalletAddress = useMemo(() => {
-    if (walletType === 'embedded' && activeEmbeddedWallet) {
-      return activeEmbeddedWallet.address;
+    if (!walletType) return null;
+    if (walletType === 'embedded') {
+      if (process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' && activeEvmWallet) {
+        return activeEvmWallet.address;
+      }
+      if (activeEmbeddedWallet) {
+        return activeEmbeddedWallet.address;
+      }
+      if (activeEvmWallet) {
+        return activeEvmWallet.address;
+      }
     }
     if (walletType === 'imported' && activeWalletPublicKey) {
       return activeWalletPublicKey.toBase58();
     }
-    if (walletType === 'external' && activeExternalWallet) {
-      return activeExternalWallet.address;
+    if (walletType === 'external') {
+      if (activeEvmWallet) return activeEvmWallet.address;
+      if (activeExternalWallet) return activeExternalWallet.address;
     }
     return null;
-  }, [walletType, activeEmbeddedWallet, activeWalletPublicKey, activeExternalWallet]);
+  }, [walletType, activeEmbeddedWallet, activeEvmWallet, activeWalletPublicKey, activeExternalWallet]);
 
   // Sync address changes with PublicKey object and Zustand store
   useEffect(() => {
     if (activeWalletAddress) {
-      const pubkey = new PublicKey(activeWalletAddress);
-      setActiveWalletPublicKey(pubkey);
-      setZustandWalletAddress(activeWalletAddress);
+      if (activeWalletAddress.startsWith('0x')) {
+        setActiveWalletPublicKey(null);
+        setZustandWalletAddress(activeWalletAddress);
+      } else {
+        try {
+          const pubkey = new PublicKey(activeWalletAddress);
+          setActiveWalletPublicKey(pubkey);
+        } catch (e) {
+          setActiveWalletPublicKey(null);
+        }
+        setZustandWalletAddress(activeWalletAddress);
+      }
     } else {
       setActiveWalletPublicKey(null);
       setZustandWalletAddress(null);
@@ -337,7 +378,8 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     ) {
       console.log("Creating embedded wallet for authenticated user...");
       setHasTriggeredWalletCreation(true);
-      createWallet().catch((err) => {
+      const doCreate = isEvmMode ? createEvmWallet : createSolanaWallet;
+      doCreate().catch((err) => {
         console.error("Failed to create embedded wallet:", err);
         setHasTriggeredWalletCreation(false);
       });
@@ -347,7 +389,9 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     privy.authenticated,
     walletType,
     embeddedWallets.length,
-    createWallet,
+    isEvmMode,
+    createEvmWallet,
+    createSolanaWallet,
     hasTriggeredWalletCreation,
   ]);
 
@@ -421,8 +465,23 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
+    const effectivePrivyWallet = activeEvmWallet || activeEmbeddedWallet || activeExternalWallet;
     const customWalletAdaptor = {
-      publicKey: new PublicKey(activeWalletAddress),
+      publicKey: activeWalletPublicKey,
+      address: activeWalletAddress,
+      walletType: walletType,
+      privyWallet: effectivePrivyWallet ? {
+        ...effectivePrivyWallet,
+        getEthereumProvider: async () => {
+          if (activeEvmWallet?.getEthereumProvider) {
+            return await activeEvmWallet.getEthereumProvider();
+          }
+          if ((effectivePrivyWallet as any)?.getEthereumProvider) {
+            return await (effectivePrivyWallet as any).getEthereumProvider();
+          }
+          throw new Error("No EVM wallet provider available.");
+        }
+      } : null,
       signTransaction: async (tx: Transaction) => {
         if (walletType === 'imported' && importedKeypair) {
           tx.partialSign(importedKeypair);
@@ -430,14 +489,14 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
         if (walletType === 'embedded' && activeEmbeddedWallet) {
           const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-          const { signedTransaction } = await activeEmbeddedWallet.signTransaction({
+          const { signedTransaction } = await (activeEmbeddedWallet as any).signTransaction({
             transaction: serialized,
           });
           return Transaction.from(signedTransaction);
         }
         if (walletType === 'external' && activeExternalWallet) {
           const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-          const { signedTransaction } = await activeExternalWallet.signTransaction({
+          const { signedTransaction } = await (activeExternalWallet as any).signTransaction({
             transaction: serialized,
           });
           return Transaction.from(signedTransaction);
@@ -452,13 +511,13 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             signed.push(tx);
           } else if (walletType === 'embedded' && activeEmbeddedWallet) {
             const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-            const { signedTransaction } = await activeEmbeddedWallet.signTransaction({
+            const { signedTransaction } = await (activeEmbeddedWallet as any).signTransaction({
               transaction: serialized,
             });
             signed.push(Transaction.from(signedTransaction));
           } else if (walletType === 'external' && activeExternalWallet) {
             const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-            const { signedTransaction } = await activeExternalWallet.signTransaction({
+            const { signedTransaction } = await (activeExternalWallet as any).signTransaction({
               transaction: serialized,
             });
             signed.push(Transaction.from(signedTransaction));
@@ -471,7 +530,7 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setZustandWallet(customWalletAdaptor);
-  }, [activeWalletAddress, walletType, importedKeypair, activeEmbeddedWallet, activeExternalWallet, setZustandWallet]);
+  }, [activeWalletAddress, walletType, importedKeypair, activeEmbeddedWallet, activeEvmWallet, activeExternalWallet, setZustandWallet]);
 
   const connectEmbedded = async () => {
     try {
@@ -583,13 +642,30 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const disconnect = async () => {
-    if (walletType === 'imported') {
-      forgetWallet();
-    } else {
-      await privy.logout();
-      setWalletType(null);
-      localStorage.removeItem('shitmarket_wallet_type');
+    try {
+      if (privy.authenticated) {
+        await privy.logout();
+      }
+    } catch (e) {
+      console.warn("Privy logout warning:", e);
     }
+    setWalletType(null);
+    setActiveWalletPublicKey(null);
+    setActiveEmbeddedWalletAddress(null);
+    setActiveExternalWalletAddress(null);
+    setImportedKeypair(null);
+    setIsImportedWalletLocked(false);
+    setSession(null);
+    localStorage.removeItem('shitmarket_wallet_type');
+    localStorage.removeItem('shitmarket_imported_pubkey');
+    localStorage.removeItem('shitmarket_imported_wallet_encrypted');
+    localStorage.removeItem('shitmarket_active_embedded_address');
+    localStorage.removeItem('shitmarket_active_external_address');
+    localStorage.removeItem('privy_solana_session');
+
+    setZustandWallet(null);
+    setZustandWalletAddress(null);
+    useAppState.getState().disconnectWallet();
   };
 
   const createSessionKey = async () => {
@@ -615,9 +691,13 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const createAdditionalWallet = async () => {
     try {
-      await createWallet({ createAdditional: true });
+      if (isEvmMode) {
+        await createEvmWallet();
+      } else {
+        await createSolanaWallet({ createAdditional: true });
+      }
     } catch (e) {
-      console.error("Failed to create additional Solana wallet:", e);
+      console.error("Failed to create additional wallet:", e);
     }
   };
 
@@ -645,7 +725,7 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else if (walletType === 'embedded') {
       if (!activeEmbeddedWallet) throw new Error("Privy embedded wallet not initialized.");
       const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-      const { signedTransaction } = await activeEmbeddedWallet.signTransaction({
+      const { signedTransaction } = await (activeEmbeddedWallet as any).signTransaction({
         transaction: serialized,
       });
       const signedTx = Transaction.from(signedTransaction);
@@ -653,7 +733,7 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } else if (walletType === 'external') {
       if (!activeExternalWallet) throw new Error("External wallet not connected.");
       const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-      const { signedTransaction } = await activeExternalWallet.signTransaction({
+      const { signedTransaction } = await (activeExternalWallet as any).signTransaction({
         transaction: serialized,
       });
       const signedTx = Transaction.from(signedTransaction);
@@ -681,11 +761,11 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return nacl.sign.detached(message, importedKeypair.secretKey);
     } else if (walletType === 'embedded') {
       if (!activeEmbeddedWallet) throw new Error("Privy embedded wallet not initialized.");
-      const { signature } = await activeEmbeddedWallet.signMessage({ message });
+      const { signature } = await (activeEmbeddedWallet as any).signMessage({ message });
       return signature;
     } else if (walletType === 'external') {
       if (!activeExternalWallet) throw new Error("External wallet not connected.");
-      const { signature } = await activeExternalWallet.signMessage({ message });
+      const { signature } = await (activeExternalWallet as any).signMessage({ message });
       return signature;
     } else {
       throw new Error("No active wallet connected.");
@@ -746,6 +826,8 @@ export const SolanaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || "clux31x800000000000000000"}
       config={{
+        supportedChains: [avalancheFuji],
+        defaultChain: avalancheFuji,
         appearance: {
           walletChainType: 'ethereum-and-solana',
           walletList: ['phantom', 'metamask', 'coinbase_wallet', 'okx_wallet', 'solflare', 'detected_wallets'],
@@ -757,6 +839,9 @@ export const SolanaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
         },
         embeddedWallets: {
           solana: {
+            createOnLogin: 'users-without-wallets',
+          },
+          ethereum: {
             createOnLogin: 'users-without-wallets',
           },
           showWalletUIs: false, // Disables confirmation modal for promptless transactions

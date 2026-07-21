@@ -3,6 +3,9 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { PublicKey, SystemProgram, ComputeBudgetProgram } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
+import bs58 from 'bs58';
+import { createPublicClient, createWalletClient, custom, http, encodeFunctionData, parseEther, parseEventLogs } from 'viem';
+import { avalancheFuji } from 'viem/chains';
 import {
   getAnchorProgram,
   connection,
@@ -15,6 +18,105 @@ import {
   getReferralStatePda,
   getListingPda,
 } from '@/utils/solanaClient';
+
+const SHITMARKET_CORE_ABI = [
+  {
+    name: 'RoomCreated',
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'roomId', type: 'bytes32', indexed: true },
+      { name: 'creator', type: 'address', indexed: true },
+      { name: 'tokenMint', type: 'bytes32', indexed: false },
+      { name: 'tokenName', type: 'string', indexed: false },
+      { name: 'chainId', type: 'string', indexed: false },
+      { name: 'openingPrice', type: 'int64', indexed: false },
+      { name: 'expiryTimestamp', type: 'uint256', indexed: false },
+      { name: 'oracle', type: 'address', indexed: false },
+      { name: 'oracleFeeAmount', type: 'uint256', indexed: false }
+    ]
+  },
+  {
+    name: 'createRoom',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_tokenMint', type: 'bytes32' },
+      { name: '_tokenName', type: 'string' },
+      { name: '_chainId', type: 'string' },
+      { name: '_durationMinutes', type: 'uint256' },
+      { name: '_openingPrice', type: 'int64' },
+      { name: '_oracle', type: 'address' },
+      { name: '_oracleFeeAmount', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'bytes32' }]
+  },
+  {
+    name: 'placeBet',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_roomId', type: 'bytes32' },
+      { name: '_side', type: 'uint8' },
+      { name: '_amount', type: 'uint256' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'getRoom',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '_roomId', type: 'bytes32' }],
+    outputs: [
+      {
+        components: [
+          { name: 'roomId', type: 'bytes32' },
+          { name: 'tokenMint', type: 'bytes32' },
+          { name: 'tokenName', type: 'bytes32' },
+          { name: 'chainId', type: 'string' },
+          { name: 'openingPrice', type: 'int64' },
+          { name: 'openingTimestamp', type: 'uint256' },
+          { name: 'expiryTimestamp', type: 'uint256' },
+          { name: 'settlementTimestamp', type: 'uint256' },
+          { name: 'durationMinutes', type: 'uint256' },
+          { name: 'moonPool', type: 'uint256' },
+          { name: 'jeetPool', type: 'uint256' },
+          { name: 'finalPrice', type: 'int64' },
+          { name: 'twapFinalPrice', type: 'int64' },
+          { name: 'winner', type: 'uint8' },
+          { name: 'status', type: 'uint8' },
+          { name: 'creator', type: 'address' },
+          { name: 'oracle', type: 'address' },
+          { name: 'oracleFeeAmount', type: 'uint256' },
+          { name: 'twapSampleCount', type: 'uint8' },
+          { name: 'twapSamples', type: 'int64[10]' },
+          { name: 'twapSampleTimestamps', type: 'uint256[10]' },
+          { name: 'disputeStatus', type: 'uint8' },
+          { name: 'disputeChallenger', type: 'address' },
+          { name: 'disputeBond', type: 'uint256' }
+        ],
+        name: '',
+        type: 'tuple'
+      }
+    ]
+  },
+  {
+    name: 'claimWinnings',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_roomId', type: 'bytes32' },
+      { name: '_side', type: 'uint8' }
+    ],
+    outputs: []
+  }
+] as const;
+
+export const publicClient = createPublicClient({
+  chain: avalancheFuji,
+  transport: http(process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc'),
+});
+
 export const formatCashtag = (sym: string) => {
   if (!sym) return '';
   return sym.startsWith('$') ? sym : `$${sym}`;
@@ -89,8 +191,42 @@ export interface Activity {
 
 
 
+export type MarketCategory = 'all' | 'crypto' | 'sports' | 'politics' | 'ai_tech' | 'pop_culture' | 'macro';
+
+export const CATEGORIES: { id: MarketCategory; label: string; icon: string }[] = [
+  { id: 'all', label: 'ALL MARKETS', icon: '🔥' },
+  { id: 'crypto', label: 'CRYPTO & MEMES', icon: '🪙' },
+  { id: 'sports', label: 'SPORTS', icon: '⚽' },
+  { id: 'politics', label: 'POLITICS', icon: '🏛️' },
+  { id: 'ai_tech', label: 'AI & TECH', icon: '🤖' },
+  { id: 'pop_culture', label: 'POP CULTURE', icon: '🎬' },
+  { id: 'macro', label: 'MACRO & FINANCE', icon: '📈' },
+];
+
+export const detectCategory = (tokenName?: string, tokenSymbol?: string, description?: string): MarketCategory => {
+  const text = `${tokenName || ''} ${tokenSymbol || ''} ${description || ''}`.toLowerCase();
+  
+  if (/\b(messi|ronaldo|nba|fifa|premier|league|ufc|f1|nfl|tennis|football|soccer|champions|ballon|basketball|world cup|olympics|box|boxing|derby|stadium|match|trophy|real madrid|barcelona|liverpool|arsenal|chelsea|manchester)\b/.test(text)) {
+    return 'sports';
+  }
+  if (/\b(election|trump|biden|kamala|senate|congress|president|politic|government|house|vote|law|governor|democrat|republican|white house|parliament|minister)\b/.test(text)) {
+    return 'politics';
+  }
+  if (/\b(openai|gpt|sam altman|claude|gemini|nvidia|apple|tesla|robot|ai|tech|spacex|starlink|cyber|agi|superintelligence|chip)\b/.test(text)) {
+    return 'ai_tech';
+  }
+  if (/\b(oscar|grammy|drake|kendrick|movie|netflix|youtube|twitch|hollywood|music|album|tiktok|streamer|kardashian|gta|game)\b/.test(text)) {
+    return 'pop_culture';
+  }
+  if (/\b(fed|rate|cpi|inflation|s&p|stock|nasdaq|gold|oil|tariff|economy|treasury|gdp|interest|yield|bank|housing|dollar)\b/.test(text)) {
+    return 'macro';
+  }
+  return 'crypto';
+};
+
 export interface Room {
   id: string;
+  category?: MarketCategory;
   token: {
     address: string;
     name: string;
@@ -106,15 +242,27 @@ export interface Room {
   moonPool: number;
   jeetPool: number;
   expiry: number; // unix timestamp in ms
-  status: 'active' | 'settled' | 'cancelled' | 'pending';
+  status: 'active' | 'settled' | 'cancelled' | 'pending' | 'disputed';
   winner?: 'moon' | 'jeet' | 'draw';
   createdAt: number;
   duration: number; // minutes
   openingPrice?: number;
+  priceFeedId?: string;
   finalTWAP?: number;
   finalPrice?: number;
   twapFinalPrice?: number;
   lastSyncedAt?: number;
+  
+  // Custom Disagreement & Oracle layer fields
+  oracleAddress?: string;
+  oracleFeeLamports?: number;
+  settlementTimestamp?: number;
+  disputeStatus?: number;
+  resolutionCriteria?: string;
+  disputedAt?: number;
+  disputeChallenger?: string;
+  disputeBond?: number;
+  oracleLogs?: string;
 }
 
 export interface UserProfile {
@@ -231,9 +379,15 @@ export interface AppState {
   };
   updateSettings: (updates: Partial<AppState['settings']>) => void;
 
+  isEvm: boolean;
   createRoom: (room: Room, isSetPrice?: boolean) => Promise<any>;
   placeBet: (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => Promise<any>;
+  placeEvmBet: (roomId: string, side: 'moon' | 'jeet', amount: number) => Promise<any>;
   claimWinnings: (roomId: string) => Promise<any>;
+  claimEvmWinnings: (roomId: string) => Promise<any>;
+  mintTestnetUsdc: (amount?: number) => Promise<any>;
+  disputeRoom: (roomId: string) => Promise<any>;
+  resolveDispute: (roomId: string, winner: 'moon' | 'jeet' | 'draw' | null, overturned: boolean) => Promise<any>;
   claimReferralRewardsOnChain: () => Promise<any>;
   connectWallet: () => void;
   disconnectWallet: () => void;
@@ -307,31 +461,51 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs = 3000, errorMsg = 'Opera
   ]);
 }
 
+export const parseBytes32Name = (hex: string): string => {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('0x')) return '';
+  try {
+    const clean = hex.replace(/^0x/, '');
+    const bytes = Buffer.from(clean, 'hex');
+    const nullIdx = bytes.indexOf(0);
+    const slice = nullIdx !== -1 ? bytes.subarray(0, nullIdx) : bytes;
+    return slice.toString('utf8').trim();
+  } catch {
+    return '';
+  }
+};
+
 // ── Map API Room to Store Room ────────────────────────────────
 export const mapApiRoom = (apiRoom: any): Room => {
   return {
     id: apiRoom.roomPubkey,
+    duration: apiRoom.durationMinutes || 60,
+    category: apiRoom.category || detectCategory(apiRoom.tokenName, apiRoom.tokenSymbol, apiRoom.resolutionCriteria),
     token: {
       address: apiRoom.originalAddress || apiRoom.tokenMint,
       name: apiRoom.tokenName || 'Unknown Token',
       symbol: apiRoom.tokenSymbol || 'UNKNWN',
       icon: apiRoom.tokenImageUrl || '💰',
-      chainId: apiRoom.chainId || 'solana',
+      chainId: apiRoom.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche'),
       pairAddress: apiRoom.pairAddress || '',
     },
     creator: apiRoom.creator || 'Unknown',
     moonPool: Number(apiRoom.moonPool || 0) / 1e9,
     jeetPool: Number(apiRoom.jeetPool || 0) / 1e9,
     expiry: new Date(apiRoom.expiry).getTime(),
-    status: apiRoom.status as 'active' | 'settled' | 'cancelled' | 'pending',
-    winner: apiRoom.winner || undefined,
+    status: apiRoom.status as 'active' | 'settled' | 'cancelled' | 'pending' | 'disputed',
+    winner: apiRoom.winner ? (apiRoom.winner as 'moon' | 'jeet' | 'draw') : undefined,
     createdAt: new Date(apiRoom.createdAt).getTime(),
-    duration: Number(apiRoom.duration || 30),
-    openingPrice: (apiRoom.openingPrice && Number(apiRoom.openingPrice) !== 0) ? Number(apiRoom.openingPrice) / 1e12 : undefined,
-    finalTWAP: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
-    finalPrice: apiRoom.finalPrice ? Number(apiRoom.finalPrice) / 1e12 : undefined,
     twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e12 : undefined,
     lastSyncedAt: Date.now(),
+    oracleAddress: apiRoom.oracleAddress || undefined,
+    oracleFeeLamports: apiRoom.oracleFeeLamports ? Number(apiRoom.oracleFeeLamports) : undefined,
+    settlementTimestamp: apiRoom.settledAt ? new Date(apiRoom.settledAt).getTime() : undefined,
+    disputeStatus: apiRoom.disputeStatus !== undefined ? apiRoom.disputeStatus : undefined,
+    resolutionCriteria: apiRoom.resolutionCriteria || undefined,
+    disputedAt: apiRoom.disputedAt ? new Date(apiRoom.disputedAt).getTime() : undefined,
+    disputeChallenger: apiRoom.disputeChallenger || undefined,
+    disputeBond: apiRoom.disputeBond ? Number(apiRoom.disputeBond) : undefined,
+    oracleLogs: apiRoom.oracleLogs || undefined,
   };
 };
 
@@ -377,7 +551,13 @@ function mergeRooms(currentRoom: Room | undefined, indexerRoom: Room | null, onC
     status = indexerRoom.status;
   }
   
-  if (base.status === 'settled' || currentRoom?.status === 'settled') {
+  if (currentRoom?.status === 'disputed' || indexerRoom?.status === 'disputed' || onChainRoom?.status === 'disputed') {
+    if (onChainRoom?.status === 'settled' || indexerRoom?.status === 'settled') {
+      status = 'settled';
+    } else {
+      status = 'disputed';
+    }
+  } else if (base.status === 'settled' || currentRoom?.status === 'settled') {
     status = 'settled';
   }
 
@@ -399,6 +579,16 @@ function mergeRooms(currentRoom: Room | undefined, indexerRoom: Room | null, onC
   const finalPrice = onChainRoom?.finalPrice ?? indexerRoom?.finalPrice ?? base.finalPrice;
   const twapFinalPrice = onChainRoom?.twapFinalPrice ?? indexerRoom?.twapFinalPrice ?? base.twapFinalPrice;
 
+  const oracleAddress = onChainRoom?.oracleAddress || indexerRoom?.oracleAddress || base.oracleAddress;
+  const oracleFeeLamports = onChainRoom?.oracleFeeLamports ?? indexerRoom?.oracleFeeLamports ?? base.oracleFeeLamports;
+  const settlementTimestamp = onChainRoom?.settlementTimestamp ?? indexerRoom?.settlementTimestamp ?? base.settlementTimestamp;
+  const disputeStatus = onChainRoom?.disputeStatus ?? indexerRoom?.disputeStatus ?? base.disputeStatus;
+  const resolutionCriteria = onChainRoom?.resolutionCriteria || indexerRoom?.resolutionCriteria || base.resolutionCriteria;
+  const disputedAt = onChainRoom?.disputedAt ?? indexerRoom?.disputedAt ?? base.disputedAt;
+  const disputeChallenger = onChainRoom?.disputeChallenger || indexerRoom?.disputeChallenger || base.disputeChallenger;
+  const disputeBond = onChainRoom?.disputeBond ?? indexerRoom?.disputeBond ?? base.disputeBond;
+  const oracleLogs = onChainRoom?.oracleLogs || indexerRoom?.oracleLogs || base.oracleLogs;
+
   return {
     ...base,
     token,
@@ -413,6 +603,15 @@ function mergeRooms(currentRoom: Room | undefined, indexerRoom: Room | null, onC
     openingPrice,
     finalPrice,
     twapFinalPrice,
+    oracleAddress,
+    oracleFeeLamports,
+    settlementTimestamp,
+    disputeStatus,
+    resolutionCriteria,
+    disputedAt,
+    disputeChallenger,
+    disputeBond,
+    oracleLogs,
     lastSyncedAt: Math.max(
       base.lastSyncedAt || 0,
       indexerRoom?.lastSyncedAt || 0,
@@ -461,15 +660,36 @@ function getPriorityFeePrice(settings: any): number {
   }
 }
 
-function handleRpcError(actionName: string, err: any) {
-  const errMsg = extractErrorMessage(err);
-  const lowerMsg = errMsg.toLowerCase();
-  const title = `${actionName.toUpperCase()} FAILED`;
-  const desc = lowerMsg.includes('not confirmed') || lowerMsg.includes('timeout')
-    ? 'The Solana network is taking too long to confirm your transaction. It might have still succeeded! Please wait a few moments, refresh, and verify your ammo balance.'
-    : errMsg;
-  
-  useAppState.getState().addToast(title, 'error', desc);
+async function ensureAvalancheFujiChain(provider: any) {
+  if (!provider || typeof provider.request !== 'function') return;
+  try {
+    await provider.request({
+      method: 'wallet_switchEthereumChain',
+      params: [{ chainId: '0xa869' }], // 43113 in hex
+    });
+  } catch (switchError: any) {
+    if (
+      switchError?.code === 4902 ||
+      switchError?.code === -32603 ||
+      switchError?.message?.includes('Unrecognized chain') ||
+      switchError?.message?.includes('Unknown chain')
+    ) {
+      try {
+        await provider.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: '0xa869',
+            chainName: 'Avalanche Fuji Testnet',
+            nativeCurrency: { name: 'AVAX', symbol: 'AVAX', decimals: 18 },
+            rpcUrls: ['https://api.avax-test.network/ext/bc/C/rpc'],
+            blockExplorerUrls: ['https://testnet.snowtrace.io']
+          }]
+        });
+      } catch (addError) {
+        console.warn('Failed to auto-add Avalanche Fuji network:', addError);
+      }
+    }
+  }
 }
 
 export const useAppState = create<AppState>()(
@@ -479,6 +699,7 @@ export const useAppState = create<AppState>()(
   roomsLoaded: false,
   listings: [],
   isPaused: false,
+  isEvm: process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche',
   user: null,
   leaderboard: {
     moon: [],
@@ -656,7 +877,10 @@ export const useAppState = create<AppState>()(
         // Hydrate on-chain state asynchronously in the background so it doesn't block UI rendering!
         (async () => {
           try {
-            const activeRooms = mapped.filter((r: Room) => r.status === 'active');
+            const isEvmMode = process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
+            if (isEvmMode) return; // EVM rooms are hydrated directly via fetchSingleRoom/readContract
+
+            const activeRooms = mapped.filter((r: Room) => r.status === 'active' && !r.id.startsWith('0x'));
             if (activeRooms.length === 0) return;
 
             const program = getAnchorProgram(null as any);
@@ -796,6 +1020,80 @@ export const useAppState = create<AppState>()(
     // Run on-chain fetch
     const onChainFetch = async () => {
       try {
+        const isEvmMode = roomId.startsWith('0x') || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
+        if (isEvmMode) {
+          const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
+          if (contractAddress && roomId.startsWith('0x')) {
+            try {
+              const onChain: any = await publicClient.readContract({
+                address: contractAddress,
+                abi: SHITMARKET_CORE_ABI,
+                functionName: 'getRoom',
+                args: [roomId as `0x${string}`]
+              });
+
+              if (onChain && onChain.roomId && onChain.roomId !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+                const current = get().rooms.find((r) => r.id === roomId);
+                const statusNum = Number(onChain.status);
+                const statusStr: 'active' | 'settled' | 'disputed' = statusNum === 0 ? 'active' : statusNum === 1 ? 'settled' : 'disputed';
+
+                let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
+                if (statusStr === 'settled') {
+                  const winnerNum = Number(onChain.winner);
+                  winnerStr = winnerNum === 0 ? 'moon' : winnerNum === 1 ? 'jeet' : 'draw';
+                }
+
+                const decodedTokenName = parseBytes32Name(onChain.tokenName);
+                const resolvedName = decodedTokenName || current?.token?.name || 'Unknown Token';
+                const resolvedSymbol = current?.token?.symbol && current.token.symbol !== 'UNKNOWN' && current.token.symbol !== 'UNKNWN'
+                  ? current.token.symbol
+                  : (decodedTokenName ? decodedTokenName.substring(0, 8).toUpperCase() : 'UNKNOWN');
+
+                const chainIdStr = onChain.chainId && onChain.chainId !== '' ? onChain.chainId : (current?.token?.chainId || 'avalanche');
+
+                const updatedRoom: Room = {
+                  id: roomId,
+                  category: current?.category || detectCategory(resolvedName, resolvedSymbol),
+                  token: {
+                    address: current?.token?.address || (typeof onChain.tokenMint === 'string' ? onChain.tokenMint : roomId),
+                    name: resolvedName,
+                    symbol: resolvedSymbol,
+                    icon: current?.token?.icon || '💰',
+                    chainId: chainIdStr,
+                    pairAddress: current?.token?.pairAddress || '',
+                  },
+                  creator: onChain.creator,
+                  moonPool: Number(onChain.moonPool) / 1e6,
+                  jeetPool: Number(onChain.jeetPool) / 1e6,
+                  expiry: Number(onChain.expiryTimestamp) * 1000,
+                  status: statusStr,
+                  winner: winnerStr,
+                  createdAt: Number(onChain.openingTimestamp) * 1000,
+                  duration: Number(onChain.durationMinutes),
+                  openingPrice: Number(onChain.openingPrice) === 0 ? undefined : Number(onChain.openingPrice) / 1e6,
+                  finalPrice: Number(onChain.finalPrice) === 0 ? undefined : Number(onChain.finalPrice) / 1e6,
+                  twapFinalPrice: Number(onChain.twapFinalPrice) === 0 ? undefined : Number(onChain.twapFinalPrice) / 1e6,
+                  lastSyncedAt: Date.now(),
+                  oracleAddress: onChain.oracle,
+                  oracleFeeLamports: Number(onChain.oracleFeeAmount),
+                  disputeChallenger: onChain.disputeChallenger && onChain.disputeChallenger !== '0x0000000000000000000000000000000000000000' ? onChain.disputeChallenger : undefined,
+                };
+
+                set((state) => {
+                  const exists = state.rooms.some((r) => r.id === roomId);
+                  const newRooms = exists
+                    ? state.rooms.map((r) => (r.id === roomId ? mergeRooms(r, null, updatedRoom) || updatedRoom : r))
+                    : [updatedRoom, ...state.rooms];
+                  return { rooms: newRooms };
+                });
+              }
+            } catch (evmErr) {
+              console.warn(`Failed to fetch EVM room ${roomId} on-chain:`, evmErr);
+            }
+          }
+          return;
+        }
+
         const program = getAnchorProgram(null as any);
         const onChain = await withTimeout(
           (program.account as any).room.fetch(new PublicKey(roomId)),
@@ -804,7 +1102,7 @@ export const useAppState = create<AppState>()(
         ) as any;
 
         if (onChain) {
-          const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled';
+          const statusStr = Object.keys(onChain.status)[0].toLowerCase() as 'active' | 'settled' | 'disputed';
           let winnerStr: 'moon' | 'jeet' | 'draw' | undefined = undefined;
           if (onChain.winner) {
             const wKey = Object.keys(onChain.winner)[0].toLowerCase();
@@ -859,7 +1157,7 @@ export const useAppState = create<AppState>()(
               name: decodedName,
               symbol: current?.token?.symbol || decodedName.substring(0, 10).toUpperCase(),
               icon: current?.token?.icon || '💰',
-              chainId: current?.token?.chainId || (isEvm ? 'monad' : 'solana'),
+              chainId: current?.token?.chainId || (isEvm ? 'avalanche' : 'solana'),
               pairAddress: current?.token?.pairAddress || '',
             },
             creator: onChain.creator.toBase58(),
@@ -874,6 +1172,13 @@ export const useAppState = create<AppState>()(
             finalPrice: onChain.finalPrice ? onChain.finalPrice.toNumber() / 1e12 : undefined,
             twapFinalPrice: onChain.twapFinalPrice ? onChain.twapFinalPrice.toNumber() / 1e12 : undefined,
             lastSyncedAt: Date.now(),
+            oracleAddress: onChain.oracle ? onChain.oracle.toBase58() : undefined,
+            oracleFeeLamports: onChain.oracleFeeLamports ? onChain.oracleFeeLamports.toNumber() : undefined,
+            settlementTimestamp: onChain.settlementTimestamp ? onChain.settlementTimestamp.toNumber() * 1000 : undefined,
+            disputeStatus: onChain.disputeStatus !== undefined ? onChain.disputeStatus : undefined,
+            resolutionCriteria: onChain.resolutionCriteria 
+              ? Buffer.from(onChain.resolutionCriteria).toString('utf8').replace(/\0/g, '').trim() 
+              : undefined,
           };
 
           if (!updatedRoom.token.icon || !updatedRoom.token.icon.startsWith('http') || !updatedRoom.token.pairAddress || updatedRoom.token.pairAddress === '') {
@@ -962,29 +1267,207 @@ export const useAppState = create<AppState>()(
   },
 
   fetchBalance: async () => {
-    const { user, wallet } = get();
-    if (!wallet || !wallet.publicKey) return;
-    try {
-      const balance = await withTimeout(
-        connection.getBalance(wallet.publicKey),
-        3000,
-        'Solana balance fetch timed out'
-      );
-      const solBalance = balance / 1e9;
-      if (user) {
-        set({
-          user: {
-            ...user,
-            balance: solBalance,
+    const { user, wallet, isEvm } = get();
+    if (!wallet) return;
+
+    const isEvmMode = isEvm || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' || (wallet.address && wallet.address.startsWith('0x'));
+
+    if (isEvmMode && wallet.address) {
+      try {
+        const nativeBalBigInt = await publicClient.getBalance({ address: wallet.address as `0x${string}` });
+        const avaxBal = Number(nativeBalBigInt) / 1e18;
+
+        const usdcAddress = process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS as `0x${string}`;
+        let usdcBal = 0;
+        if (usdcAddress) {
+          try {
+            const usdcBalBigInt = await publicClient.readContract({
+              address: usdcAddress,
+              abi: [{ name: 'balanceOf', type: 'function', stateMutability: 'view', inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] }],
+              functionName: 'balanceOf',
+              args: [wallet.address as `0x${string}`]
+            }) as bigint;
+            usdcBal = Number(usdcBalBigInt) / 1e6;
+          } catch (e) {
+            // Fallback if USDC contract query fails
           }
-        });
+        }
+
+        const effectiveBalance = usdcBal;
+        set((state) => ({
+          user: state.user ? {
+            ...state.user,
+            balance: effectiveBalance,
+          } : {
+            wallet: wallet.address,
+            balance: effectiveBalance,
+            trenchScore: 'D',
+            stats: { totalBets: 0, wins: 0, losses: 0, profit: 0, winStreak: 0, longestWinStreak: 0, biggestBet: 0 },
+            achievements: [],
+            bets: [],
+            username: null,
+            avatarUrl: null,
+            referredBy: null,
+            referralCode: null,
+            referralsCount: 0,
+            referralEarnings: '0',
+            referralPayouts: [],
+            unclaimedReferralRewards: 0,
+            activities: []
+          }
+        }));
+        return;
+      } catch (err) {
+        console.error('Failed to fetch EVM balance:', err);
       }
-    } catch (err) {
-      console.error('Failed to fetch wallet SOL balance:', err);
+    }
+
+    if (wallet.publicKey) {
+      try {
+        const balance = await withTimeout(
+          connection.getBalance(wallet.publicKey),
+          3000,
+          'Balance fetch timed out'
+        );
+        const solBalance = balance / 1e9;
+        if (user) {
+          set({
+            user: {
+              ...user,
+              balance: solBalance,
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Failed to fetch wallet balance:', err);
+      }
     }
   },
 
   createRoom: async (room: Room, isSetPrice?: boolean) => {
+    const isEvmMode = process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
+    if (isEvmMode) {
+      const { wallet, setTransactionLoading, setTransactionError } = get();
+      if (!wallet || !wallet.address) {
+        get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet command helmet first!");
+        return;
+      }
+      
+      setTransactionLoading(true);
+      setTransactionError(null);
+      
+      const toastId = get().addToast(
+        'DEPLOYING EVM ARENA',
+        'loading',
+        `Staging EVM battlefield room for ${room.token.symbol}...`
+      );
+      
+      try {
+        let provider: any = null;
+        if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+          provider = await wallet.privyWallet.getEthereumProvider();
+        } else if (typeof (window as any).ethereum !== 'undefined') {
+          provider = (window as any).ethereum;
+        }
+
+        if (!provider) {
+          throw new Error("No EVM provider found on wallet or browser window.");
+        }
+
+        await ensureAvalancheFujiChain(provider);
+
+        const evmWalletClient = createWalletClient({
+          account: wallet.address as `0x${string}`,
+          chain: avalancheFuji,
+          transport: custom(provider)
+        });
+        
+        const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
+        
+        let tokenMintHex = room.token.address;
+        if (!tokenMintHex.startsWith('0x')) {
+          try {
+            const decodeFn = typeof (bs58 as any).decode === 'function' ? (bs58 as any).decode : (bs58 as any).default?.decode;
+            const decoded = decodeFn(tokenMintHex);
+            tokenMintHex = '0x' + Buffer.from(decoded).toString('hex');
+          } catch (e) {
+            tokenMintHex = '0x' + Buffer.from(tokenMintHex).toString('hex').padStart(64, '0');
+          }
+        } else {
+          tokenMintHex = '0x' + tokenMintHex.replace('0x', '').padStart(64, '0');
+        }
+        
+        const priceVal = room.openingPrice ? parseFloat(String(room.openingPrice)) : 0;
+        const openingPriceI64 = BigInt(Math.round(priceVal * 1e6));
+        
+        const { request } = await publicClient.simulateContract({
+          address: contractAddress,
+          abi: SHITMARKET_CORE_ABI,
+          functionName: 'createRoom',
+          args: [
+            tokenMintHex as `0x${string}`,
+            room.token.name || 'Unknown Token',
+            room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche'),
+            BigInt(room.duration),
+            openingPriceI64,
+            '0x0000000000000000000000000000000000000000',
+            BigInt(0)
+          ],
+          account: wallet.address as `0x${string}`
+        });
+        
+        const txHash = await evmWalletClient.writeContract(request);
+        console.log("EVM Room created! Tx:", txHash);
+        
+        let actualRoomId: string = txHash;
+        try {
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+          const roomLogs = parseEventLogs({
+            abi: SHITMARKET_CORE_ABI,
+            eventName: 'RoomCreated',
+            logs: receipt.logs,
+          });
+          if (roomLogs && roomLogs.length > 0 && (roomLogs[0].args as any)?.roomId) {
+            actualRoomId = (roomLogs[0].args as any).roomId;
+          }
+          await get().fetchBalance();
+        } catch (receiptErr) {
+          console.warn("Failed to extract roomCreated log receipt:", receiptErr);
+        }
+
+        const optimisticRoom = {
+          ...room,
+          id: actualRoomId,
+          status: 'active' as const,
+        };
+        set((state) => ({ rooms: [optimisticRoom, ...state.rooms] }));
+        
+        get().updateToast(toastId, {
+          type: 'success',
+          message: 'EVM ARENA STAGED',
+          description: `Battlefield room deployed for ${room.token.symbol}.`,
+          txSig: txHash
+        });
+        
+        return {
+          tx: txHash,
+          roomPda: actualRoomId,
+          alreadyExists: false
+        };
+      } catch (err: any) {
+        console.error("Failed to create EVM room:", err);
+        setTransactionError(err.message || String(err));
+        get().updateToast(toastId, {
+          type: 'error',
+          message: 'DEPLOY MISSION FAILED',
+          description: err.message
+        });
+        throw err;
+      } finally {
+        setTransactionLoading(false);
+      }
+    }
+
     const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
     if (!wallet || !wallet.publicKey) {
       get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
@@ -1140,6 +1623,16 @@ export const useAppState = create<AppState>()(
         console.warn("Failed to cache token meta before creation", err);
       }
 
+      // Convert custom oracle pubkeys & fee
+      const customOracle = room.oracleAddress ? new PublicKey(room.oracleAddress) : null;
+      const customOracleFee = room.oracleFeeLamports ? new BN(room.oracleFeeLamports) : null;
+
+      // Convert resolution criteria string to [u8; 64]
+      const criteriaStr = room.resolutionCriteria || '';
+      const criteriaBuf = Buffer.alloc(64);
+      Buffer.from(criteriaStr, 'utf8').copy(criteriaBuf, 0);
+      const criteriaArray = Array.from(criteriaBuf);
+
       const txObj = await (program.methods as any)
         .createRoom(
           tokenMintPubkey,
@@ -1147,6 +1640,9 @@ export const useAppState = create<AppState>()(
           room.duration,
           null, // switchboardFeed Option<Pubkey>
           openingPriceParam, // openingPriceParam Option<i64>
+          customOracle, // oracle Option<Pubkey>
+          customOracleFee, // oracleFeeLamports Option<u64>
+          criteriaArray, // resolutionCriteria Option<[u8; 64]>
           chosenNonce // new nonce parameter
         )
         .accounts({
@@ -1232,6 +1728,11 @@ export const useAppState = create<AppState>()(
   },
 
   placeBet: async (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => {
+    // If EVM side (e.g. no wallet, or specific chain ID check)
+    if (get().isEvm) {
+      return await get().placeEvmBet(roomId, side, amount);
+    }
+
     const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
     if (!wallet || !wallet.publicKey) {
       get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
@@ -1377,7 +1878,304 @@ export const useAppState = create<AppState>()(
     }
   },
 
+  placeEvmBet: async (roomId: string, side: 'moon' | 'jeet', amount: number) => {
+    const { wallet, setTransactionLoading, setTransactionError } = get();
+    if (!wallet || !wallet.address || !wallet.privyWallet) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet command helmet first!");
+      return;
+    }
+    
+    setTransactionLoading(true);
+    setTransactionError(null);
+    
+    const roomObj = get().rooms.find((r) => r.id === roomId);
+    const assetSym = roomObj?.token?.symbol || 'UNKNOWN';
+    
+    const toastId = get().addToast(
+      'CHARGING ENEMY LINES',
+      'loading',
+      `Deploying ${amount} USDC on ${side.toUpperCase()} for ${assetSym}...`
+    );
+    
+    try {
+      let provider: any = null;
+      if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+        provider = await wallet.privyWallet.getEthereumProvider();
+      } else if (typeof (window as any).ethereum !== 'undefined') {
+        provider = (window as any).ethereum;
+      }
+      
+      if (!provider) {
+        throw new Error("No EVM provider found on wallet or browser window.");
+      }
+
+      await ensureAvalancheFujiChain(provider);
+
+      const evmWalletClient = createWalletClient({
+        account: wallet.address as `0x${string}`,
+        chain: avalancheFuji,
+        transport: custom(provider)
+      });
+      
+      const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
+      const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
+      const sideVal = side === 'moon' ? 0 : 1;
+      const amountUSDC = BigInt(Math.round(amount * 1e6)); // USDC 6 decimals
+
+      // Ensure USDC allowance for ShitMarketCore contract
+      try {
+        const allowance = await publicClient.readContract({
+          address: usdcAddress,
+          abi: [{
+            name: 'allowance',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+            outputs: [{ name: '', type: 'uint256' }]
+          }] as const,
+          functionName: 'allowance',
+          args: [wallet.address as `0x${string}`, contractAddress]
+        });
+
+        if (allowance < amountUSDC) {
+          const { request: approveReq } = await publicClient.simulateContract({
+            address: usdcAddress,
+            abi: [{
+              name: 'approve',
+              type: 'function',
+              stateMutability: 'nonpayable',
+              inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
+              outputs: [{ name: '', type: 'bool' }]
+            }] as const,
+            functionName: 'approve',
+            args: [contractAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+            account: wallet.address as `0x${string}`
+          });
+          const approveHash = await evmWalletClient.writeContract(approveReq);
+          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        }
+      } catch (allowanceErr) {
+        console.warn("ERC20 USDC approval check warning:", allowanceErr);
+      }
+      
+      const { request } = await publicClient.simulateContract({
+        address: contractAddress,
+        abi: SHITMARKET_CORE_ABI,
+        functionName: 'placeBet',
+        args: [roomId as `0x${string}`, sideVal, amountUSDC],
+        account: wallet.address as `0x${string}`
+      });
+      
+      const txHash = await evmWalletClient.writeContract(request);
+      console.log("EVM Bet placed! Tx:", txHash);
+
+      try {
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        await get().fetchBalance();
+        await get().fetchSingleRoom(roomId);
+      } catch (receiptErr) {
+        console.warn("Failed waiting for EVM bet receipt:", receiptErr);
+      }
+
+      // Update local user.bets state so locked positions & history render immediately
+      const newBet: Bet = {
+        id: txHash,
+        txSig: txHash,
+        roomId: roomId,
+        user: wallet.address,
+        side: side,
+        amount: amount,
+        timestamp: Date.now(),
+        claimed: false
+      };
+      set((state) => {
+        if (!state.user) return {};
+        const existingBets = state.user.bets || [];
+        const idx = existingBets.findIndex((b) => b.roomId === roomId && b.side === side);
+        let updatedBets;
+        if (idx !== -1) {
+          updatedBets = [...existingBets];
+          updatedBets[idx] = {
+            ...updatedBets[idx],
+            amount: updatedBets[idx].amount + amount
+          };
+        } else {
+          updatedBets = [newBet, ...existingBets];
+        }
+        return {
+          user: {
+            ...state.user,
+            bets: updatedBets
+          }
+        };
+      });
+      
+      // Optimistic bet update
+      get().addActivity({
+        type: 'bet',
+        title: `DEPLOYED ${amount} USDC ON ${side.toUpperCase()}`,
+        message: `You stacked ${amount} USDC on ${side.toUpperCase()} in room ${roomId}.`,
+        link: `/room/${roomId}`
+      });
+      
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'BATTLE POSITION SECURED',
+        description: `Staked ${amount} USDC on ${side.toUpperCase()}.`,
+        txSig: txHash
+      });
+      
+      return txHash;
+    } catch (err: any) {
+      console.error("Failed to place EVM bet:", err);
+      setTransactionError(err.message || String(err));
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'BATTLE ORDER FLUNKED',
+        description: err.message
+      });
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  claimEvmWinnings: async (roomId: string) => {
+    const { wallet, setTransactionLoading, setTransactionError } = get();
+    if (!wallet || !wallet.address || !wallet.privyWallet) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet command helmet first!");
+      return;
+    }
+    
+    setTransactionLoading(true);
+    setTransactionError(null);
+    
+    const toastId = get().addToast(
+      'RECOVERING SPOILS',
+      'loading',
+      'Securing spoils from EVM prediction arena vault...'
+    );
+    
+    try {
+      let provider: any = null;
+      if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+        provider = await wallet.privyWallet.getEthereumProvider();
+      } else if (typeof (window as any).ethereum !== 'undefined') {
+        provider = (window as any).ethereum;
+      }
+
+      if (!provider) {
+        throw new Error("No EVM provider found on wallet or browser window.");
+      }
+
+      await ensureAvalancheFujiChain(provider);
+
+      const evmWalletClient = createWalletClient({
+        account: wallet.address as `0x${string}`,
+        chain: avalancheFuji,
+        transport: custom(provider)
+      });
+      
+      const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
+      
+      try {
+        await fetch(`${INDEXER_URL}/api/rooms/${roomId}/settle`, { method: 'POST' });
+      } catch (e) {
+        console.warn("Settlement trigger failed, proceeding with direct claim:", e);
+      }
+      
+      const userBet = get().user?.bets.find((b) => b.roomId === roomId && !b.claimed);
+      const sideVal = userBet?.side === 'moon' ? 0 : 1;
+      
+      const { request } = await publicClient.simulateContract({
+        address: contractAddress,
+        abi: SHITMARKET_CORE_ABI,
+        functionName: 'claimWinnings',
+        args: [roomId as `0x${string}`, sideVal],
+        account: wallet.address as `0x${string}`
+      });
+      
+      const txHash = await evmWalletClient.writeContract(request);
+      console.log("EVM Claim submitted! Tx:", txHash);
+      
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'SPOILS SECURED',
+        description: `Spoils recovered to your EVM wallet.`,
+        txSig: txHash
+      });
+      
+      return txHash;
+    } catch (err: any) {
+      console.error("Failed to claim EVM winnings:", err);
+      setTransactionError(err.message || String(err));
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'CLAIM MISSION FLUNKED',
+        description: err.message
+      });
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  mintTestnetUsdc: async (amount: number = 1000) => {
+    const { wallet, setTransactionLoading, setTransactionError } = get();
+    if (!wallet || !wallet.address) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet command helmet first!");
+      return;
+    }
+    setTransactionLoading(true);
+    setTransactionError(null);
+    const toastId = get().addToast(
+      'AIRDROPPING AMMO & SPONSORING GAS',
+      'loading',
+      `Sponsoring AVAX gas & minting ${amount} Testnet USDC to ${wallet.address.substring(0, 6)}...`
+    );
+    try {
+      const res = await fetch('/api/faucet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: wallet.address,
+          amount,
+          fundGas: true
+        })
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to process gas sponsorship & USDC minting');
+      }
+
+      const txHash = data.txHashes?.[data.txHashes.length - 1] || '';
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'AMMO & GAS SECURED',
+        description: `Successfully sponsored AVAX gas & minted ${amount} Testnet USDC!`,
+        txSig: txHash
+      });
+
+      await get().fetchBalance();
+      return txHash;
+    } catch (err: any) {
+      console.error("Failed to mint testnet USDC:", err);
+      setTransactionError(err.message || String(err));
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'FAUCET MINT FLUNKED',
+        description: err.message || String(err)
+      });
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
   claimWinnings: async (roomId: string) => {
+    if (get().isEvm) {
+      return await get().claimEvmWinnings(roomId);
+    }
+
     const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
     if (!wallet || !wallet.publicKey) {
       get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
@@ -2170,12 +2968,27 @@ export const useAppState = create<AppState>()(
     if (address) {
       // First get their current SOL balance directly from RPC
       let balance = 0;
-      try {
-        const pubkey = new PublicKey(address);
-        const lamports = await connection.getBalance(pubkey);
-        balance = lamports / 1e9;
-      } catch (err) {
-        console.error('Failed to get balance on wallet connection:', err);
+      if (address.startsWith('0x')) {
+        try {
+          const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
+          const raw = await publicClient.readContract({
+            address: usdcAddress,
+            abi: [{ name: 'balanceOf', type: 'function', stateMutability: 'view', inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] }] as const,
+            functionName: 'balanceOf',
+            args: [address as `0x${string}`]
+          });
+          balance = Number(raw) / 1e6;
+        } catch (e) {
+          console.error('Failed to get EVM USDC balance on wallet connection:', e);
+        }
+      } else {
+        try {
+          const pubkey = new PublicKey(address);
+          const lamports = await connection.getBalance(pubkey);
+          balance = lamports / 1e9;
+        } catch (err) {
+          console.error('Failed to get SOL balance on wallet connection:', err);
+        }
       }
       
       // Query the user's profile and bet history from the indexer API
@@ -2585,6 +3398,173 @@ export const useAppState = create<AppState>()(
 
   parlayBet: (legs: any[], amount: number) => {
     console.log("Parlay bet processed:", legs, amount);
+  },
+
+  disputeRoom: async (roomId: string) => {
+    const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
+    if (!wallet || !wallet.publicKey) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
+      return;
+    }
+    
+    setTransactionLoading(true);
+    setTransactionError(null);
+    
+    const toastId = get().addToast(
+      'INITIATING DISPUTE',
+      'loading',
+      'Locking 0.1 SOL dispute bond to challenge results...'
+    );
+
+    try {
+      const program = getAnchorProgram(wallet);
+      const roomPda = new PublicKey(roomId);
+      const escrowPda = getEscrowPda(roomPda);
+      const configPda = getPlatformConfigPda();
+      
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
+
+      const txObj = await (program.methods as any)
+        .disputeRoom()
+        .accounts({
+          room: roomPda,
+          escrow: escrowPda,
+          config: configPda,
+          challenger: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
+        ])
+        .transaction();
+
+      if (!sendTransaction) {
+        throw new Error("No transaction sender registered. Connect your wallet command helmet first.");
+      }
+      const tx = await sendTransaction(txObj);
+      
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'DISPUTE DECLARED',
+        description: 'Dispute bond secured. Room status set to DISPUTED.',
+        txSig: tx
+      });
+
+      // Force refreshing the rooms list in the background
+      get().fetchRooms();
+
+      return tx;
+    } catch (err: any) {
+      console.error("Failed to dispute room:", err);
+      setTransactionError(err.message || String(err));
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'DISPUTE LOCK FAILED',
+        description: cleanErr
+      });
+      
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  resolveDispute: async (roomId: string, winner: 'moon' | 'jeet' | 'draw' | null, overturned: boolean) => {
+    const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
+    if (!wallet || !wallet.publicKey) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
+      return;
+    }
+    
+    setTransactionLoading(true);
+    setTransactionError(null);
+    
+    const toastId = get().addToast(
+      'RESOLVING DISPUTE',
+      'loading',
+      'Publishing final arbitration verdict...'
+    );
+
+    try {
+      const program = getAnchorProgram(wallet);
+      const roomPda = new PublicKey(roomId);
+      const escrowPda = getEscrowPda(roomPda);
+      const configPda = getPlatformConfigPda();
+      
+      // Fetch room state to extract challenger
+      const roomOnChain: any = await (program.account as any).room.fetch(roomPda);
+      let challengerAddress = roomOnChain.creator; // default/fallback
+      
+      // Fetch room details from indexer DB to get the correct disputeChallenger address
+      try {
+        const res = await fetch(`${INDEXER_URL}/api/rooms/${roomId}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data && json.data.disputeChallenger) {
+            challengerAddress = new PublicKey(json.data.disputeChallenger);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch challenger from indexer, defaulting...", err);
+      }
+
+      const winnerArg = winner === null || winner === 'draw' 
+        ? null 
+        : (winner === 'moon' ? { moon: {} } : { jeet: {} });
+
+      const priorityFeeValue = getPriorityFeePrice(get().settings);
+
+      const txObj = await (program.methods as any)
+        .resolveDispute(winnerArg, overturned)
+        .accounts({
+          room: roomPda,
+          escrow: escrowPda,
+          challenger: challengerAddress,
+          vault: getVaultPda(),
+          config: configPda,
+          admin: wallet.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .preInstructions([
+          ComputeBudgetProgram.setComputeUnitLimit({ units: 250_000 }),
+          ComputeBudgetProgram.setComputeUnitPrice({ microLamports: priorityFeeValue })
+        ])
+        .transaction();
+
+      if (!sendTransaction) {
+        throw new Error("No transaction sender registered. Connect your wallet command helmet first.");
+      }
+      const tx = await sendTransaction(txObj);
+      
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'DISPUTE RESOLVED',
+        description: `Room settled with winner: ${winner ? winner.toUpperCase() : 'DRAW'}.`,
+        txSig: tx
+      });
+
+      // Force refreshing the rooms list in the background
+      get().fetchRooms();
+
+      return tx;
+    } catch (err: any) {
+      console.error("Failed to resolve dispute:", err);
+      setTransactionError(err.message || String(err));
+      
+      const cleanErr = extractErrorMessage(err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'RESOLUTION FLUNKED',
+        description: cleanErr
+      });
+      
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
   }
 }),
 {

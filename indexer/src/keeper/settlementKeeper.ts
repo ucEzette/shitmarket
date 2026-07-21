@@ -577,6 +577,10 @@ export function startSettlementKeeper(
         where: {
           status: 'active',
           expiry: { lte: new Date() },
+          OR: [
+            { oracleAddress: null },
+            { oracleAddress: keeper.publicKey.toBase58() }
+          ]
         },
         select: {
           roomPubkey: true,

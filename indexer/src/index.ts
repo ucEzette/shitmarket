@@ -27,10 +27,13 @@ import { startWsServer } from './websocket/wsServer';
 import { startEventListener, stopEventListener } from './listener/eventListener';
 import { runBackfiller } from './listener/backfiller';
 import { startSettlementKeeper } from './keeper/settlementKeeper';
+import { startAiOracleKeeper } from './keeper/aiOracleKeeper';
 import { runTwapCron } from './keeper/twapCron';
 import { RpcCircuitBreaker } from './solana/rpcCircuitBreaker';
 import cron from 'node-cron';
 import { runPruner } from './utils/dbPruner';
+import { startEvmListener } from './listener/evmEventListener';
+import { startEvmKeeper } from './keeper/evmSettlementKeeper';
 
 function computeInstructionDiscriminator(name: string): number[] {
   // Convert camelCase to snake_case (e.g., createRoom -> create_room)
@@ -255,46 +258,69 @@ async function main(): Promise<void> {
   logger.info({ msg: 'Solana RPC connected', slot, rpc: config.solana.rpcUrl });
   circuitBreaker.reportSuccess();
 
-  // 4. Anchor program + event parser
-  const { program, eventParser } = buildAnchorProgram(circuitBreaker);
+  const coreChain = process.env.CORE_CHAIN || 'solana';
 
-  // 5. REST API
-  const app = createApiServer(circuitBreaker);
-  startApiServer(app);
+  if (coreChain === 'avalanche') {
+    logger.info('Starting services in AVALANCHE (EVM) Core Chain mode...');
+    
+    // 5. REST API
+    const app = createApiServer(circuitBreaker);
+    startApiServer(app);
 
-  // 6. WebSocket server
-  startWsServer();
+    // 6. WebSocket server
+    startWsServer();
 
-  // 7. Event listener
-  startEventListener(connection, eventParser);
+    // 7. EVM Event listener
+    await startEvmListener();
 
-  // 8. Settlement keeper
-  startSettlementKeeper(connection, program);
+    // 8. EVM Settlement keeper
+    startEvmKeeper();
+    
+    logger.info('EVM Indexer & Keeper running successfully.');
+  } else {
+    logger.info('Starting services in SOLANA Core Chain mode...');
+    
+    // 4. Anchor program + event parser
+    const { program, eventParser } = buildAnchorProgram(circuitBreaker);
 
+    // 5. REST API
+    const app = createApiServer(circuitBreaker);
+    startApiServer(app);
 
-  // Detect devnet/local for more conservative RPC polling intervals
-  const isDevnet =
-    config.solana.rpcUrl.includes('devnet') ||
-    config.solana.rpcUrl.includes('localhost') ||
-    config.solana.rpcUrl.includes('127.0.0.1');
+    // 6. WebSocket server
+    startWsServer();
 
-  // 9. TWAP Cron (slower on devnet to avoid 429s)
-  const twapIntervalMs = isDevnet ? 120_000 : 60_000;
-  setInterval(() => {
-    runTwapCron().catch(err => logger.error({ msg: 'twapCron failed', error: err }));
-  }, twapIntervalMs);
+    // 7. Solana Event listener
+    startEventListener(connection, eventParser);
 
-  // 10. Self-Healing Backfiller failsafe (startup run + periodic interval)
-  const backfillIntervalMs = isDevnet ? 180_000 : 60_000;
-  runBackfiller(connection, program, eventParser).catch(err =>
-    logger.error({ msg: 'Startup self-healing backfiller failed', error: err })
-  );
-  setInterval(() => {
+    // 8. Solana Settlement keeper
+    startSettlementKeeper(connection, program);
+    startAiOracleKeeper(connection, program);
+
+    // Detect devnet/local for more conservative RPC polling intervals
+    const isDevnet =
+      config.solana.rpcUrl.includes('devnet') ||
+      config.solana.rpcUrl.includes('localhost') ||
+      config.solana.rpcUrl.includes('127.0.0.1');
+
+    // 9. TWAP Cron (slower on devnet to avoid 429s)
+    const twapIntervalMs = isDevnet ? 120_000 : 60_000;
+    setInterval(() => {
+      runTwapCron().catch(err => logger.error({ msg: 'twapCron failed', error: err }));
+    }, twapIntervalMs);
+
+    // 10. Self-Healing Backfiller failsafe (startup run + periodic interval)
+    const backfillIntervalMs = isDevnet ? 180_000 : 60_000;
     runBackfiller(connection, program, eventParser).catch(err =>
-      logger.error({ msg: 'Interval self-healing backfiller failed', error: err })
+      logger.error({ msg: 'Startup self-healing backfiller failed', error: err })
     );
-  }, backfillIntervalMs);
-  logger.info({ msg: 'Scheduled intervals', twapIntervalMs, backfillIntervalMs, isDevnet });
+    setInterval(() => {
+      runBackfiller(connection, program, eventParser).catch(err =>
+        logger.error({ msg: 'Interval self-healing backfiller failed', error: err })
+      );
+    }, backfillIntervalMs);
+    logger.info({ msg: 'Scheduled Solana intervals', twapIntervalMs, backfillIntervalMs, isDevnet });
+  }
 
   // 11. Scheduled DB space pruner and chat radar backup (every night at midnight)
   cron.schedule('0 0 * * *', () => {

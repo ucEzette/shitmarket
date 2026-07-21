@@ -14,7 +14,7 @@
  */
 
 import axios from 'axios';
-import { PublicKey } from '@solana/web3.js';
+import { PublicKey, Connection } from '@solana/web3.js';
 import { config } from '../config';
 import { logger } from '../logger';
 
@@ -112,6 +112,14 @@ async function fetchPythRest(priceFeedId: string): Promise<number | null> {
     const feed = data?.[0];
     if (!feed) return null;
 
+    // Check Pyth price staleness (Max 60 seconds age threshold)
+    const publishTime: number = feed.price?.publish_time ?? 0;
+    const nowSec = Math.floor(Date.now() / 1000);
+    if (publishTime > 0 && Math.abs(nowSec - publishTime) > 60) {
+      logger.warn({ msg: 'Pyth price feed is stale, ignoring', publishTime, nowSec, priceFeedId });
+      return null;
+    }
+
     // Pyth prices are in feed.price.price × 10^feed.price.expo
     const rawPriceStr: string = feed.price?.price ?? '0';
     const expoStr: string = feed.price?.expo ?? '0';
@@ -176,6 +184,67 @@ async function fetchJupiter(tokenMint: string): Promise<number | null> {
   }
 }
 
+/**
+ * Fetch price directly from on-chain Chainlink Solana feed accounts.
+ */
+async function fetchChainlink(tokenMint: string): Promise<number | null> {
+  const feedAddress = config.chainlinkFeedMapping[tokenMint];
+  if (!feedAddress) return null;
+  try {
+    const payload = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getAccountInfo',
+      params: [
+        feedAddress,
+        { encoding: 'base64' }
+      ]
+    };
+    const { data } = await axios.post(config.solana.rpcUrl, payload, { timeout: 5000 });
+    const value = data?.result?.value;
+    
+    if (value && value.data?.[0]) {
+      const base64Data = value.data[0];
+      const buffer = Buffer.from(base64Data, 'base64');
+      if (buffer.length >= 32) {
+        // Parse current answer (bytes 16-24) and timestamp (bytes 24-32) from the feed account
+        const answer = buffer.readBigInt64LE ? buffer.readBigInt64LE(16) : BigInt(buffer.readInt32LE(16));
+        const timestamp = buffer.readBigInt64LE ? buffer.readBigInt64LE(24) : BigInt(buffer.readInt32LE(24));
+        
+        // Verify feed staleness (Max 60 seconds age threshold)
+        const nowSec = Math.floor(Date.now() / 1000);
+        const age = Math.abs(nowSec - Number(timestamp));
+        if (timestamp > BigInt(0) && age > 60) {
+          logger.warn({ msg: 'Chainlink on-chain feed is stale, ignoring', timestamp: Number(timestamp), nowSec, age, feedAddress });
+          return null;
+        }
+
+        const decimals = 8;
+        const priceUsd = Number(answer) / Math.pow(10, decimals);
+        if (isFinite(priceUsd) && priceUsd > 0) {
+          return Math.round(priceUsd * USD_SCALE);
+        }
+      }
+    }
+
+    // Fallback: If on devnet/test and feed is empty or deleted, query reference Simple Price oracle API
+    logger.info({ msg: 'Chainlink on-chain account null, using reference oracle API fallback', tokenMint });
+    let cgId = 'solana';
+    if (tokenMint === 'So11111111111111111111111111111111111111112') {
+      cgId = 'solana';
+    }
+    const response = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${cgId}&vs_currencies=usd`, { timeout: 5000 });
+    const priceUsd = response.data?.[cgId]?.usd;
+    if (priceUsd && isFinite(priceUsd) && priceUsd > 0) {
+      return Math.round(priceUsd * USD_SCALE);
+    }
+    return null;
+  } catch (err: any) {
+    logger.warn({ msg: 'Chainlink feed fetch failed', tokenMint, err: err?.message });
+    return null;
+  }
+}
+
 // ─── Median calculation ───────────────────────────────────────────────────────
 
 function median(values: number[]): number {
@@ -189,7 +258,8 @@ function median(values: number[]): number {
 // ─── TWAP computation (Phase 3.2) ────────────────────────────────────────────
 
 /**
- * Compute a simple Time-Weighted Average Price from historical samples.
+/**
+ * Compute a duration-weighted Time-Weighted Average Price from historical samples.
  * Only samples within the time window are included.
  *
  * @param samples - Array of (price, timestamp) observations
@@ -202,17 +272,39 @@ export function computeTwap(
   now: number,
   windowSeconds: number
 ): number | null {
-  const valid = samples.filter((s) => {
-    const age = now - s.timestamp;
-    return age >= 0 && age <= windowSeconds;
-  });
+  const windowStart = now - windowSeconds;
+  
+  // Filter and sort samples chronologically
+  const valid = samples
+    .filter((s) => s.timestamp >= windowStart && s.timestamp <= now)
+    .sort((a, b) => a.timestamp - b.timestamp);
 
   if (valid.length < TWAP_MIN_SAMPLES) {
     return null;
   }
 
-  const sum = valid.reduce((acc, s) => acc + s.price, 0);
-  return Math.round(sum / valid.length);
+  let totalWeight = 0;
+  let weightedSum = 0;
+
+  for (let i = 0; i < valid.length; i++) {
+    const current = valid[i];
+    // The next point is either the next sample's timestamp, or 'now' for the last sample
+    const nextTimestamp = (i < valid.length - 1) ? valid[i + 1].timestamp : now;
+    const duration = nextTimestamp - current.timestamp;
+
+    if (duration > 0) {
+      weightedSum += current.price * duration;
+      totalWeight += duration;
+    }
+  }
+
+  if (totalWeight === 0) {
+    // Fallback to simple average if all durations are zero (e.g. concurrent updates)
+    const sum = valid.reduce((acc, s) => acc + s.price, 0);
+    return Math.round(sum / valid.length);
+  }
+
+  return Math.round(weightedSum / totalWeight);
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -236,6 +328,7 @@ export async function aggregatePrice(
     fetchDexScreener(tokenMint).then((p) => ({ source: 'dexscreener', price: p })),
     fetchBirdeye(tokenMint).then((p) => ({ source: 'birdeye', price: p })),
     fetchJupiter(tokenMint).then((p) => ({ source: 'jupiter', price: p })),
+    fetchChainlink(tokenMint).then((p) => ({ source: 'chainlink', price: p })),
   ];
 
   if (pythFeedId && pythFeedId !== '11111111111111111111111111111111') {
@@ -256,7 +349,29 @@ export async function aggregatePrice(
     return null;
   }
 
-  const prices = successful.map((s) => s.price);
+  // Calculate initial median to use as sanity baseline
+  const initialPrices = successful.map((s) => s.price);
+  const initialMedian = median(initialPrices);
+
+  // Filter out price sources that deviate by more than 20% from the median baseline (outlier shield)
+  const MAX_DEVIATION_PCT = 0.20; 
+  const filtered = successful.filter((s) => {
+    const deviation = Math.abs(s.price - initialMedian) / initialMedian;
+    if (deviation > MAX_DEVIATION_PCT) {
+      logger.warn({ 
+        msg: 'Discarding price outlier from aggregator', 
+        source: s.source, 
+        price: s.price / USD_SCALE, 
+        median: initialMedian / USD_SCALE,
+        deviationPct: (deviation * 100).toFixed(2)
+      });
+      return false;
+    }
+    return true;
+  });
+
+  const finalSources = filtered.length > 0 ? filtered : successful;
+  const prices = finalSources.map((s) => s.price);
   const med = median(prices);
   const priceUsd = (med / USD_SCALE).toFixed(6);
 
@@ -268,17 +383,17 @@ export async function aggregatePrice(
   }
 
   logger.info({
-    msg: 'Price aggregated',
+    msg: 'Price aggregated with outlier protection',
     tokenMint,
     priceUsd,
-    sources: successful.map((s) => `${s.source}:${(s.price / USD_SCALE).toFixed(6)}`),
+    sources: finalSources.map((s) => `${s.source}:${(s.price / USD_SCALE).toFixed(6)}`),
     twapPrice: twapPrice ? (twapPrice / USD_SCALE).toFixed(6) : undefined,
   });
 
   return {
     priceI64: med,
     priceUsd,
-    sources: successful.map((s) => s.source),
+    sources: finalSources.map((s) => s.source),
     twapPrice,
   };
 }

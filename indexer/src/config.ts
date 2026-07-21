@@ -12,6 +12,7 @@ function optional(key: string, fallback: string): string {
 }
 
 export const config = {
+  coreChain: optional('CORE_CHAIN', 'solana'),
   solana: {
     rpcUrl: optional('SOLANA_RPC_URL', 'https://api.devnet.solana.com'),
     secondaryRpcUrl: optional('SOLANA_SECONDARY_RPC_URL', ''),
@@ -19,6 +20,12 @@ export const config = {
     programId: required('PROGRAM_ID'),
     keeperPrivateKey: required('KEEPER_PRIVATE_KEY'),
     relayerPrivateKey: optional('RELAYER_PRIVATE_KEY', optional('KEEPER_PRIVATE_KEY', '')),
+    aiOraclePrivateKey: optional('AI_ORACLE_PRIVATE_KEY', optional('KEEPER_PRIVATE_KEY', '')),
+  },
+  evm: {
+    rpcUrl: optional('AVALANCHE_RPC_URL', 'https://api.avax-test.network/ext/bc/C/rpc'),
+    contractAddress: optional('CORE_CONTRACT_ADDRESS', '0x0000000000000000000000000000000000000000'),
+    keeperPrivateKey: optional('EVM_KEEPER_PRIVATE_KEY', ''),
   },
   db: {
     url: required('DATABASE_URL'),
@@ -39,6 +46,7 @@ export const config = {
   },
   pythFeedMapping: JSON.parse(optional('PYTH_FEED_MAPPING', '{}')),
   switchboardFeedMapping: JSON.parse(optional('SWITCHBOARD_FEED_MAPPING', '{}')),
+  chainlinkFeedMapping: JSON.parse(optional('CHAINLINK_FEED_MAPPING', '{}')),
   log: {
     level: optional('LOG_LEVEL', 'info'),
   },

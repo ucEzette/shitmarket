@@ -21,23 +21,26 @@ const TOKEN_NAME_LEN: usize = 32;
 const MINIMUM_LIQUIDITY_SOL: u64 = 100_000_000; // 0.1 SOL minimum pool requirement
 const MAX_TWAP_SAMPLES: usize = 5; // number of price samples to store for TWAP
 const SECONDARY_FEE_BPS: u16 = 50; // 0.5% fee for secondary market trades
+const CHALLENGE_WINDOW_SECONDS: i64 = 1800; // 30 minutes challenge period
+
 
 
 // ─────────────────────────────────────────────
 //  ENUMS
 // ─────────────────────────────────────────────
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Side {
     Moon,
     Jeet,
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum RoomStatus {
     Active,
     Settled,
     Pending,
+    Disputed,
 }
 
 // Reputation enum scrapped
@@ -112,11 +115,18 @@ pub struct Room {
     /// The final TWAP-smoothed price used for settlement.
     pub twap_final_price: i64,
     pub bump: u8,
+
+    // NEW FIELDS FOR PERMISSIONLESS DISAGREEMENT LAYER
+    pub oracle: Pubkey,
+    pub oracle_fee_lamports: u64,
+    pub settlement_timestamp: i64,
+    pub dispute_status: u8, // 0 = None, 1 = Overturned
+    pub resolution_criteria: [u8; 64],
 }
 
 impl Room {
-    // 8 + 32 + 32 + 32 + 32 + 32(pyth) + 32(switchboard) + 8 + 8 + 4 + 8 + 8 + 8 + 2 + 8 + 32 + 1(twap_ct) + 40(twap_samples: 5*8) + 40(twap_timestamps: 5*8) + 8(twap_final) + 8(entry_liq) + 8(entry_mcap) + 1 = 393
-    pub const LEN: usize = 8 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + 4 + 8 + 8 + 8 + 2 + 8 + 32 + 1 + 40 + 40 + 8 + 8 + 8 + 1;
+    // 393 base + 32 (oracle) + 8 (fee) + 8 (settle_ts) + 1 (status) + 64 (criteria) = 506
+    pub const LEN: usize = 8 + 32 + 32 + 32 + 32 + 32 + 8 + 8 + 4 + 8 + 8 + 8 + 2 + 8 + 32 + 1 + 40 + 40 + 8 + 8 + 8 + 1 + 32 + 8 + 8 + 1 + 64;
 
     pub fn total_pool(&self) -> Result<u64> {
         self.moon_pool
@@ -247,7 +257,25 @@ pub struct RoomCreated {
     pub opening_price: i64,
     pub duration_minutes: u32,
     pub expiry_timestamp: i64,
+    pub oracle: Pubkey,
+    pub oracle_fee_lamports: u64,
+    pub resolution_criteria: [u8; 64],
 }
+
+#[event]
+pub struct RoomDisputed {
+    pub room: Pubkey,
+    pub challenger: Pubkey,
+    pub dispute_bond: u64,
+}
+
+#[event]
+pub struct DisputeResolved {
+    pub room: Pubkey,
+    pub winner: u8, // 0 = Moon, 1 = Jeet, 2 = Draw
+    pub refund_challenger: bool,
+}
+
 
 
 
@@ -492,7 +520,7 @@ pub struct SettleRoom<'info> {
 
     #[account(
         mut,
-        constraint = keeper.key() == config.keeper @ ShitMarketError::UnauthorizedKeeper
+        constraint = keeper.key() == room.oracle @ ShitMarketError::UnauthorizedOracle
     )]
     pub keeper: Signer<'info>,
 
@@ -897,6 +925,9 @@ pub mod shitmarket {
         duration_minutes: u32,
         switchboard_feed: Option<Pubkey>,
         opening_price_param: Option<i64>,
+        oracle: Option<Pubkey>,
+        oracle_fee_lamports: Option<u64>,
+        resolution_criteria: Option<[u8; 64]>,
         _nonce: u8,
     ) -> Result<()> {
         // Circuit breaker: platform must not be paused
@@ -949,6 +980,13 @@ pub mod shitmarket {
         room.twap_final_price = 0;
         room.bump = ctx.bumps.room;
 
+        // Custom oracle fields
+        room.oracle = oracle.unwrap_or(ctx.accounts.config.keeper);
+        room.oracle_fee_lamports = oracle_fee_lamports.unwrap_or(0);
+        room.settlement_timestamp = 0;
+        room.dispute_status = 0;
+        room.resolution_criteria = resolution_criteria.unwrap_or([0u8; 64]);
+
         room.status = RoomStatus::Active;
         room.expiry_timestamp = expiry;
 
@@ -961,6 +999,9 @@ pub mod shitmarket {
             opening_price: room.opening_price,
             duration_minutes,
             expiry_timestamp: room.expiry_timestamp,
+            oracle: room.oracle,
+            oracle_fee_lamports: room.oracle_fee_lamports,
+            resolution_criteria: room.resolution_criteria,
         });
 
         msg!("Room created: {} ({})", room.token_name_str(), room.token_mint);
@@ -1164,7 +1205,6 @@ pub mod shitmarket {
         let twap_window = ctx.accounts.config.twap_window_seconds;
         let twap_final = room.compute_twap_final(now, twap_window);
         room.twap_final_price = twap_final;
-
         // Calculate and transfer platform fee to treasury
         let fee_bps = ctx.accounts.config.platform_fee_bps;
         let platform_fee = calc_platform_fee(total_pool, fee_bps)?;
@@ -1183,7 +1223,24 @@ pub mod shitmarket {
                 .ok_or(ShitMarketError::Overflow)?;
         }
 
+        // Transfer oracle fee to the resolver
+        let oracle_fee = room.oracle_fee_lamports;
+        if oracle_fee > 0 && total_pool > 0 {
+            let escrow_info = ctx.accounts.escrow.to_account_info();
+            let keeper_info = ctx.accounts.keeper.to_account_info();
+
+            **escrow_info.lamports.borrow_mut() = escrow_info
+                .lamports()
+                .checked_sub(oracle_fee)
+                .ok_or(ShitMarketError::Underflow)?;
+            **keeper_info.lamports.borrow_mut() = keeper_info
+                .lamports()
+                .checked_add(oracle_fee)
+                .ok_or(ShitMarketError::Overflow)?;
+        }
+
         // Mark room settled
+        room.settlement_timestamp = now;
         room.status = RoomStatus::Settled;
         room.winner = winner;
         room.final_price = final_price;
@@ -1283,7 +1340,10 @@ pub mod shitmarket {
         } else {
             calc_platform_fee(total_pool, config.platform_fee_bps)?
         };
-        let total_payout_pool = total_pool.checked_sub(platform_fee).ok_or(ShitMarketError::Underflow)?;
+        let oracle_fee = if is_one_sided { 0 } else { room.oracle_fee_lamports };
+        let total_payout_pool = total_pool
+            .checked_sub(platform_fee).ok_or(ShitMarketError::Underflow)?
+            .checked_sub(oracle_fee).ok_or(ShitMarketError::Underflow)?;
 
         let payout = if let Some(winner) = room.winner {
             require!(bet.side == winner, ShitMarketError::NotAWinner);
@@ -1776,6 +1836,105 @@ pub mod shitmarket {
         
         Ok(())
     }
+
+    /// Dispute / challenge a settled prediction room within the challenge window
+    pub fn dispute_room(ctx: Context<DisputeRoom>) -> Result<()> {
+        let room = &mut ctx.accounts.room;
+        let now = Clock::get()?.unix_timestamp;
+
+        require!(room.status == RoomStatus::Settled, ShitMarketError::RoomNotSettled);
+        require!(
+            now <= room.settlement_timestamp + CHALLENGE_WINDOW_SECONDS,
+            ShitMarketError::ChallengePeriodExpired
+        );
+
+        // Lock dispute bond (0.1 SOL) from challenger -> escrow
+        let bond_amount = 100_000_000u64; // 0.1 SOL
+        let cpi_ctx = CpiContext::new(
+            ctx.accounts.system_program.to_account_info(),
+            system_program::Transfer {
+                from: ctx.accounts.challenger.to_account_info(),
+                to: ctx.accounts.escrow.to_account_info(),
+            },
+        );
+        system_program::transfer(cpi_ctx, bond_amount)?;
+
+        // Set status to Disputed
+        room.status = RoomStatus::Disputed;
+
+        emit!(RoomDisputed {
+            room: room.key(),
+            challenger: ctx.accounts.challenger.key(),
+            dispute_bond: bond_amount,
+        });
+
+        msg!("Room disputed: {} by challenger {}", room.key(), ctx.accounts.challenger.key());
+        Ok(())
+    }
+
+    /// Resolve an active dispute. Overturn or confirm verdict, slash or refund bond.
+    pub fn resolve_dispute(
+        ctx: Context<ResolveDispute>,
+        winner: Option<Side>,
+        overturned: bool,
+    ) -> Result<()> {
+        let room = &mut ctx.accounts.room;
+        let bond_amount = 100_000_000u64; // 0.1 SOL
+
+        if overturned {
+            // Overturned! Refund the challenger their bond from the escrow
+            let escrow_info = ctx.accounts.escrow.to_account_info();
+            let challenger_info = ctx.accounts.challenger.to_account_info();
+
+            **escrow_info.lamports.borrow_mut() = escrow_info
+                .lamports()
+                .checked_sub(bond_amount)
+                .ok_or(ShitMarketError::Underflow)?;
+            **challenger_info.lamports.borrow_mut() = challenger_info
+                .lamports()
+                .checked_add(bond_amount)
+                .ok_or(ShitMarketError::Overflow)?;
+
+            room.dispute_status = 1; // Overturned
+        } else {
+            // Dispute dismissed. Slash bond: transfer from escrow -> vault
+            let escrow_info = ctx.accounts.escrow.to_account_info();
+            let vault_info = ctx.accounts.vault.to_account_info();
+
+            **escrow_info.lamports.borrow_mut() = escrow_info
+                .lamports()
+                .checked_sub(bond_amount)
+                .ok_or(ShitMarketError::Underflow)?;
+            **vault_info.lamports.borrow_mut() = vault_info
+                .lamports()
+                .checked_add(bond_amount)
+                .ok_or(ShitMarketError::Overflow)?;
+
+            room.dispute_status = 0; // Dismissed/None
+        }
+
+        // Set the final winner and restore settled status
+        room.winner = winner;
+        room.status = RoomStatus::Settled;
+
+        emit!(DisputeResolved {
+            room: room.key(),
+            winner: if let Some(w) = winner {
+                if w == Side::Moon { 0 } else { 1 }
+            } else {
+                2 // Draw
+            },
+            refund_challenger: overturned,
+        });
+
+        msg!(
+            "Dispute resolved for room {}: winner={:?}, overturned={}",
+            room.key(),
+            winner,
+            overturned
+        );
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -1801,4 +1960,74 @@ pub struct MigrateBet<'info> {
 
     pub system_program: Program<'info, System>,
 }
+
+#[derive(Accounts)]
+pub struct DisputeRoom<'info> {
+    #[account(
+        mut,
+        constraint = room.status == RoomStatus::Settled @ ShitMarketError::RoomNotSettled
+    )]
+    pub room: Account<'info, Room>,
+
+    /// CHECK: Escrow PDA; validated by seeds.
+    #[account(
+        mut,
+        seeds = [b"escrow", room.key().as_ref()],
+        bump
+    )]
+    pub escrow: UncheckedAccount<'info>,
+
+    #[account(
+        seeds = [b"platform_config"],
+        bump = config.bump
+    )]
+    pub config: Account<'info, PlatformConfig>,
+
+    #[account(mut)]
+    pub challenger: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ResolveDispute<'info> {
+    #[account(
+        mut,
+        constraint = room.status == RoomStatus::Disputed @ ShitMarketError::DisputeNotActive
+    )]
+    pub room: Account<'info, Room>,
+
+    /// CHECK: Escrow PDA; validated by seeds.
+    #[account(
+        mut,
+        seeds = [b"escrow", room.key().as_ref()],
+        bump
+    )]
+    pub escrow: UncheckedAccount<'info>,
+
+    /// CHECK: Challenger to receive refund if dispute is successful.
+    #[account(mut)]
+    pub challenger: AccountInfo<'info>,
+
+    /// CHECK: Vault PDA to collect slashed dispute bonds.
+    #[account(
+        mut,
+        seeds = [b"vault"],
+        bump
+    )]
+    pub vault: UncheckedAccount<'info>,
+
+    #[account(
+        seeds = [b"platform_config"],
+        bump = config.bump,
+        constraint = admin.key() == config.admin @ ShitMarketError::UnauthorizedDisputeResolver
+    )]
+    pub config: Account<'info, PlatformConfig>,
+
+    #[account(mut)]
+    pub admin: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
 

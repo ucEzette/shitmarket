@@ -83,4 +83,15 @@ pub enum ShitMarketError {
     NoRewardsToClaim,
     #[msg("Invalid PDA derivation or seeds mismatch")]
     InvalidPDA,
+    #[msg("Room is currently disputed and locked")]
+    RoomDisputed,
+    #[msg("The challenge period has expired")]
+    ChallengePeriodExpired,
+    #[msg("No active dispute found on this room")]
+    DisputeNotActive,
+    #[msg("Only the admin can resolve disputes")]
+    UnauthorizedDisputeResolver,
+    #[msg("Oracle signer does not match room oracle")]
+    UnauthorizedOracle,
 }
+

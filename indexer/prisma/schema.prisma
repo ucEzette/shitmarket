@@ -14,10 +14,10 @@ datasource db {
 
 model Room {
   id              String   @id @default(uuid()) @db.Uuid
-  roomPubkey      String   @unique @map("room_pubkey") @db.VarChar(44)
-  tokenMint       String   @map("token_mint") @db.VarChar(44)
-  priceFeed       String?  @map("price_feed") @db.VarChar(44)
-  switchboardFeed String?  @map("switchboard_feed") @db.VarChar(44)
+  roomPubkey      String   @unique @map("room_pubkey") @db.VarChar(66)
+  tokenMint       String   @map("token_mint") @db.VarChar(66)
+  priceFeed       String?  @map("price_feed") @db.VarChar(66)
+  switchboardFeed String?  @map("switchboard_feed") @db.VarChar(66)
   tokenName       String?  @map("token_name")
   tokenSymbol     String?  @map("token_symbol")
   tokenImageUrl   String?  @map("token_image_url")
@@ -32,8 +32,19 @@ model Room {
   twapFinalPrice  BigInt?  @map("twap_final_price")
   totalPool       BigInt   @default(0) @map("total_pool")
   platformFee     BigInt   @default(0) @map("platform_fee")
-  creator         String?  @map("creator") @db.VarChar(44)
+  creator             String?  @map("creator") @db.VarChar(66)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  // New fields for Disagreement & Oracle layer
+  oracleAddress       String?   @map("oracle_address") @db.VarChar(66)
+  oracleFeeLamports   BigInt    @default(0) @map("oracle_fee_lamports")
+  settledAt           DateTime? @map("settled_at") @db.Timestamptz()
+  disputeStatus       Int       @default(0) @map("dispute_status") // 0 = None, 1 = Overturned
+  resolutionCriteria  String?   @map("resolution_criteria") @db.VarChar(100)
+  disputedAt          DateTime? @map("disputed_at") @db.Timestamptz()
+  disputeChallenger   String?   @map("dispute_challenger") @db.VarChar(66)
+  disputeBond         BigInt?   @map("dispute_bond")
+  oracleLogs          String?   @map("oracle_logs") @db.Text
 
   bets            Bet[]
   payouts         Payout[]
@@ -51,8 +62,8 @@ model Room {
 
 model Bet {
   id          String   @id @default(uuid()) @db.Uuid
-  roomPubkey  String   @map("room_pubkey") @db.VarChar(44)
-  userPubkey  String   @map("user_pubkey") @db.VarChar(44)
+  roomPubkey  String   @map("room_pubkey") @db.VarChar(66)
+  userPubkey  String   @map("user_pubkey") @db.VarChar(66)
   side        String   @db.VarChar(5)
   amount      BigInt
   claimed     Boolean  @default(false)
@@ -69,10 +80,10 @@ model Bet {
 // ─── User Profiles ────────────────────────────────────────────────────────────
 
 model UserProfile {
-  userPubkey   String   @id @map("user_pubkey") @db.VarChar(44)
+  userPubkey   String   @id @map("user_pubkey") @db.VarChar(66)
   username     String?  @unique @db.VarChar(30)
   avatarUrl    String?  @map("avatar_url")
-  referredBy   String?  @map("referred_by") @db.VarChar(44)
+  referredBy   String?  @map("referred_by") @db.VarChar(66)
   referralCode String?  @unique @map("referral_code") @db.VarChar(20)
   totalBets    Int      @default(0) @map("total_bets")
   wins         Int      @default(0)
@@ -105,7 +116,7 @@ model PriceSample {
 
 model Reputation {
   id          String   @id @default(uuid()) @db.Uuid
-  userPubkey  String   @unique @map("user_pubkey") @db.VarChar(44)
+  userPubkey  String   @unique @map("user_pubkey") @db.VarChar(66)
   tier        String   @default("D") @db.Char(1) // D, C, B, A, S
   totalBets   BigInt   @default(0) @map("total_bets")
   totalWins   BigInt   @default(0) @map("total_wins")
@@ -132,8 +143,8 @@ model ProcessedTx {
 
 model Payout {
   id          String   @id @default(uuid()) @db.Uuid
-  roomPubkey  String   @map("room_pubkey") @db.VarChar(44)
-  userPubkey  String   @map("user_pubkey") @db.VarChar(44)
+  roomPubkey  String   @map("room_pubkey") @db.VarChar(66)
+  userPubkey  String   @map("user_pubkey") @db.VarChar(66)
   amount      BigInt
   claimedAt   DateTime? @map("claimed_at") @db.Timestamptz()
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
@@ -150,9 +161,9 @@ model Payout {
 
 model ReferralPayout {
   id           String   @id @default(uuid()) @db.Uuid
-  referrer     String   @map("referrer_pubkey") @db.VarChar(44)
-  invitee      String   @map("invitee_pubkey") @db.VarChar(44)
-  roomPubkey   String   @map("room_pubkey") @db.VarChar(44)
+  referrer     String   @map("referrer_pubkey") @db.VarChar(66)
+  invitee      String   @map("invitee_pubkey") @db.VarChar(66)
+  roomPubkey   String   @map("room_pubkey") @db.VarChar(66)
   betAmount    BigInt   @map("bet_amount")
   rewardAmount BigInt   @map("reward_amount")
   txSig        String?  @map("tx_sig") @db.VarChar(88)
@@ -166,9 +177,9 @@ model ReferralPayout {
 
 model ChatMessage {
   id         String   @id @default(uuid()) @db.Uuid
-  roomPubkey String   @map("room_pubkey") @db.VarChar(44)
+  roomPubkey String   @map("room_pubkey") @db.VarChar(66)
   side       String   @db.VarChar(10) // 'moon', 'jeet', or 'all'
-  user       String   @db.VarChar(44)
+  user       String   @db.VarChar(66)
   message    String   @db.VarChar(500)
   timestamp  DateTime @default(now()) @map("timestamp") @db.Timestamptz()
 
@@ -182,7 +193,7 @@ model ChatMessage {
 
 model Activity {
   id         String   @id @default(uuid()) @db.Uuid
-  userPubkey String   @map("user_pubkey") @db.VarChar(44)
+  userPubkey String   @map("user_pubkey") @db.VarChar(66)
   type       String   @db.VarChar(20)
   title      String   @db.VarChar(100)
   message    String   @db.VarChar(500)

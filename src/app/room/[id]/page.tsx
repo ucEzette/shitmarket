@@ -9,7 +9,7 @@ import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
 import { HeaderPanel } from '@/components/ui/HeaderPanel';
 import { 
-  Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, 
+  Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, Brain,
   AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal, Bookmark
 } from 'lucide-react';
 import * as Slider from '@radix-ui/react-slider';
@@ -141,10 +141,37 @@ export default function RoomDetailPage() {
     addMessage, connectWallet, isTransactionLoading, 
     fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile,
     showAlert, addToast,
-    listings, fetchRoomListings, listPosition, cancelListing, buyPosition, wallet
+    listings, fetchRoomListings, listPosition, cancelListing, buyPosition, wallet,
+    disputeRoom, resolveDispute
   } = useAppState();
 
   const room = rooms.find((r) => r.id === roomId);
+
+  const [disputeCountdown, setDisputeCountdown] = useState<string | null>(null);
+  const [arbitrationWinner, setArbitrationWinner] = useState<'moon' | 'jeet' | 'draw'>('moon');
+  const [arbitrationOverturned, setArbitrationOverturned] = useState<boolean>(true);
+
+  useEffect(() => {
+    const settlementTime = room?.settlementTimestamp ? Number(room.settlementTimestamp) : 0;
+    if (!room || room.status !== 'settled' || !settlementTime) {
+      setDisputeCountdown(null);
+      return;
+    }
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const windowExpiry = settlementTime + 30 * 60 * 1000;
+      const diff = windowExpiry - now;
+      if (diff <= 0) {
+        setDisputeCountdown(null);
+        clearInterval(timer);
+        return;
+      }
+      const mins = Math.floor(diff / 60000);
+      const secs = Math.floor((diff % 60000) / 1000);
+      setDisputeCountdown(`${mins}m ${String(secs).padStart(2, '0')}s`);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [room?.status, room?.settlementTimestamp]);
 
   // Bulletproof safety parsers for all numeric room fields
   const moonPoolSafe = typeof room?.moonPool === 'number' ? room.moonPool : parseFloat(room?.moonPool as any) || 0;
@@ -161,7 +188,7 @@ export default function RoomDetailPage() {
 
   const [selectedSide, setSelectedSide] = useState<'moon' | 'jeet'>('moon');
   const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
-  const [stakeAmount, setStakeAmount] = useState<number>(0.1);
+  const [stakeAmount, setStakeAmount] = useState<number>(10);
   const [chatInput, setChatInput] = useState('');
   const [countdownText, setCountdownText] = useState('00:00:00');
   const [isRoomSettling, setIsRoomSettling] = useState(false);
@@ -298,41 +325,31 @@ export default function RoomDetailPage() {
     };
   }, [roomId, fetchSingleRoom, refreshProfile, fetchRoomBets]);
 
-  // Poll DexScreener for live token price updating every 5 seconds
+  // Poll live token price aggregator (DexScreener, Birdeye, Jupiter, Chainlink, Pyth) every 5 seconds
   useEffect(() => {
     if (!room || room.status !== 'active') return;
 
     const fetchLivePrice = async () => {
       try {
-        let dsUrl = `https://api.dexscreener.com/latest/dex/tokens/${room.token.address}`;
-        if (room.token.pairAddress && room.token.chainId) {
-          dsUrl = `https://api.dexscreener.com/latest/dex/pairs/${room.token.chainId}/${room.token.pairAddress}`;
-        }
-        const res = await fetch(dsUrl);
+        const queryParams = room.priceFeedId ? `?pythFeedId=${room.priceFeedId}` : '';
+        const indexerUrl = `${process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001'}/api/rooms/token-price/${room.token.address}${queryParams}`;
+        
+        const res = await fetch(indexerUrl);
         if (res.ok) {
           const json = await res.json();
-          let pairs = json?.pairs || [];
-          if (json?.pair) {
-            pairs = [json.pair];
-          }
-          if (pairs.length > 0) {
-            const sorted = pairs.sort((a: any, b: any) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0));
-            const bestPair = sorted[0];
-            const price = parseFloat(bestPair.priceUsd);
-            if (isFinite(price) && price > 0) {
-              setLivePrice(price);
-            }
+          if (json.success && isFinite(json.priceUsd) && json.priceUsd > 0) {
+            setLivePrice(json.priceUsd);
           }
         }
       } catch (err) {
-        console.warn('Failed to fetch live price inside room details:', err);
+        console.warn('Failed to fetch live aggregated price inside room details:', err);
       }
     };
 
     fetchLivePrice();
     const priceInterval = setInterval(fetchLivePrice, 5000);
     return () => clearInterval(priceInterval);
-  }, [room?.token?.address, room?.token?.pairAddress, room?.token?.chainId, room?.status, room?.id]);
+  }, [room?.token?.address, room?.priceFeedId, room?.status, room?.id]);
 
   useEffect(() => {
     if (room?.id) {
@@ -342,10 +359,25 @@ export default function RoomDetailPage() {
 
   useEffect(() => {
     const loadOnChainBets = async () => {
-      if (!wallet?.publicKey || !room?.id) {
+      if (!room?.id) {
         setOnChainBets([]);
         return;
       }
+
+      if (room.id.startsWith('0x') || !wallet?.publicKey) {
+        const evmBets = user ? user.bets.filter((b) => b.roomId === room.id) : [];
+        setOnChainBets(evmBets.map((b) => ({
+          pubkey: b.id || (b as any).pubkey || String(Date.now()),
+          roomId: b.roomId,
+          user: b.user,
+          currentOwner: b.user,
+          side: b.side,
+          amount: b.amount,
+          claimed: b.claimed
+        })));
+        return;
+      }
+
       try {
         const program = getAnchorProgram(wallet);
         const roomPda = new PublicKey(room.id);
@@ -528,7 +560,7 @@ export default function RoomDetailPage() {
 
     if (user.balance < stakeAmount) {
       const rect = e?.currentTarget.getBoundingClientRect();
-      showAlert('INSUFFICIENT AMMO SOL IN WALLET!', 'error', 'INSUFFICIENT AMMO', undefined, rect);
+      showAlert('INSUFFICIENT AMMO USDC IN WALLET!', 'error', 'INSUFFICIENT AMMO', undefined, rect);
       return;
     }
 
@@ -557,7 +589,7 @@ export default function RoomDetailPage() {
     setLocalShake(true);
 
     // Append to battle logs
-    const newLog = `[ARTILLERY SHELL] Fired ${stakeAmount.toFixed(2)} SOL ammo payload on ${selectedSide.toUpperCase()} side!`;
+    const newLog = `[ARTILLERY SHELL] Fired ${stakeAmount.toFixed(0)} USDC ammo payload on ${selectedSide.toUpperCase()} side!`;
     setBattleLogs((prev) => [...prev, newLog]);
 
     // After flight finishes (800ms)
@@ -866,7 +898,7 @@ export default function RoomDetailPage() {
 
           <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 bg-trench-black/90 border border-neon-moon/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] z-10">
             <span className="font-mono text-[7px] sm:text-[9px] text-neon-moon block font-bold uppercase tracking-wider">MOON POT</span>
-            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{moonPoolSafe.toFixed(2)} SOL</span>
+            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{moonPoolSafe.toFixed(2)} {room?.token?.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
           </div>
         </div>
 
@@ -890,7 +922,7 @@ export default function RoomDetailPage() {
 
           <div className="absolute top-2 right-2 md:top-4 md:right-4 bg-trench-black/90 border border-jeet-red/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] text-right z-10">
             <span className="font-mono text-[7px] sm:text-[9px] text-jeet-red block font-bold uppercase tracking-wider">JEET POT</span>
-            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{jeetPoolSafe.toFixed(2)} SOL</span>
+            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{jeetPoolSafe.toFixed(2)} {room?.token?.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
           </div>
         </div>
 
@@ -1322,7 +1354,118 @@ export default function RoomDetailPage() {
             </div>
           </div>
 
-          {isSettled ? (
+          {room.status === 'disputed' ? (
+            // Disputed State card
+            <div className="space-y-4 text-center py-4">
+              <div className="bg-red-950/40 border-2 border-jeet-red p-4 rounded text-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-jeet-red/5 animate-pulse" />
+                <AlertTriangle className="text-jeet-red mx-auto mb-2 animate-bounce" size={36} />
+                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">ARENA LOCK ACTIVE</span>
+                <span className="font-staatliches text-2xl block mt-1 tracking-wider text-jeet-red uppercase">
+                  ⚠️ VERDICT DISPUTED
+                </span>
+                <p className="font-mono text-[10px] text-gray-300 mt-2 normal-case leading-relaxed">
+                  Bettor challenged the verdict by posting a 0.1 SOL bond. Funds are frozen pending arbitrator arbitration.
+                </p>
+                <div className="mt-3 text-[8px] text-trench-gasmask uppercase border-t border-trench-sandbag/40 pt-2 text-left space-y-1">
+                  <div>Challenger: <span className="text-white font-bold">{room.disputeChallenger?.slice(0, 6)}...{room.disputeChallenger?.slice(-4)}</span></div>
+                  <div>Bond Escrowed: <span className="text-white font-bold">0.1 SOL</span></div>
+                </div>
+              </div>
+
+              {/* Arbitrator Resolution Console */}
+              {wallet?.publicKey && room.oracleAddress && wallet.publicKey.toBase58() === room.oracleAddress && (
+                <div className="bg-trench-black border-2 border-moon-gold p-4 rounded text-left space-y-3">
+                  <h4 className="font-staatliches text-lg text-moon-gold tracking-wider uppercase border-b border-trench-sandbag pb-1">
+                    ⚔️ ARBITRATION PANEL
+                  </h4>
+                  <p className="font-mono text-[9px] text-trench-gasmask uppercase leading-tight font-bold">
+                    As the designated oracle arbitrator, you must review the dispute and submit the final verdict.
+                  </p>
+                  
+                  {/* Select Winner */}
+                  <div className="space-y-1.5">
+                    <span className="font-mono text-[8px] text-trench-gasmask font-bold uppercase">SELECT FACTUAL WINNER:</span>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['moon', 'jeet', 'draw'] as const).map((side) => (
+                        <button
+                          key={side}
+                          type="button"
+                          onClick={() => { setArbitrationWinner(side); synthSound('bet'); }}
+                          className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded border transition-all ${
+                            arbitrationWinner === side
+                              ? 'bg-moon-gold border-moon-gold text-black font-bold'
+                              : 'border-trench-sandbag bg-trench-mud text-trench-gasmask'
+                          }`}
+                        >
+                          {side}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Overturn Verdict Toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={arbitrationOverturned}
+                      onChange={(e) => { setArbitrationOverturned(e.target.checked); synthSound('bet'); }}
+                      className="accent-moon-gold"
+                    />
+                    <span className="font-mono text-[8px] text-white uppercase font-bold">
+                      OVERTURN ORIGINAL VERDICT (REFUND CHALLENGER)
+                    </span>
+                  </label>
+
+                  <button
+                    disabled={isTransactionLoading}
+                    onClick={async () => {
+                      synthSound('bet');
+                      try {
+                        const winnerArg = arbitrationWinner === 'draw' ? null : arbitrationWinner;
+                        await resolveDispute(room.id, winnerArg, arbitrationOverturned);
+                        fetchSingleRoom(room.id);
+                      } catch (err) {
+                        console.error("Arbitration failed", err);
+                      }
+                    }}
+                    className="w-full mt-2 py-2.5 bg-moon-gold hover:bg-yellow-400 disabled:bg-trench-sandbag font-staatliches text-xl text-black border-b-4 border-yellow-800 shadow-glow-gold rounded uppercase flex items-center justify-center gap-1.5 font-bold"
+                  >
+                    {isTransactionLoading ? (
+                      <>
+                        <Loader2 className="animate-spin text-black shrink-0" size={16} />
+                        <span>SUBMITTING RESOLUTION...</span>
+                      </>
+                    ) : (
+                      <span>PUBLISH VERDICT 🎯</span>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* AI Arbitrator Telemetry */}
+              {room.resolutionCriteria && (
+                <div className="bg-black/80 border border-trench-sandbag/40 p-3 rounded text-left font-mono text-[9px]">
+                  <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-xs font-bold border-b border-trench-sandbag/40 pb-1 mb-2">
+                    <Brain size={14} className="animate-pulse" />
+                    <span>AI ARBITRATOR TELEMETRY</span>
+                  </div>
+                  <div className="text-[10px] text-white font-bold mb-2">
+                    Criteria: "{room.resolutionCriteria}"
+                  </div>
+                  {room.oracleLogs ? (
+                    <div className="bg-[#050803] p-2 border border-trench-sandbag/45 text-trench-gasmask max-h-48 overflow-y-auto whitespace-pre-wrap font-mono leading-normal scrollbar text-[9px]">
+                      {room.oracleLogs}
+                    </div>
+                  ) : (
+                    <div className="text-trench-gasmask animate-pulse">
+                      📡 SCANNING SIGNALS... AI NODE SCRAPER DETECTED DISPUTED ROOM. Awaiting execution sweep signature.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : isSettled ? (
             // Concluded / Settled State card
             <div className="space-y-4 text-center py-4">
               <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
@@ -1342,6 +1485,45 @@ export default function RoomDetailPage() {
                   </p>
                 )}
               </div>
+
+              {/* Challenge Period Countdown / Dispute button */}
+              {disputeCountdown ? (
+                <div className="bg-trench-black border-2 border-yellow-500/40 p-4 rounded text-left space-y-2.5">
+                  <div className="flex justify-between items-center border-b border-trench-sandbag/35 pb-1">
+                    <span className="font-mono text-[9px] text-yellow-500 font-bold uppercase">CHALLENGE PERIOD OPEN</span>
+                    <span className="font-mono text-xs text-yellow-500 font-extrabold animate-pulse">{disputeCountdown}</span>
+                  </div>
+                  <p className="font-mono text-[8px] text-trench-gasmask uppercase font-bold leading-tight">
+                    Disagree with this verdict? Lock 0.1 SOL dispute bond to challenge results and pause winnings claims.
+                  </p>
+                  <button
+                    disabled={isTransactionLoading}
+                    onClick={async () => {
+                      synthSound('bet');
+                      try {
+                        await disputeRoom(room.id);
+                        fetchSingleRoom(room.id);
+                      } catch (err) {
+                        console.error("Dispute trigger failed", err);
+                      }
+                    }}
+                    className="w-full py-2 bg-yellow-500 hover:bg-yellow-400 disabled:bg-trench-sandbag text-black font-staatliches text-lg uppercase rounded border-b-2 border-yellow-800 shadow-glow-yellow font-bold flex items-center justify-center gap-1.5"
+                  >
+                    {isTransactionLoading ? (
+                      <>
+                        <Loader2 className="animate-spin text-black shrink-0" size={14} />
+                        <span>ESCROWING BOND...</span>
+                      </>
+                    ) : (
+                      <span>FILE DISPUTE ⚠️</span>
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-trench-mud border border-trench-sandbag p-2.5 rounded font-mono text-[9px] text-trench-gasmask uppercase font-bold flex items-center justify-center gap-1.5">
+                  <span>🔒 dispute challenge window closed</span>
+                </div>
+              )}
 
               {/* Tactical Skirmish Receipt / Evidence Card */}
               <div className="bg-trench-black border border-dashed border-trench-sandbag p-4 rounded text-left font-mono text-[10px] text-trench-gasmask uppercase space-y-2 relative">
@@ -1375,6 +1557,28 @@ export default function RoomDetailPage() {
                   </span>
                 </div>
               </div>
+
+              {/* AI Arbitrator Telemetry */}
+              {room.resolutionCriteria && (
+                <div className="bg-black/80 border border-trench-sandbag/40 p-3 rounded text-left font-mono text-[9px]">
+                  <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-xs font-bold border-b border-trench-sandbag/40 pb-1 mb-2">
+                    <Brain size={14} className="animate-pulse" />
+                    <span>AI ARBITRATOR TELEMETRY</span>
+                  </div>
+                  <div className="text-[10px] text-white font-bold mb-2">
+                    Criteria: "{room.resolutionCriteria}"
+                  </div>
+                  {room.oracleLogs ? (
+                    <div className="bg-[#050803] p-2 border border-trench-sandbag/45 text-trench-gasmask max-h-48 overflow-y-auto whitespace-pre-wrap font-mono leading-normal scrollbar text-[9px]">
+                      {room.oracleLogs}
+                    </div>
+                  ) : (
+                    <div className="text-trench-gasmask animate-pulse">
+                      📡 SCANNING SIGNALS... AI NODE SCRAPER DETECTED Expired ROOM. Awaiting execution sweep signature.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {userWon && (
                 <div className="p-4 bg-trench-black border-2 border-moon-gold rounded text-center relative overflow-hidden">
@@ -1464,7 +1668,6 @@ export default function RoomDetailPage() {
                   </button>
                 </div>
               )}
-
             </div>
           ) : room.expiry <= Date.now() ? (
             // Expired but not settled yet (Pending telemetry resolving)
@@ -1571,15 +1774,15 @@ export default function RoomDetailPage() {
 
 
 
-              {/* 3. AMMUNITION (SOL) Preset Selector Slots */}
+              {/* 3. AMMUNITION (USDC) Preset Selector Slots */}
               <div className="mb-6 bg-trench-black p-4 border border-trench-sandbag rounded">
                 <div className="flex justify-between items-center mb-3 border-b border-trench-sandbag/40 pb-2">
-                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">3. AMMUNITION (SOL)</span>
+                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">3. AMMUNITION (USDC)</span>
                 </div>
 
                 {/* Preset slots layout matching mockup */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                  {[0.05, 0.1, 0.5, 1.0].map((val) => {
+                  {[5, 10, 25, 50, 100].map((val) => {
                     const isSelected = stakeAmount === val;
                     return (
                       <button
@@ -1594,7 +1797,7 @@ export default function RoomDetailPage() {
                             : 'bg-trench-mud text-trench-gasmask border-trench-sandbag hover:text-white'
                         }`}
                       >
-                        {val} SOL
+                        {val} USDC
                       </button>
                     );
                   })}
@@ -1605,9 +1808,9 @@ export default function RoomDetailPage() {
                   className="relative flex items-center select-none touch-none w-full h-5 cursor-pointer"
                   value={[stakeAmount]}
                   onValueChange={(val) => setStakeAmount(val[0])}
-                  min={0.01}
-                  max={5.0}
-                  step={0.05}
+                  min={1}
+                  max={500}
+                  step={1}
                 >
                   <Slider.Track className="bg-trench-mud relative grow rounded-full h-2 border border-trench-sandbag overflow-hidden">
                     <Slider.Range className={`absolute h-full rounded-full ${
@@ -1622,9 +1825,9 @@ export default function RoomDetailPage() {
 
                 {/* Range text below slider matching mockup */}
                 <div className="flex justify-between items-center mt-3 font-mono text-[9px] text-trench-gasmask uppercase font-bold">
-                  <span>Min: 0.01 SOL</span>
-                  <span className="text-yellow-400">Amt: {stakeAmount.toFixed(2)} SOL</span>
-                  <span>Max: 5.0 SOL</span>
+                  <span>Min: 1 USDC</span>
+                  <span className="text-yellow-400">Amt: {stakeAmount.toFixed(0)} USDC</span>
+                  <span>Max: 500 USDC</span>
                 </div>
               </div>
 
@@ -1636,7 +1839,7 @@ export default function RoomDetailPage() {
                 </div>
                 <div className="flex justify-between text-trench-gasmask uppercase font-bold">
                   <span>EXPECTED BOOTY</span>
-                  <span className="text-neon-moon font-bold">+{getPotentialPayout(selectedSide).toFixed(2)} SOL</span>
+                  <span className="text-neon-moon font-bold">+{getPotentialPayout(selectedSide).toFixed(2)} USDC</span>
                 </div>
                 <div className="flex justify-between text-trench-gasmask/60 text-[10px] uppercase font-bold">
                   <span>TRENCH MINE FEE</span>
@@ -1655,7 +1858,7 @@ export default function RoomDetailPage() {
                 ) : (
                   <span className="relative z-10 flex items-center gap-1.5 justify-center font-bold">
                     <Sparkles size={20} className="text-black shrink-0 animate-pulse" />
-                    STAKE ON POT!
+                    STAKE / ADD POSITION 💣
                   </span>
                 )}
                 {/* Shimmer overlay block */}
@@ -1665,7 +1868,7 @@ export default function RoomDetailPage() {
               <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold">
                 <ShieldAlert size={16} className="text-jeet-red shrink-0 mt-0.5" />
                 <p>
-                  'Bets are locked. Firing shells takes permanent SOL ammo payload. Finalized on countdown expiry!'
+                  'Bets are locked. Firing shells takes permanent USDC ammo payload. Finalized on countdown expiry!'
                 </p>
               </div>
             </>
@@ -1745,7 +1948,7 @@ export default function RoomDetailPage() {
             </div>
             <div className="flex gap-1.5 items-start text-jeet-red font-bold animate-pulse uppercase">
               <span>⚠️</span>
-              <span>[GAS WAR] Solana network congested; base fee calculated dynamically.</span>
+              <span>[GAS WAR] Network congested; base fee calculated dynamically.</span>
             </div>
 
             {activeRoomChats.length > 0 ? (
@@ -1833,7 +2036,7 @@ export default function RoomDetailPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-white font-bold">{bet.amount.toFixed(2)} SOL</span>
+                        <span className="text-white font-bold">{bet.amount.toFixed(2)} USDC</span>
                         <span className="text-trench-gasmask/70 text-[8px] sm:text-[9px]">{timeString}</span>
                       </div>
                     </div>

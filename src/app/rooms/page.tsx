@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useAppState, Room, formatCashtag, formatPrice } from '@/store/useAppState';
+import { useAppState, Room, formatCashtag, formatPrice, MarketCategory, CATEGORIES, detectCategory } from '@/store/useAppState';
 import { PixelCrackedHelmet, PixelShovel, PixelGasMask } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
@@ -73,7 +73,8 @@ const formatExpiryUTC = (timestamp: number) => {
 };
 
 export default function RoomsPage() {
-  const formatDuration = (mins: number) => {
+  const formatDuration = (mins: number | undefined) => {
+    if (!mins) return '60 MIN';
     if (mins >= 43200) return `${Math.floor(mins/43200)} MONTH`;
     if (mins >= 10080) return `${Math.floor(mins/10080)} WEEK`;
     if (mins >= 1440) return `${Math.floor(mins/1440)} DAY`;
@@ -87,6 +88,7 @@ export default function RoomsPage() {
   const [filterSoon, setFilterSoon] = useState<'ending' | 'expired'>('ending');
   const [filterBiggest, setFilterBiggest] = useState<'ending' | 'expired'>('ending');
   const [selectedNetwork, setSelectedNetwork] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<MarketCategory>('all');
   const [showOtherNetworksDrawer, setShowOtherNetworksDrawer] = useState(false);
   const [drawerSearch, setDrawerSearch] = useState('');
   const [mounted, setMounted] = useState(false);
@@ -143,9 +145,9 @@ export default function RoomsPage() {
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
   const [showSkeleton, setShowSkeleton] = useState(!roomsLoaded);
 
-  const [quickAmountNew, setQuickAmountNew] = useState<number>(0.8);
-  const [quickAmountSoon, setQuickAmountSoon] = useState<number>(0.1);
-  const [quickAmountBiggest, setQuickAmountBiggest] = useState<number>(0.1);
+  const [quickAmountNew, setQuickAmountNew] = useState<number>(10);
+  const [quickAmountSoon, setQuickAmountSoon] = useState<number>(10);
+  const [quickAmountBiggest, setQuickAmountBiggest] = useState<number>(10);
   const [audioEnabled, setAudioEnabled] = useState(false);
 
   useEffect(() => {
@@ -188,6 +190,10 @@ export default function RoomsPage() {
       const now = Date.now();
 
       rooms.forEach((room) => {
+        if (room.status === 'disputed') {
+          texts[room.id] = '⚠️ DISPUTED';
+          return;
+        }
         if (room.status !== 'active') {
           texts[room.id] = 'SETTLED';
           return;
@@ -219,10 +225,17 @@ export default function RoomsPage() {
   const getCategorizedRooms = () => {
     const now = Date.now();
 
-    // Helper to filter a room by selected status and network
+    // Helper to filter a room by selected status, network, and category
     const filterRoom = (r: Room, listFilter: 'ending' | 'expired') => {
+      if (!r.token || !r.token.name || r.token.name === 'Unknown Token' || r.token.symbol === 'UNKNOWN' || r.token.symbol === 'UNKNWN') {
+        return false;
+      }
+      if (selectedCategory !== 'all') {
+        const cat = r.category || detectCategory(r.token.name, r.token.symbol);
+        if (cat !== selectedCategory) return false;
+      }
       if (listFilter === 'expired') {
-        if (r.status !== 'settled' && r.expiry > now) return false;
+        if (r.status !== 'settled' && r.status !== 'disputed' && r.expiry > now) return false;
       } else {
         if (r.status !== 'active' || r.expiry <= now) return false;
       }
@@ -325,15 +338,20 @@ export default function RoomsPage() {
 
     const timeText = timeRemainingText[room.id] || '00:00:00';
     const isSettled = room.status === 'settled';
+    const isDisputed = room.status === 'disputed';
 
     // Left border indicator & background tint & box shadow glow
-    const borderGlow = isSettled
+    const borderGlow = isDisputed
+      ? 'border-l-[4px] border-l-jeet-red/85 shadow-[inset_4px_0_10px_rgba(255,7,58,0.15)] animate-pulse'
+      : isSettled
       ? 'border-l-[4px] border-l-moon-gold/80 shadow-[inset_4px_0_10px_rgba(255,215,0,0.06)]'
       : isMoonLeading
       ? 'border-l-[4px] border-l-neon-moon/80 shadow-[inset_4px_0_10px_rgba(22,163,74,0.1)]'
       : 'border-l-[4px] border-l-jeet-red/80 shadow-[inset_4px_0_10px_rgba(255,7,58,0.1)]';
 
-    const hoverGlow = isSettled
+    const hoverGlow = isDisputed
+      ? 'hover:bg-[#1a0205] hover:shadow-[inset_4px_0_15px_rgba(255,7,58,0.22),_0_0_12px_rgba(255,7,58,0.15)]'
+      : isSettled
       ? 'hover:bg-[#171103] hover:shadow-[inset_4px_0_15px_rgba(255,215,0,0.12),_0_0_12px_rgba(255,215,0,0.1)]'
       : isMoonLeading
       ? 'hover:bg-[#07170a] hover:shadow-[inset_4px_0_15px_rgba(22,163,74,0.18),_0_0_12px_rgba(22,163,74,0.12)]'
@@ -348,8 +366,8 @@ export default function RoomsPage() {
         {/* Timer Bomb Clock Header */}
         <div className="flex justify-between items-center mb-2">
           <div className="flex items-center gap-1 bg-trench-black border border-trench-sandbag/80 rounded px-1.5 py-0.5">
-            <Bomb size={9} className={isSettled ? 'text-moon-gold' : 'text-jeet-red'} />
-            <span className={`font-mono text-[9px] font-bold ${isSettled ? 'text-moon-gold' : 'text-white'}`}>
+            <Bomb size={9} className={isDisputed ? 'text-jeet-red animate-pulse' : isSettled ? 'text-moon-gold' : 'text-jeet-red'} />
+            <span className={`font-mono text-[9px] font-bold ${isDisputed ? 'text-jeet-red' : isSettled ? 'text-moon-gold' : 'text-white'}`}>
               {formatDuration(room.duration)}
             </span>
           </div>
@@ -371,10 +389,16 @@ export default function RoomsPage() {
               />
             </button>
             {/* Small Chain Icon to indicate network */}
-            <div className="bg-trench-black p-0.5 rounded border border-trench-sandbag/30 flex items-center justify-center h-5 w-5 shrink-0" title={`Network: ${room.token.chainId?.toUpperCase() || 'SOLANA'}`}>
-              <NetworkLogo chainId={room.token.chainId || 'solana'} active={true} className="w-3.5 h-3.5" />
+            <div className="bg-trench-black p-0.5 rounded border border-trench-sandbag/30 flex items-center justify-center h-5 w-5 shrink-0" title={`Network: ${room.token.chainId?.toUpperCase() || (process.env.NEXT_PUBLIC_CORE_CHAIN?.toUpperCase() || 'AVALANCHE')}`}>
+              <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
             </div>
-            <div className={`text-[9px] font-mono font-bold bg-trench-black px-1.5 py-0.5 rounded border border-trench-sandbag/30 uppercase ${isSettled ? 'text-moon-gold' : 'text-neon-moon animate-pulse'}`}>
+            <div className={`text-[9px] font-mono font-bold bg-trench-black px-1.5 py-0.5 rounded border uppercase ${
+              isDisputed
+                ? 'text-jeet-red border-jeet-red/50 animate-pulse'
+                : isSettled
+                ? 'text-moon-gold border-trench-sandbag/30'
+                : 'text-neon-moon border-trench-sandbag/30 animate-pulse'
+            }`}>
               {timeText}
             </div>
           </div>
@@ -430,15 +454,15 @@ export default function RoomsPage() {
         {/* Polymarket prediction target box */}
         <div className="bg-trench-black/40 border border-trench-sandbag/20 p-1.5 rounded mb-2 text-center font-mono text-[9px] leading-tight">
           <p className="text-white font-bold uppercase">
-            WILL {room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} END ABOVE ${formatPrice(room.openingPrice)} ON {formatExpiryUTC(room.expiry)}?
+            WILL {room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} END ABOVE {room.openingPrice !== undefined && formatPrice(room.openingPrice) !== 'N/A' ? `$${formatPrice(room.openingPrice)}` : '$1.00'} ON {formatExpiryUTC(room.expiry)}?
           </p>
         </div>
 
         {/* Pools Breakdown progress bar */}
         <div className="space-y-1 mb-2 font-mono text-[8px] font-bold">
           <div className="flex justify-between text-[9px]">
-            <span className="text-neon-moon uppercase">MOON POT: {room.moonPool.toFixed(2)} SOL</span>
-            <span className="text-jeet-red uppercase">JEET POT: {room.jeetPool.toFixed(2)} SOL</span>
+            <span className="text-neon-moon uppercase">MOON POT: {room.moonPool.toFixed(2)} {room.token.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
+            <span className="text-jeet-red uppercase">JEET POT: {room.jeetPool.toFixed(2)} {room.token.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
           </div>
 
           {/* Dual Bar */}
@@ -454,8 +478,20 @@ export default function RoomsPage() {
           </div>
         </div>
 
-        {/* Quick Bet Buttons */}
-        {!isSettled ? (
+        {/* Quick Bet Buttons / Settlement Badges */}
+        {isDisputed ? (
+          <div className="w-full py-1 bg-red-950/45 border border-dashed border-jeet-red text-center rounded mt-auto">
+            <span className="font-staatliches text-xs text-jeet-red uppercase tracking-widest animate-pulse font-bold">
+              ⚠️ VERDICT DISPUTED
+            </span>
+          </div>
+        ) : isSettled ? (
+          <div className="w-full py-1 bg-trench-black border border-dashed border-moon-gold/40 text-center rounded mt-auto">
+            <span className="font-staatliches text-xs text-moon-gold uppercase tracking-widest glow-gold font-bold">
+              WINNER: {room.winner?.toUpperCase() || 'MOON'}
+            </span>
+          </div>
+        ) : (
           <div className="grid grid-cols-2 gap-1.5 mt-auto">
             <button
               onClick={(e) => handleQuickBet(e, room.id, 'moon', quickAmount)}
@@ -473,12 +509,6 @@ export default function RoomsPage() {
               <span className="now">JEET</span>
               <span className="play !whitespace-nowrap">JEET {quickAmount}</span>
             </button>
-          </div>
-        ) : (
-          <div className="w-full py-1 bg-trench-black border border-dashed border-moon-gold/40 text-center rounded mt-auto">
-            <span className="font-staatliches text-xs text-moon-gold uppercase tracking-widest glow-gold font-bold">
-              WINNER: {room.winner?.toUpperCase() || 'MOON'}
-            </span>
           </div>
         )}
       </div>
@@ -779,7 +809,7 @@ export default function RoomsPage() {
                                       {r.token.name}
                                     </span>
                                     <span className="font-mono text-[8px] text-neon-moon font-bold block leading-none">
-                                      {formatCashtag(r.token.symbol)} // {totalPot.toFixed(1)} SOL POT
+                                      {formatCashtag(r.token.symbol)} // {totalPot.toFixed(1)} {r.token.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'} POT
                                     </span>
                                   </div>
                                 </div>
@@ -816,8 +846,6 @@ export default function RoomsPage() {
                 </div>
               </>
             )}
-          </div>
-
           {/* Rocket Deploy Button */}
           <Link href="/create-room" className="w-full md:w-auto">
             <button className="w-full py-2 px-4 font-staatliches text-lg tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all flex items-center justify-center gap-2 uppercase font-bold h-11 text-center">
@@ -826,6 +854,31 @@ export default function RoomsPage() {
             </button>
           </Link>
         </div>
+      </div>
+    </div>
+
+      {/* Polymarket-Style Category Selector Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none border-b border-trench-sandbag/40 shrink-0">
+        {CATEGORIES.map((cat) => {
+          const isActive = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => {
+                setSelectedCategory(cat.id);
+                synthSound('bet');
+              }}
+              className={`px-3 py-1.5 rounded-lg border font-staatliches text-xs tracking-wider uppercase transition-all duration-150 flex items-center gap-1.5 shrink-0 select-none ${
+                isActive
+                  ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-glow-moon scale-105 font-bold'
+                  : 'bg-trench-black/60 border-trench-sandbag/40 text-trench-gasmask hover:text-white hover:border-gray-500'
+              }`}
+            >
+              <span className="text-sm">{cat.icon}</span>
+              <span>{cat.label}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* 3-Column Dashboard View */}
@@ -851,25 +904,21 @@ export default function RoomsPage() {
                 />
               </div>
 
-              {/* Quick Bet Pill: ⚡ Amount SOL */}
-              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0">
+              {/* Quick Bet Pill: ⚡ Amount USDC */}
+              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0" title="Quick Stake Amount (USDC)">
                 <span className="text-neon-moon font-bold select-none">⚡</span>
                 <input
                   type="number"
-                  step="0.1"
-                  min="0"
+                  step="1"
+                  min="1"
                   value={quickAmountNew}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value);
                     setQuickAmountNew(isNaN(val) ? 0 : val);
                   }}
-                  className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
+                  className="w-10 bg-transparent text-white font-bold focus:outline-none text-center"
                 />
-                <img
-                  src="https://dd.dexscreener.com/ds-data/chains/solana.png"
-                  alt="SOL"
-                  className="w-3.5 h-3.5 object-contain rounded-full ml-0.5"
-                />
+                <span className="font-staatliches text-[10px] text-neon-moon font-bold ml-0.5 tracking-wider">USDC</span>
               </div>
 
 
@@ -905,7 +954,7 @@ export default function RoomsPage() {
                               : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
                           }`}
                         >
-                          DATE
+                          NEWEST
                         </button>
                         <button
                           onClick={() => {
@@ -991,25 +1040,21 @@ export default function RoomsPage() {
                 />
               </div>
 
-              {/* Quick Bet Pill: ⚡ Amount SOL */}
-              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0">
+              {/* Quick Bet Pill: ⚡ Amount USDC */}
+              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0" title="Quick Stake Amount (USDC)">
                 <span className="text-neon-moon font-bold select-none">⚡</span>
                 <input
                   type="number"
-                  step="0.1"
-                  min="0"
+                  step="1"
+                  min="1"
                   value={quickAmountSoon}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value);
                     setQuickAmountSoon(isNaN(val) ? 0 : val);
                   }}
-                  className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
+                  className="w-10 bg-transparent text-white font-bold focus:outline-none text-center"
                 />
-                <img
-                  src="https://dd.dexscreener.com/ds-data/chains/solana.png"
-                  alt="SOL"
-                  className="w-3.5 h-3.5 object-contain rounded-full ml-0.5"
-                />
+                <span className="font-staatliches text-[10px] text-neon-moon font-bold ml-0.5 tracking-wider">USDC</span>
               </div>
 
 
@@ -1131,25 +1176,21 @@ export default function RoomsPage() {
                 />
               </div>
 
-              {/* Quick Bet Pill: ⚡ Amount SOL */}
-              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0">
+              {/* Quick Bet Pill: ⚡ Amount USDC */}
+              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0" title="Quick Stake Amount (USDC)">
                 <span className="text-neon-moon font-bold select-none">⚡</span>
                 <input
                   type="number"
-                  step="0.1"
-                  min="0"
+                  step="1"
+                  min="1"
                   value={quickAmountBiggest}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value);
                     setQuickAmountBiggest(isNaN(val) ? 0 : val);
                   }}
-                  className="w-12 bg-transparent text-white font-bold focus:outline-none text-center"
+                  className="w-10 bg-transparent text-white font-bold focus:outline-none text-center"
                 />
-                <img
-                  src="https://dd.dexscreener.com/ds-data/chains/solana.png"
-                  alt="SOL"
-                  className="w-3.5 h-3.5 object-contain rounded-full ml-0.5"
-                />
+                <span className="font-staatliches text-[10px] text-neon-moon font-bold ml-0.5 tracking-wider">USDC</span>
               </div>
 
 
@@ -1263,7 +1304,7 @@ export default function RoomsPage() {
                 FIGHT IN COLD BLOOD? CONNECT YOUR AMMO WALLET!
               </h4>
               <p className="font-mono text-xs text-trench-gasmask font-bold uppercase mt-0.5">
-                Connect your Solana wallet to stack ammo on Moon or Jeet across live prediction rooms.
+                Connect your wallet to stack ammo on Moon or Jeet across live prediction rooms.
               </p>
             </div>
           </div>

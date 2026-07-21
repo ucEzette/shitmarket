@@ -192,9 +192,9 @@ export const HeaderSettings: React.FC = () => {
           </div>
 
           <div className="space-y-4 font-mono text-[10px] text-white">
-            {/* Solana Congestion Widget */}
+            {/* Network Congestion Widget */}
             <div className="flex justify-between items-center bg-trench-mud border border-trench-sandbag/30 rounded p-1.5 mb-2">
-              <span className="text-[8px] text-trench-gasmask uppercase font-bold">SOLANA CONGESTION:</span>
+              <span className="text-[8px] text-trench-gasmask uppercase font-bold">NETWORK CONGESTION:</span>
               <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
                 congestionStatus === 'LOW' ? 'bg-green-500/20 text-green-400' :
                 congestionStatus === 'NORMAL' ? 'bg-blue-500/20 text-blue-400' :
@@ -389,15 +389,26 @@ export const Header: React.FC<{
               <HeaderSettings />
 
               {/* Ammo Display (Click toggles WalletPanel) */}
-              <button
-                onClick={() => setShowWalletPanel(!showWalletPanel)}
-                className="flex items-center gap-1 px-1.5 py-0.5 bg-trench-mud hover:bg-trench-mud/85 border border-trench-sandbag/40 rounded-sm cursor-pointer transition-all active:translate-y-0.5"
-              >
-                <Coins size={9} className="text-moon-gold font-bold" />
-                <span className="font-mono text-[8px] sm:text-[9px] font-bold text-moon-gold">
-                  <span className="hidden sm:inline">AMMO: </span><span className="glow-gold font-bold">{balance.toFixed(2)} SOL</span>
-                </span>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowWalletPanel(!showWalletPanel)}
+                  className="flex items-center gap-1 px-1.5 py-0.5 bg-trench-mud hover:bg-trench-mud/85 border border-trench-sandbag/40 rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+                >
+                  <Coins size={9} className="text-moon-gold font-bold" />
+                  <span className="font-mono text-[8px] sm:text-[9px] font-bold text-moon-gold">
+                    <span className="hidden sm:inline">AMMO: </span><span className="glow-gold font-bold">{(user?.balance ?? balance).toFixed(2)} {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' || useAppState.getState().isEvm ? 'USDC' : 'SOL'}</span>
+                  </span>
+                </button>
+                {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' && (
+                  <button
+                    onClick={() => useAppState.getState().mintTestnetUsdc(1000)}
+                    className="px-1.5 py-0.5 bg-neon-moon/20 hover:bg-neon-moon text-neon-moon hover:text-black border border-neon-moon/50 font-mono text-[8px] font-bold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+                    title="Get 1,000 Free Testnet USDC"
+                  >
+                    +1K USDC
+                  </button>
+                )}
+              </div>
 
               {/* Connected wallet profile image linking to profile */}
               <Link

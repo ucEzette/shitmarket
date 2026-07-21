@@ -61,7 +61,7 @@ export const ComplianceModal: React.FC = () => {
             <div>
               <span className="text-moon-gold font-bold block text-[11px] mb-0.5">PVP RISK MATRIX (RUIN WARNING)</span>
               <p className="text-[9px]">
-                SHITMARKET prediction pools operate as high-velocity, peer-to-peer battlegrounds. Wagers are non-custodial and final. Volatile Solana tokens fluctuate rapidly; there are no refunds, insurance, or safety nets.
+                SHITMARKET prediction pools operate as high-velocity, peer-to-peer battlegrounds. Wagers are non-custodial and final. Volatile memecoins and oracle-verifiable assets fluctuate rapidly; there are no refunds, insurance, or safety nets.
               </p>
             </div>
           </div>
@@ -71,7 +71,7 @@ export const ComplianceModal: React.FC = () => {
             <div>
               <span className="text-white font-bold block text-[11px] mb-0.5">DECENTRALIZED AS-IS SERVICE</span>
               <p className="text-[9px]">
-                The smart contract program runs directly on the Solana blockchain. By deploying ammunition wagers, you accept all network risks, slippage variations, and network congestion limits.
+                The permissionless smart contracts run directly on-chain via multi-chain oracle aggregation (Pyth Network, Chainlink, DexScreener, Birdeye). By deploying ammunition wagers, you accept all network risks, slippage variations, and execution limits.
               </p>
             </div>
           </div>

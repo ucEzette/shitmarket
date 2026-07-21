@@ -710,7 +710,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
 
       {/* Devnet Warning Notice */}
       <div className="w-full bg-[#fcd34d] text-black font-mono text-[10px] sm:text-xs tracking-wider uppercase py-1.5 px-4 text-center border-b border-yellow-600 flex items-center justify-center gap-2 z-[110] relative font-bold shadow-[0_2px_8px_rgba(251,191,36,0.15)]">
-        <span>⚠️ NOTICE: THE PLATFORM IS RUNNING ON SOLANA DEVNET. ALL STAKED SOL AND TOKENS ARE MOCK FAUCET ASSETS.</span>
+        <span>⚠️ NOTICE: THE PLATFORM IS RUNNING ON AVALANCHE C-CHAIN / MULTI-CHAIN TESTNET. ALL STAKED ASSETS ARE MOCK FAUCET ASSETS.</span>
       </div>
 
       {/* Main Header */}
@@ -836,15 +836,15 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
                   <div className="pl-6 mt-1 flex items-center">
                     <a
                       href={
-                        (typeof window !== 'undefined' && window.location.hostname === 'localhost')
-                          ? `https://explorer.solana.com/tx/${toast.txSig}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`
+                        toast.txSig.startsWith('0x')
+                          ? `https://testnet.snowtrace.io/tx/${toast.txSig}`
                           : `https://solscan.io/tx/${toast.txSig}?cluster=devnet`
                       }
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 font-mono text-[9px] text-[#00FFFF] hover:underline font-bold"
                     >
-                      <span>VERIFY ON SOLSCAN</span>
+                      <span>{toast.txSig.startsWith('0x') ? 'VERIFY ON SNOWTRACE' : 'VERIFY ON SOLSCAN'}</span>
                       <ExternalLink size={8} />
                     </a>
                   </div>

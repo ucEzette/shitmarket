@@ -17,6 +17,9 @@ import {
   getUserReferralPda,
   getReferralStatePda,
   getListingPda,
+  safePublicKey,
+  cleanEvmAddress,
+  isSameRoom,
 } from '@/utils/solanaClient';
 
 const SHITMARKET_CORE_ABI = [
@@ -476,12 +479,17 @@ export const parseBytes32Name = (hex: string): string => {
 
 // ── Map API Room to Store Room ────────────────────────────────
 export const mapApiRoom = (apiRoom: any): Room => {
+  const rawAddress = apiRoom.originalAddress || apiRoom.tokenMint || '';
+  const cleanedAddress = cleanEvmAddress(rawAddress);
+  const openingPriceNum = apiRoom.openingPrice ? Number(apiRoom.openingPrice) / 1e6 : undefined;
+
   return {
     id: apiRoom.roomPubkey,
     duration: apiRoom.durationMinutes || 60,
     category: apiRoom.category || detectCategory(apiRoom.tokenName, apiRoom.tokenSymbol, apiRoom.resolutionCriteria),
+    openingPrice: openingPriceNum,
     token: {
-      address: apiRoom.originalAddress || apiRoom.tokenMint,
+      address: cleanedAddress,
       name: apiRoom.tokenName || 'Unknown Token',
       symbol: apiRoom.tokenSymbol || 'UNKNWN',
       icon: apiRoom.tokenImageUrl || '💰',
@@ -495,7 +503,7 @@ export const mapApiRoom = (apiRoom: any): Room => {
     status: apiRoom.status as 'active' | 'settled' | 'cancelled' | 'pending' | 'disputed',
     winner: apiRoom.winner ? (apiRoom.winner as 'moon' | 'jeet' | 'draw') : undefined,
     createdAt: new Date(apiRoom.createdAt).getTime(),
-    twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e12 : undefined,
+    twapFinalPrice: apiRoom.twapFinalPrice ? Number(apiRoom.twapFinalPrice) / 1e6 : undefined,
     lastSyncedAt: Date.now(),
     oracleAddress: apiRoom.oracleAddress || undefined,
     oracleFeeLamports: apiRoom.oracleFeeLamports ? Number(apiRoom.oracleFeeLamports) : undefined,
@@ -884,7 +892,7 @@ export const useAppState = create<AppState>()(
             if (activeRooms.length === 0) return;
 
             const program = getAnchorProgram(null as any);
-            const pubkeys = activeRooms.map((r: Room) => new PublicKey(r.id));
+            const pubkeys = activeRooms.map((r: Room) => safePublicKey(r.id)).filter((pk: PublicKey | null): pk is PublicKey => pk !== null);
             const onChainRooms = await withTimeout(
               (program.account as any).room.fetchMultiple(pubkeys),
               3000,
@@ -1095,8 +1103,10 @@ export const useAppState = create<AppState>()(
         }
 
         const program = getAnchorProgram(null as any);
+        const roomPk = safePublicKey(roomId);
+        if (!roomPk) return;
         const onChain = await withTimeout(
-          (program.account as any).room.fetch(new PublicKey(roomId)),
+          (program.account as any).room.fetch(roomPk),
           3000,
           'On-chain room fetch timed out'
         ) as any;
@@ -1127,8 +1137,8 @@ export const useAppState = create<AppState>()(
           let lookupAddress = rawMint;
           let isEvm = false;
           try {
-            const pubkey = new PublicKey(rawMint);
-            const bytes = pubkey.toBytes();
+            const pubkey = safePublicKey(rawMint);
+            const bytes = pubkey ? pubkey.toBytes() : new Uint8Array(32);
             let evmCheck = true;
             for (let i = 20; i < 32; i++) {
               if (bytes[i] !== 0) {
@@ -1624,7 +1634,7 @@ export const useAppState = create<AppState>()(
       }
 
       // Convert custom oracle pubkeys & fee
-      const customOracle = room.oracleAddress ? new PublicKey(room.oracleAddress) : null;
+      const customOracle = safePublicKey(room.oracleAddress);
       const customOracleFee = room.oracleFeeLamports ? new BN(room.oracleFeeLamports) : null;
 
       // Convert resolution criteria string to [u8; 64]
@@ -1753,7 +1763,8 @@ export const useAppState = create<AppState>()(
 
     try {
       const program = getAnchorProgram(wallet);
-      const roomPda = new PublicKey(roomId);
+      const roomPda = safePublicKey(roomId);
+      if (!roomPda) throw new Error(`Invalid room address: ${roomId}`);
       const escrowPda = getEscrowPda(roomPda);
       const betPda = getBetPda(roomPda, wallet.publicKey, side);
       const configPda = getPlatformConfigPda();
@@ -2194,7 +2205,8 @@ export const useAppState = create<AppState>()(
     try {
       // ── Step 1: Init program early (needed for on-chain status check) ─────────
       const program = getAnchorProgram(wallet);
-      const roomPda = new PublicKey(roomId);
+      const roomPda = safePublicKey(roomId);
+      if (!roomPda) throw new Error(`Invalid room address: ${roomId}`);
       const escrowPda = getEscrowPda(roomPda);
       const [configPda] = PublicKey.findProgramAddressSync(
         [Buffer.from('platform_config')],
@@ -2391,7 +2403,8 @@ export const useAppState = create<AppState>()(
       const userState = get().user;
       if (userState && userState.referredBy) {
         try {
-          const referrerPubkey = new PublicKey(userState.referredBy);
+          const referrerPubkey = safePublicKey(userState.referredBy);
+          if (!referrerPubkey) throw new Error("Invalid referrer address");
           const userReferralPda = getUserReferralPda(wallet.publicKey);
           const referralStatePda = getReferralStatePda(referrerPubkey);
 
@@ -2600,7 +2613,8 @@ export const useAppState = create<AppState>()(
   fetchRoomListings: async (roomId: string) => {
     try {
       const program = getAnchorProgram(null as any);
-      const roomPubkey = new PublicKey(roomId);
+      const roomPubkey = safePublicKey(roomId);
+      if (!roomPubkey) return;
 
       const listingAccounts = await connection.getProgramAccounts(program.programId, {
         filters: [
@@ -2704,8 +2718,9 @@ export const useAppState = create<AppState>()(
 
     try {
       const program = getAnchorProgram(wallet);
-      const room = new PublicKey(roomPubkey);
-      const bet = new PublicKey(betPubkey);
+      const room = safePublicKey(roomPubkey);
+      const bet = safePublicKey(betPubkey);
+      if (!room || !bet) throw new Error("Invalid room or bet public key");
       const listingPda = getListingPda(bet);
       const configPda = getPlatformConfigPda();
 
@@ -2805,8 +2820,9 @@ export const useAppState = create<AppState>()(
 
     try {
       const program = getAnchorProgram(wallet);
-      const listing = new PublicKey(listingPubkey);
-      const bet = new PublicKey(betPubkey);
+      const listing = safePublicKey(listingPubkey);
+      const bet = safePublicKey(betPubkey);
+      if (!listing || !bet) throw new Error("Invalid listing or bet public key");
 
       const priorityFeeValue = getPriorityFeePrice(get().settings);
 
@@ -2881,10 +2897,11 @@ export const useAppState = create<AppState>()(
 
     try {
       const program = getAnchorProgram(wallet);
-      const room = new PublicKey(roomPubkey);
-      const listing = new PublicKey(listingPubkey);
-      const bet = new PublicKey(betPubkey);
-      const sellerPubkey = new PublicKey(seller);
+      const room = safePublicKey(roomPubkey);
+      const listing = safePublicKey(listingPubkey);
+      const bet = safePublicKey(betPubkey);
+      const sellerPubkey = safePublicKey(seller);
+      if (!room || !listing || !bet || !sellerPubkey) throw new Error("Invalid public key");
       const vaultPda = getVaultPda();
       const configPda = getPlatformConfigPda();
 
@@ -2983,9 +3000,11 @@ export const useAppState = create<AppState>()(
         }
       } else {
         try {
-          const pubkey = new PublicKey(address);
-          const lamports = await connection.getBalance(pubkey);
-          balance = lamports / 1e9;
+          const pubkey = safePublicKey(address);
+          if (pubkey) {
+            const lamports = await connection.getBalance(pubkey);
+            balance = lamports / 1e9;
+          }
         } catch (err) {
           console.error('Failed to get SOL balance on wallet connection:', err);
         }
@@ -3016,12 +3035,15 @@ export const useAppState = create<AppState>()(
       
       try {
         const program = getAnchorProgram(null as any);
-        const referralStatePda = getReferralStatePda(new PublicKey(address));
-        const account = await (program.account as any).referralState.fetch(referralStatePda);
-        if (account) {
-          const unclaimed = (account.unclaimedRewards as any).toNumber();
-          const claimed = (account.claimedRewards as any).toNumber();
-          unclaimedReferralRewards = Math.max(0, (unclaimed - claimed) / 1e9);
+        const userPk = safePublicKey(address);
+        if (userPk) {
+          const referralStatePda = getReferralStatePda(userPk);
+          const account = await (program.account as any).referralState.fetch(referralStatePda);
+          if (account) {
+            const unclaimed = (account.unclaimedRewards as any).toNumber();
+            const claimed = (account.claimedRewards as any).toNumber();
+            unclaimedReferralRewards = Math.max(0, (unclaimed - claimed) / 1e9);
+          }
         }
       } catch (e) {
         // Account not initialized or fetch failed (e.g. no rewards)
@@ -3063,7 +3085,7 @@ export const useAppState = create<AppState>()(
             roomId: b.roomPubkey,
             user: b.userPubkey,
             side: b.side,
-            amount: Number(b.amount) / 1e9,
+            amount: Number(b.amount) / (b.roomPubkey?.startsWith('0x') ? 1e6 : 1e9),
             claimed: b.claimed,
             timestamp: new Date(b.createdAt).getTime(),
             txSig: b.txSig || null,
@@ -3199,12 +3221,15 @@ export const useAppState = create<AppState>()(
     let unclaimedReferralRewards = 0;
     try {
       const program = getAnchorProgram(null as any);
-      const referralStatePda = getReferralStatePda(new PublicKey(address));
-      const account = await (program.account as any).referralState.fetch(referralStatePda);
-      if (account) {
-        const unclaimed = (account.unclaimedRewards as any).toNumber();
-        const claimed = (account.claimedRewards as any).toNumber();
-        unclaimedReferralRewards = Math.max(0, (unclaimed - claimed) / 1e9);
+      const userPk = safePublicKey(address);
+      if (userPk) {
+        const referralStatePda = getReferralStatePda(userPk);
+        const account = await (program.account as any).referralState.fetch(referralStatePda);
+        if (account) {
+          const unclaimed = (account.unclaimedRewards as any).toNumber();
+          const claimed = (account.claimedRewards as any).toNumber();
+          unclaimedReferralRewards = Math.max(0, (unclaimed - claimed) / 1e9);
+        }
       }
     } catch (e) {
       // Account not initialized or fetch failed (e.g. no rewards)
@@ -3229,7 +3254,7 @@ export const useAppState = create<AppState>()(
           roomId: b.roomPubkey,
           user: b.userPubkey,
           side: b.side,
-          amount: Number(b.amount) / 1e9,
+          amount: Number(b.amount) / (b.roomPubkey?.startsWith('0x') ? 1e6 : 1e9),
           claimed: b.claimed,
           timestamp: new Date(b.createdAt).getTime(),
           txSig: b.txSig || null,
@@ -3418,7 +3443,8 @@ export const useAppState = create<AppState>()(
 
     try {
       const program = getAnchorProgram(wallet);
-      const roomPda = new PublicKey(roomId);
+      const roomPda = safePublicKey(roomId);
+      if (!roomPda) throw new Error("Invalid room ID");
       const escrowPda = getEscrowPda(roomPda);
       const configPda = getPlatformConfigPda();
       
@@ -3490,7 +3516,8 @@ export const useAppState = create<AppState>()(
 
     try {
       const program = getAnchorProgram(wallet);
-      const roomPda = new PublicKey(roomId);
+      const roomPda = safePublicKey(roomId);
+      if (!roomPda) throw new Error("Invalid room ID");
       const escrowPda = getEscrowPda(roomPda);
       const configPda = getPlatformConfigPda();
       
@@ -3504,7 +3531,8 @@ export const useAppState = create<AppState>()(
         if (res.ok) {
           const json = await res.json();
           if (json.data && json.data.disputeChallenger) {
-            challengerAddress = new PublicKey(json.data.disputeChallenger);
+            const challengerPk = safePublicKey(json.data.disputeChallenger);
+            if (challengerPk) challengerAddress = challengerPk;
           }
         }
       } catch (err) {

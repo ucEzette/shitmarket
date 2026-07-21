@@ -9,6 +9,46 @@ if (process.env.NEXT_PUBLIC_PROGRAM_ID && idlJson.address !== process.env.NEXT_P
 
 // Always use the env-provided RPC. Never fall back to a local validator — it won't be running in prod/dev.
 export const PROGRAM_ID = new PublicKey(programIdString);
+
+export const safePublicKey = (val: any): PublicKey | null => {
+  if (!val) return null;
+  if (typeof val === 'object' && typeof val.toBase58 === 'function') return val as PublicKey;
+  if (typeof val !== 'string') return null;
+  try {
+    return new PublicKey(val);
+  } catch {
+    return null;
+  }
+};
+
+export const cleanEvmAddress = (address: any): string => {
+  if (!address || typeof address !== 'string') return address || '';
+  const trimmed = address.trim();
+  if (trimmed.startsWith('0x000000000000000000000000') && trimmed.length === 66) {
+    return '0x' + trimmed.slice(26).toLowerCase();
+  }
+  if (trimmed.startsWith('0x') && trimmed.length === 42) {
+    return trimmed.toLowerCase();
+  }
+  try {
+    const pubkey = new PublicKey(trimmed);
+    const buffer = pubkey.toBuffer();
+    let isLeadingZeroPadded = true;
+    for (let i = 0; i < 12; i++) {
+      if (buffer[i] !== 0) { isLeadingZeroPadded = false; break; }
+    }
+    if (isLeadingZeroPadded) {
+      return '0x' + buffer.slice(12, 32).toString('hex').toLowerCase();
+    }
+  } catch {}
+  return trimmed;
+};
+
+export const isSameRoom = (id1?: string, id2?: string): boolean => {
+  if (!id1 || !id2) return false;
+  if (id1 === id2) return true;
+  return cleanEvmAddress(id1) === cleanEvmAddress(id2);
+};
 export const RPC_ENDPOINT =
   process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
   'https://api.devnet.solana.com';

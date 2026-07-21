@@ -15,7 +15,7 @@ import {
 import * as Slider from '@radix-ui/react-slider';
 import confetti from 'canvas-confetti';
 import { PublicKey, SystemProgram } from '@solana/web3.js';
-import { getAnchorProgram, connection, getListingPda, getBetPda } from '@/utils/solanaClient';
+import { getAnchorProgram, connection, getListingPda, getBetPda, safePublicKey, cleanEvmAddress, isSameRoom } from '@/utils/solanaClient';
 import { Listing } from '@/store/useAppState';
 import { BN } from '@coral-xyz/anchor';
 
@@ -283,11 +283,12 @@ export default function RoomDetailPage() {
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data && json.data.bets) {
+          const isEvm = roomId.startsWith('0x');
           const mapped = json.data.bets.map((b: any) => ({
             id: b.id,
             user: b.userPubkey,
             side: b.side,
-            amount: Number(b.amount) / 1e9,
+            amount: Number(b.amount) / (isEvm ? 1e6 : 1e9),
             timestamp: new Date(b.createdAt).getTime(),
           })).sort((a: any, b: any) => b.timestamp - a.timestamp);
           setRoomBets(mapped);
@@ -365,7 +366,7 @@ export default function RoomDetailPage() {
       }
 
       if (room.id.startsWith('0x') || !wallet?.publicKey) {
-        const evmBets = user ? user.bets.filter((b) => b.roomId === room.id) : [];
+        const evmBets = user ? user.bets.filter((b) => isSameRoom(b.roomId, room.id)) : [];
         setOnChainBets(evmBets.map((b) => ({
           pubkey: b.id || (b as any).pubkey || String(Date.now()),
           roomId: b.roomId,
@@ -380,7 +381,11 @@ export default function RoomDetailPage() {
 
       try {
         const program = getAnchorProgram(wallet);
-        const roomPda = new PublicKey(room.id);
+        const roomPda = safePublicKey(room.id);
+        if (!roomPda) {
+          setOnChainBets([]);
+          return;
+        }
         const [newBets, legacyBets] = await Promise.all([
           connection.getProgramAccounts(program.programId, {
             filters: [
@@ -441,7 +446,7 @@ export default function RoomDetailPage() {
     loadOnChainBets();
     const interval = setInterval(loadOnChainBets, 10000);
     return () => clearInterval(interval);
-  }, [wallet?.publicKey, room?.id, listings]);
+  }, [wallet?.publicKey, wallet?.address, user, room?.id, listings]);
 
   // Auto scroll chat list to bottom
   useEffect(() => {
@@ -492,6 +497,61 @@ export default function RoomDetailPage() {
     return () => clearInterval(timer);
   }, [room]);
 
+  // Find user wagers in this room
+  const userBetsInRoom = user && room ? user.bets.filter((b) => isSameRoom(b.roomId, room.id)) : [];
+  
+  // Consolidated user bets combining local state, indexer DB profile, and on-chain account fetches
+  const displayBets = useMemo(() => {
+    const map = new Map<string, any>();
+
+    userBetsInRoom.forEach((b) => {
+      const roomPk = safePublicKey(room?.id);
+      const userPk = safePublicKey(user?.wallet || wallet?.address || wallet?.publicKey?.toBase58()) || SystemProgram.programId;
+      const key = roomPk && userPk ? getBetPda(roomPk, userPk, b.side).toBase58() : (b.id || `bet-${b.side}`);
+      map.set(key, {
+        pubkey: key,
+        id: b.id,
+        roomId: b.roomId,
+        user: user?.wallet || wallet?.address || '',
+        currentOwner: user?.wallet || wallet?.address || '',
+        side: b.side,
+        amount: b.amount,
+        claimed: b.claimed,
+        timestamp: b.timestamp || Date.now()
+      });
+    });
+
+    onChainBets.forEach((b) => {
+      map.set(b.pubkey, b);
+    });
+
+    return Array.from(map.values());
+  }, [onChainBets, userBetsInRoom, room?.id, user?.wallet, wallet?.address, wallet?.publicKey]);
+
+  // Consolidated sector transaction history combining indexer API logs and local/on-chain bets
+  const allSectorBets = useMemo(() => {
+    const map = new Map<string, any>();
+
+    roomBets.forEach((b) => {
+      map.set(b.id || `${b.user}-${b.timestamp}`, b);
+    });
+
+    displayBets.forEach((b) => {
+      const key = b.pubkey || b.id;
+      if (!map.has(key)) {
+        map.set(key, {
+          id: key,
+          user: b.user || b.currentOwner || 'Recruit',
+          side: b.side,
+          amount: b.amount,
+          timestamp: b.timestamp || Date.now()
+        });
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
+  }, [roomBets, displayBets]);
+
   if (isLoading && !room) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center py-24 text-center select-none bg-trench-black scanlines">
@@ -519,10 +579,6 @@ export default function RoomDetailPage() {
     );
   }
 
-
-
-
-
   // Potential payout calculation (plat fee is 1.25%)
   const getPotentialPayout = (side: 'moon' | 'jeet') => {
     const isMoon = side === 'moon';
@@ -543,10 +599,8 @@ export default function RoomDetailPage() {
     return isNaN(mult) ? 1.0 : Number(mult.toFixed(2));
   };
 
-  // Find user wagers in this room
-  const userBetsInRoom = user ? user.bets.filter((b) => b.roomId === room.id) : [];
-  const userTotalBet = userBetsInRoom.reduce((sum, b) => sum + b.amount, 0);
-  const userSidesChosen = Array.from(new Set(userBetsInRoom.map((b) => b.side)));
+  const userTotalBet = displayBets.reduce((sum, b) => sum + b.amount, 0);
+  const userSidesChosen = Array.from(new Set(displayBets.map((b) => b.side)));
   
   const hasBetOnMoon = userSidesChosen.includes('moon');
   const hasBetOnJeet = userSidesChosen.includes('jeet');
@@ -1173,11 +1227,11 @@ export default function RoomDetailPage() {
                 <span className="text-neon-moon font-bold uppercase">COIN INTEL BRIEF:</span>
                 <span className="text-trench-gasmask uppercase">MINT ADDR:</span>
                 <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full min-w-0">
-                  <span className="truncate min-w-0">{room.token.address}</span>
+                  <span className="truncate min-w-0">{cleanEvmAddress(room.token.address)}</span>
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigator.clipboard.writeText(room.token.address);
+                      navigator.clipboard.writeText(cleanEvmAddress(room.token.address));
                       addToast("CONTRACT ADDRESS COPIED TO CLIPBOARD!", 'success');
                     }}
                     className="text-neon-moon hover:text-white ml-1 font-bold font-staatliches text-[10px] tracking-wider uppercase bg-trench-black border border-neon-moon/40 px-1 rounded active:scale-95 transition-transform"
@@ -2011,18 +2065,19 @@ export default function RoomDetailPage() {
                 <Terminal className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
                 <span>&gt;_ BET HISTORY (ALL SECTOR TRANS)</span>
               </div>
-              <span className="text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">LATEST {roomBets.length} ACTIONS</span>
+              <span className="text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">LATEST {allSectorBets.length} ACTIONS</span>
             </div>
 
             <div 
               className="flex-1 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px] select-text scrollbar"
             >
-              {roomBets.length > 0 ? (
-                roomBets.map((bet) => {
-                  const formattedUser = bet.user.slice(0, 4) + '...' + bet.user.slice(-4);
+              {allSectorBets.length > 0 ? (
+                allSectorBets.map((bet) => {
+                  const formattedUser = bet.user ? (bet.user.length > 8 ? bet.user.slice(0, 4) + '...' + bet.user.slice(-4) : bet.user) : 'RECRUIT';
                   const isMoon = bet.side === 'moon';
                   const colorClass = isMoon ? 'text-[#16A34A] glow-moon' : 'text-jeet-red glow-jeet';
                   const timeString = new Date(bet.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                  const currencySymbol = (room.token.chainId === 'solana' || !room.id.startsWith('0x')) ? 'SOL' : 'USDC';
 
                   return (
                     <div key={bet.id} className="flex items-center justify-between font-bold uppercase hover:bg-trench-mud/20 px-1 py-0.5 rounded transition-colors">
@@ -2036,7 +2091,7 @@ export default function RoomDetailPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-white font-bold">{bet.amount.toFixed(2)} USDC</span>
+                        <span className="text-white font-bold">{bet.amount.toFixed(2)} {currencySymbol}</span>
                         <span className="text-trench-gasmask/70 text-[8px] sm:text-[9px]">{timeString}</span>
                       </div>
                     </div>
@@ -2054,11 +2109,11 @@ export default function RoomDetailPage() {
           <div className="retro-panel p-2 sm:p-3 min-h-[13rem] flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
             <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-xs sm:text-sm font-bold uppercase border-b border-trench-sandbag/40 pb-1.5 mb-2">
               <Swords className="w-3.5 h-3.5 text-neon-moon animate-pulse" />
-              <span>⚔️ YOUR LOCKED MARKET POSITIONS ({userBetsInRoom.length})</span>
+              <span>⚔️ YOUR LOCKED MARKET POSITIONS ({displayBets.length})</span>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar">
-              {userBetsInRoom.length > 0 ? (
+              {displayBets.length > 0 ? (
                 <div className="overflow-x-auto w-full">
                   <table className="w-full text-left font-mono text-[10px] uppercase">
                     <thead>
@@ -2071,19 +2126,7 @@ export default function RoomDetailPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {(() => {
-                        const displayBets = onChainBets.length > 0 ? onChainBets : userBetsInRoom.map(b => ({
-                          id: b.id,
-                          pubkey: getBetPda(new PublicKey(room.id), new PublicKey(user?.wallet || wallet?.publicKey?.toBase58() || SystemProgram.programId.toBase58()), b.side).toBase58(),
-                          roomId: room.id,
-                          user: user?.wallet || wallet?.publicKey?.toBase58() || '',
-                          currentOwner: user?.wallet || wallet?.publicKey?.toBase58() || '',
-                          side: b.side,
-                          amount: b.amount,
-                          claimed: b.claimed
-                        }));
-
-                        return displayBets.map((bet) => {
+                      {displayBets.map((bet) => {
                           const entryPrice = openingPriceSafe || 0;
                           const currentSpotPrice = livePrice || openingPriceSafe || 0;
                           
@@ -2125,7 +2168,7 @@ export default function RoomDetailPage() {
                                   {bet.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
                                 </span>
                               </td>
-                              <td className="py-2 px-2 text-white font-bold">{bet.amount.toFixed(2)} SOL</td>
+                              <td className="py-2 px-2 text-white font-bold">{bet.amount.toFixed(2)} {(room.token.chainId === 'solana' || !room.id.startsWith('0x')) ? 'SOL' : 'USDC'}</td>
                               <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(entryPrice)}</td>
                               <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(currentSpotPrice)}</td>
                               <td className="py-2 px-2 text-right">
@@ -2161,8 +2204,7 @@ export default function RoomDetailPage() {
                               </td>
                             </tr>
                           );
-                        });
-                      })()}
+                        })}
                     </tbody>
                   </table>
                 </div>

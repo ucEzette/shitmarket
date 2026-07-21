@@ -8,7 +8,7 @@ import { avalancheFuji } from 'viem/chains';
 import * as bip39 from 'bip39';
 import { derivePath } from 'ed25519-hd-key';
 import bs58 from 'bs58';
-import { connection, RPC_ENDPOINT } from '../utils/solanaClient';
+import { connection, RPC_ENDPOINT, safePublicKey } from '../utils/solanaClient';
 import { useAppState } from '@/store/useAppState';
 
 // Browser-safe hex conversion helpers (no Buffer required)
@@ -291,10 +291,13 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const savedEncrypted = localStorage.getItem('shitmarket_imported_wallet_encrypted');
       
       if (savedPubkey) {
-        setActiveWalletPublicKey(new PublicKey(savedPubkey));
-        setWalletType('imported');
-        if (savedEncrypted) {
-          setIsImportedWalletLocked(true);
+        const pk = safePublicKey(savedPubkey);
+        if (pk) {
+          setActiveWalletPublicKey(pk);
+          setWalletType('imported');
+          if (savedEncrypted) {
+            setIsImportedWalletLocked(true);
+          }
         }
       }
     }

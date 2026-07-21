@@ -9,7 +9,7 @@ import { Connection, PublicKey } from '@solana/web3.js';
 import * as anchor from '@coral-xyz/anchor';
 import { config } from '../../config';
 import { settleRoomByPubkey } from '../../keeper/settlementKeeper';
-import { aggregatePrice } from '../../feeds/priceAggregator';
+import { aggregatePrice, getLookupAddress } from '../../feeds/priceAggregator';
 
 export const roomsRouter = express.Router();
 
@@ -33,27 +33,8 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
   }
 
   try {
-    let lookupAddress = mintAddress;
-    let isEvm = false;
-    try {
-      const pubkey = new PublicKey(mintAddress);
-      const buffer = pubkey.toBuffer();
-      let evmCheck = true;
-      for (let i = 20; i < 32; i++) {
-        if (buffer[i] !== 0) {
-          evmCheck = false;
-          break;
-        }
-      }
-      if (evmCheck) {
-        lookupAddress = '0x' + buffer.slice(0, 20).toString('hex');
-        isEvm = true;
-      }
-    } catch {
-      if (mintAddress.startsWith('0x')) {
-        isEvm = true;
-      }
-    }
+    const lookupAddress = getLookupAddress(mintAddress);
+    const isEvm = lookupAddress.startsWith('0x');
 
     const url = `${config.external.dexscreenerUrl}/tokens/${lookupAddress}`;
     const { data } = await axios.get(url, { timeout: 5000 });
@@ -64,7 +45,7 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
       name: best.baseToken?.name,
       symbol: best.baseToken?.symbol,
       imageUrl: best.info?.imageUrl ?? undefined,
-      chainId: best.chainId ?? (isEvm ? 'monad' : 'solana'),
+      chainId: best.chainId ?? (isEvm ? 'avalanche' : 'solana'),
       originalAddress: lookupAddress,
       pairAddress: best.pairAddress,
     };

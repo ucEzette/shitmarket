@@ -39,24 +39,40 @@ export interface PriceSample {
   timestamp: number;  // unix seconds
 }
 
-function getLookupAddress(tokenMint: string): string {
-  try {
-    const pubkey = new PublicKey(tokenMint);
-    const buffer = pubkey.toBuffer();
-    let isEvm = true;
-    for (let i = 20; i < 32; i++) {
-      if (buffer[i] !== 0) {
-        isEvm = false;
-        break;
-      }
-    }
-    if (isEvm) {
-      return '0x' + buffer.slice(0, 20).toString('hex');
-    }
-  } catch {
-    // Already an EVM address or invalid Solana public key
+export function getLookupAddress(tokenMint: string): string {
+  if (!tokenMint) return tokenMint || '';
+  const trimmed = tokenMint.trim();
+
+  if (trimmed.startsWith('0x000000000000000000000000') && trimmed.length === 66) {
+    return '0x' + trimmed.slice(26).toLowerCase();
   }
-  return tokenMint;
+
+  if (trimmed.startsWith('0x') && trimmed.length === 42) {
+    return trimmed.toLowerCase();
+  }
+
+  try {
+    const pubkey = new PublicKey(trimmed);
+    const buffer = pubkey.toBuffer();
+
+    let leadingZeroPadded = true;
+    for (let i = 0; i < 12; i++) {
+      if (buffer[i] !== 0) { leadingZeroPadded = false; break; }
+    }
+    if (leadingZeroPadded) {
+      return '0x' + buffer.slice(12, 32).toString('hex').toLowerCase();
+    }
+
+    let trailingZeroPadded = true;
+    for (let i = 20; i < 32; i++) {
+      if (buffer[i] !== 0) { trailingZeroPadded = false; break; }
+    }
+    if (trailingZeroPadded) {
+      return '0x' + buffer.slice(0, 20).toString('hex').toLowerCase();
+    }
+  } catch {}
+
+  return trimmed;
 }
 
 // ─── Internal fetch helpers ───────────────────────────────────────────────────

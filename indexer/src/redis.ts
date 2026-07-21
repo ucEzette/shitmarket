@@ -23,11 +23,19 @@ redisSub.on('error', (err) => logger.error({ msg: 'Redis subscriber error', err 
 redisSub.on('connect', () => logger.info('Redis subscriber connected'));
 
 export async function connectRedis(): Promise<void> {
-  await Promise.all([redis.connect(), redisSub.connect()]);
+  try {
+    await Promise.all([redis.connect(), redisSub.connect()]);
+  } catch (err: any) {
+    logger.warn({ msg: 'Redis failed to connect — operating in fallback mode without Redis cache', err: err.message });
+  }
 }
 
 export async function disconnectRedis(): Promise<void> {
-  await Promise.all([redis.quit(), redisSub.quit()]);
+  try {
+    await Promise.all([redis.quit(), redisSub.quit()]);
+  } catch (e) {
+    // Ignore cleanup errors
+  }
 }
 
 // ─── Room cache helpers ───────────────────────────────────────────────────────

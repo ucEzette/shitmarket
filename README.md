@@ -1,12 +1,14 @@
-# ShitMarket — Backend
+# ShitMarket — Permissionless PvP Prediction Market
 
-PvP meme coin prediction market on Solana. This repo contains:
+Permissionless PvP prediction market for memecoins and any argument verifiable via our multi-oracle price aggregator (Pyth Network, Chainlink, DexScreener, Birdeye). Core smart contracts deployed on Avalanche C-Chain with Solana/multi-chain cross-chain deposit support (Circle CCTP). This repo contains:
 
 | Directory | Description |
 |---|---|
-| `program/` | Anchor/Rust Solana program |
-| `indexer/` | TypeScript event indexer, settlement keeper, REST API, WebSocket server |
-| `src/` | Next.js frontend (existing) |
+| `contracts/` | Core Solidity smart contract ([ShitMarketCore.sol](file:///Users/adam/Documents/shitmarket/contracts/ShitMarketCore.sol)) with Pyth on-chain verification |
+| `evm/` | Hardhat deployment scripts, local EVM testing environment, and contract verification configs |
+| `indexer/` | TypeScript event indexer, settlement keeper, CCTP relayer, REST API, and WebSocket server |
+| `src/` | Next.js frontend web app with Privy multi-chain authentication & Viem Web3 state management |
+| `program/` | Legacy Solana Anchor program (maintained for dual-chain compatibility) |
 
 ---
 
@@ -213,14 +215,46 @@ Winner: `final_price > opening_price` → Moon wins. Otherwise Jeet wins.
 
 ---
 
+## Avalanche Multi-Chain Integration
+
+ShitMarket has been upgraded to run as a **chain-agnostic prediction protocol** with its core state engine on the **Avalanche C-Chain** (wagering in USDC) while supporting deposits and withdrawals from Solana and other chains.
+
+### Dual-Chain Architecture
+*   **Hub (Avalanche C-Chain)**: The core Solidity contract [ShitMarketCore.sol](file:///Users/adam/Documents/shitmarket/contracts/ShitMarketCore.sol) manages prediction room states, betting pools, claims, and the ticket marketplace.
+*   **Spokes (Solana, Base, Ethereum)**: Host deposit gateways that burn USDC via Circle CCTP, which are then relayed to mint/credit equivalent USDC on Avalanche.
+*   **User UX**: Privy embedded wallets provision an EVM smart account on the fly for any logged-in Solana or social user, supporting gasless transaction signatures sponsored by a platform Paymaster.
+
+### Run in Avalanche Mode
+To switch the indexer and keeper services to Avalanche mode:
+1. Configure environment variables in `indexer/.env`:
+   ```bash
+   CORE_CHAIN=avalanche
+   AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+   CORE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
+   EVM_KEEPER_PRIVATE_KEY=0xYourEVMKeeperPrivateKey
+   ```
+2. Configure frontend env settings in `.env.local`:
+   ```bash
+   NEXT_PUBLIC_CORE_CHAIN=avalanche
+   NEXT_PUBLIC_CORE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
+   NEXT_PUBLIC_AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+   ```
+3. Start the indexer backend:
+   ```bash
+   cd indexer
+   npm run dev
+   ```
+
+---
+
 ## Security Model
 
 | Threat | Mitigation |
 |---|---|
-| Reentrancy on claim | `claimed = true` set before lamport transfer |
+| Reentrancy on claim | `claimed = true` set before transfer/callback (Anchor and Solidity) |
 | Duplicate settlement | `RoomStatus::Active` checked before settlement |
-| Rogue keeper | Keeper pubkey stored in `PlatformConfig`; only admin can change it |
-| Admin rug | No `cancel_room` instruction exists; funds locked until settlement |
-| Arithmetic overflow | All math uses `checked_add/sub/mul/div` with explicit error |
-| Stale prices | Keeper aggregates from 2+ sources; mock returns ±5% of opening in dev |
-| Double-processing events | Transaction signatures cached in Redis (48h TTL) |
+| Rogue keeper | Keeper address stored in `PlatformConfig`; only admin can change it |
+| Admin rug | No `cancel_room` or admin-claim actions exist during active pools; funds locked until settlement |
+| Arithmetic overflow | Checked math functions utilized (Anchor safe math, Solidity 0.8+ native check) |
+| Stale prices | Keeper aggregates from 4+ sources (DexScreener, Birdeye, Jupiter, Chainlink) with 20% outlier shield |
+| Double-processing events | Transaction signatures/hashes cached in Redis (48h TTL) |

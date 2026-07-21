@@ -180,6 +180,38 @@ const newInstructions = [
         type: { defined: { name: "Side" } }
       }
     ]
+  },
+  {
+    name: "disputeRoom",
+    rustName: "dispute_room",
+    accounts: [
+      { name: "room", writable: true },
+      { name: "escrow", writable: true },
+      { name: "config" },
+      { name: "challenger", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: []
+  },
+  {
+    name: "resolveDispute",
+    rustName: "resolve_dispute",
+    accounts: [
+      { name: "room", writable: true },
+      { name: "escrow", writable: true },
+      { name: "challenger", writable: true },
+      { name: "vault", writable: true },
+      { name: "config" },
+      { name: "admin", writable: true, signer: true },
+      { name: "systemProgram" }
+    ],
+    args: [
+      {
+        name: "winner",
+        type: { option: { defined: { name: "Side" } } }
+      },
+      { name: "overturned", type: "bool" }
+    ]
   }
 ];
 
@@ -479,6 +511,92 @@ if (betType && betType.type && betType.type.fields) {
     }
   }
 }
+
+// Update RoomStatus enum variants to include Disputed
+const roomStatusType = idl.types.find(t => t.name === "RoomStatus");
+if (roomStatusType && roomStatusType.type && roomStatusType.type.variants) {
+  if (!roomStatusType.type.variants.some(v => v.name === "Disputed")) {
+    roomStatusType.type.variants.push({ name: "Disputed" });
+  }
+}
+
+// Update Room type to include custom oracle and dispute fields
+const roomType = idl.types.find(t => t.name === "room" || t.name === "Room");
+if (roomType && roomType.type && roomType.type.fields) {
+  if (!roomType.type.fields.some(f => f.name === "oracle")) {
+    roomType.type.fields.push({ name: "oracle", type: "pubkey" });
+  }
+  if (!roomType.type.fields.some(f => f.name === "oracleFeeLamports")) {
+    roomType.type.fields.push({ name: "oracleFeeLamports", type: "u64" });
+  }
+  if (!roomType.type.fields.some(f => f.name === "settlementTimestamp")) {
+    roomType.type.fields.push({ name: "settlementTimestamp", type: "i64" });
+  }
+  if (!roomType.type.fields.some(f => f.name === "disputeStatus")) {
+    roomType.type.fields.push({ name: "disputeStatus", type: "u8" });
+  }
+  if (!roomType.type.fields.some(f => f.name === "resolutionCriteria")) {
+    roomType.type.fields.push({ name: "resolutionCriteria", type: { array: ["u8", 64] } });
+  }
+}
+
+// Patch createRoom arguments to include the new custom oracle & resolution fields
+const createRoomInstr = idl.instructions.find(i => i.name === 'createRoom');
+if (createRoomInstr) {
+  createRoomInstr.args = [
+    { name: "tokenMint", type: "pubkey" },
+    { name: "tokenName", type: "string" },
+    { name: "durationMinutes", type: "u32" },
+    { name: "switchboardFeed", type: { option: "pubkey" } },
+    { name: "openingPriceParam", type: { option: "i64" } },
+    { name: "oracle", type: { option: "pubkey" } },
+    { name: "oracleFeeLamports", type: { option: "u64" } },
+    { name: "resolutionCriteria", type: { option: { array: ["u8", 64] } } },
+    { name: "nonce", type: "u8" }
+  ];
+}
+
+// Add dispute event structures
+const roomDisputedType = {
+  name: "RoomDisputed",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "room", type: "pubkey" },
+      { name: "challenger", type: "pubkey" },
+      { name: "disputeBond", type: "u64" }
+    ]
+  }
+};
+const disputeResolvedType = {
+  name: "DisputeResolved",
+  type: {
+    kind: "struct",
+    fields: [
+      { name: "room", type: "pubkey" },
+      { name: "winner", type: "u8" },
+      { name: "refundChallenger", type: "bool" }
+    ]
+  }
+};
+
+[roomDisputedType, disputeResolvedType].forEach(t => {
+  const existingIdx = idl.types.findIndex(item => item.name === t.name);
+  if (existingIdx >= 0) idl.types[existingIdx] = t;
+  else idl.types.push(t);
+});
+
+const roomDisputedEvent = { name: "RoomDisputed", discriminator: getEventDiscriminator("RoomDisputed") };
+const disputeResolvedEvent = { name: "DisputeResolved", discriminator: getEventDiscriminator("DisputeResolved") };
+
+if (!idl.events) {
+  idl.events = [];
+}
+[roomDisputedEvent, disputeResolvedEvent].forEach(e => {
+  const existingIdx = idl.events.findIndex(item => item.name === e.name);
+  if (existingIdx >= 0) idl.events[existingIdx] = e;
+  else idl.events.push(e);
+});
 
 // 4. Save patched IDL back to all destinations
 idlPaths.forEach(p => {

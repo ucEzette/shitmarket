@@ -497,8 +497,8 @@ export const mapApiRoom = (apiRoom: any): Room => {
       pairAddress: apiRoom.pairAddress || '',
     },
     creator: apiRoom.creator || 'Unknown',
-    moonPool: Number(apiRoom.moonPool || 0) / 1e9,
-    jeetPool: Number(apiRoom.jeetPool || 0) / 1e9,
+    moonPool: Number(apiRoom.moonPool || 0) / (apiRoom.chainId === 'avalanche' || apiRoom.roomPubkey?.startsWith('0x') ? 1e6 : 1e9),
+    jeetPool: Number(apiRoom.jeetPool || 0) / (apiRoom.chainId === 'avalanche' || apiRoom.roomPubkey?.startsWith('0x') ? 1e6 : 1e9),
     expiry: new Date(apiRoom.expiry).getTime(),
     status: apiRoom.status as 'active' | 'settled' | 'cancelled' | 'pending' | 'disputed',
     winner: apiRoom.winner ? (apiRoom.winner as 'moon' | 'jeet' | 'draw') : undefined,
@@ -516,6 +516,32 @@ export const mapApiRoom = (apiRoom: any): Room => {
     oracleLogs: apiRoom.oracleLogs || undefined,
   };
 };
+
+const PERSISTED_ROOMS_KEY = 'shitmarket_persisted_rooms_v2';
+
+export function loadPersistedRooms(): Room[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(PERSISTED_ROOMS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {
+    console.warn('Failed to load persisted rooms from localStorage:', e);
+  }
+  return [];
+}
+
+export function savePersistedRooms(rooms: Room[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const slice = rooms.slice(0, 250);
+    localStorage.setItem(PERSISTED_ROOMS_KEY, JSON.stringify(slice));
+  } catch (e) {
+    console.warn('Failed to save persisted rooms to localStorage:', e);
+  }
+}
 
 function isRoomEqual(a: Room, b: Room): boolean {
   if (a.id !== b.id) return false;
@@ -703,8 +729,8 @@ async function ensureAvalancheFujiChain(provider: any) {
 export const useAppState = create<AppState>()(
   persist(
     (set, get) => ({
-  rooms: [],
-  roomsLoaded: false,
+  rooms: loadPersistedRooms(),
+  roomsLoaded: loadPersistedRooms().length > 0,
   listings: [],
   isPaused: false,
   isEvm: process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche',
@@ -870,17 +896,20 @@ export const useAppState = create<AppState>()(
   fetchRooms: async () => {
     try {
       const indexerApi = INDEXER_URL;
-      const res = await fetchWithTimeout(`${indexerApi}/api/rooms?status=all&limit=50`, {}, 3000);
+      const res = await fetchWithTimeout(`${indexerApi}/api/rooms?status=all&limit=100`, {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
         const mapped = json.data.map(mapApiRoom);
         const currentRooms = get().rooms;
         const mergedRooms = mapped.map((newRoom: Room) => {
-          const current = currentRooms.find((r) => r.id === newRoom.id);
+          const current = currentRooms.find((r) => isSameRoom(r.id, newRoom.id));
           return mergeRooms(current, newRoom, null) || newRoom;
         });
-        const missingRooms = currentRooms.filter((cr) => !mapped.some((mr: Room) => mr.id === cr.id));
-        set({ rooms: [...mergedRooms, ...missingRooms], roomsLoaded: true });
+        const missingRooms = currentRooms.filter((cr) => !mapped.some((mr: Room) => isSameRoom(mr.id, cr.id)));
+        const finalRooms = [...mergedRooms, ...missingRooms];
+        finalRooms.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        set({ rooms: finalRooms, roomsLoaded: true });
+        savePersistedRooms(finalRooms);
 
         // Hydrate on-chain state asynchronously in the background so it doesn't block UI rendering!
         (async () => {
@@ -1445,12 +1474,38 @@ export const useAppState = create<AppState>()(
           console.warn("Failed to extract roomCreated log receipt:", receiptErr);
         }
 
-        const optimisticRoom = {
+        const optimisticRoom: Room = {
           ...room,
           id: actualRoomId,
           status: 'active' as const,
         };
-        set((state) => ({ rooms: [optimisticRoom, ...state.rooms] }));
+        const updatedRooms = [optimisticRoom, ...get().rooms.filter(r => !isSameRoom(r.id, optimisticRoom.id))];
+        set({ rooms: updatedRooms });
+        savePersistedRooms(updatedRooms);
+
+        fetch(`${INDEXER_URL}/api/rooms`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            roomPubkey: actualRoomId,
+            tokenMint: room.token.address,
+            tokenName: room.token.name,
+            tokenSymbol: room.token.symbol,
+            tokenImageUrl: room.token.icon,
+            category: room.category,
+            resolutionCriteria: room.resolutionCriteria,
+            oracleAddress: room.oracleAddress,
+            oracleFeeLamports: room.oracleFeeLamports,
+            moonPool: room.moonPool,
+            jeetPool: room.jeetPool,
+            openingPrice: room.openingPrice,
+            expiry: new Date(room.expiry).toISOString(),
+            creator: wallet.address,
+            chainId: room.token.chainId,
+            duration: room.duration,
+            status: 'active'
+          })
+        }).catch(err => console.warn("Failed to post EVM room to indexer:", err));
         
         get().updateToast(toastId, {
           type: 'success',
@@ -1703,7 +1758,33 @@ export const useAppState = create<AppState>()(
         openingPrice: onChainOpeningPrice,
         status: 'active' as const,
       };
-      set((state) => ({ rooms: [optimisticRoom, ...state.rooms] }));
+      const updatedRooms = [optimisticRoom, ...get().rooms.filter(r => !isSameRoom(r.id, optimisticRoom.id))];
+      set({ rooms: updatedRooms });
+      savePersistedRooms(updatedRooms);
+
+      fetch(`${INDEXER_URL}/api/rooms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomPubkey: roomPda.toBase58(),
+          tokenMint: room.token.address,
+          tokenName: room.token.name,
+          tokenSymbol: room.token.symbol,
+          tokenImageUrl: room.token.icon,
+          category: room.category,
+          resolutionCriteria: room.resolutionCriteria,
+          oracleAddress: room.oracleAddress,
+          oracleFeeLamports: room.oracleFeeLamports,
+          moonPool: room.moonPool,
+          jeetPool: room.jeetPool,
+          openingPrice: onChainOpeningPrice,
+          expiry: new Date(onChainExpiry).toISOString(),
+          creator: wallet.publicKey.toBase58(),
+          chainId: room.token.chainId,
+          duration: room.duration,
+          status: 'active'
+        })
+      }).catch(err => console.warn("Failed to post Solana room to indexer:", err));
       
       // Force refreshing the rooms list in the background
       get().fetchRooms();
@@ -3240,14 +3321,16 @@ export const useAppState = create<AppState>()(
       const res = await fetchWithTimeout(`${indexerApi}/api/profile/${address}`, {}, 3000);
       const json = await res.json();
       if (json.success && json.data) {
+        const isEvmMode = get().isEvm || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
+        const decimals = isEvmMode ? 1e6 : 1e9;
         const stats = {
           totalBets: json.data.totalBets || 0,
           wins: json.data.wins || 0,
           losses: json.data.losses || 0,
-          profit: Number(json.data.profit || 0) / 1e9,
+          profit: Number(json.data.profit || 0) / decimals,
           winStreak: json.data.winStreak || 0,
           longestWinStreak: json.data.longestWinStreak || 0,
-          biggestBet: Number(json.data.biggestBet || 0) / 1e9,
+          biggestBet: Number(json.data.biggestBet || 0) / decimals,
         };
         const bets = (json.data.bets || []).map((b: any) => ({
           id: b.id,

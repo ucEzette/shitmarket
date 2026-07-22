@@ -285,7 +285,7 @@ const FALLBACK_DATA = {
     { topic: 'Meme Coin Super Cycle', score: 92, trend: 'up' },
     { topic: 'Solana L2 Mania', score: 85, trend: 'up' },
     { topic: 'AI Agent Tokens', score: 78, trend: 'up' },
-    { topic: 'Polymarket Predictions', score: 72, trend: 'up' },
+    { topic: 'Event Predictions', score: 72, trend: 'up' },
     { topic: 'NFT Renaissance', score: 45, trend: 'down' },
   ],
   intelligenceReport: 'Meme coin super cycle narrative dominates. Solana meme tokens seeing highest volume since March. AI agent tokens gaining traction. Market neutral with bullish bias on high-volume meme pairs.'

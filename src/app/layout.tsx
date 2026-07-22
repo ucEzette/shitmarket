@@ -12,6 +12,11 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+// Prevent Next.js from statically prerendering any page at build time.
+// All pages in this dapp depend on browser-only Solana wallet providers and
+// live chain data — static generation would fail and is not useful here.
+export const dynamic = 'force-dynamic';
+
 
 const fontStaatliches = Staatliches({
   weight: '400',

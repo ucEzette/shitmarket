@@ -7,26 +7,8 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  experimental: {
-    // Next.js 14: keep heavy packages as native Node.js requires on the server
-    // so webpack doesn't bundle their diagnostics_channel internals that lack
-    // tracingChannel (causing prerender failures on all pages).
-    serverComponentsExternalPackages: [
-      '@solana/web3.js',
-      '@coral-xyz/anchor',
-      '@solana/wallet-adapter-base',
-      '@solana/wallet-adapter-react',
-      '@solana/wallet-adapter-react-ui',
-      '@solana/wallet-adapter-wallets',
-      '@solana-mobile/wallet-adapter-mobile',
-      '@solana-program/memo',
-      'unstorage',
-      'pino',
-      'pino-pretty',
-      'undici',
-    ],
-  },
   webpack: (config, { isServer }) => {
+    // Stub out packages that are browser-only or unused on the server
     config.resolve.alias = {
       ...config.resolve.alias,
       '@stripe/crypto': false,
@@ -37,10 +19,9 @@ const nextConfig = {
     };
 
     if (isServer) {
-      // Force BOTH `diagnostics_channel` and `node:diagnostics_channel` to resolve
-      // to the native Node.js module so webpack never bundles the old copies from
-      // lru-cache (inside unstorage) or pino (inside @privy-io/react-auth /
-      // @walletconnect) that call tracingChannel without it being available.
+      // Force `diagnostics_channel` (both bare and `node:` prefixed) to resolve
+      // to the native Node.js built-in so webpack never bundles old copies from
+      // lru-cache (inside unstorage) or pino that call tracingChannel.
       const existingExternals = Array.isArray(config.externals)
         ? config.externals
         : config.externals

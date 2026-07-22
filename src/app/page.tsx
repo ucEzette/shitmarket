@@ -242,7 +242,7 @@ function HomeContent() {
       <section className="mx-auto max-w-7xl w-full px-4 py-12">
         <div className="premium-glass-card p-8 rounded-[24px] relative shadow-2xl border border-white/10">
           <div className="absolute top-[-14px] left-[50%] -translate-x-[50%] bg-black/60 backdrop-blur-md border border-white/15 text-white px-6 py-1.5 rounded-full font-mono text-[10px] tracking-widest shadow-lg uppercase font-bold">
-            ⚔️ THE TRENCH COMMANDERS ⚔️
+            THE TRENCH COMMANDERS
           </div>
           <h3 className="font-staatliches text-2xl text-white tracking-wider mb-4 mt-2 text-center uppercase">
             MEET YOUR BATTLE COMPANIONS

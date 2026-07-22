@@ -10,7 +10,8 @@ import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
 import { HeaderPanel } from '@/components/ui/HeaderPanel';
 import { 
   Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, Brain,
-  AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal, Bookmark
+  AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal, Bookmark,
+  ExternalLink, Scale, FileText, CheckCircle2
 } from 'lucide-react';
 import * as Slider from '@radix-ui/react-slider';
 import confetti from 'canvas-confetti';
@@ -147,6 +148,13 @@ export default function RoomDetailPage() {
 
   const room = rooms.find((r) => r.id === roomId);
 
+  const isDebateMarket = room ? (
+    (room.category as string) === 'debate' || 
+    (room.category as string) === 'prediction' || 
+    (!!room.resolutionCriteria && room.resolutionCriteria.length > 0 && (!room.token.pairAddress || room.token.pairAddress === '')) ||
+    room.token.address === room.creator
+  ) : false;
+
   const [disputeCountdown, setDisputeCountdown] = useState<string | null>(null);
   const [arbitrationWinner, setArbitrationWinner] = useState<'moon' | 'jeet' | 'draw'>('moon');
   const [arbitrationOverturned, setArbitrationOverturned] = useState<boolean>(true);
@@ -200,6 +208,12 @@ export default function RoomDetailPage() {
   const [onChainBets, setOnChainBets] = useState<any[]>([]);
   const [selectedBetToList, setSelectedBetToList] = useState<any | null>(null);
   const [askPriceInput, setAskPriceInput] = useState<string>('');
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const lastSyncedLabel = room?.lastSyncedAt ? formatRelativeTime(room.lastSyncedAt) : 'syncing...';
 
   useEffect(() => {
@@ -726,6 +740,15 @@ export default function RoomDetailPage() {
     (c) => c.roomId === room.id && (c.side === activeChatTab || c.side === 'all')
   );
 
+  if (!mounted || !room) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] font-mono text-xs uppercase tracking-widest text-trench-gasmask animate-pulse bg-transparent">
+        <Loader2 className="animate-spin text-neon-moon mb-3" size={32} />
+        <span>ESTABLISHING TARGET SCAN... SECURING ENCRYPTED LINK</span>
+      </div>
+    );
+  }
+
   const isSettled = room.status === 'settled';
   const isDrawOrVoid = isSettled && (!room.winner || room.winner === 'draw');
   const userWon = isSettled && room.winner && room.winner !== 'draw' && userSidesChosen.includes(room.winner as any);
@@ -1037,222 +1060,432 @@ export default function RoomDetailPage() {
         {/* COLUMN 1: ACTIVE COIN COMBAT (lg:col-span-9) */}
         <section className="lg:col-span-9 flex flex-col gap-6 min-w-0 w-full overflow-hidden">
 
-          {/* Polymarket-style high-impact prediction question */}
-          <div className="bg-trench-black border-2 border-trench-sandbag p-4 md:p-5 rounded-xl shadow-2xl relative scanlines overflow-hidden">
-            {/* corner rivets */}
-            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-            <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-            <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-            
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pl-4 pr-4">
-              <div className="space-y-1.5 flex-1">
-                <span className="font-mono text-[9px] text-neon-moon font-extrabold uppercase tracking-widest block animate-pulse">
-                  🔮 ACTIVE TARGET PREDICTION QUESTION
-                </span>
-                <h2 className="font-staatliches text-2xl sm:text-3xl text-white tracking-wide uppercase leading-tight">
-                  Will {room ? room.token.name : 'Token'} ({room ? formatCashtag(room.token.symbol) : 'TKN'}) end above ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} on {new Date(expirySafe).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}?
-                </h2>
-              </div>
-              
-              <div className="shrink-0 flex flex-col gap-1 bg-[#0d140a] border border-[#2c3d25] px-4 py-2 rounded">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
-                  <span className="font-mono text-xs text-white uppercase font-bold tracking-widest">
-                    {isRoomSettling || (room && room.status === 'settled') ? 'RESOLVED' : 'ACTIVE'}
-                  </span>
-                </div>
-                <span className="font-mono text-[9px] text-trench-gasmask uppercase tracking-wider">
-                  Last synced {lastSyncedLabel}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* Determine Market Category Structure */}
+          {(() => {
+            if (isDebateMarket && room) {
+              let refUrl = '';
+              let criteriaText = room.resolutionCriteria || '';
+              if (criteriaText.includes('| Ref: ')) {
+                const parts = criteriaText.split('| Ref: ');
+                criteriaText = parts[0].trim();
+                refUrl = parts[1].trim();
+              } else if (criteriaText.includes('Ref: ')) {
+                const parts = criteriaText.split('Ref: ');
+                criteriaText = parts[0].trim();
+                refUrl = parts[1].trim();
+              }
 
-          {/* Toggle buttons for Chart view */}
-          <div className="flex justify-end gap-2 font-mono text-[10px]">
-            <button className="px-3.5 py-1 bg-neon-moon text-black font-bold rounded uppercase tracking-wider border border-neon-moon">
-              Line
-            </button>
-            <button className="px-3.5 py-1 bg-transparent text-trench-gasmask border border-trench-sandbag rounded uppercase tracking-wider hover:text-white transition-colors">
-              Crates
-            </button>
-          </div>
+              return (
+                <div className="space-y-6 animate-fadeIn">
+                  {/* 1. Prediction Question & Statement Card */}
+                  <div className="bg-[#080B11] border-2 border-yellow-500/40 p-6 rounded-2xl shadow-2xl relative overflow-hidden">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                      <div className="flex items-start gap-4">
+                        <div className="w-16 h-16 rounded-2xl bg-black border-2 border-yellow-400 overflow-hidden shrink-0 flex items-center justify-center text-3xl shadow-lg">
+                          {room.token.icon && (room.token.icon.startsWith('http') || room.token.icon.startsWith('data:') || room.token.icon.startsWith('blob:')) ? (
+                            <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <span>{room.token.icon || '🗣️'}</span>
+                          )}
+                        </div>
 
-          {/* Stable and Static DexScreener Chart Terminal with Militarized Console Shell Frame (Permanently Flicker-Free) */}
-          <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[320px] sm:h-[410px] flex flex-col justify-between z-10 scanlines">
-            
-            {/* Steel Console Top Header Bar */}
-            <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">
-              {/* corner rivets */}
-              <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-              <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-              
-              <div className="flex items-center gap-2 pl-4">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
-                <span className="text-white tracking-widest font-staatliches text-xs">CRT RADAR CONSOLE</span>
-              </div>
-              
-              {/* System status LEDs */}
-              <div className="flex items-center gap-3 pr-4">
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_6px_#16a34a]" />
-                  <span>SYS ON</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_6px_#f59e0b] animate-ping" />
-                  <span>DEX SYNC</span>
-                </div>
-              </div>
-            </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="px-2.5 py-0.5 rounded-full bg-yellow-400/10 border border-yellow-400/50 font-mono text-[10px] text-yellow-400 font-extrabold uppercase tracking-wider">
+                              DEBATE / PREDICTION MARKET
+                            </span>
+                            <span className="px-2.5 py-0.5 rounded-full bg-gray-800 border border-gray-700 font-mono text-[10px] text-white font-extrabold uppercase">
+                              ${room.token.symbol}
+                            </span>
+                          </div>
+                          <h1 className="font-staatliches text-3xl sm:text-4xl text-white tracking-wide uppercase leading-tight mt-1">
+                            {criteriaText || room.token.name}
+                          </h1>
+                          <p className="font-mono text-xs text-gray-400 mt-1">
+                            CREATED BY <span className="text-white font-bold">{cleanEvmAddress(room.creator)}</span> • EXPIRATION: <span className="text-neon-moon font-bold">{new Date(room.expiry).toLocaleString()}</span>
+                          </p>
+                        </div>
+                      </div>
 
-            {/* Interactive Iframe CRT Panel Overlay Container */}
-            <div className="w-full flex-1 relative bg-black overflow-hidden group">
-              
-              {/* 1. Vertical Sweep Radar Overlay */}
-              <div className="radar-sweep-line absolute left-0 right-0 h-[2px] bg-neon-moon/20 shadow-[0_0_10px_#16a34a] z-10 pointer-events-none" />
-
-              {/* 2. Glass Reflection Glare Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none z-10" />
-
-              {/* 3. CRT Scanline Grid Overlay */}
-              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.15)_50%)] bg-[size:100%_4px] opacity-25 z-10" />
-
-              {/* 4. Steel Overlay Inner Shadows */}
-              <div className="absolute inset-0 border border-white/5 pointer-events-none z-10 shadow-[inset_0_0_15px_rgba(0,0,0,0.95)]" />
-
-              {/* Memoized Stable chart iframe. Specifying a unique React Key forces React to reuse 
-                  the existing DOM node instead of rebuilding it on parent wagers state updates,
-                  completely resolving any iframe flashing/flickering! */}
-              {room.token.chainId && room.token.pairAddress ? (
-                <LazyDexChart
-                  chainId={room.token.chainId}
-                  pairAddress={room.token.pairAddress}
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] pt-12 z-10 animate-pulse">
-                  <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
-                  <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
-                    WAITING FOR MARKET TELEMETRY...
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Steel Console Bottom Panel */}
-            <div className="w-full bg-[#0d140a] border-t border-[#2c3d25] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-1 font-mono text-[8px] text-trench-gasmask uppercase font-bold relative select-none">
-              <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-              <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-              
-              <span className="pl-4">INDEXER ADDR: {room.token.pairAddress ? room.token.pairAddress.substring(0, 16) : 'WAITING'}...</span>
-              <span className="pr-4 text-neon-moon">CHANNEL SECURE</span>
-            </div>
-          </div>
-
-          {/* 🛡️ TARGET AREA TELEMETRY & COIN INTEL BRIEFING */}
-          <div className="bg-trench-black border-2 border-trench-sandbag p-4 rounded-lg font-mono text-xs shadow-2xl relative space-y-4">
-            <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm font-bold uppercase border-b border-trench-sandbag pb-2">
-              <Terminal className="w-4 h-4 text-yellow-500 animate-pulse" />
-              <span>🛡️ TARGET AREA TELEMETRY & COIN BRIEFING</span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
-                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NAME</span>
-                <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.name}>
-                  {room.token.name || 'UNKNOWN'}
-                </span>
-              </div>
-
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
-                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TICKER / SYMBOL</span>
-                <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.symbol}>
-                  {formatCashtag(room.token.symbol || 'UNKNWN')}
-                </span>
-              </div>
-
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden flex flex-col justify-between">
-                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
-                {room.token.chainId && (
-                  <div className="mt-1 bg-trench-black/60 p-0.5 rounded border border-[#1d3515] flex items-center justify-center h-7 w-7 shrink-0">
-                    <img
-                      src={`https://dd.dexscreener.com/ds-data/chains/${room.token.chainId.toLowerCase()}.png`}
-                      alt={room.token.chainId}
-                      className="w-5 h-5 object-contain rounded-full"
-                      onError={(e) => {
-                        e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
-                      }}
-                    />
+                      <div className="bg-[#05080E] border border-gray-800 p-4 rounded-xl shrink-0 text-center min-w-[140px]">
+                        <span className="font-mono text-[9px] text-gray-400 uppercase font-bold block">STATUS</span>
+                        <span className={`font-staatliches text-2xl block mt-0.5 ${
+                          room.status === 'settled' ? 'text-moon-gold' : room.status === 'disputed' ? 'text-jeet-red' : 'text-neon-moon animate-pulse'
+                        }`}>
+                          {room.status.toUpperCase()}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                )}
-              </div>
 
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
-                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ENTRY PRICE (POOL)</span>
-                <span className="text-yellow-500 font-staatliches text-base block mt-0.5">
-                  {room.status === 'pending' 
-                    ? 'PENDING TRIGGER' 
-                    : openingPriceSafe !== undefined 
-                      ? `$${formatPrice(openingPriceSafe)}` 
-                      : 'N/A'}
-                </span>
-              </div>
+                  {/* 2. Official Resolution Rules & Evidence Panel */}
+                  <div className="bg-[#080B11] border border-yellow-500/30 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                      <div className="flex items-center gap-2 text-yellow-400 font-staatliches text-xl font-bold uppercase">
+                        <Scale size={22} className="text-yellow-400" />
+                        <span>OFFICIAL MARKET RESOLUTION RULES</span>
+                      </div>
+                      {refUrl && (
+                        <a
+                          href={refUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-3 py-1 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-cyan-400 font-mono text-xs rounded-lg flex items-center gap-1.5 font-bold transition-colors"
+                        >
+                          <span>VERIFY REFERENCE URL</span>
+                          <ExternalLink size={12} />
+                        </a>
+                      )}
+                    </div>
 
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
-                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">LAST PRICE (REALTIME)</span>
-                <span className="text-neon-moon font-staatliches text-base block mt-0.5 glow-moon animate-pulse">
-                  {livePrice !== null 
-                    ? `$${formatPrice(livePrice)}` 
-                    : openingPriceSafe !== undefined 
-                      ? `$${formatPrice(openingPriceSafe)}`
-                      : 'N/A'}
-                </span>
-              </div>
+                    <div className="bg-[#04060A] border border-yellow-500/40 p-5 rounded-xl font-mono text-xs text-gray-100 leading-relaxed space-y-3 shadow-inner">
+                      <p className="font-bold uppercase text-white tracking-wide text-sm">
+                        {criteriaText || 'Resolves MOON (YES) if the specified statement evaluates TRUE according to oracle rules. Resolves JEET (NO) if FALSE.'}
+                      </p>
+                    </div>
 
-              <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
-                <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROOM DURATION</span>
-                <span className="text-white font-staatliches text-base block mt-0.5">
-                  {durationSafe 
-                    ? (durationSafe >= 60 
-                        ? `${durationSafe.toLocaleString()} MINS (${formatDuration(durationSafe)})` 
-                        : `${durationSafe} MINS`) 
-                    : '60 MINS'}
-                </span>
-              </div>
-            </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                      <div className="bg-[#050A06] border border-emerald-900/60 p-4 rounded-xl space-y-1">
+                        <span className="font-staatliches text-lg text-neon-moon uppercase tracking-wider block">
+                          MOON (YES) OUTCOME CONDITION
+                        </span>
+                        <p className="font-mono text-xs text-gray-300">
+                          Resolves MOON if statement is confirmed TRUE before market expiry timestamp.
+                        </p>
+                      </div>
 
-            {/* Coin Briefing Text */}
-            <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed border-l-4 border-l-neon-moon">
-              <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
-                <span className="text-neon-moon font-bold uppercase">COIN INTEL BRIEF:</span>
-                <span className="text-trench-gasmask uppercase">MINT ADDR:</span>
-                <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full min-w-0">
-                  <span className="truncate min-w-0">{cleanEvmAddress(room.token.address)}</span>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigator.clipboard.writeText(cleanEvmAddress(room.token.address));
-                      addToast("CONTRACT ADDRESS COPIED TO CLIPBOARD!", 'success');
-                    }}
-                    className="text-neon-moon hover:text-white ml-1 font-bold font-staatliches text-[10px] tracking-wider uppercase bg-trench-black border border-neon-moon/40 px-1 rounded active:scale-95 transition-transform"
-                  >
-                    [COPY]
+                      <div className="bg-[#0F0506] border border-red-900/60 p-4 rounded-xl space-y-1">
+                        <span className="font-staatliches text-lg text-jeet-red uppercase tracking-wider block">
+                          JEET (NO) OUTCOME CONDITION
+                        </span>
+                        <p className="font-mono text-xs text-gray-300">
+                          Resolves JEET if statement is confirmed FALSE or condition remains unfulfilled.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 3. Oracle Telemetry & Verification Card */}
+                  <div className="bg-[#080B11] border border-gray-800 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
+                      <div className="flex items-center gap-2 text-neon-moon font-staatliches text-xl font-bold uppercase">
+                        <Brain size={22} />
+                        <span>ORACLE PROTOCOL TELEMETRY</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded bg-emerald-950 border border-neon-moon/40 font-mono text-[10px] text-neon-moon font-bold uppercase">
+                        PERMISSIONLESS SETTLEMENT
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
+                      <div className="bg-[#04060A] border border-gray-800 p-3.5 rounded-xl">
+                        <span className="text-gray-500 uppercase block font-bold text-[9px]">ORACLE MECHANISM</span>
+                        <span className="text-white font-bold block truncate mt-1">
+                          {room.resolutionCriteria?.includes('DAO JURY') ? 'Community DAO Jury' : 'Autonomous AI Node'}
+                        </span>
+                      </div>
+
+                      <div className="bg-[#04060A] border border-gray-800 p-3.5 rounded-xl">
+                        <span className="text-gray-500 uppercase block font-bold text-[9px]">ORACLE SIGNER KEY</span>
+                        <span className="text-neon-moon font-bold block truncate mt-1 select-all" title={room.oracleAddress}>
+                          {room.oracleAddress ? `${room.oracleAddress.slice(0, 6)}...${room.oracleAddress.slice(-4)}` : 'DEFAULT KEEPER'}
+                        </span>
+                      </div>
+
+                      <div className="bg-[#04060A] border border-gray-800 p-3.5 rounded-xl">
+                        <span className="text-gray-500 uppercase block font-bold text-[9px]">ORACLE FEE</span>
+                        <span className="text-yellow-400 font-bold block mt-1">
+                          {room.oracleFeeLamports ? `${(room.oracleFeeLamports / 1e6).toFixed(3)} USDC` : '0 USDC'}
+                        </span>
+                      </div>
+
+                      <div className="bg-[#04060A] border border-gray-800 p-3.5 rounded-xl">
+                        <span className="text-gray-500 uppercase block font-bold text-[9px]">EVALUATION STATUS</span>
+                        <span className="text-cyan-400 font-bold block mt-1">
+                          {room.status === 'settled' ? 'VERIFIED ON-CHAIN' : 'MONITORING SOURCES'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {room.oracleLogs && (
+                      <div className="bg-[#04060A] border border-gray-800 p-4 rounded-xl space-y-1.5 font-mono text-xs">
+                        <span className="text-neon-moon font-bold uppercase text-[10px] block">ORACLE LOG AUDIT TRAIL:</span>
+                        <p className="text-gray-300 whitespace-pre-wrap">{room.oracleLogs}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-6">
+                {/* High-impact prediction question */}
+                <div className="bg-trench-black border-2 border-trench-sandbag p-4 md:p-5 rounded-xl shadow-2xl relative scanlines overflow-hidden">
+                  {/* corner rivets */}
+                  <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                  <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                  <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                  <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                  
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pl-4 pr-4">
+                    <div className="space-y-1.5 flex-1">
+                      <span className="font-mono text-[9px] text-neon-moon font-extrabold uppercase tracking-widest block animate-pulse">
+                        🔮 ACTIVE TARGET PREDICTION QUESTION
+                      </span>
+                      <h2 className="font-staatliches text-2xl sm:text-3xl text-white tracking-wide uppercase leading-tight">
+                        Will {room ? room.token.name : 'Token'} ({room ? formatCashtag(room.token.symbol) : 'TKN'}) end above ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} on {new Date(expirySafe).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}?
+                      </h2>
+                    </div>
+                    
+                    <div className="shrink-0 flex flex-col gap-1 bg-[#0d140a] border border-[#2c3d25] px-4 py-2 rounded">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
+                        <span className="font-mono text-xs text-white uppercase font-bold tracking-widest">
+                          {isRoomSettling || (room && room.status === 'settled') ? 'RESOLVED' : 'ACTIVE'}
+                        </span>
+                      </div>
+                      <span className="font-mono text-[9px] text-trench-gasmask uppercase tracking-wider">
+                        Last synced {lastSyncedLabel}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Toggle buttons for Chart view */}
+                <div className="flex justify-end gap-2 font-mono text-[10px]">
+                  <button className="px-3.5 py-1 bg-neon-moon text-black font-bold rounded uppercase tracking-wider border border-neon-moon">
+                    Line
                   </button>
-                </span>
+                  <button className="px-3.5 py-1 bg-transparent text-trench-gasmask border border-trench-sandbag rounded uppercase tracking-wider hover:text-white transition-colors">
+                    Crates
+                  </button>
+                </div>
+
+                {/* Stable and Static DexScreener Chart Terminal with Militarized Console Shell Frame (Permanently Flicker-Free) */}
+                <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[320px] sm:h-[410px] flex flex-col justify-between z-10 scanlines">
+                  
+                  {/* Steel Console Top Header Bar */}
+                  <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">
+                    {/* corner rivets */}
+                    <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                    <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                    
+                    <div className="flex items-center gap-2 pl-4">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
+                      <span className="text-white tracking-widest font-staatliches text-xs">CRT RADAR CONSOLE</span>
+                    </div>
+                    
+                    {/* System status LEDs */}
+                    <div className="flex items-center gap-3 pr-4">
+                      <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_6px_#16a34a]" />
+                        <span>SYS ON</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_6px_#f59e0b] animate-ping" />
+                        <span>DEX SYNC</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Interactive Iframe CRT Panel Overlay Container */}
+                  <div className="w-full flex-1 relative bg-black overflow-hidden group">
+                    
+                    {/* 1. Vertical Sweep Radar Overlay */}
+                    <div className="radar-sweep-line absolute left-0 right-0 h-[2px] bg-neon-moon/20 shadow-[0_0_10px_#16a34a] z-10 pointer-events-none" />
+
+                    {/* 2. Glass Reflection Glare Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none z-10" />
+
+                    {/* 3. CRT Scanline Grid Overlay */}
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.15)_50%)] bg-[size:100%_4px] opacity-25 z-10" />
+
+                    {/* 4. Steel Overlay Inner Shadows */}
+                    <div className="absolute inset-0 border border-white/5 pointer-events-none z-10 shadow-[inset_0_0_15px_rgba(0,0,0,0.95)]" />
+
+                    {room.token.chainId && room.token.pairAddress ? (
+                      <LazyDexChart
+                        chainId={room.token.chainId}
+                        pairAddress={room.token.pairAddress}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] pt-12 z-10 animate-pulse">
+                        <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
+                        <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
+                          WAITING FOR MARKET TELEMETRY...
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Steel Console Bottom Panel */}
+                  <div className="w-full bg-[#0d140a] border-t border-[#2c3d25] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-1 font-mono text-[8px] text-trench-gasmask uppercase font-bold relative select-none">
+                    <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                    <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
+                    
+                    <span className="pl-4">INDEXER ADDR: {room.token.pairAddress ? room.token.pairAddress.substring(0, 16) : 'WAITING'}...</span>
+                    <span className="pr-4 text-neon-moon">CHANNEL SECURE</span>
+                  </div>
+                </div>
+
+                {/* 🛡️ TARGET AREA TELEMETRY & COIN INTEL BRIEFING */}
+                <div className="bg-trench-black border-2 border-trench-sandbag p-4 rounded-lg font-mono text-xs shadow-2xl relative space-y-4">
+                  <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm font-bold uppercase border-b border-trench-sandbag pb-2">
+                    <Terminal className="w-4 h-4 text-yellow-500 animate-pulse" />
+                    <span>{isDebateMarket ? '🛡️ DEBATE INTEL BRIEFING & ORACLE SPECIFICATION' : '🛡️ TARGET AREA TELEMETRY & COIN BRIEFING'}</span>
+                  </div>
+
+                  {isDebateMarket ? (
+                    <>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden col-span-1 sm:col-span-2">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">DEBATE QUESTION / TOPIC</span>
+                          <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.resolutionCriteria || room.token.name}>
+                            {room.resolutionCriteria || room.token.name || 'UNKNOWN'}
+                          </span>
+                        </div>
+
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">RESOLUTION ID</span>
+                          <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.symbol}>
+                            {formatCashtag(room.token.symbol || 'UNKNWN')}
+                          </span>
+                        </div>
+
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ORACLE FEE</span>
+                          <span className="text-yellow-400 font-staatliches text-base block mt-0.5">
+                            {room.oracleFeeLamports ? `${(Number(room.oracleFeeLamports) / 1e6).toFixed(2)} USDC` : '0.00 USDC'}
+                          </span>
+                        </div>
+
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROUND DURATION</span>
+                          <span className="text-white font-staatliches text-base block mt-0.5">
+                            {durationSafe ? `${durationSafe} MINS` : '60 MINS'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Debate Briefing Text */}
+                      <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed border-l-4 border-l-neon-moon">
+                        <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
+                          <span className="text-neon-moon font-bold uppercase">ORACLE RESOLUTION INTEL:</span>
+                          <span className="text-trench-gasmask uppercase">VALIDATOR ADDR:</span>
+                          <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full min-w-0">
+                            <span className="truncate min-w-0">{cleanEvmAddress(room.oracleAddress || room.creator)}</span>
+                          </span>
+                        </div>
+                        <div className="uppercase">
+                          <span>This is a community prediction debate market. Wagers are placed in USDC on whether the question resolves to YES (MOON) or NO (JEET). Autonomous keepers monitor the criteria, and settlement is completed permissionlessly based on verified rules.</span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NAME</span>
+                          <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.name}>
+                            {room.token.name || 'UNKNOWN'}
+                          </span>
+                        </div>
+
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TICKER / SYMBOL</span>
+                          <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.symbol}>
+                            {formatCashtag(room.token.symbol || 'UNKNWN')}
+                          </span>
+                        </div>
+
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden flex flex-col justify-between">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
+                          {room.token.chainId && (
+                            <div className="mt-1 bg-trench-black/60 p-0.5 rounded border border-[#1d3515] flex items-center justify-center h-7 w-7 shrink-0">
+                              <img
+                                src={`https://dd.dexscreener.com/ds-data/chains/${room.token.chainId.toLowerCase()}.png`}
+                                alt={room.token.chainId}
+                                className="w-5 h-5 object-contain rounded-full"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ENTRY PRICE (POOL)</span>
+                          <span className="text-yellow-500 font-staatliches text-base block mt-0.5">
+                            {room.status === 'pending' 
+                              ? 'PENDING TRIGGER' 
+                              : openingPriceSafe !== undefined 
+                                ? `$${formatPrice(openingPriceSafe)}` 
+                                : 'N/A'}
+                          </span>
+                        </div>
+
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">LAST PRICE (REALTIME)</span>
+                          <span className="text-neon-moon font-staatliches text-base block mt-0.5 glow-moon animate-pulse">
+                            {livePrice !== null 
+                              ? `$${formatPrice(livePrice)}` 
+                              : openingPriceSafe !== undefined 
+                                ? `$${formatPrice(openingPriceSafe)}`
+                                : 'N/A'}
+                          </span>
+                        </div>
+
+                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
+                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROOM DURATION</span>
+                          <span className="text-white font-staatliches text-base block mt-0.5">
+                            {durationSafe 
+                              ? (durationSafe >= 60 
+                                  ? `${durationSafe.toLocaleString()} MINS (${formatDuration(durationSafe)})` 
+                                  : `${durationSafe} MINS`) 
+                              : '60 MINS'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Coin Briefing Text */}
+                      <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed border-l-4 border-l-neon-moon">
+                        <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
+                          <span className="text-neon-moon font-bold uppercase">COIN INTEL BRIEF:</span>
+                          <span className="text-trench-gasmask uppercase">MINT ADDR:</span>
+                          <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full min-w-0">
+                            <span className="truncate min-w-0">{cleanEvmAddress(room.token.address)}</span>
+                            <button 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(cleanEvmAddress(room.token.address));
+                                addToast("CONTRACT ADDRESS COPIED TO CLIPBOARD!", 'success');
+                              }}
+                              className="text-neon-moon hover:text-white ml-1 font-bold font-staatliches text-[10px] tracking-wider uppercase bg-trench-black border border-neon-moon/40 px-1 rounded active:scale-95 transition-transform"
+                            >
+                              [COPY]
+                            </button>
+                          </span>
+                        </div>
+                        <div className="uppercase">
+                        {room.token.symbol === 'PEPE' ? (
+                          <span>🐸 Pepe the frog, standard infantry memecoin. Plunged into the bearish mud after local high listings, currently fighting for bullish recovery inside the SOL arena. Highly volatile.</span>
+                        ) : room.token.symbol === 'WIF' ? (
+                          <span>🐕 Soldier Dogwifhat, holding the line with a standard-issue wool cap. Defending the bullish support trench with high-morale community reinforcement.</span>
+                        ) : room.token.symbol === 'JEET' ? (
+                          <span>📉 The ultimate paperhands avatar. A mascot for those who take profit at the first sign of green. Usually found dumping on early believers.</span>
+                        ) : (
+                          <span>📊 Operation targeting {room.token.symbol} ({room.token.name}). Active token index synced in real time via DexScreener. Factions are competing to influence the TWAP before deployment countdown expires.</span>
+                        )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
-              <div className="uppercase">
-              {room.token.symbol === 'PEPE' ? (
-                <span>🐸 Pepe the frog, standard infantry memecoin. Plunged into the bearish mud after local high listings, currently fighting for bullish recovery inside the SOL arena. Highly volatile.</span>
-              ) : room.token.symbol === 'WIF' ? (
-                <span>🐕 Soldier Dogwifhat, holding the line with a standard-issue wool cap. Defending the bullish support trench with high-morale community reinforcement.</span>
-              ) : room.token.symbol === 'JEET' ? (
-                <span>📉 The ultimate paperhands avatar. A mascot for those who take profit at the first sign of green. Usually found dumping on early believers.</span>
-              ) : (
-                <span>📊 Operation targeting ${room.token.symbol} ({room.token.name}). Active token index synced in real time via DexScreener. Factions are competing to influence the TWAP before deployment countdown expires.</span>
-              )}
-              </div>
-            </div>
-          </div>
+            );
+          })()}
 
           {/* EXIT TRENCH MARKETPLACE PANEL */}
           <div className="bg-trench-black border-2 border-trench-sandbag p-4 md:p-5 rounded-xl shadow-2xl relative overflow-hidden scanlines">
@@ -1380,8 +1613,26 @@ export default function RoomDetailPage() {
           <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
           <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
           
-          <div className="text-center border-b-2 border-trench-sandbag pb-4 mb-5">
-            <span className="font-staatliches text-sm text-yellow-500 block uppercase tracking-wider text-left mb-2">🛡️ STANCE CONFIGURATOR</span>
+          <div className="text-center border-b-2 border-trench-sandbag pb-4 mb-4">
+            <span className="font-staatliches text-sm text-yellow-500 block uppercase tracking-wider text-left mb-2 flex items-center gap-1.5">
+              <Swords size={16} className="text-yellow-500" />
+              <span>STANCE CONFIGURATOR</span>
+            </span>
+
+            {/* Prominent Bidding Resolution Condition Card */}
+            {room && (
+              <div className="bg-[#04070D] border border-yellow-500/50 p-3.5 rounded-xl mb-3 text-left font-mono shadow-md">
+                <div className="flex items-center gap-1.5 text-yellow-400 text-[10px] font-bold uppercase tracking-wider mb-1 pb-1 border-b border-gray-800/80">
+                  <Scale size={13} className="shrink-0 text-yellow-400" />
+                  <span>BIDDING RESOLUTION CONDITION</span>
+                </div>
+                <p className="text-white text-xs font-bold leading-snug">
+                  {(room.category as string) === 'debate' || (room.category as string) === 'prediction' || (!!room.resolutionCriteria && room.resolutionCriteria.length > 0)
+                    ? (room.resolutionCriteria || room.token.name)
+                    : `Will ${room.token.symbol} end above $${formatPrice(openingPriceSafe || 1)} on ${new Date(expirySafe).toLocaleString()}?`}
+                </p>
+              </div>
+            )}
             
             {/* Displaying requested images (moonJuice for moon and jeetSkeleton for jeet) */}
             <PepePortrait 
@@ -1428,10 +1679,13 @@ export default function RoomDetailPage() {
               </div>
 
               {/* Arbitrator Resolution Console */}
-              {wallet?.publicKey && room.oracleAddress && wallet.publicKey.toBase58() === room.oracleAddress && (
+              {room.oracleAddress && (
+                (wallet?.publicKey && wallet.publicKey.toBase58().toLowerCase() === room.oracleAddress.toLowerCase()) ||
+                (wallet?.address && wallet.address.toLowerCase() === room.oracleAddress.toLowerCase())
+              ) && (
                 <div className="bg-trench-black border-2 border-moon-gold p-4 rounded text-left space-y-3">
                   <h4 className="font-staatliches text-lg text-moon-gold tracking-wider uppercase border-b border-trench-sandbag pb-1">
-                    ⚔️ ARBITRATION PANEL
+                    ARBITRATION PANEL
                   </h4>
                   <p className="font-mono text-[9px] text-trench-gasmask uppercase leading-tight font-bold">
                     As the designated oracle arbitrator, you must review the dispute and submit the final verdict.
@@ -1529,7 +1783,7 @@ export default function RoomDetailPage() {
                 }`}>
                   {room.winner === 'moon' ? 'MOON ARMY WON' : room.winner === 'jeet' ? 'JEET SQUADRON WON' : 'BATTLE DRAW / VOIDED'}
                 </span>
-                {finalPriceSafe !== undefined && openingPriceSafe !== undefined && (
+                {!isDebateMarket && finalPriceSafe !== undefined && openingPriceSafe !== undefined ? (
                   <p className="font-mono text-[10px] text-gray-300 mt-2 normal-case leading-relaxed">
                     Exit price of <span className="text-white font-bold">${formatPrice(finalPriceSafe)}</span> was{' '}
                     <span className={finalPriceSafe > openingPriceSafe ? 'text-neon-moon font-bold' : finalPriceSafe < openingPriceSafe ? 'text-jeet-red font-bold' : 'text-yellow-500 font-bold'}>
@@ -1537,7 +1791,11 @@ export default function RoomDetailPage() {
                     </span>{' '}
                     than the entry price of <span className="text-white font-bold">${formatPrice(openingPriceSafe)}</span>.
                   </p>
-                )}
+                ) : isDebateMarket ? (
+                  <p className="font-mono text-[10px] text-gray-300 mt-2 normal-case leading-relaxed">
+                    This debate market resolved to <span className={`font-bold ${room.winner === 'moon' ? 'text-neon-moon' : room.winner === 'jeet' ? 'text-jeet-red' : 'text-yellow-500'}`}>{room.winner?.toUpperCase()}</span> by the oracle.
+                  </p>
+                ) : null}
               </div>
 
               {/* Challenge Period Countdown / Dispute button */}
@@ -1586,30 +1844,53 @@ export default function RoomDetailPage() {
                   <span className="text-[7px] text-neon-moon font-bold tracking-wider">VERIFIED ON-CHAIN</span>
                 </div>
                 <h4 className="font-staatliches text-xs text-white tracking-widest border-b border-trench-sandbag pb-1.5 mb-2 flex items-center gap-1 font-bold">
-                  🛡️ EVIDENCE RECEIPT
+                  🛡️ {isDebateMarket ? 'ORACLE DECISION RECEIPT' : 'EVIDENCE RECEIPT'}
                 </h4>
-                <div className="flex justify-between items-center mt-1">
-                  <span>TARGET Symbol:</span>
-                  <span className="text-white font-bold">{formatCashtag(room.token.symbol)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>ENTRY PRICE:</span>
-                  <span className="text-white font-bold">
-                    ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>EXIT PRICE (SPOT):</span>
-                  <span className="text-white font-bold">
-                    ${finalPriceSafe !== undefined ? formatPrice(finalPriceSafe) : 'N/A'}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>TWAP EXIT (EMA):</span>
-                  <span className="text-moon-gold font-bold">
-                    ${twapFinalPriceSafe !== undefined ? formatPrice(twapFinalPriceSafe) : 'N/A'}
-                  </span>
-                </div>
+                {isDebateMarket ? (
+                  <>
+                    <div className="flex justify-between items-center mt-1">
+                      <span>RESOLUTION ID:</span>
+                      <span className="text-white font-bold">{formatCashtag(room.token.symbol)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>VERDICT DECISION:</span>
+                      <span className={`font-bold ${room.winner === 'moon' ? 'text-neon-moon' : room.winner === 'jeet' ? 'text-jeet-red' : 'text-yellow-500'}`}>
+                        {room.winner?.toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>ORACLE ADDRESS:</span>
+                      <span className="text-white font-bold">
+                        {room.oracleAddress ? `${room.oracleAddress.slice(0, 6)}...${room.oracleAddress.slice(-4)}` : 'DEFAULT KEEPER'}
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between items-center mt-1">
+                      <span>TARGET Symbol:</span>
+                      <span className="text-white font-bold">{formatCashtag(room.token.symbol)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>ENTRY PRICE:</span>
+                      <span className="text-white font-bold">
+                        ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>EXIT PRICE (SPOT):</span>
+                      <span className="text-white font-bold">
+                        ${finalPriceSafe !== undefined ? formatPrice(finalPriceSafe) : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>TWAP EXIT (EMA):</span>
+                      <span className="text-moon-gold font-bold">
+                        ${twapFinalPriceSafe !== undefined ? formatPrice(twapFinalPriceSafe) : 'N/A'}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* AI Arbitrator Telemetry */}
@@ -1652,7 +1933,7 @@ export default function RoomDetailPage() {
                           <span>CLAIMING BOOTY...</span>
                         </>
                       ) : (
-                        <span>CLAIM WAR WINNINGS🏆</span>
+                        <span>CLAIM WAR WINNINGS</span>
                       )}
                     </button>
                   ) : (
@@ -1698,7 +1979,7 @@ export default function RoomDetailPage() {
                           <span>RETRIEVING SOL...</span>
                         </>
                       ) : (
-                        <span>CLAIM FULL REFUND 💰</span>
+                        <span>CLAIM FULL REFUND</span>
                       )}
                     </button>
                   ) : (
@@ -1760,7 +2041,7 @@ export default function RoomDetailPage() {
                         <span>RESOLVING DEXSCREENER & SETTLING...</span>
                       </>
                     ) : (
-                      <span>RESOLVE & CLAIM🏆</span>
+                      <span>RESOLVE & CLAIM</span>
                     )}
                   </button>
                 </div>
@@ -1912,7 +2193,7 @@ export default function RoomDetailPage() {
                 ) : (
                   <span className="relative z-10 flex items-center gap-1.5 justify-center font-bold">
                     <Sparkles size={20} className="text-black shrink-0 animate-pulse" />
-                    STAKE / ADD POSITION 💣
+                    STAKE / ADD POSITION
                   </span>
                 )}
                 {/* Shimmer overlay block */}
@@ -2099,7 +2380,7 @@ export default function RoomDetailPage() {
                 })
               ) : (
                 <div className="flex gap-1.5 items-center justify-center h-full text-trench-gasmask/50 font-bold uppercase animate-pulse">
-                  <span>⚔️ AWAITING DEPLOYMENTS ON THIS CHANNEL...</span>
+                  <span>AWAITING DEPLOYMENTS ON THIS CHANNEL...</span>
                 </div>
               )}
             </div>
@@ -2109,7 +2390,7 @@ export default function RoomDetailPage() {
           <div className="retro-panel p-2 sm:p-3 min-h-[13rem] flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
             <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-xs sm:text-sm font-bold uppercase border-b border-trench-sandbag/40 pb-1.5 mb-2">
               <Swords className="w-3.5 h-3.5 text-neon-moon animate-pulse" />
-              <span>⚔️ YOUR LOCKED MARKET POSITIONS ({displayBets.length})</span>
+              <span>YOUR LOCKED MARKET POSITIONS ({displayBets.length})</span>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar">

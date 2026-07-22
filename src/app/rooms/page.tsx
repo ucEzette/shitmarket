@@ -227,26 +227,50 @@ export default function RoomsPage() {
 
     // Helper to filter a room by selected status, network, and category
     const filterRoom = (r: Room, listFilter: 'ending' | 'expired') => {
-      if (!r.token || !r.token.name || r.token.name === 'Unknown Token' || r.token.symbol === 'UNKNOWN' || r.token.symbol === 'UNKNWN') {
+      if (!r || !r.id || !r.token) {
         return false;
       }
       if (selectedCategory !== 'all') {
-        const cat = r.category || detectCategory(r.token.name, r.token.symbol);
+        const cat = r.category || detectCategory(r.token.name, r.token.symbol, r.resolutionCriteria);
         if (cat !== selectedCategory) return false;
       }
       if (listFilter === 'expired') {
         if (r.status !== 'settled' && r.status !== 'disputed' && r.expiry > now) return false;
       } else {
-        if (r.status !== 'active' || r.expiry <= now) return false;
+        if (r.status === 'settled' || r.status === 'disputed' || r.expiry <= now) return false;
       }
-      if (selectedNetwork !== 'all' && r.token.chainId !== selectedNetwork) {
-        return false;
+      if (selectedNetwork !== 'all') {
+        const roomNet = (r.token.chainId || 'solana').toLowerCase();
+        const selNet = selectedNetwork.toLowerCase();
+        if (roomNet !== selNet && !(selNet === 'avalanche' && (roomNet === 'fuji' || roomNet === 'avax'))) {
+          return false;
+        }
       }
       return true;
     };
 
+    // Base list matching category & network (disregarding active/expired status for fallbacks)
+    const baseNetworkRooms = rooms.filter(r => {
+      if (!r || !r.id || !r.token) return false;
+      if (selectedCategory !== 'all') {
+        const cat = r.category || detectCategory(r.token.name, r.token.symbol, r.resolutionCriteria);
+        if (cat !== selectedCategory) return false;
+      }
+      if (selectedNetwork !== 'all') {
+        const roomNet = (r.token.chainId || 'solana').toLowerCase();
+        const selNet = selectedNetwork.toLowerCase();
+        if (roomNet !== selNet && !(selNet === 'avalanche' && (roomNet === 'fuji' || roomNet === 'avax'))) {
+          return false;
+        }
+      }
+      return true;
+    });
+
     // 1. New (Newest listed first / or sorted by pot)
     let newRoomsList = rooms.filter(r => filterRoom(r, filterNew));
+    if (newRoomsList.length === 0 && filterNew === 'ending' && baseNetworkRooms.length > 0) {
+      newRoomsList = [...baseNetworkRooms];
+    }
     if (searchNew.trim()) {
       const q = searchNew.toLowerCase();
       newRoomsList = newRoomsList.filter(
@@ -267,6 +291,9 @@ export default function RoomsPage() {
 
     // 2. Ending Soon (Closest expiry first / or sorted by pot)
     let endingSoonRoomsList = rooms.filter(r => filterRoom(r, filterSoon));
+    if (endingSoonRoomsList.length === 0 && filterSoon === 'ending' && baseNetworkRooms.length > 0) {
+      endingSoonRoomsList = [...baseNetworkRooms];
+    }
     if (searchSoon.trim()) {
       const q = searchSoon.toLowerCase();
       endingSoonRoomsList = endingSoonRoomsList.filter(
@@ -287,6 +314,9 @@ export default function RoomsPage() {
 
     // 3. Biggest Pot (Highest total pot first / or sorted by date)
     let biggestPotRoomsList = rooms.filter(r => filterRoom(r, filterBiggest));
+    if (biggestPotRoomsList.length === 0 && filterBiggest === 'ending' && baseNetworkRooms.length > 0) {
+      biggestPotRoomsList = [...baseNetworkRooms];
+    }
     if (searchBiggest.trim()) {
       const q = searchBiggest.toLowerCase();
       biggestPotRoomsList = biggestPotRoomsList.filter(
@@ -331,6 +361,12 @@ export default function RoomsPage() {
   };
 
   const renderRoomCard = (room: Room, quickAmount: number) => {
+    const isDebateRoom = 
+      (room.category as string) === 'debate' || 
+      (room.category as string) === 'prediction' || 
+      (!!room.resolutionCriteria && room.resolutionCriteria.length > 0 && (!room.token.pairAddress || room.token.pairAddress === '')) ||
+      room.token.address === room.creator;
+
     const isMoonLeading = room.moonPool > room.jeetPool;
     const totalPot = room.moonPool + room.jeetPool;
     const moonPercentage = totalPot > 0 ? (room.moonPool / totalPot) * 100 : 50;
@@ -388,10 +424,12 @@ export default function RoomsPage() {
                 className={watchlistedIds.includes(room.id) ? "fill-neon-moon text-neon-moon" : ""} 
               />
             </button>
-            {/* Small Chain Icon to indicate network */}
-            <div className="bg-trench-black p-0.5 rounded border border-trench-sandbag/30 flex items-center justify-center h-5 w-5 shrink-0" title={`Network: ${room.token.chainId?.toUpperCase() || (process.env.NEXT_PUBLIC_CORE_CHAIN?.toUpperCase() || 'AVALANCHE')}`}>
-              <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
-            </div>
+            {/* Small Chain Icon to indicate network (only for chart/crypto token markets) */}
+            {(!isDebateRoom && room.token.pairAddress) && (
+              <div className="bg-trench-black p-0.5 rounded border border-trench-sandbag/30 flex items-center justify-center h-5 w-5 shrink-0" title={`Network: ${room.token.chainId?.toUpperCase() || (process.env.NEXT_PUBLIC_CORE_CHAIN?.toUpperCase() || 'AVALANCHE')}`}>
+                <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
+              </div>
+            )}
             <div className={`text-[9px] font-mono font-bold bg-trench-black px-1.5 py-0.5 rounded border uppercase ${
               isDisputed
                 ? 'text-jeet-red border-jeet-red/50 animate-pulse'
@@ -407,7 +445,7 @@ export default function RoomsPage() {
         {/* Token Details with compact structure */}
         <div className="flex items-center gap-2 border-b border-trench-sandbag/30 pb-2 mb-2">
           <div className="relative bg-trench-black p-0.5 border border-trench-sandbag rounded overflow-hidden shrink-0 w-8 h-8 flex items-center justify-center">
-            {room.token.icon && room.token.icon.startsWith('http') ? (
+            {room.token.icon && (room.token.icon.startsWith('http') || room.token.icon.startsWith('data:') || room.token.icon.startsWith('blob:')) ? (
               <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded" />
             ) : (
               <PepePortrait
@@ -437,24 +475,28 @@ export default function RoomsPage() {
                 {formatCashtag(room.token.symbol)}
               </span>
             </div>
-            <span 
-              onClick={(e) => {
-                e.stopPropagation();
-                navigator.clipboard.writeText(room.token.address);
-                addToast("CONTRACT COPIED!", 'success');
-              }}
-              className="font-mono text-[8px] text-trench-gasmask hover:text-white transition-colors cursor-pointer select-all truncate block max-w-[140px]"
-              title="Click to copy CA"
-            >
-              📋 {room.token.address}
-            </span>
+            {!isDebateRoom && room.token.address && (
+              <span 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigator.clipboard.writeText(room.token.address);
+                  addToast("CONTRACT COPIED!", 'success');
+                }}
+                className="font-mono text-[8px] text-trench-gasmask hover:text-white transition-colors cursor-pointer select-all truncate block max-w-[140px]"
+                title="Click to copy CA"
+              >
+                CA: {room.token.address.slice(0, 8)}...{room.token.address.slice(-6)}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Polymarket prediction target box */}
-        <div className="bg-trench-black/40 border border-trench-sandbag/20 p-1.5 rounded mb-2 text-center font-mono text-[9px] leading-tight">
-          <p className="text-white font-bold uppercase">
-            WILL {room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} END ABOVE {room.openingPrice !== undefined && formatPrice(room.openingPrice) !== 'N/A' ? `$${formatPrice(room.openingPrice)}` : '$1.00'} ON {formatExpiryUTC(room.expiry)}?
+        {/* Prediction target box */}
+        <div className="bg-trench-black/40 border border-trench-sandbag/20 p-2 rounded mb-2 text-center font-mono text-[10px] leading-snug min-h-[44px] flex items-center justify-center">
+          <p className="text-white font-bold uppercase line-clamp-2">
+            {isDebateRoom 
+              ? (room.resolutionCriteria ? room.resolutionCriteria.split('| Ref:')[0].split('Ref:')[0].trim() : room.token.name)
+              : `WILL ${room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} END ABOVE ${room.openingPrice !== undefined && formatPrice(room.openingPrice) !== 'N/A' ? `$${formatPrice(room.openingPrice)}` : '$1.00'} ON ${formatExpiryUTC(room.expiry)}?`}
           </p>
         </div>
 
@@ -784,7 +826,7 @@ export default function RoomsPage() {
                               >
                                 <div className="flex items-center gap-2 min-w-0">
                                   <div className="relative shrink-0 w-6 h-6 bg-trench-black border border-trench-sandbag/30 rounded flex items-center justify-center">
-                                    {r.token.icon && r.token.icon.startsWith('http') ? (
+                                    {r.token.icon && (r.token.icon.startsWith('http') || r.token.icon.startsWith('data:') || r.token.icon.startsWith('blob:')) ? (
                                       <img src={r.token.icon} alt={r.token.name} className="w-full h-full object-cover rounded" />
                                     ) : (
                                       <PepePortrait
@@ -857,7 +899,7 @@ export default function RoomsPage() {
       </div>
     </div>
 
-      {/* Polymarket-Style Category Selector Bar */}
+      {/* Category Selector Bar */}
       <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none border-b border-trench-sandbag/40 shrink-0">
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.id;

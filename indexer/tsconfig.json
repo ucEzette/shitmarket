@@ -4,7 +4,7 @@
     "module": "commonjs",
     "lib": ["ES2022", "DOM"],
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "strict": true,
     "strictNullChecks": false,
     "esModuleInterop": true,
@@ -15,8 +15,9 @@
     "declarationMap": true,
     "sourceMap": true,
     "experimentalDecorators": true,
-    "emitDecoratorMetadata": true
+    "emitDecoratorMetadata": true,
+    "types": ["node", "express"]
   },
-  "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "node_modules/**", "../node_modules", "../node_modules/**", "dist"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "**/node_modules/**", "../node_modules", "../node_modules/**", "dist"]
 }

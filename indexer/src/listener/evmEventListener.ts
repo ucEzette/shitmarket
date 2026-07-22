@@ -89,23 +89,37 @@ async function handleRoomCreated(log: EvmLog) {
   const creator = decodeAddress(log.topics[2]);
   
   const data = log.data.replace('0x', '');
-  // Fields in data payload:
-  // [0]: tokenMint (bytes32)
-  // [1]: nameOffset (bytes32)
-  // [2]: chainIdOffset (bytes32)
-  // [3]: openingPrice (int64)
-  // [4]: expiryTimestamp (uint256)
-  // [5]: oracle (address)
-  // [6]: oracleFeeAmount (uint256)
-  const tokenMint = '0x' + data.slice(0, 64).slice(24); // Remove padding
-  const openingPrice = decodeInt64(data.slice(192, 256));
-  const expiryTimestamp = decodeBigInt(data.slice(256, 320));
-  const oracle = decodeAddress(data.slice(320, 384));
-  const oracleFeeAmount = decodeBigInt(data.slice(384, 448));
+  // ABI layout (non-indexed data params):
+  // slot[0] = tokenMint (address, left-padded)
+  // slot[1] = offset pointer to tokenName string
+  // slot[2] = offset pointer to chainId/description string
+  // slot[3] = openingPrice (int64)
+  // slot[4] = expiryTimestamp (uint256)
+  // slot[5] = oracle (address)
+  // slot[6] = oracleFeeAmount (uint256)
+  const tokenMint = '0x' + data.slice(0, 64).slice(24).toLowerCase();
+  const openingPrice = decodeInt64(data.slice(3 * 64, 4 * 64));
+  const expiryTimestamp = decodeBigInt(data.slice(4 * 64, 5 * 64));
+  const oracle = decodeAddress(data.slice(5 * 64, 6 * 64));
+  const oracleFeeAmount = decodeBigInt(data.slice(6 * 64, 7 * 64));
 
-  // Strings are dynamic, decoded from offsets
-  const tokenName = decodeString(log.data, 7);
-  const chainId = decodeString(log.data, 8);
+  // Decode dynamic strings using correct slot offsets (1 and 2)
+  let rawTokenName = '';
+  let rawChainId = 'avalanche';
+  try { rawTokenName = decodeString(log.data, 1); } catch {}
+  try { rawChainId = decodeString(log.data, 2) || 'avalanche'; } catch {}
+
+  rawTokenName = rawTokenName.replace(/\0/g, '').trim();
+  rawChainId = rawChainId.replace(/\0/g, '').trim() || 'avalanche';
+
+  // The "tokenName" in debate rooms is the full question — store in resolutionCriteria
+  // Truncate display columns to fit VarChar(66)
+  const resolutionCriteria = rawTokenName.slice(0, 500);
+  const tokenName = rawTokenName.length > 40
+    ? rawTokenName.slice(0, 37).trim() + '...'
+    : rawTokenName || 'Debate Market';
+  const tokenSymbol = 'DEBATE';
+  const chainId = rawChainId.slice(0, 20);
 
   const expiry = new Date(Number(expiryTimestamp) * 1000);
 
@@ -113,33 +127,34 @@ async function handleRoomCreated(log: EvmLog) {
     where: { roomPubkey: roomId },
     create: {
       roomPubkey: roomId,
-      tokenMint,
+      tokenMint: tokenMint.slice(0, 66),
       priceFeed: 'evm-aggregated',
-      tokenName,
-      tokenSymbol: tokenName, // Fallback
-      chainId,
-      originalAddress: tokenMint,
-      duration: 5, // Fallback
+      tokenName: tokenName.slice(0, 66),
+      tokenSymbol: tokenSymbol.slice(0, 20),
+      chainId: chainId.slice(0, 20),
+      originalAddress: tokenMint.slice(0, 66),
+      duration: 5,
       openingPrice: BigInt(openingPrice),
       expiry,
       status: 'active',
-      creator,
-      oracleAddress: oracle,
+      creator: creator.slice(0, 66),
+      oracleAddress: oracle.slice(0, 66),
       oracleFeeLamports: oracleFeeAmount,
+      resolutionCriteria,
     },
     update: {
       openingPrice: BigInt(openingPrice),
       expiry,
-      oracleAddress: oracle,
-      oracleFeeLamports: oracleFeeAmount,
+      oracleAddress: oracle.slice(0, 66),
+      resolutionCriteria,
     },
   });
 
   await cacheRoom(roomId, {
     status: 'active',
-    tokenMint,
+    tokenMint: tokenMint.slice(0, 66),
     tokenName,
-    tokenSymbol: tokenName,
+    tokenSymbol,
     openingPrice: openingPrice.toString(),
     moonPool: '0',
     jeetPool: '0',
@@ -149,7 +164,7 @@ async function handleRoomCreated(log: EvmLog) {
   await publishRoomUpdate(roomId, {
     type: 'RoomCreated',
     tokenName,
-    tokenSymbol: tokenName,
+    tokenSymbol,
     chainId,
     originalAddress: tokenMint,
     expiry: expiry.toISOString(),
@@ -301,13 +316,17 @@ async function pollEvmLogs() {
       method: 'eth_blockNumber',
       params: [] as any[],
     };
-    const { data: resBlock } = await axios.post(config.evm.rpcUrl, payload, { timeout: 3000 });
+    const { data: resBlock } = await axios.post(config.evm.rpcUrl, payload, { timeout: 10000 });
     const latestHex = resBlock?.result;
     if (!latestHex) return;
     const latestBlock = parseInt(latestHex, 16);
 
     if (lastProcessedBlock === 0) {
-      lastProcessedBlock = latestBlock - 50; // default lookback limit
+      // Use a configurable deployment start block to never miss historical events.
+      // Falls back to scanning the last 10,000 blocks if not set.
+      const deployBlock = parseInt(process.env.EVM_DEPLOYMENT_BLOCK || '0', 10);
+      lastProcessedBlock = deployBlock > 0 ? deployBlock - 1 : Math.max(0, latestBlock - 10000);
+      logger.info({ msg: 'EVM listener cold start', fromBlock: lastProcessedBlock, deployBlock });
     }
 
     if (latestBlock <= lastProcessedBlock) return;
@@ -317,23 +336,36 @@ async function pollEvmLogs() {
 
     logger.debug({ msg: 'Polling EVM blocks', fromBlock, toBlock });
 
-    const logsPayload = {
-      jsonrpc: '2.0',
-      id: 2,
-      method: 'eth_getLogs',
-      params: [
-        {
-          address: config.evm.contractAddress,
-          fromBlock: '0x' + fromBlock.toString(16),
-          toBlock: '0x' + toBlock.toString(16),
-        },
-      ],
-    };
+    // Fuji RPC limits eth_getLogs to ~500 blocks at a time; chunk accordingly
+    const CHUNK_SIZE = 500;
+    const allLogs: EvmLog[] = [];
+    for (let chunkFrom = fromBlock; chunkFrom <= toBlock; chunkFrom += CHUNK_SIZE) {
+      const chunkTo = Math.min(chunkFrom + CHUNK_SIZE - 1, toBlock);
+      const logsPayload = {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'eth_getLogs',
+        params: [
+          {
+            address: config.evm.contractAddress,
+            fromBlock: '0x' + chunkFrom.toString(16),
+            toBlock: '0x' + chunkTo.toString(16),
+          },
+        ],
+      };
+      try {
+        const { data: resLogs } = await axios.post(config.evm.rpcUrl, logsPayload, { timeout: 10000 });
+        if (resLogs?.error) {
+          logger.warn({ msg: 'eth_getLogs chunk error', error: resLogs.error.message, chunkFrom, chunkTo });
+        } else {
+          allLogs.push(...(resLogs?.result || []));
+        }
+      } catch (chunkErr: any) {
+        logger.warn({ msg: 'eth_getLogs chunk failed', err: chunkErr?.message, chunkFrom, chunkTo });
+      }
+    }
 
-    const { data: resLogs } = await axios.post(config.evm.rpcUrl, logsPayload, { timeout: 5000 });
-    const logs: EvmLog[] = resLogs?.result || [];
-
-    for (const log of logs) {
+    for (const log of allLogs) {
       const topic0 = log.topics[0]?.toLowerCase();
       try {
         if (topic0 === TOPICS.RoomCreated.toLowerCase()) {

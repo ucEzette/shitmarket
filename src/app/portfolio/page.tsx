@@ -107,9 +107,11 @@ const PNLChart: React.FC<{
 
   const formatVal = (val: number) => {
     const absVal = Math.abs(val);
+    const isEvmMode = useAppState.getState().isEvm || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
+    const currencyLabel = isEvmMode ? 'USDC' : 'SOL';
     const formatted = currency === 'USD' 
       ? `$${(absVal * rate).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
-      : `${absVal.toFixed(3)} SOL`;
+      : `${absVal.toFixed(3)} ${currencyLabel}`;
     return val >= 0 ? `+${formatted}` : `-${formatted}`;
   };
 
@@ -253,7 +255,9 @@ const PNLChart: React.FC<{
 };
 
 export default function PortfolioPage() {
-  const { user, rooms, roomsLoaded, fetchRooms, refreshProfile, connectWallet } = useAppState();
+  const { user, rooms, roomsLoaded, fetchRooms, refreshProfile, connectWallet, isEvm } = useAppState();
+  const isEvmMode = isEvm || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
+  const currencyLabel = isEvmMode ? 'USDC' : 'SOL';
   const [activeTab, setActiveTab] = useState<'overview' | 'positions' | 'trades' | 'performance' | 'orders' | 'wallets'>('wallets');
   const [currency, setCurrency] = useState<'USDC' | 'USD'>('USD');
   const [copiedWallet, setCopiedWallet] = useState(false);
@@ -450,7 +454,7 @@ export default function PortfolioPage() {
     if (currency === 'USD') {
       return `$${(usdcAmount * USDC_USD_RATE).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     }
-    return `${usdcAmount.toFixed(2)} USDC`;
+    return `${usdcAmount.toFixed(2)} ${currencyLabel}`;
   };
 
   // Process all positions
@@ -723,7 +727,7 @@ export default function PortfolioPage() {
                           <td className="py-3 pr-2 min-w-[120px]">
                             <div className="flex items-center gap-2">
                               <div className="relative w-6 h-6 bg-trench-black border border-trench-sandbag/35 rounded overflow-hidden shrink-0 flex items-center justify-center">
-                                {token.icon && token.icon.startsWith('http') ? (
+                                {token.icon && (token.icon.startsWith('http') || token.icon.startsWith('data:') || token.icon.startsWith('blob:')) ? (
                                   <img src={token.icon} alt={token.name} className="w-full h-full object-cover rounded" />
                                 ) : (
                                   <PepePortrait
@@ -768,10 +772,18 @@ export default function PortfolioPage() {
 
                           {/* Strike / Live */}
                           <td className="py-3 text-right text-trench-gasmask font-mono">
-                            <span className="text-white block leading-tight">${formatPrice(pos.openingPrice)}</span>
-                            <span className={`text-[9px] block leading-none ${pos.isWinning ? 'text-neon-moon font-bold' : 'text-jeet-red'}`}>
-                              ${formatPrice(pos.livePrice)}
-                            </span>
+                            {(pos.room?.category as string) === 'debate' || (pos.room?.category as string) === 'prediction' || pos.openingPrice === 1.0 ? (
+                              <span className="px-1.5 py-0.5 rounded bg-yellow-950/80 border border-yellow-500/40 text-yellow-400 font-bold text-[9px] uppercase">
+                                EVENT MARKET
+                              </span>
+                            ) : (
+                              <>
+                                <span className="text-white block leading-tight">${formatPrice(pos.openingPrice)}</span>
+                                <span className={`text-[9px] block leading-none ${pos.isWinning ? 'text-neon-moon font-bold' : 'text-jeet-red'}`}>
+                                  ${formatPrice(pos.livePrice)}
+                                </span>
+                              </>
+                            )}
                           </td>
 
                           {/* Remaining */}
@@ -1019,17 +1031,17 @@ export default function PortfolioPage() {
                           <td className="py-2.5 text-center">
                             {pos.bet.txSig ? (
                               <a 
-                                href={pos.bet.txSig 
-                                  ? (typeof window !== 'undefined' && window.location.hostname === 'localhost') 
+                                href={pos.bet.txSig.startsWith('0x') || isEvmMode
+                                  ? `https://testnet.snowtrace.io/tx/${pos.bet.txSig}`
+                                  : (typeof window !== 'undefined' && window.location.hostname === 'localhost') 
                                     ? `https://explorer.solana.com/tx/${pos.bet.txSig}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899` 
                                     : `https://solscan.io/tx/${pos.bet.txSig}?cluster=devnet`
-                                  : '#'
                                 } 
                                 target="_blank" 
                                 rel="noreferrer" 
                                 className="inline-flex items-center gap-1 text-neon-moon hover:text-white transition-colors"
                               >
-                                <span>Solscan</span>
+                                <span>{pos.bet.txSig.startsWith('0x') || isEvmMode ? 'Snowtrace' : 'Solscan'}</span>
                                 <ExternalLink size={8} />
                               </a>
                             ) : (

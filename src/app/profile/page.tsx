@@ -17,7 +17,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ShieldCheck, Award, Zap, TrendingUp, TrendingDown, RefreshCw, X, Play, Edit2, Camera, AlertTriangle, Save, Loader2, Copy, Check, Users, Coins, ExternalLink } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user, connectWallet, updateProfile, claimReferralRewardsOnChain, showAlert } = useAppState();
+  const { user, connectWallet, updateProfile, claimReferralRewardsOnChain, showAlert, isEvm } = useAppState();
+  const isEvmMode = isEvm || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
+  const currencyLabel = isEvmMode ? 'USDC' : 'SOL';
   const [replayBet, setReplayBet] = useState<{
     token: string;
     side: 'moon' | 'jeet';
@@ -297,7 +299,7 @@ export default function ProfilePage() {
                         {user.wallet}
                       </p>
                       <p className="font-mono text-xs text-moon-gold font-bold w-full text-center sm:text-left">
-                        Balance: {user.balance.toFixed(2)} Ammo SOL
+                        Balance: {user.balance.toFixed(2)} Ammo {currencyLabel}
                       </p>
                     </div>
                   </div>
@@ -421,13 +423,13 @@ export default function ProfilePage() {
                   <div className="bg-trench-black border border-trench-sandbag rounded p-3 text-center">
                     <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">CUMULATIVE PROFIT</span>
                     <span className={`font-staatliches text-2xl block ${stats.profit >= 0 ? 'text-neon-moon glow-moon' : 'text-jeet-red glow-jeet'}`}>
-                      {stats.profit >= 0 ? '+' : ''}{stats.profit.toFixed(2)} SOL
+                      {stats.profit >= 0 ? '+' : ''}{stats.profit.toFixed(2)} {currencyLabel}
                     </span>
                   </div>
 
                   <div className="bg-trench-black border border-trench-sandbag rounded p-3 text-center">
                     <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">MAX AMMO LOADED</span>
-                    <span className="font-staatliches text-2xl text-moon-gold block glow-gold">{stats.biggestBet.toFixed(2)} SOL</span>
+                    <span className="font-staatliches text-2xl text-moon-gold block glow-gold">{stats.biggestBet.toFixed(2)} {currencyLabel}</span>
                   </div>
 
                 </div>
@@ -575,7 +577,7 @@ export default function ProfilePage() {
                         }`} />
                         <div>
                           <span className="font-bold text-white block uppercase text-[11px]">
-                            {bet.amount.toFixed(2)} SOL ON {formatCashtag(tokenSym)}
+                            {bet.amount.toFixed(2)} {currencyLabel} ON {formatCashtag(tokenSym)}
                             {bRoom && (
                               <span className="text-trench-gasmask text-[9px] lowercase font-normal ml-2">
                                 ({bRoom.duration} mins round)
@@ -619,11 +621,11 @@ export default function ProfilePage() {
                           
                           {bet.txSig && (
                             <a 
-                              href={bet.txSig 
-                                ? (typeof window !== 'undefined' && window.location.hostname === 'localhost') 
+                              href={bet.txSig.startsWith('0x') || isEvmMode
+                                ? `https://testnet.snowtrace.io/tx/${bet.txSig}`
+                                : (typeof window !== 'undefined' && window.location.hostname === 'localhost') 
                                   ? `https://explorer.solana.com/tx/${bet.txSig}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899` 
                                   : `https://solscan.io/tx/${bet.txSig}?cluster=devnet`
-                                : '#'
                               } 
                               target="_blank" 
                               rel="noreferrer" 
@@ -699,7 +701,7 @@ export default function ProfilePage() {
                     </button>
                   </div>
                   <p className="font-mono text-[9px] text-neon-moon uppercase font-bold mt-3 max-w-[250px] leading-relaxed">
-                    Earn 0.1% ammo SOL on every mission deployed by your enlisted recruits. Paid automatically on-chain.
+                    Earn 0.1% ammo {currencyLabel} on every mission deployed by your enlisted recruits. Paid automatically on-chain.
                   </p>
                 </div>
 
@@ -709,9 +711,9 @@ export default function ProfilePage() {
                     <span className="font-staatliches text-3xl text-white block mt-1 glow-white">{user.referralsCount || 0}</span>
                   </div>
                   <div className="bg-trench-black border border-trench-sandbag rounded p-4 text-center shadow-inner">
-                    <span className="font-mono text-[9px] text-trench-gasmask uppercase font-bold block">COMMISSION (SOL)</span>
+                    <span className="font-mono text-[9px] text-trench-gasmask uppercase font-bold block">COMMISSION ({currencyLabel})</span>
                     <span className="font-staatliches text-3xl text-moon-gold block mt-1 glow-gold">
-                      {((Number(user.referralEarnings) || 0) / 1e9).toFixed(3)}
+                      {((Number(user.referralEarnings) || 0) / (isEvmMode ? 1e6 : 1e9)).toFixed(3)}
                     </span>
                   </div>
                 </div>
@@ -726,7 +728,7 @@ export default function ProfilePage() {
                         {(user.unclaimedReferralRewards || 0).toFixed(4)}
                       </span>
                       <span className="font-mono text-[10px] text-trench-gasmask font-bold uppercase">
-                        SOL
+                        {currencyLabel}
                       </span>
                     </div>
                     <p className="font-mono text-[8px] text-trench-gasmask uppercase font-bold mt-1.5 leading-tight">
@@ -791,8 +793,8 @@ export default function ProfilePage() {
                       const inviteeFormatted = p.invitee 
                         ? `${p.invitee.substring(0, 6)}...${p.invitee.substring(p.invitee.length - 4)}` 
                         : 'UNKNOWN_RECRUIT';
-                      const betSol = ((Number(p.betAmount) || 0) / 1e9).toFixed(2);
-                      const rewardSol = ((Number(p.rewardAmount) || 0) / 1e9).toFixed(4);
+                      const betSol = ((Number(p.betAmount) || 0) / (isEvmMode ? 1e6 : 1e9)).toFixed(2);
+                      const rewardSol = ((Number(p.rewardAmount) || 0) / (isEvmMode ? 1e6 : 1e9)).toFixed(4);
                       const formattedDate = (() => {
                         if (!p.createdAt) return 'TBD';
                         const d = new Date(p.createdAt);
@@ -806,9 +808,11 @@ export default function ProfilePage() {
                       })();
                       const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
                       const txUrl = p.txSig 
-                        ? isLocal 
-                          ? `https://explorer.solana.com/tx/${p.txSig}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899` 
-                          : `https://solscan.io/tx/${p.txSig}?cluster=devnet`
+                        ? p.txSig.startsWith('0x') || isEvmMode
+                          ? `https://testnet.snowtrace.io/tx/${p.txSig}`
+                          : isLocal 
+                            ? `https://explorer.solana.com/tx/${p.txSig}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899` 
+                            : `https://solscan.io/tx/${p.txSig}?cluster=devnet`
                         : '#';
 
                       return (
@@ -821,7 +825,7 @@ export default function ProfilePage() {
                               </span>
                             </div>
                             <div className="text-trench-gasmask text-[9px] uppercase font-semibold">
-                              WAGER SIZE: <span className="text-white font-bold">{betSol} SOL</span>
+                              WAGER SIZE: <span className="text-white font-bold">{betSol} {currencyLabel}</span>
                             </div>
                             <div className="text-[9px] text-trench-gasmask">
                               {formattedDate}
@@ -830,7 +834,7 @@ export default function ProfilePage() {
                           
                           <div className="text-right w-full sm:w-auto flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 border-trench-sandbag/30 pt-2 sm:pt-0 mt-1 sm:mt-0">
                             <div>
-                              <span className="text-neon-moon font-bold text-xs block glow-moon">+{rewardSol} SOL</span>
+                              <span className="text-neon-moon font-bold text-xs block glow-moon">+{rewardSol} {currencyLabel}</span>
                               <span className="text-[8px] text-trench-gasmask uppercase font-bold block leading-none mt-0.5">0.1% PAYOUT</span>
                             </div>
                             {p.txSig && (

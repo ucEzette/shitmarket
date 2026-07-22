@@ -222,9 +222,9 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
       orderBy = { createdAt: 'desc' };
     }
 
-    // Handle 'all' status – only show active/settled public rooms
+    // Handle 'all' status – show active, settled, and disputed public rooms
     const whereClause: any = status === 'all' 
-      ? { status: { in: ['active', 'settled'] } } 
+      ? { status: { in: ['active', 'settled', 'disputed'] } } 
       : { status };
 
     // Enforce that pending rooms can only be queried by their creator
@@ -314,6 +314,103 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
   } catch (err: any) {
     logger.error({ msg: 'GET /api/rooms error', err: err?.message });
     res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ── POST /api/rooms ────────────────────────────────────────────────────────────
+
+roomsRouter.post('/', async (req, res) => {
+  try {
+    const {
+      roomPubkey,
+      tokenMint,
+      tokenName,
+      tokenSymbol,
+      tokenImageUrl,
+      category,
+      resolutionCriteria,
+      oracleAddress,
+      oracleFeeLamports,
+      moonPool,
+      jeetPool,
+      openingPrice,
+      expiry,
+      creator,
+      chainId,
+      duration,
+      status
+    } = req.body;
+
+    if (!roomPubkey) {
+      return res.status(400).json({ success: false, error: 'Missing roomPubkey' });
+    }
+
+    const expiryDate = expiry ? new Date(expiry) : new Date(Date.now() + (duration || 60) * 60 * 1000);
+    const openingPriceBigInt = openingPrice ? BigInt(Math.round(Number(openingPrice) * 1e12)) : BigInt(1e12);
+
+    const normRoomPubkey = roomPubkey.startsWith('0x') ? roomPubkey.toLowerCase() : roomPubkey;
+    const normTokenMint = tokenMint ? (tokenMint.startsWith('0x') ? tokenMint.toLowerCase() : tokenMint) : normRoomPubkey;
+    const normCreator = creator ? (creator.startsWith('0x') ? creator.toLowerCase() : creator) : '';
+    const normOracle = oracleAddress ? (oracleAddress.startsWith('0x') ? oracleAddress.toLowerCase() : oracleAddress) : '';
+
+    const createdRoom = await prisma.room.upsert({
+      where: { roomPubkey: normRoomPubkey },
+      create: {
+        roomPubkey: normRoomPubkey,
+        tokenMint: normTokenMint,
+        priceFeed: '0x0000000000000000000000000000000000000000000000000000000000000000',
+        tokenName: tokenName || 'Custom Prediction',
+        tokenSymbol: tokenSymbol || 'CUSTOM',
+        tokenImageUrl: tokenImageUrl || '',
+        chainId: chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche'),
+        originalAddress: normTokenMint,
+        duration: duration || 60,
+        openingPrice: openingPriceBigInt,
+        expiry: expiryDate,
+        status: status || 'active',
+        creator: normCreator,
+        oracleAddress: normOracle,
+        oracleFeeLamports: oracleFeeLamports ? BigInt(oracleFeeLamports) : BigInt(0),
+        resolutionCriteria: resolutionCriteria || '',
+        totalPool: BigInt(Math.round(((moonPool || 0) + (jeetPool || 0)) * 1e6)),
+      },
+      update: {
+        status: status || 'active',
+        tokenName: tokenName || undefined,
+        tokenImageUrl: tokenImageUrl || undefined,
+        resolutionCriteria: resolutionCriteria || undefined,
+      }
+    });
+
+    // Cache in Redis
+    await cacheRoom(normRoomPubkey, {
+      status: status || 'active',
+      tokenMint: normTokenMint,
+      tokenName: tokenName || 'Custom Prediction',
+      tokenSymbol: tokenSymbol || 'CUSTOM',
+      tokenImageUrl: tokenImageUrl || '',
+      openingPrice: openingPriceBigInt.toString(),
+      moonPool: String(moonPool || 0),
+      jeetPool: String(jeetPool || 0),
+      expiry: expiryDate.toISOString(),
+      pairAddress: '',
+    });
+
+    // Invalidate list query caches so new room appears immediately at top of GET /api/rooms
+    try {
+      const keys = await redis.keys('rooms:list:*');
+      if (keys.length > 0) {
+        await redis.del(...keys);
+      }
+    } catch (cacheErr) {
+      logger.warn({ msg: 'Failed to clear rooms query cache in Redis', cacheErr });
+    }
+
+    logger.info({ msg: 'Room created/upserted via API', roomPubkey: normRoomPubkey });
+    return res.json({ success: true, data: createdRoom });
+  } catch (err: any) {
+    logger.error({ msg: 'POST /api/rooms error', err: err?.message });
+    return res.status(500).json({ success: false, error: 'Failed to create room in indexer' });
   }
 });
 

@@ -53,25 +53,29 @@ export function validate(schema: ZodSchema, source: RequestPart = 'query') {
 
 export const roomsQuerySchema = z.object({
   filter: z.enum(['ending', 'biggest', 'newest']).optional().default('ending'),
-  status: z.enum(['active', 'settled', 'pending', 'all']).optional().default('active'),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
-  creator: z.string().min(32).max(48).optional(),
+  status: z.enum(['active', 'settled', 'pending', 'disputed', 'all']).optional().default('active'),
+  limit: z.coerce.number().int().min(1).max(500).optional().default(50),
+  creator: z.string().min(10).max(70).optional(),
 });
 
 export const roomPubkeyParamSchema = z.object({
   pubkey: z
     .string()
-    .min(32, 'Pubkey too short')
-    .max(48, 'Pubkey too long')
-    .regex(/^[1-9A-HJ-NP-Za-km-z]+$/, 'Invalid base58 pubkey'),
+    .min(10, 'Pubkey too short')
+    .max(70, 'Pubkey too long'),
 });
 
 export const walletParamSchema = z.object({
   wallet: z
     .string()
-    .min(32, 'Wallet address too short')
-    .max(48, 'Wallet address too long')
-    .regex(/^[1-9A-HJ-NP-Za-km-z]+$/, 'Invalid base58 wallet address'),
+    .refine(
+      (val) => {
+        const isSolana = /^[1-9A-HJ-NP-Za-km-z]{32,48}$/.test(val);
+        const isEvm = /^0x[a-fA-F0-9]{40}$/.test(val);
+        return isSolana || isEvm;
+      },
+      { message: 'Invalid wallet address format (Must be valid Solana or EVM address)' }
+    ),
 });
 
 export const leaderboardQuerySchema = z.object({
@@ -82,8 +86,8 @@ export const leaderboardQuerySchema = z.object({
 // ─── WebSocket incoming message ──────────────────────────────────────────────
 
 export const wsMessageSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('subscribe'), room: z.string().min(32).max(48) }),
-  z.object({ type: z.literal('unsubscribe'), room: z.string().min(32).max(48) }),
+  z.object({ type: z.literal('subscribe'), room: z.string().min(32).max(66) }),
+  z.object({ type: z.literal('unsubscribe'), room: z.string().min(32).max(66) }),
   z.object({ type: z.literal('subscribe_global') }),
   z.object({ type: z.literal('ping') }),
 ]);

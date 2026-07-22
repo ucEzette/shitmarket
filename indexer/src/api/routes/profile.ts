@@ -28,22 +28,23 @@ function parseBet(data: Buffer) {
 
 profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req, res) => {
   try {
-    const { wallet } = req.params;
+    const wallet = req.params.wallet.startsWith('0x') ? req.params.wallet.toLowerCase() : req.params.wallet;
 
     // Self-healing: Fetch on-chain bets for this wallet as current owner and sync with database
     try {
-      const connection = new Connection(config.solana.rpcUrl, 'confirmed');
-      const programId = new PublicKey(config.solana.programId);
-      const onChainAccounts = await connection.getProgramAccounts(programId, {
-        filters: [
-          { dataSize: 115 },
-          { memcmp: { offset: 72, bytes: wallet } }
-        ]
-      });
+      if (!wallet.startsWith('0x')) {
+        const connection = new Connection(config.solana.rpcUrl, 'confirmed');
+        const programId = new PublicKey(config.solana.programId);
+        const onChainAccounts = await connection.getProgramAccounts(programId, {
+          filters: [
+            { dataSize: 115 },
+            { memcmp: { offset: 72, bytes: wallet } }
+          ]
+        });
 
-      for (const acc of onChainAccounts) {
-        const parsed = parseBet(acc.account.data);
-        if (parsed) {
+        for (const acc of onChainAccounts) {
+          const parsed = parseBet(acc.account.data);
+          if (parsed) {
           let dbBet = await prisma.bet.findFirst({
             where: {
               roomPubkey: parsed.room,
@@ -89,6 +90,7 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
             logger.info({ msg: 'Self-healed / created missing bet in database', betId: newBet.id, wallet, amount: parsed.amount.toString() });
           }
         }
+      }
       }
     } catch (err: any) {
       logger.warn({ msg: 'Self-healing on-chain bets sync failed', err: err.message });
@@ -290,11 +292,13 @@ profileRouter.get('/:wallet', validate(walletParamSchema, 'params'), async (req,
 
 profileRouter.post('/update', async (req, res) => {
   try {
-    const { userPubkey, username, avatarUrl, referredBy } = req.body;
+    let { userPubkey, username, avatarUrl, referredBy } = req.body;
 
     if (!userPubkey) {
       return res.status(400).json({ success: false, error: 'userPubkey is required' });
     }
+
+    userPubkey = userPubkey.startsWith('0x') ? userPubkey.toLowerCase() : userPubkey;
 
     // Clean up username
     const cleanUsername = username ? username.trim().slice(0, 30) : undefined;
@@ -333,7 +337,10 @@ profileRouter.post('/update', async (req, res) => {
     let finalReferredBy: string | undefined = undefined;
     if (referredBy && referredBy !== userPubkey) {
       let resolvedReferrer: string | null = null;
-      if (referredBy.length !== 44) {
+      const isSolanaAddress = referredBy.length === 44 && !referredBy.startsWith('0x');
+      const isEvmAddress = referredBy.startsWith('0x') && referredBy.length === 42;
+      
+      if (!isSolanaAddress && !isEvmAddress) {
         const refProfile = await prisma.userProfile.findFirst({
           where: { referralCode: { equals: referredBy, mode: 'insensitive' } }
         });
@@ -341,7 +348,7 @@ profileRouter.post('/update', async (req, res) => {
           resolvedReferrer = refProfile.userPubkey;
         }
       } else {
-        resolvedReferrer = referredBy;
+        resolvedReferrer = referredBy.startsWith('0x') ? referredBy.toLowerCase() : referredBy;
       }
 
       if (resolvedReferrer && resolvedReferrer !== userPubkey) {

@@ -4,7 +4,7 @@
   "description": "ShitMarket — Solana event indexer, settlement keeper, WebSocket server, and REST API",
   "main": "dist/index.js",
   "scripts": {
-    "build": "esbuild src/*.ts src/*/*.ts src/*/*/*.ts --outdir=dist --platform=node --target=node20 --format=cjs",
+    "build": "esbuild src/*.ts src/*/*.ts src/*/*/*.ts --outdir=dist --platform=node --target=node20 --format=cjs && mkdir -p dist/utils dist/feeds && cp src/utils/idl.json dist/utils/idl.json && cp src/feeds/pythFeedMap.json dist/feeds/pythFeedMap.json",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",

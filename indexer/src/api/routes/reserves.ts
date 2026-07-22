@@ -76,80 +76,110 @@ interface ReservesReport {
 
 reservesRouter.get('/', async (_req, res) => {
   try {
-    const connection = new Connection(config.solana.rpcUrl, 'confirmed');
-
-    // ── 1. Fetch on-chain escrow balances ───────────────────────
-    // Derive the escrow PDAs for each active room.
-    // In production, we'd iterate all Room PDAs from the program.
-    // For now, fetch from DB and derive on-chain addresses.
+    const isEvm = config.coreChain === 'avalanche';
 
     const activeRooms = await prismaRead.room.findMany({
       where: { status: 'active' },
       select: { id: true, roomPubkey: true },
     });
-
-    const settledRooms = await prismaRead.room.findMany({
-      where: { status: 'settled' },
-      select: { id: true, roomPubkey: true },
-    });
-
-    const allRoomPubkeys = [...activeRooms, ...settledRooms].map((r) => r.roomPubkey);
-
-    // Build escrow PDA list
+    
+    let totalAssetsLamports = 0;
+    let totalAssetsSol = 0;
     const escrowAccounts: EscrowAccount[] = [];
-    let totalOnChainLamports = 0n;
+    let platformConfigBalance = 0n;
 
-    for (const roomPubkey of allRoomPubkeys) {
+    if (isEvm) {
+      const { createPublicClient, http } = require('viem');
+      const { avalancheFuji } = require('viem/chains');
+
+      const publicClient = createPublicClient({
+        chain: avalancheFuji,
+        transport: http(config.evm.rpcUrl),
+      });
+
+      const balance = await publicClient.getBalance({
+        address: config.evm.contractAddress as `0x${string}`,
+      });
+
+      // AVAX has 18 decimals. Scale to 9 decimals (Gwei) to match SOL/Lamports scale in database
+      const balanceGwei = Number(balance / 1000000000n);
+      totalAssetsLamports = balanceGwei;
+      totalAssetsSol = balanceGwei / 1e9;
+
+      escrowAccounts.push({
+        pubkey: config.evm.contractAddress,
+        label: 'ShitMarketCore Smart Contract (AVAX Escrow)',
+        balanceLamports: balanceGwei,
+        balanceSol: balanceGwei / 1e9,
+      });
+    } else {
+      const connection = new Connection(config.solana.rpcUrl, 'confirmed');
+
+      // ── 1. Fetch on-chain escrow balances ───────────────────────
+      // Derive the escrow PDAs for each active room.
+      // In production, we'd iterate all Room PDAs from the program.
+      // For now, fetch from DB and derive on-chain addresses.
+
+      const settledRooms = await prismaRead.room.findMany({
+        where: { status: 'settled' },
+        select: { id: true, roomPubkey: true },
+      });
+
+      const allRoomPubkeys = [...activeRooms, ...settledRooms].map((r) => r.roomPubkey);
+
+      let totalOnChainLamports = 0n;
+
+      for (const roomPubkey of allRoomPubkeys) {
+        try {
+          const roomPk = new PublicKey(roomPubkey);
+          if (!PROGRAM_ID) throw new Error('PROGRAM_ID missing');
+          const [escrowPda] = PublicKey.findProgramAddressSync(
+            [Buffer.from(ESCROW_SEED), roomPk.toBuffer()],
+            PROGRAM_ID
+          );
+
+          const accountInfo = await connection.getAccountInfo(escrowPda);
+          const balance = BigInt(accountInfo?.lamports ?? 0);
+
+          if (balance > 0n) {
+            escrowAccounts.push({
+              pubkey: escrowPda.toBase58(),
+              label: `Room Escrow: ${roomPubkey.slice(0, 8)}...`,
+              balanceLamports: Number(balance),
+              balanceSol: Number(balance) / 1e9,
+            });
+            totalOnChainLamports += balance;
+          }
+        } catch (err) {
+          logger.warn({ msg: 'Failed to fetch escrow balance', roomPubkey, err });
+        }
+      }
+
+      // Platform config PDA balance (treasury)
       try {
-        const roomPk = new PublicKey(roomPubkey);
         if (!PROGRAM_ID) throw new Error('PROGRAM_ID missing');
-        const [escrowPda] = PublicKey.findProgramAddressSync(
-          [Buffer.from(ESCROW_SEED), roomPk.toBuffer()],
+        const [configPda] = PublicKey.findProgramAddressSync(
+          [Buffer.from(PLATFORM_CONFIG_SEED)],
           PROGRAM_ID
         );
-
-        const accountInfo = await connection.getAccountInfo(escrowPda);
-        const balance = BigInt(accountInfo?.lamports ?? 0);
-
-        if (balance > 0n) {
+        const configAccount = await connection.getAccountInfo(configPda);
+        platformConfigBalance = BigInt(configAccount?.lamports ?? 0);
+        if (platformConfigBalance > 0n) {
           escrowAccounts.push({
-            pubkey: escrowPda.toBase58(),
-            label: `Room Escrow: ${roomPubkey.slice(0, 8)}...`,
-            balanceLamports: Number(balance),
-            balanceSol: Number(balance) / 1e9,
+            pubkey: configPda.toBase58(),
+            label: 'Platform Config (Treasury)',
+            balanceLamports: Number(platformConfigBalance),
+            balanceSol: Number(platformConfigBalance) / 1e9,
           });
-          totalOnChainLamports += balance;
+          totalOnChainLamports += platformConfigBalance;
         }
       } catch (err) {
-        logger.warn({ msg: 'Failed to fetch escrow balance', roomPubkey, err });
+        logger.warn({ msg: 'Failed to fetch platform config balance', err });
       }
-    }
 
-    // Platform config PDA balance (treasury)
-    let platformConfigBalance = 0n;
-    try {
-      if (!PROGRAM_ID) throw new Error('PROGRAM_ID missing');
-      const [configPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from(PLATFORM_CONFIG_SEED)],
-        PROGRAM_ID
-      );
-      const configAccount = await connection.getAccountInfo(configPda);
-      platformConfigBalance = BigInt(configAccount?.lamports ?? 0);
-      if (platformConfigBalance > 0n) {
-        escrowAccounts.push({
-          pubkey: configPda.toBase58(),
-          label: 'Platform Config (Treasury)',
-          balanceLamports: Number(platformConfigBalance),
-          balanceSol: Number(platformConfigBalance) / 1e9,
-        });
-        totalOnChainLamports += platformConfigBalance;
-      }
-    } catch (err) {
-      logger.warn({ msg: 'Failed to fetch platform config balance', err });
+      totalAssetsLamports = Number(totalOnChainLamports);
+      totalAssetsSol = totalAssetsLamports / 1e9;
     }
-
-    const totalAssetsLamports = Number(totalOnChainLamports);
-    const totalAssetsSol = totalAssetsLamports / 1e9;
 
     // ── 2. Calculate liabilities (from DB) ──────────────────────
     // Unclaimed bets: all active room bets that haven't been claimed

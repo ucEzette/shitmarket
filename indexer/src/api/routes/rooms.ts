@@ -64,6 +64,150 @@ async function fetchTokenMeta(mintAddress: string): Promise<any> {
 async function syncRoomFromChain(pubkeyStr: string): Promise<any> {
   try {
     logger.info({ msg: 'Triggering on-chain room fetch for sync', pubkeyStr });
+
+    if (config.coreChain === 'avalanche') {
+      const { createPublicClient, http } = require('viem');
+      const { avalancheFuji } = require('viem/chains');
+
+      const publicClient = createPublicClient({
+        chain: avalancheFuji,
+        transport: http(config.evm.rpcUrl),
+      });
+
+      const SHITMARKET_GET_ROOM_ABI = [
+        {
+          name: 'getRoom',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [{ name: '_roomId', type: 'bytes32' }],
+          outputs: [
+            {
+              type: 'tuple',
+              name: '',
+              components: [
+                { name: 'id', type: 'bytes32' },
+                { name: 'creator', type: 'address' },
+                { name: 'tokenMint', type: 'address' },
+                { name: 'tokenName', type: 'string' },
+                { name: 'chainId', type: 'string' },
+                { name: 'openingPrice', type: 'int64' },
+                { name: 'finalPrice', type: 'int64' },
+                { name: 'twapFinalPrice', type: 'int64' },
+                { name: 'expiryTimestamp', type: 'uint256' },
+                { name: 'moonPool', type: 'uint256' },
+                { name: 'jeetPool', type: 'uint256' },
+                { name: 'totalPool', type: 'uint256' },
+                { name: 'status', type: 'uint8' },
+                { name: 'winner', type: 'uint8' },
+                { name: 'oracleAddress', type: 'address' },
+                { name: 'oracleFeeAmount', type: 'uint256' },
+                { name: 'resolutionCriteria', type: 'string' },
+                { name: 'twapRecorded', type: 'bool' },
+                { name: 'disputeTime', type: 'uint256' }
+              ]
+            }
+          ]
+        }
+      ] as const;
+
+      const roomData: any = await publicClient.readContract({
+        address: config.evm.contractAddress as `0x${string}`,
+        abi: SHITMARKET_GET_ROOM_ABI,
+        functionName: 'getRoom',
+        args: [pubkeyStr as `0x${string}`],
+      });
+
+      if (!roomData || roomData.id === '0x0000000000000000000000000000000000000000000000000000000000000000') {
+        logger.warn({ msg: 'Failed to fetch room account from Avalanche chain or room uninitialized', pubkeyStr });
+        return null;
+      }
+
+      const tokenMintStr = roomData.tokenMint.toLowerCase();
+      const creatorStr = roomData.creator.toLowerCase();
+      const oracleStr = roomData.oracleAddress.toLowerCase();
+      const openingPrice = BigInt(roomData.openingPrice.toString());
+      const expiry = new Date(Number(roomData.expiryTimestamp) * 1000);
+
+      // Status mapping: 0=Pending, 1=Active, 2=Settled, 3=Voided, 4=Disputed
+      const statusMap = ['pending', 'active', 'settled', 'voided', 'disputed'];
+      const statusStr = statusMap[roomData.status] || 'active';
+
+      // Winner mapping: 0=Moon, 1=Jeet, 2=Draw
+      const winnerMap = ['moon', 'jeet', 'draw'];
+      const winnerStr = statusStr === 'settled' ? (winnerMap[roomData.winner] || null) : null;
+
+      const finalPrice = BigInt(roomData.finalPrice.toString());
+      const twapFinalPrice = BigInt(roomData.twapFinalPrice.toString());
+
+      const meta = await fetchTokenMeta(tokenMintStr);
+
+      const moonPool = roomData.moonPool.toString();
+      const jeetPool = roomData.jeetPool.toString();
+      const totalPool = BigInt(moonPool) + BigInt(jeetPool);
+
+      const resolutionCriteria = roomData.resolutionCriteria || '';
+      const tokenName = meta.name || roomData.tokenName || 'Debate Market';
+
+      const createdRoom = await prisma.room.upsert({
+        where: { roomPubkey: pubkeyStr },
+        create: {
+          roomPubkey: pubkeyStr,
+          tokenMint: tokenMintStr,
+          priceFeed: 'evm-aggregated',
+          tokenName: tokenName.slice(0, 66),
+          tokenSymbol: (meta.symbol || 'DEBATE').slice(0, 20),
+          tokenImageUrl: meta.imageUrl,
+          chainId: (meta.chainId || roomData.chainId || 'avalanche').slice(0, 20),
+          originalAddress: tokenMintStr,
+          duration: 5,
+          openingPrice,
+          expiry,
+          status: statusStr,
+          creator: creatorStr,
+          winner: winnerStr,
+          finalPrice: statusStr === 'settled' ? finalPrice : null,
+          twapFinalPrice: statusStr === 'settled' ? twapFinalPrice : null,
+          totalPool,
+          oracleAddress: oracleStr,
+          oracleFeeLamports: BigInt(roomData.oracleFeeAmount.toString()),
+          resolutionCriteria,
+        },
+        update: {
+          status: statusStr,
+          creator: creatorStr,
+          winner: winnerStr,
+          finalPrice: statusStr === 'settled' ? finalPrice : null,
+          twapFinalPrice: statusStr === 'settled' ? twapFinalPrice : null,
+          totalPool,
+          oracleAddress: oracleStr,
+          resolutionCriteria,
+        }
+      });
+
+      // Cache in Redis
+      const redisCacheData: Record<string, string> = {
+        status: statusStr,
+        tokenMint: tokenMintStr,
+        tokenName,
+        tokenSymbol: meta.symbol || 'DEBATE',
+        tokenImageUrl: meta.imageUrl ?? '',
+        openingPrice: openingPrice.toString(),
+        moonPool,
+        jeetPool,
+        expiry: expiry.toISOString(),
+        finalPrice: finalPrice.toString(),
+        twapFinalPrice: twapFinalPrice.toString(),
+        pairAddress: meta.pairAddress ?? '',
+      };
+      if (winnerStr) {
+        redisCacheData.winner = winnerStr;
+      }
+      await cacheRoom(pubkeyStr, redisCacheData);
+
+      logger.info({ msg: 'EVM On-chain room sync complete', pubkeyStr });
+      return createdRoom;
+    }
+
     const connection = new Connection(config.solana.rpcUrl, 'confirmed');
     const programId = new PublicKey(config.solana.programId);
     

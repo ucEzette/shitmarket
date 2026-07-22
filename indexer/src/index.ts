@@ -254,11 +254,20 @@ async function main(): Promise<void> {
   );
   const connection = circuitBreaker.getConnection();
 
-  const slot = await connection.getSlot();
-  logger.info({ msg: 'Solana RPC connected', slot, rpc: config.solana.rpcUrl });
-  circuitBreaker.reportSuccess();
+  const coreChain = config.coreChain;
 
-  const coreChain = process.env.CORE_CHAIN || 'solana';
+  try {
+    const slot = await connection.getSlot();
+    logger.info({ msg: 'Solana RPC connected', slot, rpc: config.solana.rpcUrl });
+    circuitBreaker.reportSuccess();
+  } catch (err: any) {
+    if (coreChain === 'solana') {
+      logger.fatal({ msg: 'Fatal startup error: Failed to connect to Solana RPC', error: err.message });
+      process.exit(1);
+    } else {
+      logger.warn({ msg: 'Failed to connect to Solana RPC, but running in EVM mode. Skipping.', error: err.message });
+    }
+  }
 
   if (coreChain === 'avalanche') {
     logger.info('Starting services in AVALANCHE (EVM) Core Chain mode...');

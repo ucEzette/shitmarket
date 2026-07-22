@@ -45,7 +45,7 @@ async function checkRpc(
   cb: RpcCircuitBreaker | null
 ): Promise<{ status: 'ok' | 'degraded' | 'error'; circuitState: string; isPrimary: boolean; slot?: number }> {
   const connection = cb?.getConnection();
-  if (!connection || !cb) {
+  if (!connection || !cb || config.coreChain === 'avalanche') {
     return { status: 'ok', circuitState: 'CLOSED', isPrimary: true };
   }
   try {

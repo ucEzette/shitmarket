@@ -402,7 +402,7 @@ export const Header: React.FC<{
                 {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' && (
                   <button
                     onClick={() => useAppState.getState().mintTestnetUsdc(1000)}
-                    className="px-1.5 py-0.5 bg-neon-moon/20 hover:bg-neon-moon text-neon-moon hover:text-black border border-neon-moon/50 font-mono text-[8px] font-bold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+                    className="hidden sm:inline-block px-1.5 py-0.5 bg-neon-moon/20 hover:bg-neon-moon text-neon-moon hover:text-black border border-neon-moon/50 font-mono text-[8px] font-bold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
                     title="Get 1,000 Free Testnet USDC"
                   >
                     +1K USDC

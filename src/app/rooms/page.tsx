@@ -8,7 +8,7 @@ import { useAppState, Room, formatCashtag, formatPrice, MarketCategory, CATEGORI
 import { PixelCrackedHelmet, PixelShovel, PixelGasMask } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
-import { Search, Flame, Bomb, ArrowRight, UserPlus, Plus, X, Bookmark, Rocket } from 'lucide-react';
+import { Search, Flame, Bomb, ArrowRight, UserPlus, Plus, X, Bookmark, Rocket, Clock } from 'lucide-react';
 
 const NetworkLogo = ({ chainId, active, className = "w-7 h-7" }: { chainId: string; active: boolean; className?: string }) => {
   if (chainId === 'all') {
@@ -84,9 +84,6 @@ export default function RoomsPage() {
 
   const router = useRouter();
   const { rooms, roomsLoaded, fetchRooms, user, placeBet, connectWallet, addToast } = useAppState();
-  const [filterNew, setFilterNew] = useState<'ending' | 'expired'>('ending');
-  const [filterSoon, setFilterSoon] = useState<'ending' | 'expired'>('ending');
-  const [filterBiggest, setFilterBiggest] = useState<'ending' | 'expired'>('ending');
   const [selectedNetwork, setSelectedNetwork] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<MarketCategory>('all');
   const [showOtherNetworksDrawer, setShowOtherNetworksDrawer] = useState(false);
@@ -136,18 +133,13 @@ export default function RoomsPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
-  const [searchNew, setSearchNew] = useState('');
-  const [searchSoon, setSearchSoon] = useState('');
-  const [searchBiggest, setSearchBiggest] = useState('');
-  const [sortNew, setSortNew] = useState<'newest' | 'pot'>('newest');
-  const [sortSoon, setSortSoon] = useState<'expiry' | 'pot'>('expiry');
-  const [sortBiggest, setSortBiggest] = useState<'pot' | 'newest'>('pot');
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'expiry' | 'pot'>('newest');
+  const [statusFilter, setStatusFilter] = useState<'live' | 'expired'>('live');
   const [timeRemainingText, setTimeRemainingText] = useState<{ [id: string]: string }>({});
   const [showSkeleton, setShowSkeleton] = useState(!roomsLoaded);
-
-  const [quickAmountNew, setQuickAmountNew] = useState<number>(10);
-  const [quickAmountSoon, setQuickAmountSoon] = useState<number>(10);
-  const [quickAmountBiggest, setQuickAmountBiggest] = useState<number>(10);
+  const [quickAmount, setQuickAmount] = useState<number>(10);
   const [audioEnabled, setAudioEnabled] = useState(false);
 
   useEffect(() => {
@@ -166,10 +158,6 @@ export default function RoomsPage() {
       window.dispatchEvent(new CustomEvent('toggle-audio'));
     }
   };
-
-  const [showGearNew, setShowGearNew] = useState(false);
-  const [showGearSoon, setShowGearSoon] = useState(false);
-  const [showGearBiggest, setShowGearBiggest] = useState(false);
 
   // Load fresh active rooms directly on mount
   useEffect(() => {
@@ -221,24 +209,27 @@ export default function RoomsPage() {
     return () => clearInterval(interval);
   }, [rooms]);
 
-  // Filtering & Sorting Logic for the 3 columns
-  const getCategorizedRooms = () => {
+  // Unified Filtering & Sorting Logic
+  const getFilteredAndSortedRooms = () => {
     const now = Date.now();
 
-    // Helper to filter a room by selected status, network, and category
-    const filterRoom = (r: Room, listFilter: 'ending' | 'expired') => {
-      if (!r || !r.id || !r.token) {
-        return false;
-      }
+    let filtered = rooms.filter((r) => {
+      if (!r || !r.id || !r.token) return false;
+
+      // 1. Category Filter
       if (selectedCategory !== 'all') {
         const cat = r.category || detectCategory(r.token.name, r.token.symbol, r.resolutionCriteria);
         if (cat !== selectedCategory) return false;
       }
-      if (listFilter === 'expired') {
+
+      // 2. Status Filter
+      if (statusFilter === 'expired') {
         if (r.status !== 'settled' && r.status !== 'disputed' && r.expiry > now) return false;
       } else {
         if (r.status === 'settled' || r.status === 'disputed' || r.expiry <= now) return false;
       }
+
+      // 3. Network Filter
       if (selectedNetwork !== 'all') {
         const roomNet = (r.token.chainId || 'solana').toLowerCase();
         const selNet = selectedNetwork.toLowerCase();
@@ -246,108 +237,41 @@ export default function RoomsPage() {
           return false;
         }
       }
-      return true;
-    };
 
-    // Base list matching category & network (disregarding active/expired status for fallbacks)
-    const baseNetworkRooms = rooms.filter(r => {
-      if (!r || !r.id || !r.token) return false;
-      if (selectedCategory !== 'all') {
-        const cat = r.category || detectCategory(r.token.name, r.token.symbol, r.resolutionCriteria);
-        if (cat !== selectedCategory) return false;
-      }
-      if (selectedNetwork !== 'all') {
-        const roomNet = (r.token.chainId || 'solana').toLowerCase();
-        const selNet = selectedNetwork.toLowerCase();
-        if (roomNet !== selNet && !(selNet === 'avalanche' && (roomNet === 'fuji' || roomNet === 'avax'))) {
+      // 4. Search Query Filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchesName = r.token.name.toLowerCase().includes(q);
+        const matchesSymbol = r.token.symbol.toLowerCase().includes(q);
+        const matchesAddress = r.token.address.toLowerCase() === q;
+        const matchesCriteria = r.resolutionCriteria?.toLowerCase().includes(q);
+        if (!matchesName && !matchesSymbol && !matchesAddress && !matchesCriteria) {
           return false;
         }
       }
+
       return true;
     });
 
-    // 1. New (Newest listed first / or sorted by pot)
-    let newRoomsList = rooms.filter(r => filterRoom(r, filterNew));
-    if (newRoomsList.length === 0 && filterNew === 'ending' && baseNetworkRooms.length > 0) {
-      newRoomsList = [...baseNetworkRooms];
-    }
-    if (searchNew.trim()) {
-      const q = searchNew.toLowerCase();
-      newRoomsList = newRoomsList.filter(
-        (r) =>
-          r.token.name.toLowerCase().includes(q) ||
-          r.token.symbol.toLowerCase().includes(q) ||
-          r.token.address.toLowerCase() === q
-      );
-    }
-    newRoomsList.sort((a, b) => {
-      if (sortNew === 'pot') {
+    // 5. Sorting
+    filtered.sort((a, b) => {
+      if (sortBy === 'pot') {
         const potA = a.moonPool + a.jeetPool;
         const potB = b.moonPool + b.jeetPool;
         return potB - potA;
-      }
-      return b.createdAt - a.createdAt;
-    });
-
-    // 2. Ending Soon (Closest expiry first / or sorted by pot)
-    let endingSoonRoomsList = rooms.filter(r => filterRoom(r, filterSoon));
-    if (endingSoonRoomsList.length === 0 && filterSoon === 'ending' && baseNetworkRooms.length > 0) {
-      endingSoonRoomsList = [...baseNetworkRooms];
-    }
-    if (searchSoon.trim()) {
-      const q = searchSoon.toLowerCase();
-      endingSoonRoomsList = endingSoonRoomsList.filter(
-        (r) =>
-          r.token.name.toLowerCase().includes(q) ||
-          r.token.symbol.toLowerCase().includes(q) ||
-          r.token.address.toLowerCase() === q
-      );
-    }
-    endingSoonRoomsList.sort((a, b) => {
-      if (sortSoon === 'pot') {
-        const potA = a.moonPool + a.jeetPool;
-        const potB = b.moonPool + b.jeetPool;
-        return potB - potA;
-      }
-      return a.expiry - b.expiry;
-    });
-
-    // 3. Biggest Pot (Highest total pot first / or sorted by date)
-    let biggestPotRoomsList = rooms.filter(r => filterRoom(r, filterBiggest));
-    if (biggestPotRoomsList.length === 0 && filterBiggest === 'ending' && baseNetworkRooms.length > 0) {
-      biggestPotRoomsList = [...baseNetworkRooms];
-    }
-    if (searchBiggest.trim()) {
-      const q = searchBiggest.toLowerCase();
-      biggestPotRoomsList = biggestPotRoomsList.filter(
-        (r) =>
-          r.token.name.toLowerCase().includes(q) ||
-          r.token.symbol.toLowerCase().includes(q) ||
-          r.token.address.toLowerCase() === q
-      );
-    }
-    biggestPotRoomsList.sort((a, b) => {
-      if (sortBiggest === 'newest') {
+      } else if (sortBy === 'expiry') {
+        return a.expiry - b.expiry;
+      } else {
         return b.createdAt - a.createdAt;
       }
-      const potA = a.moonPool + a.jeetPool;
-      const potB = b.moonPool + b.jeetPool;
-      return potB - potA;
     });
 
-    return {
-      newRooms: newRoomsList,
-      endingSoonRooms: endingSoonRoomsList,
-      biggestPotRooms: biggestPotRoomsList,
-      allMatchingCount: newRoomsList.length + endingSoonRoomsList.length + biggestPotRoomsList.length
-    };
+    return filtered;
   };
-
-  const { newRooms, endingSoonRooms, biggestPotRooms, allMatchingCount } = getCategorizedRooms();
 
   // Quick Bet Placement handler
   const handleQuickBet = (e: React.MouseEvent, roomId: string, side: 'moon' | 'jeet', amount: number) => {
-    e.stopPropagation(); // Prevent card redirect click
+    e.stopPropagation();
     e.preventDefault();
 
     if (!user || !user.wallet) {
@@ -376,200 +300,196 @@ export default function RoomsPage() {
     const isSettled = room.status === 'settled';
     const isDisputed = room.status === 'disputed';
 
-    // Left border indicator & background tint & box shadow glow
-    const borderGlow = isDisputed
-      ? 'border-l-[4px] border-l-jeet-red/85 shadow-[inset_4px_0_10px_rgba(255,7,58,0.15)] animate-pulse'
-      : isSettled
-      ? 'border-l-[4px] border-l-moon-gold/80 shadow-[inset_4px_0_10px_rgba(255,215,0,0.06)]'
-      : isMoonLeading
-      ? 'border-l-[4px] border-l-neon-moon/80 shadow-[inset_4px_0_10px_rgba(22,163,74,0.1)]'
-      : 'border-l-[4px] border-l-jeet-red/80 shadow-[inset_4px_0_10px_rgba(255,7,58,0.1)]';
-
-    const hoverGlow = isDisputed
-      ? 'hover:bg-[#1a0205] hover:shadow-[inset_4px_0_15px_rgba(255,7,58,0.22),_0_0_12px_rgba(255,7,58,0.15)]'
-      : isSettled
-      ? 'hover:bg-[#171103] hover:shadow-[inset_4px_0_15px_rgba(255,215,0,0.12),_0_0_12px_rgba(255,215,0,0.1)]'
-      : isMoonLeading
-      ? 'hover:bg-[#07170a] hover:shadow-[inset_4px_0_15px_rgba(22,163,74,0.18),_0_0_12px_rgba(22,163,74,0.12)]'
-      : 'hover:bg-[#180507] hover:shadow-[inset_4px_0_15px_rgba(255,7,58,0.18),_0_0_12px_rgba(255,7,58,0.12)]';
-
     return (
       <div
         key={room.id}
         onClick={() => router.push(`/room/${room.id}`)}
-        className={`p-3.5 cursor-pointer flex flex-col justify-between relative group transition-all duration-150 select-none scanlines ${borderGlow} ${hoverGlow} bg-[#05050A]`}
+        className={`bg-trench-mud border rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 select-none relative group hover:-translate-y-0.5 ${
+          isMoonLeading
+            ? 'border-neon-moon/30 shadow-glow-moon hover:border-neon-moon/70 hover:shadow-glow-moon-strong'
+            : 'border-jeet-red/30 shadow-glow-jeet hover:border-jeet-red/70 hover:shadow-glow-jeet-strong'
+        }`}
       >
-        {/* Timer Bomb Clock Header */}
-        <div className="flex justify-between items-center mb-2">
-          <div className="flex items-center gap-1 bg-trench-black border border-trench-sandbag/80 rounded px-1.5 py-0.5">
-            <Bomb size={9} className={isDisputed ? 'text-jeet-red animate-pulse' : isSettled ? 'text-moon-gold' : 'text-jeet-red'} />
-            <span className={`font-mono text-[9px] font-bold ${isDisputed ? 'text-jeet-red' : isSettled ? 'text-moon-gold' : 'text-white'}`}>
-              {formatDuration(room.duration)}
-            </span>
+        {/* Card Header */}
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div className="flex items-start gap-3">
+            {/* Icon */}
+            <div className="relative bg-trench-black border border-trench-sandbag rounded-xl overflow-hidden shrink-0 w-10 h-10 flex items-center justify-center">
+              {room.token.icon && (room.token.icon.startsWith('http') || room.token.icon.startsWith('data:') || room.token.icon.startsWith('blob:')) ? (
+                <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded-lg" />
+              ) : (
+                <PepePortrait
+                  src={(() => {
+                    const id = room.id || '';
+                    let hash = 0;
+                    for (let i = 0; i < id.length; i++) {
+                      hash = id.charCodeAt(i) + ((hash << 5) - hash);
+                    }
+                    const index = Math.abs(hash);
+                    return isMoonLeading 
+                      ? MOON_PEPES[index % MOON_PEPES.length] 
+                      : JEET_PEPES[index % JEET_PEPES.length];
+                  })()}
+                  size={36}
+                  glowColor={isMoonLeading ? 'moon' : 'jeet'}
+                  className="rounded-lg"
+                />
+              )}
+            </div>
+            {/* Question */}
+            <div className="min-w-0">
+              <h4 className="font-bold text-sm text-slate-100 line-clamp-2 leading-snug tracking-wide group-hover:text-white transition-colors">
+                {isDebateRoom 
+                  ? (room.resolutionCriteria ? room.resolutionCriteria.split('| Ref:')[0].split('Ref:')[0].trim() : room.token.name)
+                  : `Will ${room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} end above ${room.openingPrice !== undefined && formatPrice(room.openingPrice) !== 'N/A' ? `$${formatPrice(room.openingPrice)}` : '$1.00'}?`}
+              </h4>
+              {!isDebateRoom && room.token.address && (
+                <span 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(room.token.address);
+                    addToast("CONTRACT COPIED!", 'success');
+                  }}
+                  className="font-mono text-[9px] text-trench-gasmask hover:text-slate-300 transition-colors cursor-pointer select-all truncate mt-0.5 inline-block max-w-[150px]"
+                  title="Click to copy CA"
+                >
+                  CA: {room.token.address.slice(0, 6)}...{room.token.address.slice(-4)}
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            {/* Bookmark button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                toggleBookmark(room.id);
-                synthSound('bet');
-              }}
-              className="p-1 hover:bg-trench-black border border-trench-sandbag/30 text-trench-gasmask hover:text-white rounded transition-colors"
-              title={watchlistedIds.includes(room.id) ? "Remove Bookmark" : "Bookmark Room"}
-            >
-              <Bookmark 
-                size={10} 
-                className={watchlistedIds.includes(room.id) ? "fill-neon-moon text-neon-moon" : ""} 
-              />
-            </button>
-            {/* Small Chain Icon to indicate network (only for chart/crypto token markets) */}
-            {(!isDebateRoom && room.token.pairAddress) && (
-              <div className="bg-trench-black p-0.5 rounded border border-trench-sandbag/30 flex items-center justify-center h-5 w-5 shrink-0" title={`Network: ${room.token.chainId?.toUpperCase() || (process.env.NEXT_PUBLIC_CORE_CHAIN?.toUpperCase() || 'AVALANCHE')}`}>
-                <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
+        </div>
+
+        {/* Outcome Selector Rows */}
+        <div className="space-y-2 mb-4">
+          {/* Moon Outcome Row */}
+          <div className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
+            isSettled && room.winner === 'moon'
+              ? 'bg-green-950/20 border-green-500/30'
+              : isSettled && room.winner !== 'moon'
+              ? 'opacity-40 border-transparent'
+              : 'bg-trench-black/40 border-trench-sandbag/40 hover:border-trench-sandbag'
+          }`}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm">🚀</span>
+              <span className="font-bold text-xs text-slate-200">MOON</span>
+              {isSettled && room.winner === 'moon' && <span className="text-[10px] text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded font-mono font-bold">WINNER</span>}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-sm text-slate-100">{moonPercentage.toFixed(0)}%</span>
+              {!isSettled && !isDisputed ? (
+                <button
+                  onClick={(e) => handleQuickBet(e, room.id, 'moon', quickAmount)}
+                  className="px-3.5 py-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white border border-green-600/30 transition-all rounded-lg font-bold text-xs min-w-[70px] text-center"
+                >
+                  MOON
+                </button>
+              ) : (
+                <div className="w-[70px]" />
+              )}
+            </div>
+          </div>
+
+          {/* Jeet Outcome Row */}
+          <div className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
+            isSettled && room.winner === 'jeet'
+              ? 'bg-red-950/20 border-red-500/30'
+              : isSettled && room.winner !== 'jeet'
+              ? 'opacity-40 border-transparent'
+              : 'bg-trench-black/40 border-trench-sandbag/40 hover:border-trench-sandbag'
+          }`}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm">💀</span>
+              <span className="font-bold text-xs text-slate-200">JEET</span>
+              {isSettled && room.winner === 'jeet' && <span className="text-[10px] text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded font-mono font-bold">WINNER</span>}
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-bold text-sm text-slate-100">{jeetPercentage.toFixed(0)}%</span>
+              {!isSettled && !isDisputed ? (
+                <button
+                  onClick={(e) => handleQuickBet(e, room.id, 'jeet', quickAmount)}
+                  className="px-3.5 py-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white border border-red-600/30 transition-all rounded-lg font-bold text-xs min-w-[70px] text-center"
+                >
+                  JEET
+                </button>
+              ) : (
+                <div className="w-[70px]" />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Card Footer */}
+        <div className="flex items-center justify-between border-t border-trench-sandbag/40 pt-3 mt-auto text-[10px] font-mono text-trench-gasmask">
+          {/* Left Info Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Network */}
+            <div className="flex items-center gap-1 bg-trench-black/60 px-1.5 py-0.5 rounded border border-trench-sandbag/40 shrink-0">
+              <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
+              <span className="uppercase text-[9px] font-bold text-slate-300">
+                {(room.token.chainId || 'solana').slice(0, 5)}
+              </span>
+            </div>
+
+            <span>·</span>
+
+            {/* Volume */}
+            <span className="font-bold text-slate-300">
+              ${totalPot.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} {room.token.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'} Vol.
+            </span>
+
+            <span>·</span>
+
+            {/* Status */}
+            {isDisputed ? (
+              <span className="text-red-500 font-bold animate-pulse">⚠️ DISPUTED</span>
+            ) : isSettled ? (
+              <span className="text-moon-gold font-bold">💀 SETTLED</span>
+            ) : (
+              <div className="flex items-center gap-1 text-green-500 font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                <span>{timeText}</span>
               </div>
             )}
-            <div className={`text-[9px] font-mono font-bold bg-trench-black px-1.5 py-0.5 rounded border uppercase ${
-              isDisputed
-                ? 'text-jeet-red border-jeet-red/50 animate-pulse'
-                : isSettled
-                ? 'text-moon-gold border-trench-sandbag/30'
-                : 'text-neon-moon border-trench-sandbag/30 animate-pulse'
-            }`}>
-              {timeText}
-            </div>
-          </div>
-        </div>
-
-        {/* Token Details with compact structure */}
-        <div className="flex items-center gap-2 border-b border-trench-sandbag/30 pb-2 mb-2">
-          <div className="relative bg-trench-black p-0.5 border border-trench-sandbag rounded overflow-hidden shrink-0 w-8 h-8 flex items-center justify-center">
-            {room.token.icon && (room.token.icon.startsWith('http') || room.token.icon.startsWith('data:') || room.token.icon.startsWith('blob:')) ? (
-              <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded" />
-            ) : (
-              <PepePortrait
-                src={(() => {
-                  const id = room.id || '';
-                  let hash = 0;
-                  for (let i = 0; i < id.length; i++) {
-                    hash = id.charCodeAt(i) + ((hash << 5) - hash);
-                  }
-                  const index = Math.abs(hash);
-                  return isMoonLeading 
-                    ? MOON_PEPES[index % MOON_PEPES.length] 
-                    : JEET_PEPES[index % JEET_PEPES.length];
-                })()}
-                size={24}
-                glowColor={isMoonLeading ? 'moon' : 'jeet'}
-                className="rounded"
-              />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-1 flex-wrap">
-              <h4 className="font-staatliches text-base text-white tracking-wide truncate max-w-[90px]">
-                {room.token.name}
-              </h4>
-              <span className="font-mono text-[9px] text-neon-moon font-bold truncate">
-                {formatCashtag(room.token.symbol)}
-              </span>
-            </div>
-            {!isDebateRoom && room.token.address && (
-              <span 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigator.clipboard.writeText(room.token.address);
-                  addToast("CONTRACT COPIED!", 'success');
-                }}
-                className="font-mono text-[8px] text-trench-gasmask hover:text-white transition-colors cursor-pointer select-all truncate block max-w-[140px]"
-                title="Click to copy CA"
-              >
-                CA: {room.token.address.slice(0, 8)}...{room.token.address.slice(-6)}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Prediction target box */}
-        <div className="bg-trench-black/40 border border-trench-sandbag/20 p-2 rounded mb-2 text-center font-mono text-[10px] leading-snug min-h-[44px] flex items-center justify-center">
-          <p className="text-white font-bold uppercase line-clamp-2">
-            {isDebateRoom 
-              ? (room.resolutionCriteria ? room.resolutionCriteria.split('| Ref:')[0].split('Ref:')[0].trim() : room.token.name)
-              : `WILL ${room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} END ABOVE ${room.openingPrice !== undefined && formatPrice(room.openingPrice) !== 'N/A' ? `$${formatPrice(room.openingPrice)}` : '$1.00'} ON ${formatExpiryUTC(room.expiry)}?`}
-          </p>
-        </div>
-
-        {/* Pools Breakdown progress bar */}
-        <div className="space-y-1 mb-2 font-mono text-[8px] font-bold">
-          <div className="flex justify-between text-[9px]">
-            <span className="text-neon-moon uppercase">MOON POT: {room.moonPool.toFixed(2)} {room.token.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
-            <span className="text-jeet-red uppercase">JEET POT: {room.jeetPool.toFixed(2)} {room.token.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
           </div>
 
-          {/* Dual Bar */}
-          <div className="w-full h-1.5 bg-trench-black border border-trench-sandbag/60 rounded overflow-hidden flex">
-            <div
-              style={{ width: `${moonPercentage}%` }}
-              className="bg-neon-moon h-full transition-all duration-300"
+          {/* Right Bookmark button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleBookmark(room.id);
+              synthSound('bet');
+            }}
+            className="p-1 hover:bg-trench-black border border-trench-sandbag/40 text-trench-gasmask hover:text-white rounded transition-colors"
+            title={watchlistedIds.includes(room.id) ? "Remove Bookmark" : "Bookmark Room"}
+          >
+            <Bookmark 
+              size={11} 
+              className={watchlistedIds.includes(room.id) ? "fill-neon-moon text-neon-moon animate-pulse" : ""} 
             />
-            <div
-              style={{ width: `${jeetPercentage}%` }}
-              className="bg-jeet-red h-full transition-all duration-300"
-            />
-          </div>
+          </button>
         </div>
-
-        {/* Quick Bet Buttons / Settlement Badges */}
-        {isDisputed ? (
-          <div className="w-full py-1 bg-red-950/45 border border-dashed border-jeet-red text-center rounded mt-auto">
-            <span className="font-staatliches text-xs text-jeet-red uppercase tracking-widest animate-pulse font-bold">
-              ⚠️ VERDICT DISPUTED
-            </span>
-          </div>
-        ) : isSettled ? (
-          <div className="w-full py-1 bg-trench-black border border-dashed border-moon-gold/40 text-center rounded mt-auto">
-            <span className="font-staatliches text-xs text-moon-gold uppercase tracking-widest glow-gold font-bold">
-              WINNER: {room.winner?.toUpperCase() || 'MOON'}
-            </span>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-1.5 mt-auto">
-            <button
-              onClick={(e) => handleQuickBet(e, room.id, 'moon', quickAmount)}
-              className="uiverse-btn uiverse-btn-sm uiverse-btn-moon font-staatliches tracking-wider"
-            >
-              <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
-              <span className="now">MOON</span>
-              <span className="play !whitespace-nowrap">MOON {quickAmount}</span>
-            </button>
-            <button
-              onClick={(e) => handleQuickBet(e, room.id, 'jeet', quickAmount)}
-              className="uiverse-btn uiverse-btn-sm uiverse-btn-jeet font-staatliches tracking-wider"
-            >
-              <img src="/pepes/jeet-skeleton.png" className="btn-icon object-contain" alt="Pepe" />
-              <span className="now">JEET</span>
-              <span className="play !whitespace-nowrap">JEET {quickAmount}</span>
-            </button>
-          </div>
-        )}
       </div>
     );
   };
 
-  const renderColumnSkeleton = () => (
-    <div className="retro-panel rounded-xl overflow-hidden divide-y divide-trench-sandbag bg-black animate-pulse">
-      {[1, 2, 3].map((n) => (
-        <div key={n} className="p-3.5 h-44 bg-[#05050A]" />
+  const renderGridSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-pulse">
+      {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
+        <div key={n} className="bg-trench-mud border border-trench-sandbag rounded-2xl p-4 h-48" />
       ))}
     </div>
   );
 
-  const renderEmptyColumn = () => (
-    <div className="flex flex-col items-center justify-center py-10 text-center text-trench-gasmask border border-dashed border-trench-sandbag/40 rounded-lg p-4 font-mono text-[10px] uppercase font-bold">
-      <p>No Arenas Found</p>
+  const renderEmptyGrid = () => (
+    <div className="flex flex-col items-center justify-center py-20 text-center text-trench-gasmask border-2 border-dashed border-trench-sandbag/40 rounded-2xl p-8 font-mono text-xs uppercase font-bold w-full bg-trench-mud/30">
+      <p className="text-slate-400 text-sm">No Active Markets Found</p>
+      <p className="mt-2 text-[10px] text-trench-gasmask">Try adjusting your filters or search query.</p>
     </div>
   );
+
+  const filteredRooms = getFilteredAndSortedRooms();
 
   return (
     <div className="w-full px-4 md:px-8 py-6 flex-1 flex flex-col select-none max-w-full">
@@ -888,6 +808,7 @@ export default function RoomsPage() {
                 </div>
               </>
             )}
+          </div>
           {/* Rocket Deploy Button */}
           <Link href="/create-room" className="w-full md:w-auto">
             <button className="w-full py-2 px-4 font-staatliches text-lg tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all flex items-center justify-center gap-2 uppercase font-bold h-11 text-center">
@@ -897,10 +818,9 @@ export default function RoomsPage() {
           </Link>
         </div>
       </div>
-    </div>
 
       {/* Category Selector Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none border-b border-trench-sandbag/40 shrink-0">
+      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none border-b border-trench-sandbag/40 shrink-0">
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.id;
           return (
@@ -923,422 +843,107 @@ export default function RoomsPage() {
         })}
       </div>
 
-      {/* 3-Column Dashboard View */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 items-start min-h-0 w-full mb-6">
-        
-        {/* Column 1: New */}
-        <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 relative">
-            <div className="flex items-center justify-between gap-1 flex-wrap lg:flex-nowrap">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="w-2 h-2 rounded-full bg-neon-moon shadow-[0_0_6px_#39ff14]" />
-                <h3 className="font-staatliches text-lg tracking-wider text-white uppercase">NEW</h3>
-              </div>
-
-              {/* Search Pill */}
-              <div className="relative flex-1 min-w-[60px] max-w-[100px]">
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={searchNew}
-                  onChange={(e) => setSearchNew(e.target.value)}
-                  className="w-full px-2 py-0.5 bg-trench-black/80 border border-trench-sandbag/40 text-white font-mono text-[9px] placeholder-trench-gasmask/60 rounded-full focus:border-neon-moon focus:outline-none uppercase font-bold text-center"
-                />
-              </div>
-
-              {/* Quick Bet Pill: ⚡ Amount USDC */}
-              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0" title="Quick Stake Amount (USDC)">
-                <span className="text-neon-moon font-bold select-none">⚡</span>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={quickAmountNew}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setQuickAmountNew(isNaN(val) ? 0 : val);
-                  }}
-                  className="w-10 bg-transparent text-white font-bold focus:outline-none text-center"
-                />
-                <span className="font-staatliches text-[10px] text-neon-moon font-bold ml-0.5 tracking-wider">USDC</span>
-              </div>
-
-
-              {/* Settings Gear Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setShowGearNew(prev => !prev);
-                    synthSound('bet');
-                  }}
-                  className={`p-1 text-xs rounded transition-all h-6 flex items-center justify-center shrink-0 ${showGearNew ? 'text-neon-moon font-bold scale-110' : 'text-trench-gasmask hover:text-white'}`}
-                  title="Filter and Sort Settings"
-                >
-                  ⚙
-                </button>
-                {showGearNew && (
-                  <div className="absolute right-0 top-7 z-30 w-44 bg-trench-black border-2 border-trench-sandbag rounded-lg p-3 shadow-glow-moon scanlines font-mono text-[10px] space-y-2.5">
-                    <div className="flex justify-between items-center border-b border-trench-sandbag/40 pb-1 mb-1">
-                      <span className="text-white font-bold uppercase">SETTINGS</span>
-                      <button onClick={() => setShowGearNew(false)} className="text-trench-gasmask hover:text-white font-bold">×</button>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-neon-moon font-bold uppercase block text-[9px]">SORT BY</span>
-                      <div className="grid grid-cols-2 gap-1">
-                        <button
-                          onClick={() => {
-                            setSortNew('newest');
-                            synthSound('bet');
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
-                            sortNew === 'newest'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          NEWEST
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSortNew('pot');
-                            synthSound('bet');
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
-                            sortNew === 'pot'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          POT
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-neon-moon font-bold uppercase block text-[9px]">STATUS FILTER</span>
-                      <div className="flex flex-col gap-1">
-                        <button
-                          onClick={() => {
-                            setFilterNew('ending');
-                            synthSound('bet');
-                          }}
-                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filterNew !== 'expired'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          🟢 LIVE ARENAS
-                        </button>
-                        <button
-                          onClick={() => {
-                            setFilterNew('expired');
-                            synthSound('bet');
-                          }}
-                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filterNew === 'expired'
-                              ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          💀 EXPIRED ROOMS
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin max-h-[480px] lg:max-h-none">
-            {showSkeleton ? (
-              renderColumnSkeleton()
-            ) : newRooms.length > 0 ? (
-              <div className="retro-panel rounded-xl overflow-hidden divide-y divide-trench-sandbag bg-black shadow-[0_0_15px_rgba(22,163,74,0.05)]">
-                {newRooms.map((room) => renderRoomCard(room, quickAmountNew))}
-              </div>
-            ) : (
-              renderEmptyColumn()
-            )}
-          </div>
+      {/* Unified Search & Filters Toolbar */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-trench-mud border border-trench-sandbag rounded-2xl p-3.5 mb-6">
+        <div className="flex items-center gap-2">
+          <span className="font-staatliches text-xl text-white tracking-wider font-bold uppercase">
+            All Markets
+          </span>
+          <span className="font-mono text-xs text-trench-gasmask bg-trench-black border border-trench-sandbag/80 px-2 py-0.5 rounded-full font-bold">
+            {filteredRooms.length}
+          </span>
         </div>
 
-        {/* Column 2: Ending Soon */}
-        <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 relative">
-            <div className="flex items-center justify-between gap-1 flex-wrap lg:flex-nowrap">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="w-2 h-2 rounded-full bg-jeet-red shadow-[0_0_6px_#ff073a]" />
-                <h3 className="font-staatliches text-lg tracking-wider text-white uppercase">ENDING SOON</h3>
-              </div>
-
-              {/* Search Pill */}
-              <div className="relative flex-1 min-w-[60px] max-w-[100px]">
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={searchSoon}
-                  onChange={(e) => setSearchSoon(e.target.value)}
-                  className="w-full px-2 py-0.5 bg-trench-black/80 border border-trench-sandbag/40 text-white font-mono text-[9px] placeholder-trench-gasmask/60 rounded-full focus:border-jeet-red focus:outline-none uppercase font-bold text-center"
-                />
-              </div>
-
-              {/* Quick Bet Pill: ⚡ Amount USDC */}
-              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0" title="Quick Stake Amount (USDC)">
-                <span className="text-neon-moon font-bold select-none">⚡</span>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={quickAmountSoon}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setQuickAmountSoon(isNaN(val) ? 0 : val);
-                  }}
-                  className="w-10 bg-transparent text-white font-bold focus:outline-none text-center"
-                />
-                <span className="font-staatliches text-[10px] text-neon-moon font-bold ml-0.5 tracking-wider">USDC</span>
-              </div>
-
-
-              {/* Settings Gear Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setShowGearSoon(prev => !prev);
-                    synthSound('bet');
-                  }}
-                  className={`p-1 text-xs rounded transition-all h-6 flex items-center justify-center shrink-0 ${showGearSoon ? 'text-neon-moon font-bold scale-110' : 'text-trench-gasmask hover:text-white'}`}
-                  title="Filter and Sort Settings"
-                >
-                  ⚙
-                </button>
-                {showGearSoon && (
-                  <div className="absolute right-0 top-7 z-30 w-44 bg-trench-black border-2 border-trench-sandbag rounded-lg p-3 shadow-glow-moon scanlines font-mono text-[10px] space-y-2.5">
-                    <div className="flex justify-between items-center border-b border-trench-sandbag/40 pb-1 mb-1">
-                      <span className="text-white font-bold uppercase">SETTINGS</span>
-                      <button onClick={() => setShowGearSoon(false)} className="text-trench-gasmask hover:text-white font-bold">×</button>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-neon-moon font-bold uppercase block text-[9px]">SORT BY</span>
-                      <div className="grid grid-cols-2 gap-1">
-                        <button
-                          onClick={() => {
-                            setSortSoon('expiry');
-                            synthSound('bet');
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
-                            sortSoon === 'expiry'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          TIME
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSortSoon('pot');
-                            synthSound('bet');
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
-                            sortSoon === 'pot'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          POT
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-neon-moon font-bold uppercase block text-[9px]">STATUS FILTER</span>
-                      <div className="flex flex-col gap-1">
-                        <button
-                          onClick={() => {
-                            setFilterSoon('ending');
-                            synthSound('bet');
-                          }}
-                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filterSoon !== 'expired'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          🟢 LIVE ARENAS
-                        </button>
-                        <button
-                          onClick={() => {
-                            setFilterSoon('expired');
-                            synthSound('bet');
-                          }}
-                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filterSoon === 'expired'
-                              ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          💀 EXPIRED ROOMS
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Search */}
+          <div className="relative flex-1 md:flex-initial min-w-[200px] max-w-full">
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-trench-gasmask" />
+            <input
+              type="text"
+              placeholder="Search markets..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-1.5 bg-trench-black/80 border border-trench-sandbag/60 text-white font-mono text-xs placeholder-trench-gasmask/50 rounded-lg focus:border-neon-moon focus:outline-none uppercase font-bold tracking-wider"
+            />
           </div>
-          <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin max-h-[480px] lg:max-h-none">
-            {showSkeleton ? (
-              renderColumnSkeleton()
-            ) : endingSoonRooms.length > 0 ? (
-              <div className="retro-panel rounded-xl overflow-hidden divide-y divide-trench-sandbag bg-black shadow-[0_0_15px_rgba(22,163,74,0.05)]">
-                {endingSoonRooms.map((room) => renderRoomCard(room, quickAmountSoon))}
-              </div>
-            ) : (
-              renderEmptyColumn()
-            )}
+
+          {/* Sort */}
+          <div className="flex items-center bg-trench-black/80 border border-trench-sandbag/60 rounded-lg p-0.5 h-9 shrink-0">
+            {(['newest', 'expiry', 'pot'] as const).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => {
+                  setSortBy(opt);
+                  synthSound('bet');
+                }}
+                className={`px-3 py-1 rounded-md text-[10px] font-mono font-bold uppercase transition-all ${
+                  sortBy === opt
+                    ? 'bg-trench-sandbag text-neon-moon border border-neon-moon/40'
+                    : 'text-trench-gasmask hover:text-slate-200'
+                }`}
+              >
+                {opt === 'newest' ? 'NEW' : opt === 'expiry' ? 'TIME' : 'POT'}
+              </button>
+            ))}
+          </div>
+
+          {/* Status filter */}
+          <div className="flex items-center bg-trench-black/80 border border-trench-sandbag/60 rounded-lg p-0.5 h-9 shrink-0">
+            {(['live', 'expired'] as const).map((opt) => (
+              <button
+                key={opt}
+                onClick={() => {
+                  setStatusFilter(opt);
+                  synthSound('bet');
+                }}
+                className={`px-3 py-1 rounded-md text-[10px] font-mono font-bold uppercase transition-all ${
+                  statusFilter === opt
+                    ? 'bg-trench-sandbag text-neon-moon border border-neon-moon/40'
+                    : 'text-trench-gasmask hover:text-slate-200'
+                }`}
+              >
+                {opt === 'live' ? '🟢 LIVE' : '💀 EXPIRED'}
+              </button>
+            ))}
+          </div>
+
+          {/* Quick Bet Stake Input */}
+          <div className="flex items-center gap-1.5 bg-trench-black/80 border border-trench-sandbag/60 rounded-lg px-2 py-1 h-9 font-mono text-xs text-white shrink-0" title="Quick Bet Stake Amount">
+            <span className="text-neon-moon font-bold animate-pulse select-none">⚡</span>
+            <input
+              type="number"
+              step="1"
+              min="1"
+              value={quickAmount}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setQuickAmount(isNaN(val) ? 0 : val);
+              }}
+              className="w-10 bg-transparent text-white font-bold focus:outline-none text-center"
+            />
+            <span className="font-staatliches text-xs text-neon-moon font-bold tracking-wider select-none">
+              {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}
+            </span>
           </div>
         </div>
+      </div>
 
-        {/* Column 3: Biggest Pot */}
-        <div className="flex flex-col bg-trench-black/40 border-2 border-trench-sandbag/60 rounded-xl p-4 lg:max-h-[68vh] w-full">
-          <div className="flex flex-col border-b-2 border-trench-sandbag/40 pb-2 mb-3 shrink-0 relative">
-            <div className="flex items-center justify-between gap-1 flex-wrap lg:flex-nowrap">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className="w-2 h-2 rounded-full bg-moon-gold shadow-[0_0_6px_#ffd700]" />
-                <h3 className="font-staatliches text-lg tracking-wider text-white uppercase">BIGGEST POT</h3>
-              </div>
-
-              {/* Search Pill */}
-              <div className="relative flex-1 min-w-[60px] max-w-[100px]">
-                <input
-                  type="text"
-                  placeholder="Search"
-                  value={searchBiggest}
-                  onChange={(e) => setSearchBiggest(e.target.value)}
-                  className="w-full px-2 py-0.5 bg-trench-black/80 border border-trench-sandbag/40 text-white font-mono text-[9px] placeholder-trench-gasmask/60 rounded-full focus:border-moon-gold focus:outline-none uppercase font-bold text-center"
-                />
-              </div>
-
-              {/* Quick Bet Pill: ⚡ Amount USDC */}
-              <div className="flex items-center gap-0.5 bg-trench-black/80 border border-trench-sandbag/40 rounded-full px-1.5 py-0.5 text-white font-mono text-[9px] h-6 shrink-0" title="Quick Stake Amount (USDC)">
-                <span className="text-neon-moon font-bold select-none">⚡</span>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={quickAmountBiggest}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setQuickAmountBiggest(isNaN(val) ? 0 : val);
-                  }}
-                  className="w-10 bg-transparent text-white font-bold focus:outline-none text-center"
-                />
-                <span className="font-staatliches text-[10px] text-neon-moon font-bold ml-0.5 tracking-wider">USDC</span>
-              </div>
-
-
-              {/* Settings Gear Dropdown */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setShowGearBiggest(prev => !prev);
-                    synthSound('bet');
-                  }}
-                  className={`p-1 text-xs rounded transition-all h-6 flex items-center justify-center shrink-0 ${showGearBiggest ? 'text-neon-moon font-bold scale-110' : 'text-trench-gasmask hover:text-white'}`}
-                  title="Filter and Sort Settings"
-                >
-                  ⚙
-                </button>
-                {showGearBiggest && (
-                  <div className="absolute right-0 top-7 z-30 w-44 bg-trench-black border-2 border-trench-sandbag rounded-lg p-3 shadow-glow-moon scanlines font-mono text-[10px] space-y-2.5">
-                    <div className="flex justify-between items-center border-b border-trench-sandbag/40 pb-1 mb-1">
-                      <span className="text-white font-bold uppercase">SETTINGS</span>
-                      <button onClick={() => setShowGearBiggest(false)} className="text-trench-gasmask hover:text-white font-bold">×</button>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-neon-moon font-bold uppercase block text-[9px]">SORT BY</span>
-                      <div className="grid grid-cols-2 gap-1">
-                        <button
-                          onClick={() => {
-                            setSortBiggest('pot');
-                            synthSound('bet');
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
-                            sortBiggest === 'pot'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          POT
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSortBiggest('newest');
-                            synthSound('bet');
-                          }}
-                          className={`px-1.5 py-0.5 rounded text-center border transition-all text-[8px] ${
-                            sortBiggest === 'newest'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          DATE
-                        </button>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <span className="text-neon-moon font-bold uppercase block text-[9px]">STATUS FILTER</span>
-                      <div className="flex flex-col gap-1">
-                        <button
-                          onClick={() => {
-                            setFilterBiggest('ending');
-                            synthSound('bet');
-                          }}
-                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filterBiggest !== 'expired'
-                              ? 'bg-trench-sandbag text-neon-moon border-neon-moon font-bold shadow-glow-moon'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          🟢 LIVE ARENAS
-                        </button>
-                        <button
-                          onClick={() => {
-                            setFilterBiggest('expired');
-                            synthSound('bet');
-                          }}
-                          className={`px-2 py-0.5 rounded text-left border transition-all text-[8px] ${
-                            filterBiggest === 'expired'
-                              ? 'bg-trench-sandbag text-moon-gold border-moon-gold font-bold shadow-glow-gold'
-                              : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-                          }`}
-                        >
-                          💀 EXPIRED ROOMS
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+      {/* Markets Grid */}
+      <div className="flex-1 min-h-0 w-full mb-6">
+        {showSkeleton ? (
+          renderGridSkeleton()
+        ) : filteredRooms.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredRooms.map((room) => renderRoomCard(room, quickAmount))}
           </div>
-          <div className="flex-1 overflow-y-auto pr-1 scrollbar-thin max-h-[480px] lg:max-h-none">
-            {showSkeleton ? (
-              renderColumnSkeleton()
-            ) : biggestPotRooms.length > 0 ? (
-              <div className="retro-panel rounded-xl overflow-hidden divide-y divide-trench-sandbag bg-black shadow-[0_0_15px_rgba(22,163,74,0.05)]">
-                {biggestPotRooms.map((room) => renderRoomCard(room, quickAmountBiggest))}
-              </div>
-            ) : (
-              renderEmptyColumn()
-            )}
-          </div>
-        </div>
-
+        ) : (
+          renderEmptyGrid()
+        )}
       </div>
 
       {/* Wallet Connection Helper Prompter */}
       {!user && (
-        <div className="bg-trench-mud/50 border-2 border-trench-sandbag rounded-lg p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md">
+        <div className="bg-trench-mud/50 border-2 border-trench-sandbag rounded-lg p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md mb-6">
           <div className="flex items-center gap-3">
             <PepePortrait src={PEPE_ASSETS.neonWojak} size={56} glowColor="jeet" animated className="rounded-lg" />
             <div>
@@ -1364,8 +969,6 @@ export default function RoomsPage() {
       <div className="mt-4 shrink-0">
         <DegenQuoteBanner />
       </div>
-
-
 
     </div>
   );

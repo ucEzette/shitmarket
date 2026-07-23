@@ -138,7 +138,7 @@ function HomeContent() {
             transition={{ duration: 0.7, ease: 'easeOut', delay: 0.1 }}
             className="text-sm sm:text-base md:text-lg font-mono uppercase tracking-[0.35em] text-white text-center mb-10"
           >
-            pvp memecoin prediction market
+            permissionless pvp prediction markets
           </motion.h2>
 
           {/* Centered Premium Dynamic Battle Arena Splitscreen Card */}

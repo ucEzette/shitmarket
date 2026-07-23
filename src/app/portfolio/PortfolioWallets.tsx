@@ -475,8 +475,8 @@ export default function PortfolioWallets() {
               </div>
             </div>
             
-            <div className="bg-trench-black border border-trench-sandbag rounded-lg overflow-hidden">
-              <table className="w-full text-left font-mono text-[10px]">
+            <div className="bg-trench-black border border-trench-sandbag rounded-lg overflow-x-auto">
+              <table className="w-full text-left font-mono text-[10px] min-w-[320px]">
                 <thead className="bg-trench-mud/50 text-trench-gasmask border-b border-trench-sandbag">
                   <tr>
                     <th className="py-2 px-3 font-normal uppercase">Wallet</th>
@@ -580,8 +580,8 @@ export default function PortfolioWallets() {
                 No saved cross-chain withdrawal destinations configured.
               </div>
             ) : (
-              <div className="bg-trench-black border border-trench-sandbag rounded-lg overflow-hidden">
-                <table className="w-full text-left font-mono text-[10px]">
+              <div className="bg-trench-black border border-trench-sandbag rounded-lg overflow-x-auto">
+                <table className="w-full text-left font-mono text-[10px] min-w-[320px]">
                   <tbody className="divide-y divide-trench-sandbag/40 text-white">
                     {withdrawalWallets.map((w, idx) => (
                       <tr key={idx} className="hover:bg-trench-mud/30 transition-colors">

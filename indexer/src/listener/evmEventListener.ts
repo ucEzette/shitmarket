@@ -1,8 +1,8 @@
 /**
  * evmEventListener.ts
  *
- * Polls the Avalanche C-Chain RPC for events emitted by the ShitMarketCore solidity contract.
- * Decodes events natively and saves them to the PostgreSQL database via Prisma,
+ * Polls the RPC for events emitted by the MarketFactory, OracleRegistry, and AMPool contracts.
+ * Decodes events natively via Viem and saves them to the PostgreSQL database via Prisma,
  * updating Redis for active room caches and WebSocket notifications.
  */
 
@@ -10,12 +10,9 @@ import axios from 'axios';
 import { config } from '../config';
 import { logger } from '../logger';
 import { prisma } from '../db';
-import { redis } from '../redis';
-import {
-  cacheRoom,
-  publishRoomUpdate,
-  updateLeaderboard,
-} from '../redis';
+import { redis, cacheRoom, publishRoomUpdate, updateLeaderboard } from '../redis';
+import { createPublicClient, http, decodeEventLog } from 'viem';
+import { avalancheFuji } from 'viem/chains';
 import {
   roomsCreatedTotal,
   roomsSettledTotal,
@@ -30,16 +27,107 @@ const TOPICS = {
   RoomCreated: '0xf97c4c3d156ed53cd560336ada7fa3650fbf8776167b109f16d44f2272878015',
   BetPlaced: '0xcded998c66303d5ffd5e3e307d828cf41226e0a77e5f9dbff723ddb5f54b9b0b',
   RoomSettled: '0xf69da01a307d1f7792a3153a45a6f1f50277280d9eb0564e0d897c781fa2478b',
-  RoomVoided: '0xc700f9b3899ea073a308b00842a3d7a20cc7f3e083dceb462ad6577b285eb9b7',
-  WinningsClaimed: '0xac1dfcff29900d7010c04a6028e48814b8a49daf045127abd10a4636d1d49115',
-  PositionListed: '0xdde80ab931786d5c9a0a9cb2d1a34d488150c5196d9309b25fe9cd916cd3c8b5',
-  ListingCancelled: '0x1c322de047b60db5864515be8b0f87a0ed797d9444c60987063e1b6b9817a993',
-  PositionBought: '0x0813a4e2c24216f76d3e7b8e9a1009bb0ffb9ada0e96f5138c50250480f18a9e',
-  RoomDisputed: '0xf97251d8a349e5fc0584668f69630572c62b84745d4ba12858bc66ec3c4944a7',
-  DisputeResolved: '0xc67910521cb7d2ce1cd596f3db1297455729f6b1ee412affeed08435f6237686',
-  ReferralRegistered: '0x5f1ca2fcc108b751843a763e60d2201f593516109d7dbb1b700468f2d4190bb7',
-  ReferralRewardsClaimed: '0x98741ecf35c5d20a8ed68dbd8540500684864a6c98c2a41a5844d0b3a2357d43',
+  
+  // New evolved contract events
+  MarketCreated: '0x867a25cf41e7129dc45ae631b2a0c2fa1a0337320b006bb53642c6f36c5f313d',
+  MarketResolved: '0x6dfc24f0f2fb42e49fb4fa3ffa8abb148cab908a1fb8335b3f128a08b2594af1',
+  PoolCreated: '0x8e3244639df4bfff2e524c5327de26f3d7e525c4d458add3e9ce63f98e8fde28',
+  Swap: '0xec9a01251436957128e2836cfc2674cdcef8618e093adaa9f9a3af79b9c4f4be',
+  OutcomeReported: '0xacd3834a3dbaad4455e4fb60d1b9d4763b33dd529f4bd36d71335fe2b9e18a9b',
+  OutcomeChallenged: '0xe56d33c4bd3987a9695c90e088431834f61995543c0531546dfa1a72f3517119',
+  DisputeSettled: '0xd4390d9b1eae30d53d6e598d7eba50e60f3ea18310ca83e7919e3df177bb05ca',
+  LiquidityAdded: '0xac1d76749e5447b7b16f5ab61447e1bd502f3bb4807af3b28e620d1700a6ee45',
+  LiquidityRemoved: '0x96cd817c6329656790ef8fba7675405193677d39619571282f5e21f3a98cd059',
+  PositionRedeemed: '0xcc001fe5ce00e937669e474bc7885c63d32fdd2c8bc0f56c96c6faa9078ce83d'
 };
+
+const FACTORY_ABI = [
+  {
+    name: "MarketCreated",
+    type: "event",
+    inputs: [
+      { name: "marketId", type: "uint256", indexed: true },
+      { name: "conditionId", type: "bytes32", indexed: true },
+      { name: "creator", type: "address", indexed: true },
+      { name: "ipfsHash", type: "string" },
+      { name: "outcomeCount", type: "uint256" },
+      { name: "oracle", type: "address" },
+      { name: "resolutionTime", type: "uint256" }
+    ]
+  },
+  {
+    name: "MarketResolved",
+    type: "event",
+    inputs: [
+      { name: "marketId", type: "uint256", indexed: true },
+      { name: "winningOutcomeIndex", type: "uint256" }
+    ]
+  }
+] as const;
+
+const REGISTRY_ABI = [
+  {
+    name: "OutcomeReported",
+    type: "event",
+    inputs: [
+      { name: "marketId", type: "uint256", indexed: true },
+      { name: "reporter", type: "address", indexed: true },
+      { name: "outcomeIndex", type: "uint256" }
+    ]
+  },
+  {
+    name: "OutcomeChallenged",
+    type: "event",
+    inputs: [
+      { name: "marketId", type: "uint256", indexed: true },
+      { name: "challenger", type: "address", indexed: true },
+      { name: "outcomeIndex", type: "uint256" },
+      { name: "bondAmount", type: "uint256" }
+    ]
+  },
+  {
+    name: "DisputeSettled",
+    type: "event",
+    inputs: [
+      { name: "marketId", type: "uint256", indexed: true },
+      { name: "finalOutcomeIndex", type: "uint256" },
+      { name: "overturned", type: "bool" }
+    ]
+  }
+] as const;
+
+const AM_POOL_ABI = [
+  {
+    name: "Swap",
+    type: "event",
+    inputs: [
+      { name: "swapper", type: "address", indexed: true },
+      { name: "outcomeIndex", type: "uint8" },
+      { name: "usdcSpent", type: "uint256" },
+      { name: "sharesReceived", type: "uint256" },
+      { name: "reserveYES", type: "uint256" },
+      { name: "reserveNO", type: "uint256" }
+    ]
+  }
+] as const;
+
+const CONDITIONAL_TOKENS_ABI = [
+  {
+    name: "PositionRedeemed",
+    type: "event",
+    inputs: [
+      { name: "stakeholder", type: "address", indexed: true },
+      { name: "conditionId", type: "bytes32", indexed: true },
+      { name: "winningOutcomeIndex", type: "uint256" },
+      { name: "amount", type: "uint256" }
+    ]
+  }
+] as const;
+
+const publicClient = createPublicClient({
+  chain: avalancheFuji,
+  transport: http(config.evm.rpcUrl)
+});
 
 interface EvmLog {
   address: string;
@@ -52,15 +140,6 @@ interface EvmLog {
 let isRunning = false;
 let lastProcessedBlock = 0;
 let pollingInterval: NodeJS.Timeout | null = null;
-
-// Helper to convert 32-byte EVM hex slot to dynamic string
-function decodeString(dataHex: string, offset: number): string {
-  // Offset in 32-byte words
-  const dataOffset = parseInt(dataHex.slice(2 + offset * 64, 2 + (offset + 1) * 64), 16) * 2;
-  const length = parseInt(dataHex.slice(2 + dataOffset, 2 + dataOffset + 64), 16);
-  const textHex = dataHex.slice(2 + dataOffset + 64, 2 + dataOffset + 64 + length * 2);
-  return Buffer.from(textHex, 'hex').toString('utf8').replace(/\0/g, '').trim();
-}
 
 // Helper to convert 32-byte EVM hex slot to address
 function decodeAddress(hex: string): string {
@@ -75,11 +154,18 @@ function decodeBigInt(hex: string): bigint {
 // Helper to convert 32-byte EVM hex slot to int64
 function decodeInt64(hex: string): number {
   const big = BigInt('0x' + hex);
-  // Handle two's complement for negative numbers
   if (big & (BigInt(1) << BigInt(63))) {
     return Number(big - (BigInt(1) << BigInt(64)));
   }
   return Number(big);
+}
+
+// Helper to convert 32-byte EVM hex slot to string
+function decodeString(dataHex: string, offset: number): string {
+  const dataOffset = parseInt(dataHex.slice(2 + offset * 64, 2 + (offset + 1) * 64), 16) * 2;
+  const length = parseInt(dataHex.slice(2 + dataOffset, 2 + dataOffset + 64), 16);
+  const textHex = dataHex.slice(2 + dataOffset + 64, 2 + dataOffset + 64 + length * 2);
+  return Buffer.from(textHex, 'hex').toString('utf8').replace(/\0/g, '').trim();
 }
 
 // ─── Event Handlers ───────────────────────────────────────────────────────────
@@ -89,31 +175,17 @@ async function handleRoomCreated(log: EvmLog) {
   const creator = decodeAddress(log.topics[2]);
   
   const data = log.data.replace('0x', '');
-  // ABI layout (non-indexed data params):
-  // slot[0] = tokenMint (address, left-padded)
-  // slot[1] = offset pointer to tokenName string
-  // slot[2] = offset pointer to chainId/description string
-  // slot[3] = openingPrice (int64)
-  // slot[4] = expiryTimestamp (uint256)
-  // slot[5] = oracle (address)
-  // slot[6] = oracleFeeAmount (uint256)
   const tokenMint = '0x' + data.slice(0, 64).slice(24).toLowerCase();
   const openingPrice = decodeInt64(data.slice(3 * 64, 4 * 64));
   const expiryTimestamp = decodeBigInt(data.slice(4 * 64, 5 * 64));
   const oracle = decodeAddress(data.slice(5 * 64, 6 * 64));
   const oracleFeeAmount = decodeBigInt(data.slice(6 * 64, 7 * 64));
 
-  // Decode dynamic strings using correct slot offsets (1 and 2)
   let rawTokenName = '';
   let rawChainId = 'avalanche';
   try { rawTokenName = decodeString(log.data, 1); } catch {}
   try { rawChainId = decodeString(log.data, 2) || 'avalanche'; } catch {}
 
-  rawTokenName = rawTokenName.replace(/\0/g, '').trim();
-  rawChainId = rawChainId.replace(/\0/g, '').trim() || 'avalanche';
-
-  // The "tokenName" in debate rooms is the full question — store in resolutionCriteria
-  // Truncate display columns to fit VarChar(66)
   const resolutionCriteria = rawTokenName.slice(0, 500);
   const tokenName = rawTokenName.length > 40
     ? rawTokenName.slice(0, 37).trim() + '...'
@@ -173,8 +245,6 @@ async function handleRoomCreated(log: EvmLog) {
   roomsCreatedTotal.inc();
   const activeCount = await prisma.room.count({ where: { status: 'active' } });
   activeRoomsGauge.set(activeCount);
-
-  logger.info({ msg: 'EVM RoomCreated indexed', roomId, tokenMint, openingPrice });
 }
 
 async function handleBetPlaced(log: EvmLog) {
@@ -223,8 +293,6 @@ async function handleBetPlaced(log: EvmLog) {
 
   betsPlacedTotal.inc({ side });
   betsVolumeTotal.inc(Number(amount));
-
-  logger.info({ msg: 'EVM BetPlaced indexed', roomId, user, side, amount: amount.toString() });
 }
 
 async function handleRoomSettled(log: EvmLog) {
@@ -302,8 +370,404 @@ async function handleRoomSettled(log: EvmLog) {
   roomsSettledTotal.inc({ winner });
   const activeCount = await prisma.room.count({ where: { status: 'active' } });
   activeRoomsGauge.set(activeCount);
+}
 
-  logger.info({ msg: 'EVM RoomSettled indexed', roomId, winner, finalPrice, twapFinalPrice });
+// ─── Evolved Market Factory Event Handlers ─────────────────────────────────────
+
+async function handleMarketCreated(log: EvmLog) {
+  const decoded = decodeEventLog({
+    abi: FACTORY_ABI,
+    data: log.data as `0x${string}`,
+    topics: log.topics as any
+  }) as any;
+  const { marketId, conditionId, creator, ipfsHash, oracle, resolutionTime } = decoded.args;
+
+  const expiry = new Date(Number(resolutionTime) * 1000);
+  const roomId = conditionId;
+
+  await prisma.room.upsert({
+    where: { roomPubkey: roomId },
+    create: {
+      roomPubkey: roomId,
+      tokenMint: conditionId,
+      priceFeed: 'evm-market-factory',
+      tokenName: `Market #${marketId}`,
+      tokenSymbol: 'PVP',
+      chainId: 'avalanche',
+      originalAddress: marketId.toString(),
+      duration: 5,
+      openingPrice: BigInt(500000), // 0.50 USDC
+      expiry,
+      status: 'active',
+      creator: creator.toLowerCase(),
+      oracleAddress: oracle.toLowerCase(),
+      oracleFeeLamports: BigInt(0),
+      resolutionCriteria: ipfsHash,
+    },
+    update: {
+      expiry,
+      oracleAddress: oracle.toLowerCase(),
+      resolutionCriteria: ipfsHash,
+    },
+  });
+
+  await cacheRoom(roomId, {
+    status: 'active',
+    tokenMint: conditionId,
+    tokenName: `Market #${marketId}`,
+    tokenSymbol: 'PVP',
+    openingPrice: '500000',
+    moonPool: '0',
+    jeetPool: '0',
+    expiry: expiry.toISOString(),
+  });
+
+  await publishRoomUpdate(roomId, {
+    type: 'RoomCreated',
+    tokenName: `Market #${marketId}`,
+    tokenSymbol: 'PVP',
+    chainId: 'avalanche',
+    originalAddress: conditionId,
+    expiry: expiry.toISOString(),
+  });
+
+  logger.info({ msg: 'MarketCreated indexed', marketId: marketId.toString(), conditionId });
+}
+
+async function handleMarketResolved(log: EvmLog) {
+  const decoded = decodeEventLog({
+    abi: FACTORY_ABI,
+    data: log.data as `0x${string}`,
+    topics: log.topics as any
+  }) as any;
+  const { marketId, winningOutcomeIndex } = decoded.args;
+
+  const winner = winningOutcomeIndex === 0 ? 'moon' : 'jeet';
+
+  const targetRoom = await prisma.room.findFirst({
+    where: { originalAddress: marketId.toString() }
+  });
+
+  if (targetRoom) {
+    const roomId = targetRoom.roomPubkey;
+    await prisma.room.update({
+      where: { roomPubkey: roomId },
+      data: {
+        status: 'settled',
+        winner,
+        settledAt: new Date(),
+      },
+    });
+
+    await cacheRoom(roomId, {
+      status: 'settled',
+      winner,
+    });
+
+    await publishRoomUpdate(roomId, {
+      type: 'RoomSettled',
+      winner,
+      totalPool: targetRoom.totalPool.toString(),
+      platformFee: '0',
+    });
+
+    logger.info({ msg: 'MarketResolved indexed', marketId: marketId.toString(), winner });
+  }
+}
+
+async function handleSwap(log: EvmLog) {
+  const decoded = decodeEventLog({
+    abi: AM_POOL_ABI,
+    data: log.data as `0x${string}`,
+    topics: log.topics as any
+  }) as any;
+  const { swapper, outcomeIndex, usdcSpent, reserveYES, reserveNO } = decoded.args;
+
+  let conditionId: string | null = null;
+  try {
+    conditionId = await publicClient.readContract({
+      address: log.address as `0x${string}`,
+      abi: [
+        {
+          name: "conditionId",
+          type: "function",
+          inputs: [],
+          outputs: [{ name: "conditionId", type: "bytes32" }]
+        }
+      ] as const,
+      functionName: "conditionId"
+    } as any) as string;
+  } catch (err) {
+    logger.warn({ msg: 'Failed to read conditionId from pool', pool: log.address, err });
+  }
+
+  if (conditionId) {
+    const roomId = conditionId;
+    const amount = BigInt(usdcSpent);
+    const side = outcomeIndex === 0 ? 'moon' : 'jeet';
+
+    // Log the Bet in Prisma
+    await prisma.bet.create({
+      data: {
+        roomPubkey: roomId,
+        userPubkey: swapper.toLowerCase(),
+        side,
+        amount,
+        txSig: log.transactionHash
+      }
+    });
+
+    await prisma.room.update({
+      where: { roomPubkey: roomId },
+      data: {
+        totalPool: { increment: amount }
+      }
+    });
+
+    await cacheRoom(roomId, {
+      moonPool: reserveYES.toString(),
+      jeetPool: reserveNO.toString(),
+    });
+
+    await publishRoomUpdate(roomId, {
+      type: 'BetPlaced',
+      user: swapper.toLowerCase(),
+      side,
+      amount: amount.toString(),
+      moonPool: reserveYES.toString(),
+      jeetPool: reserveNO.toString(),
+    });
+
+    logger.info({ msg: 'EVM AMM Swap indexed', pool: log.address, swapper, side, amount: amount.toString() });
+  }
+}
+
+async function handlePositionRedeemed(log: EvmLog) {
+  const decoded = decodeEventLog({
+    abi: CONDITIONAL_TOKENS_ABI,
+    data: log.data as `0x${string}`,
+    topics: log.topics as any
+  }) as any;
+  const { stakeholder, conditionId, winningOutcomeIndex, amount } = decoded.args;
+
+  const roomPubkey = conditionId;
+  const userPubkey = stakeholder.toLowerCase();
+  const amountClaimed = BigInt(amount);
+
+  logger.info({ msg: 'EVM PositionRedeemed received', roomPubkey, userPubkey, amount: amountClaimed.toString() });
+
+  // 1. Mark payout as claimed
+  await prisma.payout.updateMany({
+    where: { roomPubkey, userPubkey },
+    data: { claimedAt: new Date() },
+  });
+
+  // Also mark user's bets as claimed in this room
+  await prisma.bet.updateMany({
+    where: { roomPubkey, userPubkey },
+    data: { claimed: true }
+  });
+
+  // 2. Update user profile: wins + profit
+  const userBets = await prisma.bet.findMany({
+    where: { roomPubkey, userPubkey },
+  });
+  const totalBetAmount = userBets.reduce((sum, b) => sum + b.amount, BigInt(0));
+  const profitGain = totalBetAmount > BigInt(0) ? amountClaimed - totalBetAmount : amountClaimed;
+
+  await prisma.userProfile.upsert({
+    where: { userPubkey },
+    create: {
+      userPubkey,
+      wins: 1,
+      profit: profitGain,
+    },
+    update: {
+      wins: { increment: 1 },
+      profit: { increment: profitGain },
+    },
+  });
+
+  await updateLeaderboard(userPubkey, profitGain);
+
+  await publishRoomUpdate(roomPubkey, {
+    type: 'WinningsClaimed',
+    user: userPubkey,
+    amount: amountClaimed.toString(),
+  });
+
+  logger.info({ msg: 'EVM PositionRedeemed processed and synced successfully', roomPubkey, userPubkey });
+}
+
+async function handleLiquidityAddedOrRemoved(log: EvmLog) {
+  let conditionId: string | null = null;
+  try {
+    conditionId = await publicClient.readContract({
+      address: log.address as `0x${string}`,
+      abi: [
+        {
+          name: "conditionId",
+          type: "function",
+          inputs: [],
+          outputs: [{ name: "conditionId", type: "bytes32" }]
+        }
+      ] as const,
+      functionName: "conditionId"
+    } as any) as string;
+  } catch (err) {
+    logger.warn({ msg: 'Failed to read conditionId from pool during liquidity event', pool: log.address, err });
+    return;
+  }
+
+  if (conditionId) {
+    const roomId = conditionId;
+    try {
+      const reserve0 = await publicClient.readContract({
+        address: log.address as `0x${string}`,
+        abi: [{
+          name: 'reserves',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [{ name: '', type: 'uint256' }],
+          outputs: [{ name: '', type: 'uint256' }]
+        }] as const,
+        functionName: 'reserves',
+        args: [BigInt(0)]
+      } as any) as bigint;
+      const reserve1 = await publicClient.readContract({
+        address: log.address as `0x${string}`,
+        abi: [{
+          name: 'reserves',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [{ name: '', type: 'uint256' }],
+          outputs: [{ name: '', type: 'uint256' }]
+        }] as const,
+        functionName: 'reserves',
+        args: [BigInt(1)]
+      } as any) as bigint;
+
+      const totalPool = reserve0 + reserve1;
+      await prisma.room.update({
+        where: { roomPubkey: roomId },
+        data: {
+          totalPool
+        }
+      });
+
+      await cacheRoom(roomId, {
+        moonPool: reserve0.toString(),
+        jeetPool: reserve1.toString(),
+      });
+
+      await publishRoomUpdate(roomId, {
+        type: 'PoolLiquidityUpdated',
+        moonPool: reserve0.toString(),
+        jeetPool: reserve1.toString(),
+      });
+
+      logger.info({ msg: 'EVM Pool Liquidity sync complete', pool: log.address, reserve0: reserve0.toString(), reserve1: reserve1.toString() });
+    } catch (err) {
+      logger.error({ msg: 'Failed to sync EVM pool reserves on liquidity event', pool: log.address, err });
+    }
+  }
+}
+
+async function handleOutcomeReported(log: EvmLog) {
+  const decoded = decodeEventLog({
+    abi: REGISTRY_ABI,
+    data: log.data as `0x${string}`,
+    topics: log.topics as any
+  }) as any;
+  const { marketId, reporter, outcomeIndex } = decoded.args;
+
+  const targetRoom = await prisma.room.findFirst({
+    where: { originalAddress: marketId.toString() }
+  });
+
+  if (targetRoom) {
+    await prisma.room.update({
+      where: { roomPubkey: targetRoom.roomPubkey },
+      data: {
+        disputeStatus: 0,
+        oracleLogs: `Reported outcome: ${outcomeIndex} by ${reporter}`,
+      }
+    });
+    logger.info({ msg: 'OutcomeReported indexed', marketId: marketId.toString(), reporter });
+  }
+}
+
+async function handleOutcomeChallenged(log: EvmLog) {
+  const decoded = decodeEventLog({
+    abi: REGISTRY_ABI,
+    data: log.data as `0x${string}`,
+    topics: log.topics as any
+  }) as any;
+  const { marketId, challenger, bondAmount } = decoded.args;
+
+  const targetRoom = await prisma.room.findFirst({
+    where: { originalAddress: marketId.toString() }
+  });
+
+  if (targetRoom) {
+    await prisma.room.update({
+      where: { roomPubkey: targetRoom.roomPubkey },
+      data: {
+        status: 'disputed',
+        disputedAt: new Date(),
+        disputeChallenger: challenger.toLowerCase(),
+        disputeBond: BigInt(bondAmount),
+      }
+    });
+
+    await publishRoomUpdate(targetRoom.roomPubkey, {
+      type: 'RoomDisputed',
+      challenger: challenger.toLowerCase(),
+      bondAmount: bondAmount.toString(),
+    });
+
+    logger.info({ msg: 'OutcomeChallenged indexed', marketId: marketId.toString(), challenger });
+  }
+}
+
+async function handleDisputeSettled(log: EvmLog) {
+  const decoded = decodeEventLog({
+    abi: REGISTRY_ABI,
+    data: log.data as `0x${string}`,
+    topics: log.topics as any
+  }) as any;
+  const { marketId, finalOutcomeIndex, overturned } = decoded.args;
+
+  const targetRoom = await prisma.room.findFirst({
+    where: { originalAddress: marketId.toString() }
+  });
+
+  if (targetRoom) {
+    const winner = finalOutcomeIndex === 0 ? 'moon' : 'jeet';
+    await prisma.room.update({
+      where: { roomPubkey: targetRoom.roomPubkey },
+      data: {
+        status: 'settled',
+        winner,
+        disputeStatus: overturned ? 1 : 0,
+        settledAt: new Date(),
+      }
+    });
+
+    await cacheRoom(targetRoom.roomPubkey, {
+      status: 'settled',
+      winner,
+    });
+
+    await publishRoomUpdate(targetRoom.roomPubkey, {
+      type: 'RoomSettled',
+      winner,
+      totalPool: targetRoom.totalPool.toString(),
+      platformFee: '0',
+    });
+
+    logger.info({ msg: 'DisputeSettled indexed', marketId: marketId.toString(), winner });
+  }
 }
 
 // ─── Polling Loop ─────────────────────────────────────────────────────────────
@@ -322,8 +786,6 @@ async function pollEvmLogs() {
     const latestBlock = parseInt(latestHex, 16);
 
     if (lastProcessedBlock === 0) {
-      // Use a configurable deployment start block to never miss historical events.
-      // Falls back to scanning the last 10,000 blocks if not set.
       const deployBlock = parseInt(process.env.EVM_DEPLOYMENT_BLOCK || '0', 10);
       lastProcessedBlock = deployBlock > 0 ? deployBlock - 1 : Math.max(0, latestBlock - 10000);
       logger.info({ msg: 'EVM listener cold start', fromBlock: lastProcessedBlock, deployBlock });
@@ -336,7 +798,6 @@ async function pollEvmLogs() {
 
     logger.debug({ msg: 'Polling EVM blocks', fromBlock, toBlock });
 
-    // Fuji RPC limits eth_getLogs to ~500 blocks at a time; chunk accordingly
     const CHUNK_SIZE = 500;
     const allLogs: EvmLog[] = [];
     for (let chunkFrom = fromBlock; chunkFrom <= toBlock; chunkFrom += CHUNK_SIZE) {
@@ -347,7 +808,20 @@ async function pollEvmLogs() {
         method: 'eth_getLogs',
         params: [
           {
-            address: config.evm.contractAddress,
+            topics: [[
+              TOPICS.RoomCreated,
+              TOPICS.BetPlaced,
+              TOPICS.RoomSettled,
+              TOPICS.MarketCreated,
+              TOPICS.MarketResolved,
+              TOPICS.Swap,
+              TOPICS.OutcomeReported,
+              TOPICS.OutcomeChallenged,
+              TOPICS.DisputeSettled,
+              TOPICS.LiquidityAdded,
+              TOPICS.LiquidityRemoved,
+              TOPICS.PositionRedeemed
+            ]],
             fromBlock: '0x' + chunkFrom.toString(16),
             toBlock: '0x' + chunkTo.toString(16),
           },
@@ -374,6 +848,25 @@ async function pollEvmLogs() {
           await handleBetPlaced(log);
         } else if (topic0 === TOPICS.RoomSettled.toLowerCase()) {
           await handleRoomSettled(log);
+        } else if (topic0 === TOPICS.MarketCreated.toLowerCase()) {
+          await handleMarketCreated(log);
+        } else if (topic0 === TOPICS.MarketResolved.toLowerCase()) {
+          await handleMarketResolved(log);
+        } else if (topic0 === TOPICS.Swap.toLowerCase()) {
+          await handleSwap(log);
+        } else if (topic0 === TOPICS.OutcomeReported.toLowerCase()) {
+          await handleOutcomeReported(log);
+        } else if (topic0 === TOPICS.OutcomeChallenged.toLowerCase()) {
+          await handleOutcomeChallenged(log);
+        } else if (topic0 === TOPICS.DisputeSettled.toLowerCase()) {
+          await handleDisputeSettled(log);
+        } else if (topic0 === TOPICS.PositionRedeemed.toLowerCase()) {
+          await handlePositionRedeemed(log);
+        } else if (
+          topic0 === TOPICS.LiquidityAdded.toLowerCase() ||
+          topic0 === TOPICS.LiquidityRemoved.toLowerCase()
+        ) {
+          await handleLiquidityAddedOrRemoved(log);
         }
       } catch (err: any) {
         logger.error({ msg: 'Error processing EVM log', txHash: log.transactionHash, err: err?.message });
@@ -393,7 +886,6 @@ export async function startEvmListener(): Promise<void> {
   if (isRunning) return;
   isRunning = true;
 
-  // Retrieve last block from cache
   const cachedBlock = await redis.get('evm:last_block');
   if (cachedBlock) {
     lastProcessedBlock = parseInt(cachedBlock, 10);
@@ -402,11 +894,9 @@ export async function startEvmListener(): Promise<void> {
   logger.info({
     msg: 'EVM Event Listener started',
     rpcUrl: config.evm.rpcUrl,
-    contract: config.evm.contractAddress,
     startBlock: lastProcessedBlock,
   });
 
-  // Run poll immediately then schedule
   await pollEvmLogs();
   pollingInterval = setInterval(pollEvmLogs, 5000);
 }

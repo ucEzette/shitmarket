@@ -3,7 +3,7 @@ import { createWalletClient, createPublicClient, http, parseEther, parseUnits } 
 import { privateKeyToAccount } from 'viem/accounts';
 import { avalancheFuji } from 'viem/chains';
 
-const RPC_URL = process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc';
+const RPC_URL = process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || 'https://avalanche-fuji-c-chain-rpc.publicnode.com';
 const USDC_ADDRESS = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
 
 export async function POST(req: NextRequest) {
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     }
 
     const account = privateKeyToAccount(relayerKey as `0x${string}`);
-    const transport = http(RPC_URL);
+    const transport = http(RPC_URL, { timeout: 60000 });
     const publicClient = createPublicClient({ chain: avalancheFuji, transport });
     const walletClient = createWalletClient({ account, chain: avalancheFuji, transport });
 

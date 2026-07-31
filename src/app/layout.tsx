@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Staatliches, JetBrains_Mono, Permanent_Marker } from 'next/font/google';
 import "./globals.css";
 import { ClientWrapper } from '@/components/ClientWrapper';
 import { SolanaWalletProvider } from '@/components/WalletProvider';
@@ -12,28 +11,7 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-// Prevent Next.js from statically prerendering any page at build time.
-// All pages in this dapp depend on browser-only Solana wallet providers and
-// live chain data — static generation would fail and is not useful here.
 export const dynamic = 'force-dynamic';
-
-
-const fontStaatliches = Staatliches({
-  weight: '400',
-  subsets: ['latin'],
-  variable: '--font-staatliches',
-});
-
-const fontJetBrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains-mono',
-});
-
-const fontPermanentMarker = Permanent_Marker({
-  weight: '400',
-  subsets: ['latin'],
-  variable: '--font-permanent-marker',
-});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://shitmarket";
 
@@ -78,7 +56,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${fontStaatliches.variable} ${fontJetBrainsMono.variable} ${fontPermanentMarker.variable}`}>
+    <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Staatliches&family=JetBrains+Mono:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet" />
+        <style>{`
+          :root {
+            --font-staatliches: 'Staatliches', sans-serif;
+            --font-jetbrains-mono: 'JetBrains Mono', monospace;
+            --font-permanent-marker: 'Permanent Marker', cursive;
+          }
+        `}</style>
+      </head>
       <body className="antialiased selection:bg-neon-moon selection:text-black bg-[#071105] text-white">
         <ErrorBoundary>
           <SolanaWalletProvider>

@@ -1,3 +1,9 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
@@ -16,6 +22,8 @@ const nextConfig = {
       '@farcaster/mini-app-solana': false,
       '@farcaster/miniapp-sdk': false,
       '@solana-program/memo': false,
+      'diagnostics_channel': path.resolve(__dirname, 'diagnostics_channel_mock.js'),
+      'node:diagnostics_channel': path.resolve(__dirname, 'diagnostics_channel_mock.js'),
     };
 
     if (isServer) {
@@ -30,15 +38,7 @@ const nextConfig = {
 
       config.externals = [
         ...existingExternals,
-        ({ request }, callback) => {
-          if (
-            request === 'diagnostics_channel' ||
-            request === 'node:diagnostics_channel'
-          ) {
-            return callback(null, 'commonjs diagnostics_channel');
-          }
-          callback();
-        },
+        // Removed server-side externals function since we are mocking it globally
       ];
     }
 

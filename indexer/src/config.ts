@@ -23,7 +23,7 @@ export const config = {
     aiOraclePrivateKey: optional('AI_ORACLE_PRIVATE_KEY', ''),
   },
   evm: {
-    rpcUrl: optional('AVALANCHE_RPC_URL', 'https://api.avax-test.network/ext/bc/C/rpc'),
+    rpcUrl: optional('AVALANCHE_RPC_URL', 'https://avalanche-fuji-c-chain-rpc.publicnode.com'),
     contractAddress: optional('CORE_CONTRACT_ADDRESS', '0x0000000000000000000000000000000000000000'),
     keeperPrivateKey: optional('EVM_KEEPER_PRIVATE_KEY', ''),
   },

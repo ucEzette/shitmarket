@@ -49,6 +49,7 @@ model Room {
   bets            Bet[]
   payouts         Payout[]
   chatMessages    ChatMessage[]
+  limitOrders     LimitOrder[]
 
   @@index([status])
   @@index([expiry])
@@ -205,4 +206,29 @@ model Activity {
 
   @@index([userPubkey, createdAt])
   @@map("activities")
+}
+
+// ─── Limit Orders (CLOB) ───────────────────────────────────────────────────
+
+model LimitOrder {
+  id          String   @id @default(uuid()) @db.Uuid
+  maker       String   @db.VarChar(255)
+  roomPubkey  String   @map("room_pubkey") @db.VarChar(255)
+  outcomeIndex Int      @map("outcome_index") // 0 for YES/MOON, 1 for NO/JEET
+  price       Int      // Scaled to 1e6
+  amount      BigInt
+  filledAmount BigInt  @default(0) @map("filled_amount")
+  side        String   @db.VarChar(5) // 'buy' or 'sell'
+  nonce       BigInt
+  expiration  BigInt
+  signature   String   @db.Text
+  status      String   @default("open") @db.VarChar(15) // 'open', 'filled', 'cancelled'
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  room        Room     @relation(fields: [roomPubkey], references: [roomPubkey])
+
+  @@index([roomPubkey, outcomeIndex, status])
+  @@index([maker])
+  @@map("limit_orders")
 }

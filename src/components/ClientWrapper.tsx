@@ -433,6 +433,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
           else if (
             msg.type === 'room_update' ||
             msg.type === 'BetPlaced' ||
+            msg.type === 'PoolLiquidityUpdated' ||
             msg.type === 'RoomActivated' ||
             msg.type === 'RoomSettled' ||
             msg.type === 'WinningsClaimed' ||
@@ -446,18 +447,21 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
             if (!roomPubkey) return;
             
             if (eventType === 'BetPlaced') {
-              const moonAmount = Number(data.moonPool) / 1e9;
-              const jeetAmount = Number(data.jeetPool) / 1e9;
+              const isEvm = roomPubkey.startsWith('0x');
+              const decimalFactor = isEvm ? 1e6 : 1e9;
+              const moonAmount = Number(data.moonPool) / decimalFactor;
+              const jeetAmount = Number(data.jeetPool) / decimalFactor;
               updateRoomPools(roomPubkey, moonAmount, jeetAmount);
               
               const formattedUser = `${data.user.slice(0, 6)}...${data.user.slice(-4)}`;
-              const betSol = Number(data.amount) / 1e9;
+              const betSol = Number(data.amount) / decimalFactor;
+              const assetSymbol = isEvm ? 'USDC' : 'SOL';
               
               addMessage({
                 roomId: roomPubkey,
                 side: 'all', // Show in all tabs (Moon & Jeet)
                 user: 'COMMAND HQ',
-                message: `💥 BATTLE UPDATE: ${formattedUser} stacked ${betSol.toFixed(2)} SOL on ${data.side.toUpperCase()}! 💥`,
+                message: `💥 BATTLE UPDATE: ${formattedUser} stacked ${betSol.toFixed(2)} ${assetSymbol} on ${data.side.toUpperCase()}! 💥`,
                 timestamp: Date.now(),
               });
               
@@ -477,7 +481,22 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
                   claimed: false,
                   timestamp: Date.now(),
                 });
+
+                useAppState.getState().addActivity({
+                  type: 'bet',
+                  title: `DEPLOYED ${betSol.toFixed(2)} ${assetSymbol} ON ${data.side.toUpperCase()}`,
+                  message: `You stacked ${betSol.toFixed(2)} ${assetSymbol} on ${data.side.toUpperCase()} in room ${roomPubkey.substring(0, 8)}.`,
+                  link: `/room/${roomPubkey}`,
+                });
               }
+            }
+            
+            else if (eventType === 'PoolLiquidityUpdated') {
+              const isEvm = roomPubkey.startsWith('0x');
+              const decimalFactor = isEvm ? 1e6 : 1e9;
+              const moonAmount = Number(data.moonPool) / decimalFactor;
+              const jeetAmount = Number(data.jeetPool) / decimalFactor;
+              updateRoomPools(roomPubkey, moonAmount, jeetAmount);
             }
             
             else if (eventType === 'NewChatMessage') {
@@ -548,20 +567,31 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
             else if (eventType === 'WinningsClaimed') {
               markBetClaimed(roomPubkey, data.user);
               
+              const isEvm = roomPubkey.startsWith('0x');
+              const decimalFactor = isEvm ? 1e6 : 1e9;
+              const assetSymbol = isEvm ? 'USDC' : 'SOL';
+              const claimedAmount = Number(data.amount) / decimalFactor;
+              
               const formattedUser = `${data.user.slice(0, 6)}...${data.user.slice(-4)}`;
-              const claimedSol = Number(data.amount) / 1e9;
               
               addMessage({
                 roomId: roomPubkey,
                 side: 'all',
                 user: formattedUser,
-                message: `💎 SECURED WAR BOOTY OF ${claimedSol.toFixed(2)} SOL! LFG! 💎`,
+                message: `💎 SECURED WAR BOOTY OF ${claimedAmount.toFixed(2)} ${assetSymbol}! LFG! 💎`,
                 timestamp: Date.now(),
               });
               
               const currentUser = userRef.current;
               if (currentUser && currentUser.wallet === data.user) {
                 fetchBalance();
+
+                useAppState.getState().addActivity({
+                  type: 'win',
+                  title: `CLAIMED ${claimedAmount.toFixed(2)} ${assetSymbol} WINNINGS`,
+                  message: `You claimed ${claimedAmount.toFixed(2)} ${assetSymbol} from room ${roomPubkey.substring(0, 8)}.`,
+                  link: `/room/${roomPubkey}`,
+                });
               }
             }
           }

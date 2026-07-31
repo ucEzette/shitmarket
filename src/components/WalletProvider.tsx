@@ -821,16 +821,29 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 };
 
 const solanaConnectors = toSolanaWalletConnectors({
-  shouldAutoConnect: true,
+  shouldAutoConnect: false,
 });
+
+const customAvalancheFuji = {
+  ...avalancheFuji,
+  rpcUrls: {
+    ...avalancheFuji.rpcUrls,
+    default: {
+      http: [process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || 'https://avalanche-fuji-c-chain-rpc.publicnode.com'],
+    },
+    public: {
+      http: [process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || 'https://avalanche-fuji-c-chain-rpc.publicnode.com'],
+    },
+  },
+};
 
 export const SolanaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <PrivyProvider
       appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || "clux31x800000000000000000"}
       config={{
-        supportedChains: [avalancheFuji],
-        defaultChain: avalancheFuji,
+        supportedChains: [customAvalancheFuji],
+        defaultChain: customAvalancheFuji,
         appearance: {
           walletChainType: 'ethereum-and-solana',
           walletList: ['phantom', 'metamask', 'coinbase_wallet', 'okx_wallet', 'solflare', 'detected_wallets'],

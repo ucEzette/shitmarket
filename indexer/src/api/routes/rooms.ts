@@ -497,6 +497,10 @@ roomsRouter.post('/', async (req, res) => {
     const normCreator = creator ? (creator.startsWith('0x') ? creator.toLowerCase() : creator) : '';
     const normOracle = oracleAddress ? (oracleAddress.startsWith('0x') ? oracleAddress.toLowerCase() : oracleAddress) : '';
 
+    const isEvm = normRoomPubkey.startsWith('0x') || chainId === 'avalanche';
+    const decimalFactor = isEvm ? 1e6 : 1e9;
+    const totalPoolScaled = BigInt(Math.round(((moonPool || 0) + (jeetPool || 0)) * decimalFactor));
+
     const createdRoom = await prisma.room.upsert({
       where: { roomPubkey: normRoomPubkey },
       create: {
@@ -516,15 +520,28 @@ roomsRouter.post('/', async (req, res) => {
         oracleAddress: normOracle,
         oracleFeeLamports: oracleFeeLamports ? BigInt(oracleFeeLamports) : BigInt(0),
         resolutionCriteria: resolutionCriteria || '',
-        totalPool: BigInt(Math.round(((moonPool || 0) + (jeetPool || 0)) * 1e6)),
+        totalPool: totalPoolScaled,
       },
       update: {
         status: status || 'active',
         tokenName: tokenName || undefined,
+        tokenSymbol: tokenSymbol || undefined,
         tokenImageUrl: tokenImageUrl || undefined,
+        chainId: chainId || undefined,
+        duration: duration || undefined,
+        openingPrice: openingPriceBigInt,
+        expiry: expiryDate,
+        originalAddress: normTokenMint || undefined,
         resolutionCriteria: resolutionCriteria || undefined,
+        totalPool: totalPoolScaled,
+        oracleAddress: normOracle || undefined,
+        oracleFeeLamports: oracleFeeLamports ? BigInt(oracleFeeLamports) : undefined,
+        creator: normCreator || undefined,
       }
     });
+
+    const moonPoolScaled = Math.round(Number(moonPool || 0) * decimalFactor);
+    const jeetPoolScaled = Math.round(Number(jeetPool || 0) * decimalFactor);
 
     // Cache in Redis
     await cacheRoom(normRoomPubkey, {
@@ -534,8 +551,8 @@ roomsRouter.post('/', async (req, res) => {
       tokenSymbol: tokenSymbol || 'CUSTOM',
       tokenImageUrl: tokenImageUrl || '',
       openingPrice: openingPriceBigInt.toString(),
-      moonPool: String(moonPool || 0),
-      jeetPool: String(jeetPool || 0),
+      moonPool: moonPoolScaled.toString(),
+      jeetPool: jeetPoolScaled.toString(),
       expiry: expiryDate.toISOString(),
       pairAddress: '',
     });

@@ -9,6 +9,7 @@ import { profileRouter } from './routes/profile';
 import { leaderboardRouter } from './routes/leaderboard';
 import { reservesRouter } from './routes/reserves';
 import { adminRouter } from './routes/admin';
+import { ordersRouter } from './routes/orders';
 import { register, apiRequestDuration } from '../metrics/prometheus';
 import { config } from '../config';
 import { logger } from '../logger';
@@ -122,6 +123,7 @@ export function createApiServer(circuitBreaker?: RpcCircuitBreaker): express.App
   app.use('/api/leaderboard', leaderboardRouter);
   app.use('/api/reserves', reservesRouter);
   app.use('/api/admin', adminRouter);
+  app.use('/api/orders', ordersRouter);
 
   // ── Enhanced health check ────────────────────────────────────────────────────
   app.get('/api/health', async (_req, res) => {

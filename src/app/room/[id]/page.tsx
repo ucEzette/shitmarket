@@ -7,7 +7,9 @@ import { useAppState, Room, ChatMessage, formatCashtag, formatPrice } from '@/st
 import { INDEXER_URL } from '@/utils/config';
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
+import { OrderBook } from '@/components/OrderBook';
 import { HeaderPanel } from '@/components/ui/HeaderPanel';
+import { PublicProfileModal } from '@/components/PublicProfileModal';
 import { 
   Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, Brain,
   AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal, Bookmark,
@@ -138,7 +140,7 @@ export default function RoomDetailPage() {
   const roomId = params.id as string;
 
   const { 
-    rooms, user, chatMessages, placeBet, claimWinnings, 
+    rooms, user, chatMessages, placeBet, placeLimitOrder, executeEvmMarketTrade, claimWinnings, 
     addMessage, connectWallet, isTransactionLoading, 
     fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile,
     showAlert, addToast,
@@ -147,6 +149,30 @@ export default function RoomDetailPage() {
   } = useAppState();
 
   const room = rooms.find((r) => r.id === roomId);
+
+  const getEvmBuyCost = (shares: number, side: 'moon' | 'jeet', moonRes: number, jeetRes: number): number => {
+    const rTarget = side === 'moon' ? moonRes : jeetRes;
+    const rOpposite = side === 'moon' ? jeetRes : moonRes;
+    if (rTarget <= 0 || rOpposite <= 0) return shares * 0.5;
+    if (shares >= rTarget) return Infinity;
+    const k = rTarget * rOpposite;
+    const newTargetReserve = rTarget - shares;
+    const newOppositeReserve = k / newTargetReserve;
+    const netUsdc = newOppositeReserve - rOpposite;
+    return (netUsdc * 10000) / 9970;
+  };
+
+  const getEvmSellReceived = (shares: number, side: 'moon' | 'jeet', moonRes: number, jeetRes: number): number => {
+    const rTarget = side === 'moon' ? moonRes : jeetRes;
+    const rOpposite = side === 'moon' ? jeetRes : moonRes;
+    if (rTarget <= 0 || rOpposite <= 0) return shares * 0.5;
+    const k = rTarget * rOpposite;
+    const newTargetReserve = rTarget + shares;
+    const newOppositeReserve = k / newTargetReserve;
+    const netUsdc = rOpposite - newOppositeReserve;
+    const fee = (netUsdc * 30) / 10000;
+    return netUsdc - fee;
+  };
 
   const isDebateMarket = room ? (
     (room.category as string) === 'debate' || 
@@ -200,6 +226,13 @@ export default function RoomDetailPage() {
   const [chatInput, setChatInput] = useState('');
   const [countdownText, setCountdownText] = useState('00:00:00');
   const [isRoomSettling, setIsRoomSettling] = useState(false);
+  
+  // AMM Trade states
+  const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
+  const [tradeMode, setTradeMode] = useState<'market' | 'limit'>('limit');
+  const [limitPrice, setLimitPrice] = useState<number>(0.50);
+  const [sharesInput, setSharesInput] = useState<number>(10);
+  const [selectedProfileAddress, setSelectedProfileAddress] = useState<string | null>(null);
   const [localShake, setLocalShake] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [livePrice, setLivePrice] = useState<number | null>(null);
@@ -619,20 +652,43 @@ export default function RoomDetailPage() {
   const hasBetOnMoon = userSidesChosen.includes('moon');
   const hasBetOnJeet = userSidesChosen.includes('jeet');
 
-  const handleCharge = (e?: React.MouseEvent<HTMLButtonElement>) => {
+  const handlePlaceOrder = async (e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!user || !user.wallet) {
       connectWallet();
       synthSound('bet');
       return;
     }
 
-    if (user.balance < stakeAmount) {
+    const moonPool = room.moonPool || 0;
+    const jeetPool = room.jeetPool || 0;
+    const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
+
+    let totalCost = 0;
+    if (isEvm) {
+      if (orderType === 'buy') {
+        totalCost = getEvmBuyCost(sharesInput, selectedSide, moonPool, jeetPool);
+      } else {
+        totalCost = getEvmSellReceived(sharesInput, selectedSide, moonPool, jeetPool);
+      }
+    } else {
+      const poolTotal = moonPool + jeetPool;
+      const priceMoon = (moonPool + 10) / (poolTotal + 20);
+      const priceJeet = (jeetPool + 10) / (poolTotal + 20);
+      const price = selectedSide === 'moon' ? priceMoon : priceJeet;
+      totalCost = sharesInput * price;
+    }
+
+    if (totalCost === Infinity) {
+      const rect = e?.currentTarget.getBoundingClientRect();
+      showAlert('NOT ENOUGH LIQUIDITY IN THE AMM POOL RESERVE!', 'error', 'AMM DEPLETED', undefined, rect);
+      return;
+    }
+
+    if (orderType === 'buy' && user.balance < totalCost) {
       const rect = e?.currentTarget.getBoundingClientRect();
       showAlert('INSUFFICIENT AMMO USDC IN WALLET!', 'error', 'INSUFFICIENT AMMO', undefined, rect);
       return;
     }
-
-
 
     // Dynamic projectile physics relative values
     const tx = selectedSide === 'moon'
@@ -656,8 +712,8 @@ export default function RoomDetailPage() {
     setMortars((prev) => [...prev, newMortar]);
     setLocalShake(true);
 
-    // Append to battle logs
-    const newLog = `[ARTILLERY SHELL] Fired ${stakeAmount.toFixed(0)} USDC ammo payload on ${selectedSide.toUpperCase()} side!`;
+    const labelText = orderType === 'buy' ? 'DEPLOYED' : 'LIQUIDATED';
+    const newLog = `[ARTILLERY SHELL] Fired ${sharesInput} ${selectedSide.toUpperCase()} shares ${labelText.toLowerCase()} order payload!`;
     setBattleLogs((prev) => [...prev, newLog]);
 
     // After flight finishes (800ms)
@@ -686,11 +742,18 @@ export default function RoomDetailPage() {
       setBattleLogs((prev) => [...prev, `[IMPACT CONFIRMED] Shell detonated on opposing faction trenches!`]);
     }, 800);
 
-    placeBet(room.id, selectedSide, stakeAmount).then(() => {
+    try {
+      if (tradeMode === 'limit') {
+        await placeLimitOrder(room.id, orderType, selectedSide === 'moon' ? 0 : 1, limitPrice, sharesInput);
+      } else {
+        const slippageMultiplier = orderType === 'buy' ? 1.05 : 0.95;
+        const limitUsdc = totalCost * slippageMultiplier;
+        await executeEvmMarketTrade(room.id, selectedSide, sharesInput, orderType, limitUsdc);
+      }
       fetchRoomBets();
-    }).catch((err) => {
-      console.error('Failed to place bet:', err);
-    });
+    } catch (err) {
+      console.error('Failed to execute bet:', err);
+    }
   };
 
   const handleClaim = async () => {
@@ -719,17 +782,15 @@ export default function RoomDetailPage() {
     e.preventDefault();
     if (!chatInput.trim()) return;
 
-    // Restrict broadcasting to active bettors inside this room sector only
-    if (!user || !user.wallet || userBetsInRoom.length === 0) {
+    // Restrict broadcasting to connected users
+    if (!user || !user.wallet) {
       const submitBtn = e.currentTarget.querySelector('button[type="submit"]') as HTMLButtonElement | null;
       const rect = submitBtn ? submitBtn.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
-      showAlert("SIGNAL INTRUSION DETECTED: BROADCAST DENIED! ONLY ENLISTED SOLDIER BETTORS WHO HAVE STAKED SOL ON A SIDE IN THIS SECTOR TRENCH ARE AUTHORIZED TO TRANSMIT RADIO SIGNALS.", 'error', 'SIGNAL INTRUSION', undefined, rect);
+      showAlert("SIGNAL INTRUSION DETECTED: BROADCAST DENIED! PLEASE ENLIST YOUR WALLET COMS HELMET TO TRANSMIT RADIO SIGNALS.", 'error', 'SIGNAL INTRUSION', undefined, rect);
       return;
     }
 
-    const userAddr = user && user.wallet ? `${user.wallet.substring(0, 6)}...${user.wallet.substring(user.wallet.length - 4)}` : 'Recruit';
-    
-    sendRoomChat(room.id, activeChatTab, userAddr, chatInput.trim());
+    sendRoomChat(room.id, activeChatTab, user.wallet, chatInput.trim());
 
     setChatInput('');
     synthSound('bet');
@@ -2070,7 +2131,57 @@ export default function RoomDetailPage() {
           ) : (
             // Active Faction Selector + Slider controls
             <>
-              {/* 1. PICK YOUR STANCE */}
+              {/* AMM Pool Ratio Meter */}
+              <div className="mb-4">
+                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-2">AMM TRENCH POOL DEPTH</span>
+                {(() => {
+                  const moonPool = room.moonPool || 0;
+                  const jeetPool = room.jeetPool || 0;
+                  const totalPool = moonPool + jeetPool;
+                  
+                  const moonPct = totalPool > 0 ? (moonPool / totalPool) * 100 : 50;
+                  const jeetPct = totalPool > 0 ? (jeetPool / totalPool) * 100 : 50;
+                  
+                  const priceMoon = (moonPool + 10) / (totalPool + 20);
+                  const priceJeet = (jeetPool + 10) / (totalPool + 20);
+
+                  return (
+                    <div className="bg-[#050804] border border-trench-sandbag/45 p-3 rounded-lg font-mono text-[10px]">
+                      {/* Faction Pools details */}
+                      <div className="flex justify-between mb-1.5 font-bold uppercase text-[9px]">
+                        <span className="text-neon-moon">MOON POOL: {moonPool.toFixed(2)} USDC</span>
+                        <span className="text-jeet-red">JEET POOL: {jeetPool.toFixed(2)} USDC</span>
+                      </div>
+
+                      {/* Visual Ratio Bar */}
+                      <div className="w-full h-3 bg-trench-black border border-trench-sandbag/35 rounded-sm overflow-hidden flex mb-2">
+                        <div 
+                          style={{ width: `${moonPct}%` }}
+                          className="h-full bg-neon-moon transition-all duration-300"
+                        />
+                        <div 
+                          style={{ width: `${jeetPct}%` }}
+                          className="h-full bg-jeet-red transition-all duration-300"
+                        />
+                      </div>
+
+                      {/* Implied Prices */}
+                      <div className="grid grid-cols-2 gap-2 text-center text-[10px] font-bold mt-2 pt-2 border-t border-trench-sandbag/20">
+                        <div className="bg-neon-moon/5 p-1 rounded border border-neon-moon/25">
+                          <div className="text-neon-moon uppercase text-[8px]">MOON PRICE</div>
+                          <div className="text-white text-xs mt-0.5">{(priceMoon * 100).toFixed(0)}¢ / share</div>
+                        </div>
+                        <div className="bg-jeet-red/5 p-1 rounded border border-jeet-red/25">
+                          <div className="text-jeet-red uppercase text-[8px]">JEET PRICE</div>
+                          <div className="text-white text-xs mt-0.5">{(priceJeet * 100).toFixed(0)}¢ / share</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Stance Selector */}
               <div className="mb-4">
                 <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-2">1. PICK YOUR STANCE</span>
                 <div className="flex gap-3 h-14">
@@ -2087,7 +2198,7 @@ export default function RoomDetailPage() {
                   >
                     <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
                     <span className="now">MOON</span>
-                    <span className="play">BET MOON 🚀</span>
+                    <span className="play">BID MOON 🚀</span>
                   </button>
                   <button
                     onClick={() => {
@@ -2098,112 +2209,253 @@ export default function RoomDetailPage() {
                       selectedSide === 'jeet'
                         ? 'shadow-glow-jeet border-jeet-red animate-pulse'
                         : 'opacity-70 hover:opacity-100'
-                     }`}
+                    }`}
                   >
                     <img src="/pepes/jeet-skeleton.png" className="btn-icon object-contain" alt="Pepe" />
                     <span className="now">JEET</span>
-                    <span className="play">BET JEET 💀</span>
+                    <span className="play">BID JEET 💀</span>
                   </button>
                 </div>
               </div>
 
+              {/* OrderBook (CLOB) */}
+              <div className="mb-4">
+                <OrderBook roomId={room.id} outcomeIndex={selectedSide === 'moon' ? 0 : 1} />
+              </div>
 
-
-              {/* 3. AMMUNITION (USDC) Preset Selector Slots */}
-              <div className="mb-6 bg-trench-black p-4 border border-trench-sandbag rounded">
-                <div className="flex justify-between items-center mb-3 border-b border-trench-sandbag/40 pb-2">
-                  <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">3. AMMUNITION (USDC)</span>
+              {/* Action Tabs */}
+              <div className="mb-4">
+                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-1">CHOOSE ACTION</span>
+                <div className="grid grid-cols-2 gap-1.5 bg-trench-mud p-1 border border-trench-sandbag rounded">
+                  <button
+                    onClick={() => { setOrderType('buy'); synthSound('bet'); }}
+                    className={`py-1.5 text-center font-staatliches text-sm tracking-wider uppercase rounded transition-all font-bold ${
+                      orderType === 'buy' ? 'bg-neon-moon text-black' : 'text-trench-gasmask hover:text-white'
+                    }`}
+                  >
+                    BUY SHARES
+                  </button>
+                  <button
+                    onClick={() => { setOrderType('sell'); synthSound('bet'); }}
+                    className={`py-1.5 text-center font-staatliches text-sm tracking-wider uppercase rounded transition-all font-bold ${
+                      orderType === 'sell' ? 'bg-jeet-red text-white' : 'text-trench-gasmask hover:text-white'
+                    }`}
+                  >
+                    SELL SHARES
+                  </button>
                 </div>
+              </div>
 
-                {/* Preset slots layout matching mockup */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                  {[5, 10, 25, 50, 100].map((val) => {
-                    const isSelected = stakeAmount === val;
-                    return (
-                      <button
-                        key={val}
-                        onClick={() => {
-                          setStakeAmount(val);
-                          synthSound('bet');
-                        }}
-                        className={`py-2 text-center font-mono text-xs border rounded transition-all font-bold ${
-                          isSelected
-                            ? 'bg-yellow-400 text-black border-yellow-500 font-bold shadow-[0_0_8px_rgba(251,191,36,0.6)]'
-                            : 'bg-trench-mud text-trench-gasmask border-trench-sandbag hover:text-white'
-                        }`}
-                      >
-                        {val} USDC
-                      </button>
-                    );
-                  })}
+              {/* Trade Mode Tabs */}
+              <div className="mb-4">
+                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-1">ORDER TYPE</span>
+                <div className="grid grid-cols-2 gap-1.5 bg-trench-mud p-1 border border-trench-sandbag rounded">
+                  <button
+                    onClick={() => { setTradeMode('market'); synthSound('bet'); }}
+                    className={`py-1.5 text-center font-staatliches text-sm tracking-wider uppercase rounded transition-all font-bold ${
+                      tradeMode === 'market' ? 'bg-yellow-400 text-black' : 'text-trench-gasmask hover:text-white'
+                    }`}
+                  >
+                    MARKET
+                  </button>
+                  <button
+                    onClick={() => { setTradeMode('limit'); synthSound('bet'); }}
+                    className={`py-1.5 text-center font-staatliches text-sm tracking-wider uppercase rounded transition-all font-bold ${
+                      tradeMode === 'limit' ? 'bg-yellow-400 text-black' : 'text-trench-gasmask hover:text-white'
+                    }`}
+                  >
+                    LIMIT
+                  </button>
                 </div>
+              </div>
 
-                {/* Radix Slider */}
-                <Slider.Root
-                  className="relative flex items-center select-none touch-none w-full h-5 cursor-pointer"
-                  value={[stakeAmount]}
-                  onValueChange={(val) => setStakeAmount(val[0])}
-                  min={1}
-                  max={500}
-                  step={1}
-                >
-                  <Slider.Track className="bg-trench-mud relative grow rounded-full h-2 border border-trench-sandbag overflow-hidden">
-                    <Slider.Range className={`absolute h-full rounded-full ${
-                      selectedSide === 'moon' ? 'bg-neon-moon shadow-glow-moon' : 'bg-jeet-red shadow-glow-jeet'
-                    }`} />
-                  </Slider.Track>
-                  <Slider.Thumb
-                    className="block w-4 h-4 bg-yellow-400 border border-yellow-600 rounded-full hover:scale-110 focus:outline-none transition-transform cursor-pointer shadow-md"
-                    aria-label="Stake amount"
+              {/* Limit Price Input */}
+              {tradeMode === 'limit' && (
+                <div className="mb-4 bg-trench-black p-3.5 border border-trench-sandbag rounded">
+                  <div className="flex justify-between items-center mb-1 font-mono text-[9px] text-trench-gasmask uppercase font-bold">
+                    <span>LIMIT PRICE (USDC)</span>
+                    <span className="text-yellow-400">${limitPrice.toFixed(2)}</span>
+                  </div>
+                  <input
+                    type="number"
+                    min="0.01"
+                    max="0.99"
+                    step="0.01"
+                    value={limitPrice}
+                    onChange={(e) => setLimitPrice(parseFloat(e.target.value) || 0.5)}
+                    className="w-full bg-[#050804] border border-trench-sandbag text-white font-mono text-sm px-2.5 py-1.5 rounded focus:outline-none focus:border-yellow-400 font-bold"
                   />
-                </Slider.Root>
-
-                {/* Range text below slider matching mockup */}
-                <div className="flex justify-between items-center mt-3 font-mono text-[9px] text-trench-gasmask uppercase font-bold">
-                  <span>Min: 1 USDC</span>
-                  <span className="text-yellow-400">Amt: {stakeAmount.toFixed(0)} USDC</span>
-                  <span>Max: 500 USDC</span>
                 </div>
+              )}
+
+              {/* Order Entry Fields */}
+              <div className="mb-4 bg-trench-black p-3.5 border border-trench-sandbag rounded">
+                <div className="flex justify-between items-center mb-1 font-mono text-[9px] text-trench-gasmask uppercase font-bold">
+                  <span>{orderType === 'buy' ? 'BUY QTY (SHARES)' : 'SELL QTY (SHARES)'}</span>
+                  <span className="text-yellow-400">{sharesInput.toFixed(0)} shares</span>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  step="any"
+                  value={sharesInput}
+                  onChange={(e) => setSharesInput(parseFloat(e.target.value) || 10)}
+                  className="w-full bg-[#050804] border border-trench-sandbag text-white font-mono text-sm px-2.5 py-1.5 rounded focus:outline-none focus:border-yellow-400 font-bold"
+                />
               </div>
 
-              {/* Pot statistics and multipliers */}
-              <div className="space-y-2 mb-6 font-mono text-xs border-b border-trench-sandbag/40 pb-4">
-                <div className="flex justify-between text-trench-gasmask uppercase font-bold">
-                  <span>POT MULTIPLIER</span>
-                  <span className="text-white font-bold">{getMultiplier(selectedSide)}x</span>
-                </div>
-                <div className="flex justify-between text-trench-gasmask uppercase font-bold">
-                  <span>EXPECTED BOOTY</span>
-                  <span className="text-neon-moon font-bold">+{getPotentialPayout(selectedSide).toFixed(2)} USDC</span>
-                </div>
-                <div className="flex justify-between text-trench-gasmask/60 text-[10px] uppercase font-bold">
-                  <span>TRENCH MINE FEE</span>
-                  <span>0.002 SOL</span>
-                </div>
-              </div>
+              {/* Instant Swap Statistics */}
+              {(() => {
+                const moonPool = room.moonPool || 0;
+                const jeetPool = room.jeetPool || 0;
+                const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
 
-              {/* Glowing Faction Bet confirming Yellow tactical hatch button matching mockup */}
+                let cost = 0;
+                let price = 0;
+
+                if (isEvm) {
+                  if (orderType === 'buy') {
+                    cost = getEvmBuyCost(sharesInput, selectedSide, moonPool, jeetPool);
+                  } else {
+                    cost = getEvmSellReceived(sharesInput, selectedSide, moonPool, jeetPool);
+                  }
+                  price = sharesInput > 0 ? (cost === Infinity ? Infinity : cost / sharesInput) : 0.50;
+                } else {
+                  const totalPool = moonPool + jeetPool;
+                  const priceMoon = (moonPool + 10) / (totalPool + 20);
+                  const priceJeet = (jeetPool + 10) / (totalPool + 20);
+                  price = selectedSide === 'moon' ? priceMoon : priceJeet;
+                  cost = price * sharesInput;
+                }
+
+                const maxPayout = sharesInput;
+                const profit = cost === Infinity ? -Infinity : maxPayout - cost;
+                const roiPercent = cost > 0 && cost !== Infinity ? (profit / cost) * 100 : 0;
+
+                return (
+                  <div className="space-y-2 mb-4 font-mono text-xs border-b border-trench-sandbag/40 pb-3">
+                    <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                      <span>EXECUTION PRICE</span>
+                      <span className="text-white font-bold">
+                        {price === Infinity ? 'N/A' : `${price.toFixed(2)} USDC / share`}
+                      </span>
+                    </div>
+                    {orderType === 'buy' ? (
+                      <>
+                        <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                          <span>TOTAL SWAP COST</span>
+                          <span className="text-white font-bold">
+                            {cost === Infinity ? 'EXCEEDS RESERVES' : `${cost.toFixed(2)} USDC`}
+                          </span>
+                        </div>
+                        <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                          <span>MAX PAYOUT (WIN)</span>
+                          <span className="text-neon-moon font-bold">+{maxPayout.toFixed(2)} USDC</span>
+                        </div>
+                        <div className="flex justify-between text-trench-gasmask/80 uppercase font-bold text-[11px]">
+                          <span>NET PROFIT</span>
+                          <span className="text-yellow-400 font-bold">
+                            {cost === Infinity ? 'N/A' : `+${profit.toFixed(2)} USDC (+${roiPercent.toFixed(0)}%)`}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                          <span>IMMEDIATE PAYOUT</span>
+                          <span className="text-neon-moon font-bold">
+                            {cost === Infinity ? '0.00 USDC' : `+${cost.toFixed(2)} USDC`}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    <div className="flex justify-between text-trench-gasmask/60 text-[9px] uppercase font-bold">
+                      <span>FEE & SLIPPAGE</span>
+                      <span>0.00% (AMM SWAP)</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <button
-                onClick={handleCharge}
+                onClick={() => handlePlaceOrder()}
                 disabled={isTransactionLoading}
-                className="w-full py-4 text-center font-staatliches text-2xl uppercase tracking-widest text-black rounded border-2 border-yellow-700 border-b-4 bg-yellow-400 hover:bg-yellow-500 active:translate-y-0.5 transition-all relative overflow-hidden group font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.3)] disabled:bg-trench-sandbag disabled:border-trench-sandbag disabled:text-trench-gasmask hatch-pattern"
+                className="w-full py-3.5 text-center font-staatliches text-2xl uppercase tracking-widest text-black rounded border-2 border-yellow-700 border-b-4 bg-yellow-400 hover:bg-yellow-500 active:translate-y-0.5 transition-all relative overflow-hidden group font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.3)] disabled:bg-trench-sandbag disabled:border-trench-sandbag disabled:text-trench-gasmask hatch-pattern"
               >
                 {isTransactionLoading ? (
                   <Loader2 className="animate-spin text-black shrink-0" size={20} />
                 ) : (
                   <span className="relative z-10 flex items-center gap-1.5 justify-center font-bold">
                     <Sparkles size={20} className="text-black shrink-0 animate-pulse" />
-                    STAKE / ADD POSITION
+                    EXECUTE IMMEDIATE SWAP
                   </span>
                 )}
-                {/* Shimmer overlay block */}
                 <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-white/20 skew-x-[-20deg] group-hover:animate-[shimmer_1s_ease-in-out_infinite]"></div>
               </button>
 
-              <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold">
+              {/* Active Positions Info */}
+              {(() => {
+                const userBetsInRoom = user ? user.bets.filter(b => b.roomId === room.id) : [];
+                const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || 0), 0);
+                const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || 0), 0);
+                const totalSpentMoon = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + b.amount, 0);
+                const avgMoonPrice = moonSharesOwned > 0 ? totalSpentMoon / moonSharesOwned : 0;
+                const totalSpentJeet = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + b.amount, 0);
+                const avgJeetPrice = jeetSharesOwned > 0 ? totalSpentJeet / jeetSharesOwned : 0;
+
+                if (moonSharesOwned === 0 && jeetSharesOwned === 0) return null;
+
+                return (
+                  <div className="mt-4 bg-[#050804] border border-trench-sandbag/45 p-3 rounded-lg font-mono text-[10px] space-y-2 text-left">
+                    <div className="font-bold text-yellow-500 uppercase border-b border-trench-sandbag/30 pb-1 flex justify-between">
+                      <span>YOUR ACTIVE TRENCH POSITIONS</span>
+                    </div>
+                    {moonSharesOwned > 0 && (
+                      <div className="flex justify-between items-center bg-neon-moon/5 p-1.5 rounded border border-neon-moon/20">
+                        <div>
+                          <div className="font-bold text-neon-moon uppercase text-[9px]">Moon (YES) Positions</div>
+                          <div className="text-[9px] text-trench-gasmask font-bold mt-0.5">QTY: {moonSharesOwned.toFixed(0)} | AVG PRICE: {avgMoonPrice.toFixed(2)} USDC</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedSide('moon');
+                            setOrderType('sell');
+                            setSharesInput(moonSharesOwned);
+                            synthSound('bet');
+                          }}
+                          className="px-1.5 py-0.5 bg-jeet-red hover:bg-red-600 text-white text-[9px] uppercase font-bold rounded"
+                        >
+                          EXIT
+                        </button>
+                      </div>
+                    )}
+                    {jeetSharesOwned > 0 && (
+                      <div className="flex justify-between items-center bg-jeet-red/5 p-1.5 rounded border border-jeet-red/20">
+                        <div>
+                          <div className="font-bold text-jeet-red uppercase text-[9px]">Jeet (NO) Positions</div>
+                          <div className="text-[9px] text-gray-400 font-bold mt-0.5">QTY: {jeetSharesOwned.toFixed(0)} | AVG PRICE: {avgJeetPrice.toFixed(2)} USDC</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setSelectedSide('jeet');
+                            setOrderType('sell');
+                            setSharesInput(jeetSharesOwned);
+                            synthSound('bet');
+                          }}
+                          className="px-1.5 py-0.5 bg-jeet-red hover:bg-red-600 text-white text-[9px] uppercase font-bold rounded"
+                        >
+                          EXIT
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold text-left">
                 <ShieldAlert size={16} className="text-jeet-red shrink-0 mt-0.5" />
                 <p>
-                  'Bets are locked. Firing shells takes permanent USDC ammo payload. Finalized on countdown expiry!'
+                  'Pure PvP execution. Order limits lock USDC collateral. Exit positions early by placing opposing sell orders.'
                 </p>
               </div>
             </>
@@ -2288,12 +2540,16 @@ export default function RoomDetailPage() {
 
             {activeRoomChats.length > 0 ? (
               activeRoomChats.map((msg, index) => {
-                const isHQ = msg.user.includes('HQ') || msg.user.includes('COMMAND');
+                const isHQ = msg.user.includes('HQ') || msg.user.includes('COMMAND') || msg.user.includes('SYSTEM');
                 const bubbleColor = isHQ
                   ? 'text-yellow-500'
                   : msg.side === 'moon'
                   ? 'text-[#16A34A]'
                   : 'text-[#ff535a]';
+
+                const displayUser = msg.user.startsWith('0x') && msg.user.length > 15
+                  ? `${msg.user.substring(0, 6)}...${msg.user.substring(msg.user.length - 4)}`
+                  : msg.user;
 
                 return (
                   <div
@@ -2302,7 +2558,17 @@ export default function RoomDetailPage() {
                   >
                     <span>📡</span>
                     <span>
-                      <span className={`${bubbleColor} font-bold mr-1.5`}>[{msg.user}]</span>
+                      <span
+                        onClick={() => {
+                          if (!isHQ && msg.user.startsWith('0x')) {
+                            setSelectedProfileAddress(msg.user);
+                            synthSound('bet');
+                          }
+                        }}
+                        className={`${bubbleColor} font-bold mr-1.5 cursor-pointer hover:underline`}
+                      >
+                        [{displayUser}]
+                      </span>
                       <span className="text-gray-300">{msg.message}</span>
                     </span>
                   </div>
@@ -2366,7 +2632,17 @@ export default function RoomDetailPage() {
                         <span className={isMoon ? 'animate-pulse' : ''}>
                           {isMoon ? '🚀' : '💀'}
                         </span>
-                        <span className="text-trench-gasmask">[{formattedUser}]</span>
+                        <span
+                          onClick={() => {
+                            if (bet.user && bet.user.startsWith('0x')) {
+                              setSelectedProfileAddress(bet.user);
+                              synthSound('bet');
+                            }
+                          }}
+                          className="text-trench-gasmask cursor-pointer hover:underline"
+                        >
+                          [{formattedUser}]
+                        </span>
                         <span className={`${colorClass} font-extrabold tracking-wide`}>
                           {isMoon ? 'MOON' : 'JEET'}
                         </span>
@@ -2386,224 +2662,98 @@ export default function RoomDetailPage() {
             </div>
           </div>
 
-          {/* Locked Market Positions */}
           <div className="retro-panel p-2 sm:p-3 min-h-[13rem] flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
-            <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-xs sm:text-sm font-bold uppercase border-b border-trench-sandbag/40 pb-1.5 mb-2">
-              <Swords className="w-3.5 h-3.5 text-neon-moon animate-pulse" />
-              <span>YOUR LOCKED MARKET POSITIONS ({displayBets.length})</span>
+            <div className="flex items-center justify-between border-b border-trench-sandbag/40 pb-1.5 mb-2 font-mono">
+              <div className="flex items-center gap-1 font-staatliches text-xs sm:text-sm font-bold uppercase pb-0.5 px-1">
+                <Swords className="w-3 h-3 text-neon-moon animate-pulse" />
+                <span>Your Active Combat Positions</span>
+              </div>
+              <span className="text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">NO HOUSE FEES (PURE PVP AMM)</span>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar">
-              {displayBets.length > 0 ? (
-                <div className="overflow-x-auto w-full">
-                  <table className="w-full text-left font-mono text-[10px] uppercase">
-                    <thead>
-                      <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[9px] font-bold">
-                        <th className="py-1.5 px-2">SIDE</th>
-                        <th className="py-1.5 px-2">AMOUNT</th>
-                        <th className="py-1.5 px-2">ENTRY</th>
-                        <th className="py-1.5 px-2">CURRENT</th>
-                        <th className="py-1.5 px-2 text-right">ACTION</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayBets.map((bet) => {
-                          const entryPrice = openingPriceSafe || 0;
-                          const currentSpotPrice = livePrice || openingPriceSafe || 0;
-                          
-                          const FEE_RATE = 0.0125;
-                          let pnlPercent = 0;
-                          let pnlSol = 0;
-                          let isProfit = false;
+              {(() => {
+                const userBetsInRoom = user ? user.bets.filter(b => b.roomId === room.id) : [];
+                const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || 0), 0);
+                const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || 0), 0);
+                const totalSpentMoon = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + b.amount, 0);
+                const avgMoonPrice = moonSharesOwned > 0 ? totalSpentMoon / moonSharesOwned : 0;
+                const totalSpentJeet = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + b.amount, 0);
+                const avgJeetPrice = jeetSharesOwned > 0 ? totalSpentJeet / jeetSharesOwned : 0;
 
-                          if (entryPrice > 0 && currentSpotPrice !== entryPrice) {
-                            const isMoonWinning = currentSpotPrice > entryPrice;
-                            const isUserWinning = (bet.side === 'moon' && isMoonWinning) || (bet.side === 'jeet' && !isMoonWinning);
-                            
-                            if (isUserWinning) {
-                              const winningPool = isMoonWinning ? moonPoolSafe : jeetPoolSafe;
-                              const losingPool = isMoonWinning ? jeetPoolSafe : moonPoolSafe;
-                              
-                              if (winningPool > 0) {
-                                pnlPercent = ((losingPool / winningPool) * (1 - FEE_RATE) - FEE_RATE) * 100;
-                                pnlSol = bet.amount * (pnlPercent / 100);
-                              }
-                              isProfit = pnlPercent >= 0;
-                            } else {
-                              pnlPercent = -100;
-                              pnlSol = -bet.amount;
-                              isProfit = false;
-                            }
-                          }
+                const positions = [];
+                if (moonSharesOwned > 0) {
+                  positions.push({ side: 'moon', shares: moonSharesOwned, avgPrice: avgMoonPrice, totalSpent: totalSpentMoon });
+                }
+                if (jeetSharesOwned > 0) {
+                  positions.push({ side: 'jeet', shares: jeetSharesOwned, avgPrice: avgJeetPrice, totalSpent: totalSpentJeet });
+                }
 
-                          const activeListing = listings.find(l => l.bet === bet.pubkey);
-
-                          return (
-                            <tr key={bet.pubkey || bet.id} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
-                              <td className="py-2 px-2 font-bold">
-                                <span className={`px-1.5 py-0.5 rounded text-[8px] font-staatliches ${
-                                  bet.side === 'moon' 
-                                    ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/20 shadow-glow-moon' 
-                                    : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/20 shadow-glow-jeet'
-                                }`}>
-                                  {bet.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
+                if (positions.length > 0) {
+                  return (
+                    <div className="overflow-x-auto w-full">
+                      <table className="w-full text-left font-mono text-[10px] uppercase">
+                        <thead>
+                          <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[9px] font-bold">
+                            <th className="py-1.5 px-2">SIDE</th>
+                            <th className="py-1.5 px-2">QTY SHARES</th>
+                            <th className="py-1.5 px-2">AVG PRICE</th>
+                            <th className="py-1.5 px-2">TOTAL COST</th>
+                            <th className="py-1.5 px-2 text-right">ACTION</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {positions.map((pos) => (
+                            <tr key={pos.side} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
+                              <td className="py-2 px-2 font-bold font-staatliches text-xs">
+                                <span className={pos.side === 'moon' ? 'text-neon-moon' : 'text-jeet-red'}>
+                                  {pos.side === 'moon' ? '🚀 MOON (YES)' : '💀 JEET (NO)'}
                                 </span>
                               </td>
-                              <td className="py-2 px-2 text-white font-bold">{bet.amount.toFixed(2)} {(room.token.chainId === 'solana' || !room.id.startsWith('0x')) ? 'SOL' : 'USDC'}</td>
-                              <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(entryPrice)}</td>
-                              <td className="py-2 px-2 text-gray-300 font-bold">${formatPrice(currentSpotPrice)}</td>
+                              <td className="py-2 px-2 text-white font-bold">{pos.shares.toFixed(0)}</td>
+                              <td className="py-2 px-2 text-gray-300 font-bold">{pos.avgPrice.toFixed(2)} USDC</td>
+                              <td className="py-2 px-2 text-gray-300 font-bold">{pos.totalSpent.toFixed(2)} USDC</td>
                               <td className="py-2 px-2 text-right">
-                                {!isSettled && room.expiry > Date.now() ? (
-                                  activeListing ? (
-                                    <button
-                                      disabled={isTransactionLoading}
-                                      onClick={async (e) => {
-                                        e.stopPropagation();
-                                        synthSound('bet');
-                                        await cancelListing(activeListing.pubkey, bet.pubkey);
-                                      }}
-                                      className="px-2 py-0.5 bg-red-950/40 text-jeet-red hover:bg-jeet-red hover:text-white border border-jeet-red/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all"
-                                    >
-                                      CANCEL ASK
-                                    </button>
-                                  ) : (
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        console.log('[DEBUG] SELL TICKET clicked. Bet:', bet);
-                                        synthSound('bet');
-                                        setSelectedBetToList(bet);
-                                      }}
-                                      className="px-2 py-0.5 bg-green-950/40 text-neon-moon hover:bg-neon-moon hover:text-black border border-neon-moon/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all shadow-glow-moon"
-                                    >
-                                      SELL TICKET
-                                    </button>
-                                  )
-                                ) : (
-                                  <span className="text-trench-gasmask font-bold">LOCKED</span>
-                                )}
+                                <button
+                                  onClick={() => {
+                                    setSelectedSide(pos.side as any);
+                                    setOrderType('sell');
+                                    setSharesInput(pos.shares);
+                                    synthSound('bet');
+                                    const betPanel = document.getElementById('bet-panel');
+                                    if (betPanel) betPanel.scrollIntoView({ behavior: 'smooth' });
+                                  }}
+                                  className="px-2 py-0.5 bg-red-950/40 text-jeet-red hover:bg-jeet-red hover:text-white border border-jeet-red/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all"
+                                >
+                                  EXIT POSITION
+                                </button>
                               </td>
                             </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="flex items-center justify-center h-full py-6 text-center text-trench-gasmask/50 font-mono text-[9px] font-bold uppercase leading-relaxed">
-                  📢 NO LOCKED POSITIONS IN THIS SECTOR. STAKE SOL TO ENTER COMBAT.
-                </div>
-              )}
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="flex items-center justify-center h-full py-6 text-center text-trench-gasmask/50 font-mono text-[9px] font-bold uppercase leading-relaxed">
+                    📢 NO ACTIVE POSITION SHARES. ACQUIRE MOON OR JEET SHARES TO JOIN THE BATTLE.
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
 
       </footer>
 
-      <div className="my-8 max-w-7xl mx-auto w-full px-4">
-        <PixelBarbedWire height={16} />
-      </div>
-
-      {/* List Position Modal */}
-      {(() => {
-        if (!selectedBetToList) return null;
-        const betAmount = selectedBetToList.amount || 0;
-        const betSide = selectedBetToList.side || 'moon';
-        const betPubkey = selectedBetToList.pubkey || '';
-        return (
-          <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[10000] flex items-center justify-center p-4 scanlines">
-            <div className="retro-panel max-w-sm w-full p-5 shadow-2xl relative overflow-hidden rounded-xl border-2 border-trench-sandbag bg-trench-black">
-              <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-              <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-              <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-              <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-
-              <h3 className="font-staatliches text-2xl text-white uppercase tracking-wider mb-2 text-center border-b border-trench-sandbag pb-2">
-                ⚡ LIST TICKET FOR SALE
-              </h3>
-              
-              <div className="space-y-4 font-mono text-xs uppercase text-trench-gasmask mt-4">
-                <div className="flex justify-between items-center bg-trench-mud p-2 rounded border border-[#1d3515]">
-                  <span>FACTION SIDE:</span>
-                  <span className={`px-1.5 py-0.5 rounded font-staatliches text-xs ${
-                    betSide === 'moon' 
-                      ? 'bg-neon-moon/10 text-neon-moon border border-neon-moon/20' 
-                      : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/20'
-                  }`}>
-                    {betSide === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center bg-trench-mud p-2 rounded border border-[#1d3515]">
-                  <span>STAKED COLLATERAL:</span>
-                  <span className="text-white font-bold">{betAmount.toFixed(2)} SOL</span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-trench-gasmask">SET ASK PRICE (SOL)</label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.001"
-                      placeholder="e.g. 0.8"
-                      value={askPriceInput}
-                      onChange={(e) => setAskPriceInput(e.target.value)}
-                      className="w-full bg-black/60 border border-trench-sandbag p-2.5 rounded font-bold text-white focus:outline-none focus:border-neon-moon text-sm"
-                    />
-                    <span className="absolute right-3 top-2.5 font-bold text-trench-gasmask text-xs">SOL</span>
-                  </div>
-                </div>
-
-                {askPriceInput && !isNaN(Number(askPriceInput)) && Number(askPriceInput) > 0 && (
-                  <div className="p-2.5 bg-black/50 border border-dashed border-trench-sandbag/40 rounded text-center">
-                    {Number(askPriceInput) < betAmount ? (
-                      <span className="text-[#16A34A] font-bold">
-                        🎁 DISCOUNT: {((betAmount - Number(askPriceInput)) / betAmount * 100).toFixed(1)}% OFF
-                      </span>
-                    ) : Number(askPriceInput) > betAmount ? (
-                      <span className="text-yellow-500 font-bold">
-                        📈 PREMIUM: {((Number(askPriceInput) - betAmount) / betAmount * 100).toFixed(1)}% MARKUP
-                      </span>
-                    ) : (
-                      <span className="text-white font-bold">AT PAR VALUE</span>
-                    )}
-                  </div>
-                )}
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    onClick={() => {
-                      setSelectedBetToList(null);
-                      setAskPriceInput('');
-                      synthSound('bet');
-                    }}
-                    className="flex-1 py-2 border border-trench-sandbag font-staatliches text-base text-trench-gasmask rounded hover:text-white transition-colors uppercase font-bold"
-                  >
-                    ABORT
-                  </button>
-                  <button
-                    disabled={!askPriceInput || isNaN(Number(askPriceInput)) || Number(askPriceInput) <= 0 || isTransactionLoading}
-                    onClick={async () => {
-                      try {
-                        synthSound('bet');
-                        await listPosition(room.id, betPubkey, Number(askPriceInput));
-                        setSelectedBetToList(null);
-                        setAskPriceInput('');
-                      } catch (e) {
-                        console.error(e);
-                      }
-                    }}
-                    className="flex-1 py-2 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-base text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold uppercase transition-all"
-                  >
-                    CONFIRM LISTING
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {selectedProfileAddress && (
+        <PublicProfileModal
+          walletAddress={selectedProfileAddress}
+          onClose={() => setSelectedProfileAddress(null)}
+        />
+      )}
 
     </div>
   );

@@ -507,6 +507,7 @@ export default function CreateRoomPage() {
     try {
       const res = await createRoom(newRoom, openingPriceType === 'set' || arenaType === 'debate');
       
+      const isEvm = res && res.roomPda && res.roomPda.startsWith('0x');
       if (res && !res.alreadyExists) {
         try {
           await placeBet(res.roomPda, seedSide as any, seedAmount, true, `/room/${res.roomPda}`);
@@ -1362,7 +1363,7 @@ export default function CreateRoomPage() {
                   <div className="relative flex items-center">
                     <input
                       type="number"
-                      step="1"
+                      step="any"
                       min="1"
                       placeholder="ENTER USDC SEED AMOUNT..."
                       value={seedAmount || ''}

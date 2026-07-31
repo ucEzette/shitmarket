@@ -912,7 +912,7 @@ export default function RoomsPage() {
             <span className="text-neon-moon font-bold animate-pulse select-none">⚡</span>
             <input
               type="number"
-              step="1"
+              step="any"
               min="1"
               value={quickAmount}
               onChange={(e) => {

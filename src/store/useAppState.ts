@@ -115,9 +115,203 @@ const SHITMARKET_CORE_ABI = [
   }
 ] as const;
 
+export const MARKET_FACTORY_ABI = [
+  {
+    name: 'createMarket',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'ipfsHash', type: 'string' },
+      { name: 'outcomeCount', type: 'uint256' },
+      { name: 'oracle', type: 'address' },
+      { name: 'resolutionTime', type: 'uint256' },
+      { name: 'customResolver', type: 'address' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'conditionalTokens',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }]
+  },
+  {
+    name: 'MarketCreated',
+    type: 'event',
+    inputs: [
+      { name: 'marketId', type: 'uint256', indexed: true },
+      { name: 'conditionId', type: 'bytes32', indexed: true },
+      { name: 'creator', type: 'address', indexed: true },
+      { name: 'ipfsHash', type: 'string' },
+      { name: 'outcomeCount', type: 'uint256' },
+      { name: 'oracle', type: 'address' },
+      { name: 'resolutionTime', type: 'uint256' }
+    ]
+  }
+] as const;
+
+export const PREDICTION_ROUTER_ABI = [
+  {
+    name: 'routeBuyShares',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'poolAddress', type: 'address' },
+      { name: 'outcomeIndex', type: 'uint8' },
+      { name: 'amountShares', type: 'uint256' },
+      { name: 'maxUsdcSpent', type: 'uint256' },
+      {
+        name: 'makerOrders',
+        type: 'tuple[]',
+        components: [
+          { name: 'maker', type: 'address' },
+          { name: 'conditionId', type: 'bytes32' },
+          { name: 'outcomeIndex', type: 'uint8' },
+          { name: 'price', type: 'uint256' },
+          { name: 'amount', type: 'uint256' },
+          { name: 'side', type: 'uint8' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'expiration', type: 'uint256' }
+        ]
+      },
+      { name: 'signatures', type: 'bytes[]' },
+      { name: 'fillAmounts', type: 'uint256[]' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'routeSellShares',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'poolAddress', type: 'address' },
+      { name: 'outcomeIndex', type: 'uint8' },
+      { name: 'amountShares', type: 'uint256' },
+      { name: 'minUsdcReceived', type: 'uint256' },
+      {
+        name: 'makerOrders',
+        type: 'tuple[]',
+        components: [
+          { name: 'maker', type: 'address' },
+          { name: 'conditionId', type: 'bytes32' },
+          { name: 'outcomeIndex', type: 'uint8' },
+          { name: 'price', type: 'uint256' },
+          { name: 'amount', type: 'uint256' },
+          { name: 'side', type: 'uint8' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'expiration', type: 'uint256' }
+        ]
+      },
+      { name: 'signatures', type: 'bytes[]' },
+      { name: 'fillAmounts', type: 'uint256[]' }
+    ],
+    outputs: []
+  }
+] as const;
+
+export const CONDITIONAL_TOKENS_ABI = [
+  {
+    name: 'redeemPositions',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'conditionId', type: 'bytes32' },
+      { name: 'amount', type: 'uint256' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'id', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'getTokenId',
+    type: 'function',
+    stateMutability: 'pure',
+    inputs: [
+      { name: 'conditionId', type: 'bytes32' },
+      { name: 'outcomeIndex', type: 'uint256' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'setApprovalForAll',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'operator', type: 'address' },
+      { name: 'approved', type: 'bool' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'isApprovedForAll',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'account', type: 'address' },
+      { name: 'operator', type: 'address' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  }
+] as const;
+
+export const AM_POOL_FACTORY_ABI = [
+  {
+    name: 'createPool',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'conditionalTokens', type: 'address' },
+      { name: 'conditionId', type: 'bytes32' },
+      { name: 'usdcToken', type: 'address' }
+    ],
+    outputs: [{ name: '', type: 'address' }]
+  },
+  {
+    name: 'getPool',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'conditionId', type: 'bytes32' }],
+    outputs: [{ name: '', type: 'address' }]
+  }
+] as const;
+
+export const AM_POOL_ABI = [
+  {
+    name: 'addLiquidity',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'usdcAmount', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'removeLiquidity',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'lpAmount', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'reserves',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  }
+] as const;
+
+
 export const publicClient = createPublicClient({
   chain: avalancheFuji,
-  transport: http(process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc'),
+  transport: http(process.env.NEXT_PUBLIC_AVALANCHE_RPC_URL || 'https://avalanche-fuji-c-chain-rpc.publicnode.com', { timeout: 60000 }),
 });
 
 export const formatCashtag = (sym: string) => {
@@ -166,10 +360,24 @@ export interface Bet {
   user: string; // original bettor wallet address
   currentOwner?: string; // current owner wallet address
   side: 'moon' | 'jeet';
-  amount: number; // SOL
+  amount: number; // SOL / USDC
   claimed: boolean;
   timestamp: number;
   txSig?: string | null;
+  shares?: number; // outcome shares
+  pricePaid?: number; // price paid per share (0.01 - 0.99)
+}
+
+export interface LimitOrder {
+  id: string;
+  roomId: string;
+  user: string;
+  side: 'moon' | 'jeet';
+  price: number; // 0.01 to 0.99
+  amount: number; // total shares ordered
+  filled: number; // matched shares so far
+  timestamp: number;
+  type: 'buy' | 'sell';
 }
 
 export interface Listing {
@@ -426,6 +634,11 @@ export interface AppState {
   cancelListing: (listingPubkey: string, betPubkey: string) => Promise<string>;
   buyPosition: (roomPubkey: string, listingPubkey: string, betPubkey: string, seller: string, originalBettor: string) => Promise<string>;
   
+  // AMM Swap Actions
+  executeImmediateTrade: (roomId: string, side: 'moon' | 'jeet', amount: number, action: 'buy' | 'sell') => Promise<void>;
+  placeLimitOrder: (roomId: string, side: 'buy' | 'sell', outcomeIndex: number, price: number, amount: number) => Promise<any>;
+  executeEvmMarketTrade: (roomId: string, side: 'moon' | 'jeet', amountShares: number, orderType: 'buy' | 'sell', maxUsdcSpentOrMinReceived: number) => Promise<void>;
+
   // Real-time synchronization actions
   addRoom: (room: Room) => void;
   updateRoomPools: (roomId: string, moonPool: number, jeetPool: number) => void;
@@ -481,11 +694,14 @@ export const parseBytes32Name = (hex: string): string => {
 export const mapApiRoom = (apiRoom: any): Room => {
   const rawAddress = apiRoom.originalAddress || apiRoom.tokenMint || '';
   const cleanedAddress = cleanEvmAddress(rawAddress);
-  const openingPriceNum = apiRoom.openingPrice ? Number(apiRoom.openingPrice) / 1e6 : undefined;
+  // openingPrice is stored as BigInt scaled by 1e12 in the DB
+  const rawOP = apiRoom.openingPrice ? Number(apiRoom.openingPrice) : 0;
+  // If the value is > 1e8, it's stored in 1e12 scale; otherwise it's already in 1e6 scale
+  const openingPriceNum = rawOP > 0 ? (rawOP > 1e8 ? rawOP / 1e12 : rawOP / 1e6) : undefined;
 
   return {
     id: apiRoom.roomPubkey,
-    duration: apiRoom.durationMinutes || 60,
+    duration: apiRoom.duration || apiRoom.durationMinutes || 60,
     category: apiRoom.category || detectCategory(apiRoom.tokenName, apiRoom.tokenSymbol, apiRoom.resolutionCriteria),
     openingPrice: openingPriceNum,
     token: {
@@ -1421,62 +1637,166 @@ export const useAppState = create<AppState>()(
           transport: custom(provider)
         });
         
-        const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
-        
-        let tokenMintHex = room.token.address;
-        if (!tokenMintHex.startsWith('0x')) {
-          try {
-            const decodeFn = typeof (bs58 as any).decode === 'function' ? (bs58 as any).decode : (bs58 as any).default?.decode;
-            const decoded = decodeFn(tokenMintHex);
-            tokenMintHex = '0x' + Buffer.from(decoded).toString('hex');
-          } catch (e) {
-            tokenMintHex = '0x' + Buffer.from(tokenMintHex).toString('hex').padStart(64, '0');
-          }
-        } else {
-          tokenMintHex = '0x' + tokenMintHex.replace('0x', '').padStart(64, '0');
-        }
-        
-        const priceVal = room.openingPrice ? parseFloat(String(room.openingPrice)) : 0;
-        const openingPriceI64 = BigInt(Math.round(priceVal * 1e6));
+        const marketFactoryAddress = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS || '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0') as `0x${string}`;
+        const oracleRegistryAddress = (process.env.NEXT_PUBLIC_ORACLE_REGISTRY_ADDRESS || '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512') as `0x${string}`;
+        const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
+        const resolutionTime = BigInt(Math.floor(room.expiry / 1000));
         
         const { request } = await publicClient.simulateContract({
-          address: contractAddress,
-          abi: SHITMARKET_CORE_ABI,
-          functionName: 'createRoom',
+          address: marketFactoryAddress,
+          abi: MARKET_FACTORY_ABI,
+          functionName: 'createMarket',
           args: [
-            tokenMintHex as `0x${string}`,
-            room.token.name || 'Unknown Token',
-            room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche'),
-            BigInt(room.duration),
-            openingPriceI64,
-            '0x0000000000000000000000000000000000000000',
-            BigInt(0)
+            room.token.name || 'Unknown Room',
+            BigInt(2),
+            oracleRegistryAddress,
+            resolutionTime,
+            wallet.address as `0x${string}` // Creator resolves the market
           ],
           account: wallet.address as `0x${string}`
         });
         
-        const txHash = await evmWalletClient.writeContract(request);
+        const txHash = await evmWalletClient.writeContract({
+          ...request,
+          gas: BigInt(500000)
+        });
         console.log("EVM Room created! Tx:", txHash);
         
         let actualRoomId: string = txHash;
         try {
           const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
           const roomLogs = parseEventLogs({
-            abi: SHITMARKET_CORE_ABI,
-            eventName: 'RoomCreated',
+            abi: MARKET_FACTORY_ABI,
+            eventName: 'MarketCreated',
             logs: receipt.logs,
           });
-          if (roomLogs && roomLogs.length > 0 && (roomLogs[0].args as any)?.roomId) {
-            actualRoomId = (roomLogs[0].args as any).roomId;
+          if (roomLogs && roomLogs.length > 0 && (roomLogs[0].args as any)?.conditionId) {
+            actualRoomId = (roomLogs[0].args as any).conditionId;
           }
           await get().fetchBalance();
         } catch (receiptErr) {
           console.warn("Failed to extract roomCreated log receipt:", receiptErr);
         }
 
+        // On-chain pool seeding logic for EVM
+        const seedAmount = Number(room.moonPool || 0) + Number(room.jeetPool || 0);
+        const seedAmountScaled = BigInt(Math.round(seedAmount * 1e6));
+
+        if (seedAmountScaled > BigInt(0)) {
+          try {
+            const poolFactoryAddress = (process.env.NEXT_PUBLIC_AM_POOL_FACTORY_ADDRESS || '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9') as `0x${string}`;
+            const tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x75537828f2ce51be7289709686A69CbFDbB714F1') as `0x${string}`;
+            
+            get().updateToast(toastId, {
+              type: 'loading',
+              message: 'DEPLOYING AMM POOL',
+              description: `Checking / Staging AMM pool for ${room.token.symbol}...`
+            });
+
+            let poolAddress = await publicClient.readContract({
+              address: poolFactoryAddress,
+              abi: AM_POOL_FACTORY_ABI,
+              functionName: 'getPool',
+              args: [actualRoomId as `0x${string}`]
+            }) as `0x${string}`;
+
+            let targetPoolAddress = poolAddress;
+            if (poolAddress === '0x0000000000000000000000000000000000000000') {
+              const { request: deployPoolReq } = await publicClient.simulateContract({
+                address: poolFactoryAddress,
+                abi: AM_POOL_FACTORY_ABI,
+                functionName: 'createPool',
+                args: [tokensAddress, actualRoomId as `0x${string}`, usdcAddress],
+                account: wallet.address as `0x${string}`
+              });
+              const deployPoolHash = await evmWalletClient.writeContract({
+                ...deployPoolReq,
+                gas: BigInt(1000000)
+              });
+              await publicClient.waitForTransactionReceipt({ hash: deployPoolHash });
+
+              targetPoolAddress = await publicClient.readContract({
+                address: poolFactoryAddress,
+                abi: AM_POOL_FACTORY_ABI,
+                functionName: 'getPool',
+                args: [actualRoomId as `0x${string}`]
+              }) as `0x${string}`;
+            }
+
+            // Approve pool to spend USDC
+            const allowance = await publicClient.readContract({
+              address: usdcAddress,
+              abi: [{
+                name: 'allowance',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+                outputs: [{ name: '', type: 'uint256' }]
+              }] as const,
+              functionName: 'allowance',
+              args: [wallet.address as `0x${string}`, targetPoolAddress]
+            });
+
+            if (allowance < seedAmountScaled) {
+              get().updateToast(toastId, {
+                type: 'loading',
+                message: 'APPROVING USDC AMMO',
+                description: `Approving USDC to AMM pool for initial seeding...`
+              });
+              const { request: approveReq } = await publicClient.simulateContract({
+                address: usdcAddress,
+                abi: [{
+                  name: 'approve',
+                  type: 'function',
+                  stateMutability: 'nonpayable',
+                  inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
+                  outputs: [{ name: '', type: 'bool' }]
+                }] as const,
+                functionName: 'approve',
+                args: [targetPoolAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+                account: wallet.address as `0x${string}`
+              });
+              const approveHash = await evmWalletClient.writeContract({
+                ...approveReq,
+                gas: BigInt(100000)
+              });
+              await publicClient.waitForTransactionReceipt({ hash: approveHash });
+            }
+
+            // Call addLiquidity on AMPool
+            get().updateToast(toastId, {
+              type: 'loading',
+              message: 'SEEDING POOL LIQUIDITY',
+              description: `Injecting ${seedAmount} USDC initial ammo into pool...`
+            });
+            const { request: addLiquidityReq } = await publicClient.simulateContract({
+              address: targetPoolAddress,
+              abi: AM_POOL_ABI,
+              functionName: 'addLiquidity',
+              args: [seedAmountScaled],
+              account: wallet.address as `0x${string}`
+            });
+            const addLiquidityHash = await evmWalletClient.writeContract({
+              ...addLiquidityReq,
+              gas: BigInt(800000)
+            });
+            await publicClient.waitForTransactionReceipt({ hash: addLiquidityHash });
+            console.log("AMPool seeding complete! Tx:", addLiquidityHash);
+          } catch (seedErr: any) {
+            console.error("Failed to seed AMM pool during room creation:", seedErr);
+            throw new Error(`Seeding AMM pool failed: ${extractErrorMessage(seedErr)}`);
+          }
+        }
+
+        // Use actual seed side amounts from the Room object
+        const moonSeed = room.moonPool || 0;
+        const jeetSeed = room.jeetPool || 0;
+
         const optimisticRoom: Room = {
           ...room,
           id: actualRoomId,
+          moonPool: moonSeed > 0 ? moonSeed : seedAmount,
+          jeetPool: jeetSeed > 0 ? jeetSeed : seedAmount,
           status: 'active' as const,
         };
         const updatedRooms = [optimisticRoom, ...get().rooms.filter(r => !isSameRoom(r.id, optimisticRoom.id))];
@@ -1496,8 +1816,8 @@ export const useAppState = create<AppState>()(
             resolutionCriteria: room.resolutionCriteria,
             oracleAddress: room.oracleAddress,
             oracleFeeLamports: room.oracleFeeLamports,
-            moonPool: room.moonPool,
-            jeetPool: room.jeetPool,
+            moonPool: moonSeed > 0 ? moonSeed : seedAmount,
+            jeetPool: jeetSeed > 0 ? jeetSeed : seedAmount,
             openingPrice: room.openingPrice,
             expiry: new Date(room.expiry).toISOString(),
             creator: wallet.address,
@@ -1509,8 +1829,8 @@ export const useAppState = create<AppState>()(
         
         get().updateToast(toastId, {
           type: 'success',
-          message: 'EVM ARENA STAGED',
-          description: `Battlefield room deployed for ${room.token.symbol}.`,
+          message: 'EVM ARENA STAGED & SEEDED',
+          description: `Battlefield room and pool fully deployed & seeded with ${seedAmount} USDC!`,
           txSig: txHash
         });
         
@@ -1970,25 +2290,13 @@ export const useAppState = create<AppState>()(
     }
   },
 
-  placeEvmBet: async (roomId: string, side: 'moon' | 'jeet', amount: number) => {
-    const { wallet, setTransactionLoading, setTransactionError } = get();
+  placeLimitOrder: async (roomId: string, side: 'buy' | 'sell', outcomeIndex: number, price: number, amount: number) => {
+    const { wallet, addToast } = get();
     if (!wallet || !wallet.address || !wallet.privyWallet) {
-      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet command helmet first!");
+      addToast("WALLET NOT ENLISTED", "error", "Please connect your wallet first!");
       return;
     }
-    
-    setTransactionLoading(true);
-    setTransactionError(null);
-    
-    const roomObj = get().rooms.find((r) => r.id === roomId);
-    const assetSym = roomObj?.token?.symbol || 'UNKNOWN';
-    
-    const toastId = get().addToast(
-      'CHARGING ENEMY LINES',
-      'loading',
-      `Deploying ${amount} USDC on ${side.toUpperCase()} for ${assetSym}...`
-    );
-    
+    const toastId = addToast('SIGNING ORDER', 'loading', `Signing limit ${side} order...`);
     try {
       let provider: any = null;
       if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
@@ -1996,26 +2304,276 @@ export const useAppState = create<AppState>()(
       } else if (typeof (window as any).ethereum !== 'undefined') {
         provider = (window as any).ethereum;
       }
+      if (!provider) throw new Error("No EVM provider found");
       
-      if (!provider) {
-        throw new Error("No EVM provider found on wallet or browser window.");
-      }
-
-      await ensureAvalancheFujiChain(provider);
-
       const evmWalletClient = createWalletClient({
         account: wallet.address as `0x${string}`,
         chain: avalancheFuji,
         transport: custom(provider)
       });
       
-      const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
-      const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
-      const sideVal = side === 'moon' ? 0 : 1;
-      const amountUSDC = BigInt(Math.round(amount * 1e6)); // USDC 6 decimals
+      const domain = {
+        name: 'CTFExchange',
+        version: '1',
+        chainId: avalancheFuji.id,
+        verifyingContract: (process.env.NEXT_PUBLIC_EXCHANGE_CONTRACT || '0x0') as `0x${string}`
+      };
+      const types = {
+        Order: [
+          { name: 'maker', type: 'address' },
+          { name: 'conditionId', type: 'bytes32' },
+          { name: 'outcomeIndex', type: 'uint8' },
+          { name: 'price', type: 'uint256' },
+          { name: 'amount', type: 'uint256' },
+          { name: 'side', type: 'uint8' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'expiration', type: 'uint256' }
+        ]
+      };
+      
+      const nonce = Math.floor(Math.random() * 1e9);
+      const expiration = Math.floor(Date.now() / 1000) + 3600; // 1 hour
+      const orderSide = side === 'buy' ? 0 : 1;
+      
+      const message = {
+        maker: wallet.address as `0x${string}`,
+        conditionId: roomId.startsWith('0x') ? (roomId as `0x${string}`) : `0x${roomId}`,
+        outcomeIndex,
+        price: BigInt(Math.floor(price * 1000000)),
+        amount: BigInt(Math.round(amount * 1e6)),
+        side: orderSide,
+        nonce: BigInt(nonce),
+        expiration: BigInt(expiration)
+      };
+      
+      const signature = await evmWalletClient.signTypedData({
+        account: wallet.address as `0x${string}`,
+        domain,
+        types,
+        primaryType: 'Order',
+        message
+      });
+      
+      const response = await fetch(`${INDEXER_URL}/api/orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          maker: wallet.address,
+          roomPubkey: roomId,
+          outcomeIndex,
+          price: message.price.toString(),
+          amount: message.amount.toString(),
+          side,
+          nonce: message.nonce.toString(),
+          expiration: message.expiration.toString(),
+          signature
+        })
+      });
+      
+      const data = await response.json();
+      if (!data.success) throw new Error(data.error);
+      
+      get().updateToast(toastId, { type: 'success', message: 'LIMIT ORDER PLACED', description: 'Order signed and submitted' });
+      return data;
+    } catch (err: any) {
+      console.error(err);
+      get().updateToast(toastId, { type: 'error', message: 'ORDER FAILED', description: err.message });
+      throw err;
+    }
+  },
 
-      // Ensure USDC allowance for ShitMarketCore contract
+  executeEvmMarketTrade: async (roomId: string, side: 'moon' | 'jeet', amountShares: number, orderType: 'buy' | 'sell', maxUsdcSpentOrMinReceived: number) => {
+    const { wallet, addToast } = get();
+    if (!wallet || !wallet.address || !wallet.privyWallet) {
+      addToast("WALLET NOT ENLISTED", "error", "Please connect your wallet first!");
+      return;
+    }
+    const toastId = addToast('TRANSMITTING SWAP PAYLOAD', 'loading', `Executing Market ${orderType.toUpperCase()} of ${amountShares} shares...`);
+    try {
+      let provider: any = null;
+      if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+        provider = await wallet.privyWallet.getEthereumProvider();
+      } else if (typeof (window as any).ethereum !== 'undefined') {
+        provider = (window as any).ethereum;
+      }
+      if (!provider) throw new Error("No EVM provider found");
+      
+      const evmWalletClient = createWalletClient({
+        account: wallet.address as `0x${string}`,
+        chain: avalancheFuji,
+        transport: custom(provider)
+      });
+
+      const routerAddress = (process.env.NEXT_PUBLIC_PREDICTION_ROUTER_ADDRESS || '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9') as `0x${string}`;
+      const poolFactoryAddress = (process.env.NEXT_PUBLIC_AM_POOL_FACTORY_ADDRESS || '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9') as `0x${string}`;
+      const tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x75537828f2ce51be7289709686A69CbFDbB714F1') as `0x${string}`;
+      const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
+      
+      let poolAddress = await publicClient.readContract({
+        address: poolFactoryAddress,
+        abi: AM_POOL_FACTORY_ABI,
+        functionName: 'getPool',
+        args: [roomId as `0x${string}`]
+      }) as `0x${string}`;
+
+      // Deploy pool if it doesn't exist
+      if (poolAddress === '0x0000000000000000000000000000000000000000') {
+        console.log("No pool exists for this room. Deploying new AMPool on-chain...");
+        const { request: deployPoolReq } = await publicClient.simulateContract({
+          address: poolFactoryAddress,
+          abi: AM_POOL_FACTORY_ABI,
+          functionName: 'createPool',
+          args: [tokensAddress, roomId as `0x${string}`, usdcAddress],
+          account: wallet.address as `0x${string}`
+        });
+        const deployPoolHash = await evmWalletClient.writeContract({
+          ...deployPoolReq,
+          gas: BigInt(1000000)
+        });
+        await publicClient.waitForTransactionReceipt({ hash: deployPoolHash });
+
+        poolAddress = await publicClient.readContract({
+          address: poolFactoryAddress,
+          abi: AM_POOL_FACTORY_ABI,
+          functionName: 'getPool',
+          args: [roomId as `0x${string}`]
+        }) as `0x${string}`;
+      }
+
+      // Fetch matching limit orders from indexer API
+      const response = await fetch(`${INDEXER_URL}/api/orders/book/${roomId}`);
+      const data = await response.json();
+      
+      const makerOrders: any[] = [];
+      const signatures: string[] = [];
+      const fillAmounts: bigint[] = [];
+      
+      const amountSharesScaled = BigInt(Math.round(amountShares * 1e6));
+      const outcomeIndex = side === 'moon' ? 0 : 1;
+
+      if (data.success) {
+        if (orderType === 'buy') {
+          // As a buyer:
+          // 1) Match against asks for outcomeIndex (makers selling YES)
+          // 2) Match against bids for 1 - outcomeIndex (makers buying NO)
+          const asks = data.book.asks.filter((o: any) => o.outcomeIndex === outcomeIndex);
+          const opposingBids = data.book.bids.filter((o: any) => o.outcomeIndex === (1 - outcomeIndex));
+          
+          let sharesToFill = Number(amountSharesScaled);
+
+          // Process asks (sellers)
+          for (const order of asks) {
+            if (sharesToFill <= 0) break;
+            const remaining = Number(order.amount) - Number(order.filledAmount);
+            const fill = Math.min(sharesToFill, remaining);
+            if (fill > 0) {
+              makerOrders.push({
+                maker: order.maker,
+                conditionId: order.roomPubkey.startsWith('0x') ? order.roomPubkey : `0x${order.roomPubkey}`,
+                outcomeIndex: order.outcomeIndex,
+                price: BigInt(order.price),
+                amount: BigInt(order.amount),
+                side: 1, // Side.SELL
+                nonce: BigInt(order.nonce),
+                expiration: BigInt(order.expiration)
+              });
+              signatures.push(order.signature);
+              fillAmounts.push(BigInt(Math.floor(fill)));
+              sharesToFill -= fill;
+            }
+          }
+
+          // Process opposing bids (buyers of other outcome)
+          for (const order of opposingBids) {
+            if (sharesToFill <= 0) break;
+            const remaining = Number(order.amount) - Number(order.filledAmount);
+            const fill = Math.min(sharesToFill, remaining);
+            if (fill > 0) {
+              makerOrders.push({
+                maker: order.maker,
+                conditionId: order.roomPubkey.startsWith('0x') ? order.roomPubkey : `0x${order.roomPubkey}`,
+                outcomeIndex: order.outcomeIndex,
+                price: BigInt(order.price),
+                amount: BigInt(order.amount),
+                side: 0, // Side.BUY
+                nonce: BigInt(order.nonce),
+                expiration: BigInt(order.expiration)
+              });
+              signatures.push(order.signature);
+              fillAmounts.push(BigInt(Math.floor(fill)));
+              sharesToFill -= fill;
+            }
+          }
+        } else {
+          // As a seller:
+          // Match against bids for outcomeIndex (makers buying YES)
+          const bids = data.book.bids.filter((o: any) => o.outcomeIndex === outcomeIndex);
+          
+          let sharesToFill = Number(amountSharesScaled);
+
+          for (const order of bids) {
+            if (sharesToFill <= 0) break;
+            const remaining = Number(order.amount) - Number(order.filledAmount);
+            const fill = Math.min(sharesToFill, remaining);
+            if (fill > 0) {
+              makerOrders.push({
+                maker: order.maker,
+                conditionId: order.roomPubkey.startsWith('0x') ? order.roomPubkey : `0x${order.roomPubkey}`,
+                outcomeIndex: order.outcomeIndex,
+                price: BigInt(order.price),
+                amount: BigInt(order.amount),
+                side: 0, // Side.BUY
+                nonce: BigInt(order.nonce),
+                expiration: BigInt(order.expiration)
+              });
+              signatures.push(order.signature);
+              fillAmounts.push(BigInt(Math.floor(fill)));
+            }
+          }
+        }
+      }
+      // Query AMM reserves to check if liquidity exists
+      let hasAmmLiquidity = false;
       try {
+        const reserve0 = await publicClient.readContract({
+          address: poolAddress,
+          abi: [{
+            name: 'reserves',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: '', type: 'uint256' }],
+            outputs: [{ name: '', type: 'uint256' }]
+          }] as const,
+          functionName: 'reserves',
+          args: [BigInt(0)]
+        }) as bigint;
+        const reserve1 = await publicClient.readContract({
+          address: poolAddress,
+          abi: [{
+            name: 'reserves',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: '', type: 'uint256' }],
+            outputs: [{ name: '', type: 'uint256' }]
+          }] as const,
+          functionName: 'reserves',
+          args: [BigInt(1)]
+        }) as bigint;
+        if (reserve0 > BigInt(0) && reserve1 > BigInt(0)) {
+          hasAmmLiquidity = true;
+        }
+      } catch (err) {
+        console.warn("Failed to read AMM pool reserves:", err);
+      }
+
+      if (makerOrders.length === 0 && !hasAmmLiquidity) {
+        throw new Error("No counterparty liquidity available. There are no active limit orders on the book and the AMM pool has zero reserves. Please place a LIMIT ORDER instead to seed the book.");
+      }
+
+      if (orderType === 'buy') {
+        const maxUsdcSpent = BigInt(Math.round(maxUsdcSpentOrMinReceived * 1e6));
+        
+        // Approve router for USDC
         const allowance = await publicClient.readContract({
           address: usdcAddress,
           abi: [{
@@ -2026,10 +2584,10 @@ export const useAppState = create<AppState>()(
             outputs: [{ name: '', type: 'uint256' }]
           }] as const,
           functionName: 'allowance',
-          args: [wallet.address as `0x${string}`, contractAddress]
+          args: [wallet.address as `0x${string}`, routerAddress]
         });
 
-        if (allowance < amountUSDC) {
+        if (allowance < maxUsdcSpent) {
           const { request: approveReq } = await publicClient.simulateContract({
             address: usdcAddress,
             abi: [{
@@ -2040,95 +2598,287 @@ export const useAppState = create<AppState>()(
               outputs: [{ name: '', type: 'bool' }]
             }] as const,
             functionName: 'approve',
-            args: [contractAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+            args: [routerAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
             account: wallet.address as `0x${string}`
           });
-          const approveHash = await evmWalletClient.writeContract(approveReq);
+          const approveHash = await evmWalletClient.writeContract({
+            ...approveReq,
+            gas: BigInt(100000)
+          });
           await publicClient.waitForTransactionReceipt({ hash: approveHash });
         }
-      } catch (allowanceErr) {
-        console.warn("ERC20 USDC approval check warning:", allowanceErr);
-      }
-      
-      const { request } = await publicClient.simulateContract({
-        address: contractAddress,
-        abi: SHITMARKET_CORE_ABI,
-        functionName: 'placeBet',
-        args: [roomId as `0x${string}`, sideVal, amountUSDC],
-        account: wallet.address as `0x${string}`
-      });
-      
-      const txHash = await evmWalletClient.writeContract(request);
-      console.log("EVM Bet placed! Tx:", txHash);
 
-      try {
+        const { request } = await publicClient.simulateContract({
+          address: routerAddress,
+          abi: PREDICTION_ROUTER_ABI,
+          functionName: 'routeBuyShares',
+          args: [poolAddress, outcomeIndex, amountSharesScaled, maxUsdcSpent, makerOrders, signatures as `0x${string}`[], fillAmounts],
+          account: wallet.address as `0x${string}`
+        });
+
+        const txHash = await evmWalletClient.writeContract({
+          ...request,
+          gas: BigInt(600000)
+        });
         await publicClient.waitForTransactionReceipt({ hash: txHash });
-        await get().fetchBalance();
-        await get().fetchSingleRoom(roomId);
-      } catch (receiptErr) {
-        console.warn("Failed waiting for EVM bet receipt:", receiptErr);
+
+      } else {
+        // Market Sell
+        const minUsdcReceived = BigInt(Math.round(maxUsdcSpentOrMinReceived * 1e6));
+        const amountSharesToSell = amountSharesScaled;
+
+        // Approve router for conditional tokens
+        const isApproved = await publicClient.readContract({
+          address: tokensAddress,
+          abi: CONDITIONAL_TOKENS_ABI,
+          functionName: 'isApprovedForAll',
+          args: [wallet.address as `0x${string}`, routerAddress]
+        }) as boolean;
+
+        if (!isApproved) {
+          const { request: approveReq } = await publicClient.simulateContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'setApprovalForAll',
+            args: [routerAddress, true],
+            account: wallet.address as `0x${string}`
+          });
+          const approveHash = await evmWalletClient.writeContract({
+            ...approveReq,
+            gas: BigInt(100000)
+          });
+          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        }
+
+        const { request } = await publicClient.simulateContract({
+          address: routerAddress,
+          abi: PREDICTION_ROUTER_ABI,
+          functionName: 'routeSellShares',
+          args: [poolAddress, outcomeIndex, amountSharesToSell, minUsdcReceived, makerOrders, signatures as `0x${string}`[], fillAmounts],
+          account: wallet.address as `0x${string}`
+        });
+
+        const txHash = await evmWalletClient.writeContract({
+          ...request,
+          gas: BigInt(600000)
+        });
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
       }
 
-      // Update local user.bets state so locked positions & history render immediately
-      const newBet: Bet = {
-        id: txHash,
-        txSig: txHash,
-        roomId: roomId,
-        user: wallet.address,
-        side: side,
-        amount: amount,
-        timestamp: Date.now(),
-        claimed: false
-      };
-      set((state) => {
-        if (!state.user) return {};
-        const existingBets = state.user.bets || [];
-        const idx = existingBets.findIndex((b) => b.roomId === roomId && b.side === side);
-        let updatedBets;
-        if (idx !== -1) {
-          updatedBets = [...existingBets];
-          updatedBets[idx] = {
-            ...updatedBets[idx],
-            amount: updatedBets[idx].amount + amount
-          };
-        } else {
-          updatedBets = [newBet, ...existingBets];
-        }
-        return {
-          user: {
-            ...state.user,
-            bets: updatedBets
-          }
-        };
-      });
-      
-      // Optimistic bet update
-      get().addActivity({
-        type: 'bet',
-        title: `DEPLOYED ${amount} USDC ON ${side.toUpperCase()}`,
-        message: `You stacked ${amount} USDC on ${side.toUpperCase()} in room ${roomId}.`,
-        link: `/room/${roomId}`
-      });
-      
-      get().updateToast(toastId, {
-        type: 'success',
-        message: 'BATTLE POSITION SECURED',
-        description: `Staked ${amount} USDC on ${side.toUpperCase()}.`,
-        txSig: txHash
-      });
-      
-      return txHash;
+      get().updateToast(toastId, { type: 'success', message: 'MARKET ORDER COMPLETED', description: 'Transaction successfully settled on Avalanche Fuji.' });
+      await get().fetchBalance();
+      await get().fetchSingleRoom(roomId);
     } catch (err: any) {
-      console.error("Failed to place EVM bet:", err);
-      setTransactionError(err.message || String(err));
+      console.error(err);
+      get().updateToast(toastId, { type: 'error', message: 'MARKET ORDER FAILED', description: err.message });
+      throw err;
+    }
+  },
+
+  placeEvmBet: async (roomId: string, side: 'moon' | 'jeet', amount: number) => {
+    const roomObj = get().rooms.find((r) => r.id === roomId);
+    const moonRes = roomObj?.moonPool || 0;
+    const jeetRes = roomObj?.jeetPool || 0;
+    
+    let sharesToBuy = amount * 2;
+    if (moonRes > 0 && jeetRes > 0) {
+      const rTarget = side === 'moon' ? moonRes : jeetRes;
+      const rOpposite = side === 'moon' ? jeetRes : moonRes;
+      const fee = (amount * 30) / 10000;
+      const netUsdc = amount - fee;
+      const k = rTarget * rOpposite;
+      const newOppositeReserve = rOpposite + netUsdc;
+      const newTargetReserve = k / newOppositeReserve;
+      sharesToBuy = rTarget - newTargetReserve;
+    }
+    
+    // Use a 1% slippage buffer for EVM market swaps to allow room for precise CPMM matching
+    const maxUsdcSpent = amount * 1.01;
+    return await get().executeEvmMarketTrade(roomId, side, sharesToBuy, 'buy', maxUsdcSpent);
+  },
+
+  executeImmediateTrade: async (roomId: string, side: 'moon' | 'jeet', amount: number, action: 'buy' | 'sell') => {
+    const { wallet, user, rooms } = get();
+    if (!wallet || !wallet.address) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
+      return;
+    }
+
+    if (amount <= 0) {
+      get().addToast("Invalid amount. Must be greater than 0.", "error");
+      return;
+    }
+
+    const toastId = get().addToast(
+      'TRANSMITTING SWAP PAYLOAD',
+      'loading',
+      `Executing instant swap: ${action.toUpperCase()} ${side.toUpperCase()}...`
+    );
+
+    try {
+      const isEvmRoom = roomId.startsWith('0x');
+      if (isEvmRoom) {
+        // Redirect to new hybrid CLOB + AMM router method
+        await get().executeEvmMarketTrade(roomId, side, amount, action, amount * (action === 'buy' ? 1.05 : 0.95));
+        return;
+      }
+
+      const roomIndex = rooms.findIndex((r) => r.id === roomId);
+      if (roomIndex === -1) {
+        throw new Error("Room sector not found!");
+      }
+
+      const updatedRooms = [...rooms];
+      const room = { ...updatedRooms[roomIndex] };
+
+      // Calculate implied price of selected side using pool ratio with virtual liquidity offset (seed: 10, total offset: 20)
+      const moonPool = room.moonPool || 0;
+      const jeetPool = room.jeetPool || 0;
+      const poolTotal = moonPool + jeetPool;
+      const priceMoon = (moonPool + 10) / (poolTotal + 20);
+      const priceJeet = (jeetPool + 10) / (poolTotal + 20);
+      const price = side === 'moon' ? priceMoon : priceJeet;
+
+      let userBets = user ? [...user.bets] : [];
+      let updatedUser = user ? { ...user } : null;
+
+      if (action === 'buy') {
+        // Buy shares: amount is USDC cost
+        const sharesReceived = amount / price;
+
+        if (updatedUser && updatedUser.balance < amount) {
+          throw new Error("Insufficient AMMO (USDC) balance in platform wallet!");
+        }
+
+        if (updatedUser) {
+          updatedUser.balance -= amount;
+        }
+
+        // Add to room pool
+        if (side === 'moon') {
+          room.moonPool = (room.moonPool || 0) + amount;
+        } else {
+          room.jeetPool = (room.jeetPool || 0) + amount;
+        }
+
+        // Add or update bet record
+        const existingBetIdx = userBets.findIndex(b => b.roomId === roomId && b.side === side && !b.claimed);
+        if (existingBetIdx !== -1) {
+          const existingBet = { ...userBets[existingBetIdx] };
+          const oldShares = existingBet.shares || 0;
+          const oldCost = existingBet.amount;
+          const newShares = oldShares + sharesReceived;
+          const newCost = oldCost + amount;
+
+          existingBet.shares = newShares;
+          existingBet.amount = newCost;
+          existingBet.pricePaid = newCost / newShares;
+          userBets[existingBetIdx] = existingBet;
+        } else {
+          userBets.push({
+            id: 'bet-' + Date.now() + Math.random().toString(36).substring(2, 9),
+            roomId,
+            user: wallet.address,
+            side,
+            amount,
+            claimed: false,
+            timestamp: Date.now(),
+            shares: sharesReceived,
+            pricePaid: price
+          });
+        }
+
+        get().addActivity({
+          type: 'bet',
+          title: `BOUGHT ${sharesReceived.toFixed(0)} MOON SHARES`,
+          message: `Swapped ${amount.toFixed(2)} USDC for ${sharesReceived.toFixed(0)} ${side.toUpperCase()} shares at ${price.toFixed(2)} USDC.`,
+          link: `/room/${roomId}`
+        });
+
+        get().updateToast(toastId, {
+          type: 'success',
+          message: 'SWAP COMPLETED',
+          description: `Acquired ${sharesReceived.toFixed(0)} shares of ${side.toUpperCase()} at ${price.toFixed(2)} USDC.`
+        });
+
+      } else {
+        // Sell shares: amount is shares quantity to liquidate
+        const userShares = userBets.filter(b => b.roomId === roomId && b.side === side && !b.claimed);
+        const ownedShares = userShares.reduce((sum, b) => sum + (b.shares || 0), 0);
+
+        if (ownedShares < amount) {
+          throw new Error("Insufficient active shares to execute sell swap!");
+        }
+
+        const payout = amount * price;
+
+        if (updatedUser) {
+          updatedUser.balance += payout;
+        }
+
+        // Subtract from room pool
+        if (side === 'moon') {
+          room.moonPool = Math.max(0, (room.moonPool || 0) - payout);
+        } else {
+          room.jeetPool = Math.max(0, (room.jeetPool || 0) - payout);
+        }
+
+        // Deduct shares from bet record
+        let remainingToDeduct = amount;
+        userBets = userBets.map((b) => {
+          if (b.roomId === roomId && b.side === side && !b.claimed && (b.shares || 0) > 0 && remainingToDeduct > 0) {
+            const deduct = Math.min(remainingToDeduct, b.shares || 0);
+            remainingToDeduct -= deduct;
+            const newShares = (b.shares || 0) - deduct;
+            const newCost = Math.max(0, b.amount - (deduct * (b.pricePaid || price)));
+            return {
+              ...b,
+              shares: newShares,
+              amount: newCost
+            };
+          }
+          return b;
+        }).filter(b => (b.shares || 0) > 0 || b.amount > 0 || b.claimed);
+
+        get().addActivity({
+          type: 'bet',
+          title: `SOLD ${amount.toFixed(0)} MOON SHARES`,
+          message: `Swapped ${amount.toFixed(0)} ${side.toUpperCase()} shares for ${payout.toFixed(2)} USDC at ${price.toFixed(2)} USDC.`,
+          link: `/room/${roomId}`
+        });
+
+        get().updateToast(toastId, {
+          type: 'success',
+          message: 'SWAP COMPLETED',
+          description: `Liquidated ${amount.toFixed(0)} shares of ${side.toUpperCase()} for ${payout.toFixed(2)} USDC.`
+        });
+      }
+
+      updatedRooms[roomIndex] = room;
+
+      if (updatedUser) {
+        updatedUser.bets = userBets;
+      }
+
+      set({
+        rooms: updatedRooms,
+        user: updatedUser
+      });
+
+      // Persist rooms state
+      savePersistedRooms(updatedRooms);
+
+      // Trigger profile balance refresh
+      await get().fetchBalance();
+
+    } catch (err: any) {
+      console.error("Swap execution failed:", err);
       get().updateToast(toastId, {
         type: 'error',
-        message: 'BATTLE ORDER FLUNKED',
-        description: err.message
+        message: 'SWAP FAILED',
+        description: err.message || String(err)
       });
       throw err;
-    } finally {
-      setTransactionLoading(false);
     }
   },
 
@@ -2168,6 +2918,70 @@ export const useAppState = create<AppState>()(
         transport: custom(provider)
       });
       
+      const isEvmRoom = roomId.startsWith('0x');
+      if (isEvmRoom) {
+        const tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x75537828f2ce51be7289709686A69CbFDbB714F1') as `0x${string}`;
+
+        const tokenId0 = await publicClient.readContract({
+          address: tokensAddress,
+          abi: CONDITIONAL_TOKENS_ABI,
+          functionName: 'getTokenId',
+          args: [roomId as `0x${string}`, BigInt(0)]
+        }) as bigint;
+
+        const tokenId1 = await publicClient.readContract({
+          address: tokensAddress,
+          abi: CONDITIONAL_TOKENS_ABI,
+          functionName: 'getTokenId',
+          args: [roomId as `0x${string}`, BigInt(1)]
+        }) as bigint;
+
+        const balance0 = await publicClient.readContract({
+          address: tokensAddress,
+          abi: CONDITIONAL_TOKENS_ABI,
+          functionName: 'balanceOf',
+          args: [wallet.address as `0x${string}`, tokenId0]
+        }) as bigint;
+
+        const balance1 = await publicClient.readContract({
+          address: tokensAddress,
+          abi: CONDITIONAL_TOKENS_ABI,
+          functionName: 'balanceOf',
+          args: [wallet.address as `0x${string}`, tokenId1]
+        }) as bigint;
+
+        const redeemAmount = balance0 > balance1 ? balance0 : balance1;
+        if (redeemAmount === BigInt(0)) {
+          throw new Error("No winning position outcome shares found to redeem in this market.");
+        }
+
+        const { request } = await publicClient.simulateContract({
+          address: tokensAddress,
+          abi: CONDITIONAL_TOKENS_ABI,
+          functionName: 'redeemPositions',
+          args: [roomId as `0x${string}`, redeemAmount],
+          account: wallet.address as `0x${string}`
+        });
+
+        const txHash = await evmWalletClient.writeContract({
+          ...request,
+          gas: BigInt(500000)
+        });
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        console.log("EVM Conditional Token redemption submitted! Tx:", txHash);
+
+        get().updateToast(toastId, {
+          type: 'success',
+          message: 'SPOILS SECURED',
+          description: `Successfully claimed on-chain outcome USDC payouts.`,
+          txSig: txHash
+        });
+
+        await get().fetchBalance();
+        await get().fetchSingleRoom(roomId);
+        return txHash;
+      }
+
       const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
       
       try {
@@ -2187,7 +3001,10 @@ export const useAppState = create<AppState>()(
         account: wallet.address as `0x${string}`
       });
       
-      const txHash = await evmWalletClient.writeContract(request);
+      const txHash = await evmWalletClient.writeContract({
+        ...request,
+        gas: BigInt(500000)
+      });
       console.log("EVM Claim submitted! Tx:", txHash);
       
       get().updateToast(toastId, {
@@ -3152,14 +3969,15 @@ export const useAppState = create<AppState>()(
             read: a.read,
             timestamp: a.timestamp,
           }));
+          const decimalsForStats = address.startsWith('0x') ? 1e6 : 1e9;
           stats = {
             totalBets: json.data.totalBets || 0,
             wins: json.data.wins || 0,
             losses: json.data.losses || 0,
-            profit: Number(json.data.profit || 0) / 1e9,
+            profit: Number(json.data.profit || 0) / decimalsForStats,
             winStreak: json.data.winStreak || 0,
             longestWinStreak: json.data.longestWinStreak || 0,
-            biggestBet: Number(json.data.biggestBet || 0) / 1e9,
+            biggestBet: Number(json.data.biggestBet || 0) / decimalsForStats,
           };
           bets = (json.data.bets || []).map((b: any) => ({
             id: b.id,

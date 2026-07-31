@@ -16,6 +16,8 @@ async function main() {
     const providerFuji = new ethers.JsonRpcProvider('https://api.avax-test.network/ext/bc/C/rpc');
     const walletFuji = new ethers.Wallet(pk, providerFuji);
     const nonceFuji = await providerFuji.getTransactionCount(walletFuji.address);
+    const balanceFuji = await providerFuji.getBalance(walletFuji.address);
+    console.log(`Fuji - Balance: ${ethers.formatEther(balanceFuji)} AVAX`);
     console.log(`Fuji - Nonce: ${nonceFuji}`);
 }
 

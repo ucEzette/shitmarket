@@ -221,19 +221,19 @@ export default function ProfilePage() {
   const winRate = stats.totalBets > 0 ? ((stats.wins / stats.totalBets) * 100).toFixed(0) : '0';
 
   return (
-    <div className="mx-auto max-w-5xl w-full px-4 py-8 flex-1 flex flex-col select-none">
+    <div className="mx-auto max-w-5xl w-full px-4 py-8 flex-1 flex flex-col select-none text-slate-800 dark:text-white transition-colors duration-200">
       
       {/* 1. DISCONNECTED OVERLAY CARD */}
       {!walletConnected ? (
-        <div className="bg-trench-mud p-8 border-4 border-dashed border-trench-sandbag rounded-lg shadow-2xl text-center max-w-xl mx-auto py-16 scanlines">
+        <div className="bg-white dark:bg-trench-mud p-8 border-2 border-cyan-200 dark:border-4 dark:border-dashed dark:border-trench-sandbag rounded-2xl shadow-xl dark:shadow-2xl text-center max-w-xl mx-auto py-16 dark:scanlines text-slate-800 dark:text-white">
           <div className="relative mb-6 flex justify-center">
-            <div className="absolute inset-0 bg-jeet-red/10 rounded-full blur-xl animate-pulse" />
+            <div className="absolute inset-0 bg-red-500/10 dark:bg-jeet-red/10 rounded-full blur-xl animate-pulse" />
             <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={120} glowColor="jeet" animated className="rounded-xl relative z-10" />
           </div>
-          <h2 className="font-staatliches text-4xl text-white tracking-wider uppercase mb-2">
+          <h2 className="font-staatliches text-4xl text-[#0A1A2A] dark:text-white tracking-wider uppercase mb-2">
             TRENCH PASS SIGN IN
           </h2>
-          <p className="font-mono text-xs text-trench-gasmask uppercase max-w-md mx-auto leading-relaxed mb-8 font-bold">
+          <p className="font-mono text-xs text-slate-600 dark:text-trench-gasmask uppercase max-w-md mx-auto leading-relaxed mb-8 font-bold">
             Secure a military soldier ID to record your predictive victories, track win ratios, unlock iron badges, and manage your ammunition SOL.
           </p>
           <button
@@ -241,7 +241,7 @@ export default function ProfilePage() {
               connectWallet();
               synthSound('bet');
             }}
-            className="w-full max-w-xs py-4 font-staatliches text-2xl uppercase tracking-wider text-white bg-jeet-red hover:bg-red-700 rounded border-b-4 border-red-950 shadow-glow-jeet active:translate-y-1 transition-all flex items-center justify-center gap-2"
+            className="w-full max-w-xs py-4 font-staatliches text-2xl uppercase tracking-wider text-white bg-[#C62828] dark:bg-jeet-red hover:bg-[#B71C1C] dark:hover:bg-red-700 rounded-lg shadow-md dark:shadow-glow-jeet active:translate-y-0.5 transition-all flex items-center justify-center gap-2"
           >
             <PepePortrait src={PEPE_ASSETS.neonWojak} size={28} className="rounded-full" />
             <span>DEPLOY SANDBOX PASSPORT</span>
@@ -254,32 +254,31 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
             
             {/* Left Column: Soldier Passport ID Card (5 cols) */}
-            <div className="lg:col-span-5 bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 flex flex-col justify-between relative shadow-lg scanlines">
-              {/* Clipboard corner details */}
-              <div className="absolute top-2 right-2 font-mono text-[8px] text-trench-gasmask/50 uppercase font-bold flex items-center gap-2">
-                HQ-DOCS #8420-AA
-                <button onClick={() => { setIsEditing(!isEditing); setEditError(''); }} className="text-neon-moon hover:text-white transition-colors bg-neon-moon/10 px-1.5 py-0.5 rounded flex items-center gap-1 border border-neon-moon/30">
-                  {isEditing ? <X size={10} /> : <Edit2 size={10} />} {isEditing ? 'CANCEL' : 'EDIT'}
+            <div className="lg:col-span-5 bg-white dark:bg-trench-mud border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-2xl p-6 flex flex-col justify-between relative shadow-md dark:shadow-lg dark:scanlines text-slate-800 dark:text-white">
+              {/* Top Edit Button */}
+              <div className="absolute top-3 right-3 flex items-center gap-2">
+                <button onClick={() => { setIsEditing(!isEditing); setEditError(''); }} className="text-[#00796B] dark:text-neon-moon hover:text-slate-900 dark:hover:text-white transition-colors bg-teal-50 dark:bg-neon-moon/10 px-2 py-1 rounded-lg flex items-center gap-1 border border-[#00796B]/30 dark:border-neon-moon/30 font-mono text-xs font-bold">
+                  {isEditing ? <X size={12} /> : <Edit2 size={12} />} {isEditing ? 'CANCEL' : 'EDIT'}
                 </button>
               </div>
 
               <div>
-                <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
+                <h3 className="font-staatliches text-2xl text-[#0A1A2A] dark:text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
                   <PixelCrackedHelmet size={20} />
-                  SOLDIER PORTRAIT
+                  TRADER PROFILE
                 </h3>
 
                 {/* Passport Card details */}
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col sm:flex-row gap-4 items-center sm:items-start text-center sm:text-left">
-                    <div className={`w-28 h-28 bg-gradient-to-br ${getAvatarBg()} border-4 border-trench-sandbag rounded flex items-center justify-center relative shadow-inner overflow-hidden shrink-0 group`}>
+                    <div className={`w-28 h-28 bg-gradient-to-br ${getAvatarBg()} border-4 border-cyan-200 dark:border-trench-sandbag rounded-xl flex items-center justify-center relative shadow-inner overflow-hidden shrink-0 group`}>
                       <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.35)_50%)] bg-[size:100%_4px] pointer-events-none z-10" />
                       <img src={isEditing ? (editAvatar || PEPE_ASSETS.fewUnderstand) : (user.avatarUrl || PEPE_ASSETS.chadBull)} alt="Commander Avatar" className="w-full h-full object-cover relative z-0 group-hover:scale-110 transition-transform duration-300" />
                     </div>
 
                     <div className="space-y-2 flex-1 min-w-0 w-full flex flex-col items-center sm:items-start">
-                      <span className="font-mono text-[9px] text-neon-moon font-bold bg-neon-moon/10 px-2 py-0.5 border border-neon-moon/30 rounded uppercase tracking-wider inline-block">
-                        COMMAND SQUAD ACTIVE
+                      <span className="font-mono text-[9px] text-[#00796B] dark:text-neon-moon font-bold bg-teal-50 dark:bg-neon-moon/10 px-2 py-0.5 border border-[#00796B]/30 dark:border-neon-moon/30 rounded uppercase tracking-wider inline-block">
+                        ACTIVE TRADER
                       </span>
                       {isEditing ? (
                         <input
@@ -287,19 +286,19 @@ export default function ProfilePage() {
                           value={editUsername}
                           onChange={(e) => setEditUsername(e.target.value)}
                           maxLength={30}
-                          placeholder="ENTER CALLSIGN"
-                          className="w-full bg-trench-black border border-trench-sandbag text-white font-staatliches text-xl px-2 py-1 outline-none focus:border-neon-moon mt-1 text-center sm:text-left"
+                          placeholder="ENTER USERNAME"
+                          className="w-full bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag text-slate-900 dark:text-white font-staatliches text-xl px-2 py-1 outline-none focus:border-[#00796B] dark:focus:border-neon-moon mt-1 text-center sm:text-left rounded-lg"
                         />
                       ) : (
-                        <h4 className="font-staatliches text-2xl text-white tracking-wide truncate leading-none mt-1 w-full text-center sm:text-left" title={user.username || `COMMANDER_${user.wallet!.substring(0, 6)}`}>
-                          {user.username || `COMMANDER_${user.wallet!.substring(0, 6)}`}
+                        <h4 className="font-staatliches text-2xl text-[#0A1A2A] dark:text-white tracking-wide truncate leading-none mt-1 w-full text-center sm:text-left" title={user.username || `TRADER_${user.wallet!.substring(0, 6)}`}>
+                          {user.username || `TRADER_${user.wallet!.substring(0, 6)}`}
                         </h4>
                       )}
-                      <p className="font-mono text-[10px] text-trench-gasmask truncate uppercase leading-tight font-bold w-full text-center sm:text-left">
+                      <p className="font-mono text-[10px] text-slate-500 dark:text-trench-gasmask truncate uppercase leading-tight font-bold w-full text-center sm:text-left">
                         {user.wallet}
                       </p>
-                      <p className="font-mono text-xs text-moon-gold font-bold w-full text-center sm:text-left">
-                        Balance: {user.balance.toFixed(2)} Ammo {currencyLabel}
+                      <p className="font-mono text-xs text-amber-700 dark:text-moon-gold font-bold w-full text-center sm:text-left">
+                        Balance: {user.balance.toFixed(2)} {currencyLabel}
                       </p>
                     </div>
                   </div>
@@ -319,28 +318,26 @@ export default function ProfilePage() {
                           </div>
                           
                           <div className="mt-3 flex items-center gap-3">
-                            <label className="flex-1 cursor-pointer bg-trench-black hover:bg-[#1a1c23] border border-dashed border-trench-sandbag text-trench-gasmask hover:text-white font-mono text-[10px] uppercase font-bold py-2 text-center rounded transition-colors flex justify-center items-center gap-2">
+                            <label className="flex-1 cursor-pointer bg-[#0A0E17] hover:bg-[#1a1c23] border border-dashed border-gray-700 text-gray-300 font-mono text-[10px] uppercase font-bold py-2 text-center rounded-lg transition-colors flex justify-center items-center gap-2">
                               <Camera size={14} /> UPLOAD CUSTOM AVI
                               <input type="file" accept="image/png, image/jpeg, image/gif, image/webp" className="hidden" onChange={handleFileUpload} />
                             </label>
                           </div>
 
                           {editError && (
-                            <div className="mt-3 font-mono text-[11px] text-jeet-red bg-trench-black border-2 border-jeet-red p-3 rounded shadow-[0_0_12px_rgba(255,7,58,0.25)] text-left relative overflow-hidden scanlines">
-                              <div className="absolute top-0 left-0 right-0 h-[2px] bg-jeet-red/35" />
-                              <div className="flex items-center gap-2 text-jeet-red font-bold mb-1.5 uppercase tracking-widest text-[10px]">
+                            <div className="mt-3 font-mono text-[11px] text-red-600 bg-red-50 dark:bg-black border border-red-300 dark:border-jeet-red p-3 rounded-lg text-left relative overflow-hidden">
+                              <div className="flex items-center gap-2 text-red-600 font-bold mb-1 uppercase tracking-widest text-[10px]">
                                 <AlertTriangle size={12} className="animate-pulse shrink-0" />
-                                <span>[COMMAND_ERROR] ACCESS DENIED</span>
+                                <span>UPDATE FAILED</span>
                               </div>
-                              <div className="text-white/90 uppercase leading-relaxed font-bold">
-                                &gt; ERROR: {editError}
-                                <span className="animate-pulse">_</span>
+                              <div className="text-slate-800 dark:text-white/90 uppercase leading-relaxed font-bold">
+                                ERROR: {editError}
                               </div>
                             </div>
                           )}
 
-                          <button onClick={handleSaveProfile} disabled={isSaving} className="mt-4 w-full bg-neon-moon/20 hover:bg-neon-moon/40 border border-neon-moon text-neon-moon py-2 font-staatliches text-lg uppercase tracking-wider rounded transition-all flex items-center justify-center gap-2">
-                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} SAVE RECRUIT ID
+                          <button onClick={handleSaveProfile} disabled={isSaving} className="mt-4 w-full bg-[#00796B] dark:bg-neon-moon/20 hover:bg-[#004D40] dark:hover:bg-neon-moon/40 border border-[#00796B] dark:border-neon-moon text-white dark:text-neon-moon py-2.5 font-staatliches text-lg uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 font-bold shadow-md">
+                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} SAVE PROFILE
                           </button>
                         </div>
                       </motion.div>
@@ -348,11 +345,11 @@ export default function ProfilePage() {
                   </AnimatePresence>
                 </div>
 
-                {/* Gritty Rating Badge with ELO */}
-                <div className="mt-8 bg-trench-black border-2 border-trench-sandbag p-4 rounded flex items-center justify-between gap-4 shadow-inner">
+                {/* Rating Badge with ELO */}
+                <div className="mt-8 bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag p-4 rounded-xl flex items-center justify-between gap-4 shadow-inner">
                   <div>
-                    <span className="font-staatliches text-lg text-white tracking-wide block uppercase leading-none">
-                      TRENCH CLASSIFICATION
+                    <span className="font-staatliches text-lg text-slate-900 dark:text-white tracking-wide block uppercase leading-none">
+                      TRADER RATING
                     </span>
                     <span className={`font-mono text-[10px] ${userClass.color} uppercase font-bold`}>
                       {userClass.label} — ELO {userElo}
@@ -363,17 +360,16 @@ export default function ProfilePage() {
                       <span className={`font-staatliches text-xl ${userClass.color} block leading-tight`}>
                         {userElo}
                       </span>
-                      <span className="font-mono text-[7px] text-trench-gasmask uppercase font-bold leading-tight">
+                      <span className="font-mono text-[7px] text-slate-500 dark:text-trench-gasmask uppercase font-bold leading-tight">
                         ELO
                       </span>
                     </div>
-                    <div className="bg-trench-mud border-4 border-trench-sandbag rounded p-1.5 h-16 w-16 flex flex-col items-center justify-center relative">
-                      <span className="absolute inset-0 border border-black/40 rounded-sm pointer-events-none" />
-                      <span className={`font-staatliches text-3xl ${userClass.color} leading-none font-black shadow-inner`}>
+                    <div className="bg-white dark:bg-trench-mud border-2 border-cyan-200 dark:border-trench-sandbag rounded-xl p-1.5 h-14 w-14 flex flex-col items-center justify-center relative">
+                      <span className={`font-staatliches text-2xl ${userClass.color} leading-none font-black`}>
                         {user.trenchScore}
                       </span>
-                      <span className="font-mono text-[7px] text-trench-gasmask uppercase font-bold leading-none -mt-0.5">
-                        CLASS
+                      <span className="font-mono text-[7px] text-slate-500 dark:text-trench-gasmask uppercase font-bold leading-none">
+                        RANK
                       </span>
                     </div>
                   </div>
@@ -381,71 +377,66 @@ export default function ProfilePage() {
 
               </div>
 
-              <div className="mt-6 border-t border-trench-sandbag/40 pt-4 text-center">
-                <span className="font-mono text-[9px] text-trench-gasmask uppercase font-bold tracking-widest block">
-                  FRONT PASS APPROVED FOR PvP ARENA
-                </span>
-              </div>
             </div>
 
             {/* Right Column: Statistics Grid (7 cols) */}
-            <div className="lg:col-span-7 bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 flex flex-col justify-between relative shadow-lg scanlines">
+            <div className="lg:col-span-7 bg-white dark:bg-trench-mud border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-2xl p-6 flex flex-col justify-between relative shadow-md dark:shadow-lg dark:scanlines text-slate-800 dark:text-white">
               
               <div>
-                <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
-                  <Award className="text-moon-gold" />
-                  COMBAT ENGAGEMENT REPORT
+                <h3 className="font-staatliches text-2xl text-[#0A1A2A] dark:text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
+                  <Award className="text-amber-600 dark:text-moon-gold" />
+                  PERFORMANCE STATS
                 </h3>
 
                 {/* Grid of stats */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   
-                  <div className="bg-trench-black border border-trench-sandbag rounded p-3 text-center">
-                    <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">TOTAL BATTLES</span>
-                    <span className="font-staatliches text-2xl text-white block">{stats.totalBets}</span>
+                  <div className="bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded-xl p-3 text-center">
+                    <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask uppercase font-bold block">TOTAL BETS</span>
+                    <span className="font-staatliches text-2xl text-slate-900 dark:text-white block">{stats.totalBets}</span>
                   </div>
 
-                  <div className="bg-trench-black border border-trench-sandbag rounded p-3 text-center">
-                    <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">TACTICAL WINS</span>
-                    <span className="font-staatliches text-2xl text-neon-moon block glow-moon">{stats.wins}</span>
+                  <div className="bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded-xl p-3 text-center">
+                    <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask uppercase font-bold block">WINS</span>
+                    <span className="font-staatliches text-2xl text-[#00796B] dark:text-neon-moon block dark:glow-moon font-bold">{stats.wins}</span>
                   </div>
 
-                  <div className="bg-trench-black border border-trench-sandbag rounded p-3 text-center">
-                    <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">WAR DEFEATS</span>
-                    <span className="font-staatliches text-2xl text-jeet-red block glow-jeet">{stats.losses}</span>
+                  <div className="bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded-xl p-3 text-center">
+                    <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask uppercase font-bold block">LOSSES</span>
+                    <span className="font-staatliches text-2xl text-[#C62828] dark:text-jeet-red block dark:glow-jeet font-bold">{stats.losses}</span>
                   </div>
 
-                  <div className="bg-trench-black border border-trench-sandbag rounded p-3 text-center">
-                    <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">ACCURACY RATE</span>
-                    <span className="font-staatliches text-2xl text-white block">{winRate}%</span>
+                  <div className="bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded-xl p-3 text-center">
+                    <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask uppercase font-bold block">WIN RATE</span>
+                    <span className="font-staatliches text-2xl text-slate-900 dark:text-white block">{winRate}%</span>
                   </div>
 
-                  <div className="bg-trench-black border border-trench-sandbag rounded p-3 text-center">
-                    <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">CUMULATIVE PROFIT</span>
-                    <span className={`font-staatliches text-2xl block ${stats.profit >= 0 ? 'text-neon-moon glow-moon' : 'text-jeet-red glow-jeet'}`}>
+                  <div className="bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded-xl p-3 text-center">
+                    <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask uppercase font-bold block">NET PROFIT</span>
+                    <span className={`font-staatliches text-2xl block font-bold ${stats.profit >= 0 ? 'text-[#00796B] dark:text-neon-moon dark:glow-moon' : 'text-[#C62828] dark:text-jeet-red dark:glow-jeet'}`}>
                       {stats.profit >= 0 ? '+' : ''}{stats.profit.toFixed(2)} {currencyLabel}
                     </span>
                   </div>
 
-                  <div className="bg-trench-black border border-trench-sandbag rounded p-3 text-center">
-                    <span className="font-mono text-[8px] text-trench-gasmask uppercase font-bold block">MAX AMMO LOADED</span>
-                    <span className="font-staatliches text-2xl text-moon-gold block glow-gold">{stats.biggestBet.toFixed(2)} {currencyLabel}</span>
+                  <div className="bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded-xl p-3 text-center">
+                    <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask uppercase font-bold block">BIGGEST BET</span>
+                    <span className="font-staatliches text-2xl text-amber-700 dark:text-moon-gold block font-bold">{stats.biggestBet.toFixed(2)} {currencyLabel}</span>
                   </div>
 
                 </div>
 
                 {/* Win streak tracker */}
-                <div className="mt-6 bg-trench-black border border-trench-sandbag rounded p-3.5 flex justify-around items-center">
+                <div className="mt-6 bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded-xl p-3.5 flex justify-around items-center">
                   <div className="text-center">
-                    <span className="font-mono text-[8px] text-trench-gasmask block uppercase font-bold">CURRENT STREAK</span>
-                    <span className="font-staatliches text-xl text-neon-moon block glow-moon">
+                    <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask block uppercase font-bold">CURRENT STREAK</span>
+                    <span className="font-staatliches text-xl text-[#00796B] dark:text-neon-moon block font-bold">
                       {stats.winStreak} WINS
                     </span>
                   </div>
-                  <div className="h-8 w-px bg-trench-sandbag" />
+                  <div className="h-8 w-px bg-cyan-200 dark:bg-trench-sandbag" />
                   <div className="text-center">
-                    <span className="font-mono text-[8px] text-trench-gasmask block uppercase font-bold">LONGEST WIN STREAK</span>
-                    <span className="font-staatliches text-xl text-moon-gold block glow-gold">
+                    <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask block uppercase font-bold">LONGEST WIN STREAK</span>
+                    <span className="font-staatliches text-xl text-amber-700 dark:text-moon-gold block font-bold">
                       {stats.longestWinStreak} WINS
                     </span>
                   </div>
@@ -453,10 +444,10 @@ export default function ProfilePage() {
 
               </div>
 
-              <div className="mt-6 flex items-center gap-2 p-2.5 bg-yellow-500/5 border border-yellow-500/20 rounded text-trench-gasmask">
-                <ShieldCheck size={16} className="text-moon-gold" />
-                <p className="font-mono text-[8px] uppercase leading-tight font-bold">
-                  Passport authenticated on chain sandbox node. Operational logs are backed up via decentral secure storage.
+              <div className="mt-6 flex items-center gap-2 p-3 bg-cyan-50 dark:bg-yellow-500/5 border border-cyan-200 dark:border-yellow-500/20 rounded-xl text-slate-600 dark:text-trench-gasmask">
+                <ShieldCheck size={16} className="text-[#00796B] dark:text-moon-gold shrink-0" />
+                <p className="font-mono text-[9px] uppercase leading-tight font-bold">
+                  Authenticated on-chain. Activity logs and balances synced live with network nodes.
                 </p>
               </div>
 
@@ -464,11 +455,11 @@ export default function ProfilePage() {
 
           </div>
 
-          {/* 3. ACHIEVEMENT MEDALS (Row of custom pixel art medals) */}
-          <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 relative shadow-lg scanlines">
-            <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
-              <Award className="text-moon-gold animate-bounce" />
-              FRONT LINE CAMPAIGN MEDALS
+          {/* 3. ACHIEVEMENT BADGES */}
+          <div className="bg-white dark:bg-trench-mud border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-2xl p-6 relative shadow-md dark:shadow-lg dark:scanlines text-slate-800 dark:text-white">
+            <h3 className="font-staatliches text-2xl text-[#0A1A2A] dark:text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
+              <Award className="text-amber-600 dark:text-moon-gold animate-bounce" />
+              ACHIEVEMENT BADGES
             </h3>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
@@ -533,10 +524,10 @@ export default function ProfilePage() {
           </div>
 
           {/* 4. RECENT BET HISTORY */}
-          <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 relative shadow-lg scanlines">
-            <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
-              <Zap className="text-neon-moon animate-pulse" />
-              BATTLE LOGS
+          <div className="bg-white dark:bg-trench-mud border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-2xl p-6 relative shadow-md dark:shadow-lg dark:scanlines text-slate-800 dark:text-white">
+            <h3 className="font-staatliches text-2xl text-[#0A1A2A] dark:text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
+              <Zap className="text-[#00796B] dark:text-neon-moon" />
+              BET HISTORY
             </h3>
 
             {user.bets.length > 0 ? (
@@ -663,26 +654,26 @@ export default function ProfilePage() {
             )}
           </div>
 
-          {/* 5. TRENCH REFERRAL HQ */}
-          <div className="bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 relative shadow-lg scanlines mt-8">
-            <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
-              <Users className="text-neon-moon animate-pulse" />
-              TRENCH REFERRAL HQ
+          {/* 5. REFERRAL PROGRAM */}
+          <div className="bg-white dark:bg-trench-mud border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-2xl p-6 relative shadow-md dark:shadow-lg dark:scanlines text-slate-800 dark:text-white mt-8">
+            <h3 className="font-staatliches text-2xl text-[#0A1A2A] dark:text-white tracking-wider mb-6 flex items-center gap-1.5 uppercase">
+              <Users className="text-[#00796B] dark:text-neon-moon" />
+              REFERRAL PROGRAM
             </h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Left side: Link and Metrics */}
               <div className="space-y-6">
-                <div className={`bg-trench-black border rounded p-5 shadow-inner relative overflow-hidden transition-all duration-300 ${
+                <div className={`bg-cyan-50 dark:bg-trench-black border rounded-xl p-5 shadow-inner relative overflow-hidden transition-all duration-300 ${
                   copiedLink 
-                    ? 'border-neon-moon bg-neon-moon/5 shadow-[0_0_20px_rgba(57,255,20,0.2)]' 
-                    : 'border-trench-sandbag'
+                    ? 'border-[#00796B] dark:border-neon-moon bg-teal-50 dark:bg-neon-moon/5 shadow-xs' 
+                    : 'border-cyan-200 dark:border-trench-sandbag'
                 }`}>
                   <div className="absolute top-0 right-0 p-2 opacity-10">
                     <Users size={64} />
                   </div>
-                  <span className="font-mono text-[10px] text-trench-gasmask block uppercase font-bold mb-2">
-                    YOUR UNIQUE INVITATION CODE
+                  <span className="font-mono text-[10px] text-slate-500 dark:text-trench-gasmask block uppercase font-bold mb-2">
+                    YOUR REFERRAL LINK
                   </span>
                   
                   <div className="flex flex-col sm:flex-row gap-3">

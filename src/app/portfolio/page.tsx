@@ -6,7 +6,7 @@ import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } f
 import { synthSound } from '@/components/ClientWrapper';
 import { 
   Briefcase, TrendingUp, TrendingDown, ExternalLink, Clock, ArrowUpRight, 
-  Activity, Check, Copy, Award, Zap, Coins, Users, Radio, X, Loader2, ArrowRight 
+  Activity, Check, Copy, Award, Zap, Coins, Users, Radio, X, Loader2, ArrowRight, Wallet 
 } from 'lucide-react';
 import Link from 'next/link';
 import PortfolioWallets from './PortfolioWallets';
@@ -556,9 +556,9 @@ export default function PortfolioPage() {
             PORTFOLIO WALLETS
           </h2>
           <div className="flex items-center gap-2 mt-1">
-            <span className="w-2 h-2 rounded-full bg-neon-moon animate-pulse" />
-            <span className="font-mono text-[10px] text-trench-gasmask uppercase font-bold tracking-widest">
-              TELEMETRY DESK // COMMAND SECTOR
+            <span className="w-2 h-2 rounded-full bg-[#00796B] dark:bg-neon-moon animate-pulse" />
+            <span className="font-mono text-[10px] text-slate-500 dark:text-trench-gasmask uppercase font-bold tracking-widest">
+              PORTFOLIO OVERVIEW
             </span>
           </div>
         </div>
@@ -592,10 +592,11 @@ export default function PortfolioPage() {
           {/* Wallet Address Chip */}
           <button 
             onClick={handleCopyWallet}
-            className="flex items-center gap-2 px-3 py-1.5 bg-trench-mud border border-trench-sandbag rounded font-mono text-[10px] text-white font-bold hover:border-white transition-colors cursor-pointer select-none"
+            className="flex items-center gap-2 px-3 py-1.5 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag rounded-xl font-mono text-[10px] text-slate-800 dark:text-white font-bold hover:border-[#00796B] dark:hover:border-white transition-colors cursor-pointer select-none"
           >
-            <span>💳 {user.wallet.slice(0, 6)}...{user.wallet.slice(-4)}</span>
-            {copiedWallet ? <Check size={10} className="text-neon-moon" /> : <Copy size={10} className="text-trench-gasmask" />}
+            <Wallet size={12} className="text-[#00796B] dark:text-neon-moon" />
+            <span>{user.wallet.slice(0, 6)}...{user.wallet.slice(-4)}</span>
+            {copiedWallet ? <Check size={10} className="text-[#00796B] dark:text-neon-moon" /> : <Copy size={10} className="text-slate-400 dark:text-trench-gasmask" />}
           </button>
         </div>
       </div>

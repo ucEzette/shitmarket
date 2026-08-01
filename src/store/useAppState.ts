@@ -281,6 +281,16 @@ export const AM_POOL_FACTORY_ABI = [
     stateMutability: 'view',
     inputs: [{ name: 'conditionId', type: 'bytes32' }],
     outputs: [{ name: '', type: 'address' }]
+  },
+  {
+    name: 'PoolCreated',
+    type: 'event',
+    inputs: [
+      { name: 'conditionId', type: 'bytes32', indexed: true },
+      { name: 'poolAddress', type: 'address', indexed: true },
+      { name: 'conditionalTokens', type: 'address', indexed: true },
+      { name: 'poolIndex', type: 'uint256', indexed: false }
+    ]
   }
 ] as const;
 
@@ -297,6 +307,20 @@ export const AM_POOL_ABI = [
     type: 'function',
     stateMutability: 'nonpayable',
     inputs: [{ name: 'lpAmount', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'buyShares',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'outcomeIndex', type: 'uint8' }, { name: 'usdcAmount', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'sellShares',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'outcomeIndex', type: 'uint8' }, { name: 'shareAmount', type: 'uint256' }],
     outputs: [{ name: '', type: 'uint256' }]
   },
   {
@@ -696,8 +720,7 @@ export const mapApiRoom = (apiRoom: any): Room => {
   const cleanedAddress = cleanEvmAddress(rawAddress);
   // openingPrice is stored as BigInt scaled by 1e12 in the DB
   const rawOP = apiRoom.openingPrice ? Number(apiRoom.openingPrice) : 0;
-  // If the value is > 1e8, it's stored in 1e12 scale; otherwise it's already in 1e6 scale
-  const openingPriceNum = rawOP > 0 ? (rawOP > 1e8 ? rawOP / 1e12 : rawOP / 1e6) : undefined;
+  const openingPriceNum = rawOP > 0 ? rawOP / 1e12 : undefined;
 
   return {
     id: apiRoom.roomPubkey,
@@ -1316,14 +1339,14 @@ export const useAppState = create<AppState>()(
                     pairAddress: current?.token?.pairAddress || '',
                   },
                   creator: onChain.creator,
-                  moonPool: Number(onChain.moonPool) / 1e6,
-                  jeetPool: Number(onChain.jeetPool) / 1e6,
+                  moonPool: (current?.moonPool !== undefined && current.moonPool >= 0) ? current.moonPool : Number(onChain.moonPool) / 1e6,
+                  jeetPool: (current?.jeetPool !== undefined && current.jeetPool >= 0) ? current.jeetPool : Number(onChain.jeetPool) / 1e6,
                   expiry: Number(onChain.expiryTimestamp) * 1000,
                   status: statusStr,
                   winner: winnerStr,
                   createdAt: Number(onChain.openingTimestamp) * 1000,
                   duration: Number(onChain.durationMinutes),
-                  openingPrice: Number(onChain.openingPrice) === 0 ? undefined : Number(onChain.openingPrice) / 1e6,
+                  openingPrice: Number(onChain.openingPrice) === 0 ? undefined : Number(onChain.openingPrice) / 1e12,
                   finalPrice: Number(onChain.finalPrice) === 0 ? undefined : Number(onChain.finalPrice) / 1e6,
                   twapFinalPrice: Number(onChain.twapFinalPrice) === 0 ? undefined : Number(onChain.twapFinalPrice) / 1e6,
                   lastSyncedAt: Date.now(),
@@ -1642,6 +1665,50 @@ export const useAppState = create<AppState>()(
         const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
         const resolutionTime = BigInt(Math.floor(room.expiry / 1000));
         
+        // Check allowance for MarketFactory creation fee (5 USDC)
+        try {
+          const factoryAllowance = await publicClient.readContract({
+            address: usdcAddress,
+            abi: [{
+              name: 'allowance',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+              outputs: [{ name: '', type: 'uint256' }]
+            }] as const,
+            functionName: 'allowance',
+            args: [wallet.address as `0x${string}`, marketFactoryAddress]
+          });
+
+          if (factoryAllowance < BigInt(5_000_000)) {
+            get().updateToast(toastId, {
+              type: 'loading',
+              message: 'APPROVING CREATION FEE',
+              description: `Approving USDC creation fee to Market Factory...`
+            });
+            const { request: approveFactoryReq } = await publicClient.simulateContract({
+              address: usdcAddress,
+              abi: [{
+                name: 'approve',
+                type: 'function',
+                stateMutability: 'nonpayable',
+                inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
+                outputs: [{ name: '', type: 'bool' }]
+              }] as const,
+              functionName: 'approve',
+              args: [marketFactoryAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+              account: wallet.address as `0x${string}`
+            });
+            const approveFactoryHash = await evmWalletClient.writeContract({
+              ...approveFactoryReq,
+              gas: BigInt(100000)
+            });
+            await publicClient.waitForTransactionReceipt({ hash: approveFactoryHash });
+          }
+        } catch (allowanceErr) {
+          console.warn("Failed checking factory allowance:", allowanceErr);
+        }
+
         const { request } = await publicClient.simulateContract({
           address: marketFactoryAddress,
           abi: MARKET_FACTORY_ABI,
@@ -1685,7 +1752,20 @@ export const useAppState = create<AppState>()(
         if (seedAmountScaled > BigInt(0)) {
           try {
             const poolFactoryAddress = (process.env.NEXT_PUBLIC_AM_POOL_FACTORY_ADDRESS || '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9') as `0x${string}`;
-            const tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x75537828f2ce51be7289709686A69CbFDbB714F1') as `0x${string}`;
+            
+            let tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A') as `0x${string}`;
+            try {
+              const factoryCt = await publicClient.readContract({
+                address: marketFactoryAddress,
+                abi: MARKET_FACTORY_ABI,
+                functionName: 'conditionalTokens'
+              }) as `0x${string}`;
+              if (factoryCt && factoryCt !== '0x0000000000000000000000000000000000000000') {
+                tokensAddress = factoryCt;
+              }
+            } catch (ctErr) {
+              console.warn("Could not read conditionalTokens from marketFactory:", ctErr);
+            }
             
             get().updateToast(toastId, {
               type: 'loading',
@@ -1693,15 +1773,20 @@ export const useAppState = create<AppState>()(
               description: `Checking / Staging AMM pool for ${room.token.symbol}...`
             });
 
-            let poolAddress = await publicClient.readContract({
-              address: poolFactoryAddress,
-              abi: AM_POOL_FACTORY_ABI,
-              functionName: 'getPool',
-              args: [actualRoomId as `0x${string}`]
-            }) as `0x${string}`;
+            let poolAddress: `0x${string}` = '0x0000000000000000000000000000000000000000';
+            try {
+              poolAddress = await publicClient.readContract({
+                address: poolFactoryAddress,
+                abi: AM_POOL_FACTORY_ABI,
+                functionName: 'getPool',
+                args: [actualRoomId as `0x${string}`]
+              }) as `0x${string}`;
+            } catch (rErr) {
+              console.warn("Could not read getPool:", rErr);
+            }
 
-            let targetPoolAddress = poolAddress;
-            if (poolAddress === '0x0000000000000000000000000000000000000000') {
+            let targetPoolAddress: `0x${string}` = poolAddress;
+            if (!targetPoolAddress || targetPoolAddress === '0x0000000000000000000000000000000000000000') {
               const { request: deployPoolReq } = await publicClient.simulateContract({
                 address: poolFactoryAddress,
                 abi: AM_POOL_FACTORY_ABI,
@@ -1711,16 +1796,44 @@ export const useAppState = create<AppState>()(
               });
               const deployPoolHash = await evmWalletClient.writeContract({
                 ...deployPoolReq,
-                gas: BigInt(1000000)
+                gas: BigInt(2500000)
               });
-              await publicClient.waitForTransactionReceipt({ hash: deployPoolHash });
+              const deployReceipt = await publicClient.waitForTransactionReceipt({ hash: deployPoolHash });
 
-              targetPoolAddress = await publicClient.readContract({
-                address: poolFactoryAddress,
-                abi: AM_POOL_FACTORY_ABI,
-                functionName: 'getPool',
-                args: [actualRoomId as `0x${string}`]
-              }) as `0x${string}`;
+              // Extract poolAddress directly from transaction receipt logs
+              try {
+                const poolLogs = parseEventLogs({
+                  abi: AM_POOL_FACTORY_ABI,
+                  eventName: 'PoolCreated',
+                  logs: deployReceipt.logs,
+                });
+                if (poolLogs && poolLogs.length > 0 && (poolLogs[0].args as any)?.poolAddress) {
+                  targetPoolAddress = (poolLogs[0].args as any).poolAddress;
+                }
+              } catch (logErr) {
+                console.warn("Failed to parse PoolCreated event log:", logErr);
+              }
+
+              // Retry getPool read from contract if event log was not parsed
+              let retries = 0;
+              while ((!targetPoolAddress || targetPoolAddress === '0x0000000000000000000000000000000000000000') && retries < 5) {
+                await new Promise(r => setTimeout(r, 400));
+                try {
+                  targetPoolAddress = await publicClient.readContract({
+                    address: poolFactoryAddress,
+                    abi: AM_POOL_FACTORY_ABI,
+                    functionName: 'getPool',
+                    args: [actualRoomId as `0x${string}`]
+                  }) as `0x${string}`;
+                } catch (rErr) {
+                  console.warn("Retry reading getPool failed:", rErr);
+                }
+                retries++;
+              }
+            }
+
+            if (!targetPoolAddress || targetPoolAddress === '0x0000000000000000000000000000000000000000') {
+              throw new Error(`Failed to resolve AMM Pool address for room ${actualRoomId}`);
             }
 
             // Approve pool to spend USDC
@@ -1734,7 +1847,7 @@ export const useAppState = create<AppState>()(
                 outputs: [{ name: '', type: 'uint256' }]
               }] as const,
               functionName: 'allowance',
-              args: [wallet.address as `0x${string}`, targetPoolAddress]
+              args: [wallet.address as `0x${string}`, targetPoolAddress as `0x${string}`]
             });
 
             if (allowance < seedAmountScaled) {
@@ -1753,7 +1866,7 @@ export const useAppState = create<AppState>()(
                   outputs: [{ name: '', type: 'bool' }]
                 }] as const,
                 functionName: 'approve',
-                args: [targetPoolAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+                args: [targetPoolAddress as `0x${string}`, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
                 account: wallet.address as `0x${string}`
               });
               const approveHash = await evmWalletClient.writeContract({
@@ -1770,7 +1883,7 @@ export const useAppState = create<AppState>()(
               description: `Injecting ${seedAmount} USDC initial ammo into pool...`
             });
             const { request: addLiquidityReq } = await publicClient.simulateContract({
-              address: targetPoolAddress,
+              address: targetPoolAddress as `0x${string}`,
               abi: AM_POOL_ABI,
               functionName: 'addLiquidity',
               args: [seedAmountScaled],
@@ -1788,19 +1901,47 @@ export const useAppState = create<AppState>()(
           }
         }
 
-        // Use actual seed side amounts from the Room object
-        const moonSeed = room.moonPool || 0;
-        const jeetSeed = room.jeetPool || 0;
+        // Two-Sided AMM Seeding: 100 USDC seeding mints 100 MOON + 100 JEET tokens into CPMM reserves
+        const moonSeed = room.moonPool || seedAmount;
+        const jeetSeed = room.jeetPool || seedAmount;
+        const seedSide = 'moon';
 
         const optimisticRoom: Room = {
           ...room,
           id: actualRoomId,
-          moonPool: moonSeed > 0 ? moonSeed : seedAmount,
-          jeetPool: jeetSeed > 0 ? jeetSeed : seedAmount,
+          moonPool: moonSeed,
+          jeetPool: jeetSeed,
           status: 'active' as const,
         };
         const updatedRooms = [optimisticRoom, ...get().rooms.filter(r => !isSameRoom(r.id, optimisticRoom.id))];
-        set({ rooms: updatedRooms });
+        
+        // Log creator initial bet position
+        const initialBet: Bet = {
+          id: `bet-evm-${Date.now()}`,
+          roomId: actualRoomId,
+          user: wallet.address,
+          currentOwner: wallet.address,
+          side: seedSide,
+          amount: seedAmount,
+          claimed: false,
+          timestamp: Date.now(),
+          txSig: txHash,
+          shares: seedAmount,
+        };
+
+        const currentUser = get().user;
+        const existingBets = currentUser?.bets || [];
+        set({
+          rooms: updatedRooms,
+          user: currentUser ? {
+            ...currentUser,
+            stats: {
+              ...currentUser.stats,
+              totalBets: ((currentUser.stats?.totalBets || 0) + 1)
+            },
+            bets: [initialBet, ...existingBets.filter(b => b.id !== initialBet.id)]
+          } : undefined
+        });
         savePersistedRooms(updatedRooms);
 
         fetch(`${INDEXER_URL}/api/rooms`, {
@@ -1816,8 +1957,8 @@ export const useAppState = create<AppState>()(
             resolutionCriteria: room.resolutionCriteria,
             oracleAddress: room.oracleAddress,
             oracleFeeLamports: room.oracleFeeLamports,
-            moonPool: moonSeed > 0 ? moonSeed : seedAmount,
-            jeetPool: jeetSeed > 0 ? jeetSeed : seedAmount,
+            moonPool: moonSeed,
+            jeetPool: jeetSeed,
             openingPrice: room.openingPrice,
             expiry: new Date(room.expiry).toISOString(),
             creator: wallet.address,
@@ -1825,6 +1966,18 @@ export const useAppState = create<AppState>()(
             duration: room.duration,
             status: 'active'
           })
+        }).then(async () => {
+          // Log initial seeding bet position to database
+          await fetch(`${INDEXER_URL}/api/rooms/${actualRoomId}/bets`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userPubkey: wallet.address,
+              side: seedSide,
+              amount: Math.round(seedAmount * 1e6),
+              txSig: txHash
+            })
+          }).catch(err => console.warn("Failed to post initial seeding bet to indexer:", err));
         }).catch(err => console.warn("Failed to post EVM room to indexer:", err));
         
         get().updateToast(toastId, {
@@ -2406,18 +2559,38 @@ export const useAppState = create<AppState>()(
 
       const routerAddress = (process.env.NEXT_PUBLIC_PREDICTION_ROUTER_ADDRESS || '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9') as `0x${string}`;
       const poolFactoryAddress = (process.env.NEXT_PUBLIC_AM_POOL_FACTORY_ADDRESS || '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9') as `0x${string}`;
-      const tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x75537828f2ce51be7289709686A69CbFDbB714F1') as `0x${string}`;
+      const marketFactoryAddress = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS || '0x139E2Bd8A802f6fb37C8f1eE1ff798271f623167') as `0x${string}`;
+      
+      let tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A') as `0x${string}`;
+      try {
+        const factoryCt = await publicClient.readContract({
+          address: marketFactoryAddress,
+          abi: MARKET_FACTORY_ABI,
+          functionName: 'conditionalTokens'
+        }) as `0x${string}`;
+        if (factoryCt && factoryCt !== '0x0000000000000000000000000000000000000000') {
+          tokensAddress = factoryCt;
+        }
+      } catch (ctErr) {
+        console.warn("Could not read conditionalTokens in market trade:", ctErr);
+      }
+      
       const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
       
-      let poolAddress = await publicClient.readContract({
-        address: poolFactoryAddress,
-        abi: AM_POOL_FACTORY_ABI,
-        functionName: 'getPool',
-        args: [roomId as `0x${string}`]
-      }) as `0x${string}`;
+      let poolAddress: `0x${string}` = '0x0000000000000000000000000000000000000000';
+      try {
+        poolAddress = await publicClient.readContract({
+          address: poolFactoryAddress,
+          abi: AM_POOL_FACTORY_ABI,
+          functionName: 'getPool',
+          args: [roomId as `0x${string}`]
+        }) as `0x${string}`;
+      } catch (rErr) {
+        console.warn("Could not read getPool in market trade:", rErr);
+      }
 
       // Deploy pool if it doesn't exist
-      if (poolAddress === '0x0000000000000000000000000000000000000000') {
+      if (!poolAddress || poolAddress === '0x0000000000000000000000000000000000000000') {
         console.log("No pool exists for this room. Deploying new AMPool on-chain...");
         const { request: deployPoolReq } = await publicClient.simulateContract({
           address: poolFactoryAddress,
@@ -2428,16 +2601,38 @@ export const useAppState = create<AppState>()(
         });
         const deployPoolHash = await evmWalletClient.writeContract({
           ...deployPoolReq,
-          gas: BigInt(1000000)
+          gas: BigInt(2500000)
         });
-        await publicClient.waitForTransactionReceipt({ hash: deployPoolHash });
+        const deployReceipt = await publicClient.waitForTransactionReceipt({ hash: deployPoolHash });
 
-        poolAddress = await publicClient.readContract({
-          address: poolFactoryAddress,
-          abi: AM_POOL_FACTORY_ABI,
-          functionName: 'getPool',
-          args: [roomId as `0x${string}`]
-        }) as `0x${string}`;
+        try {
+          const poolLogs = parseEventLogs({
+            abi: AM_POOL_FACTORY_ABI,
+            eventName: 'PoolCreated',
+            logs: deployReceipt.logs,
+          });
+          if (poolLogs && poolLogs.length > 0 && (poolLogs[0].args as any)?.poolAddress) {
+            poolAddress = (poolLogs[0].args as any).poolAddress;
+          }
+        } catch (logErr) {
+          console.warn("Failed to parse PoolCreated event log:", logErr);
+        }
+
+        let retries = 0;
+        while ((!poolAddress || poolAddress === '0x0000000000000000000000000000000000000000') && retries < 5) {
+          await new Promise(r => setTimeout(r, 400));
+          try {
+            poolAddress = await publicClient.readContract({
+              address: poolFactoryAddress,
+              abi: AM_POOL_FACTORY_ABI,
+              functionName: 'getPool',
+              args: [roomId as `0x${string}`]
+            }) as `0x${string}`;
+          } catch (rErr) {
+            console.warn("Retry reading getPool failed in trade:", rErr);
+          }
+          retries++;
+        }
       }
 
       // Fetch matching limit orders from indexer API
@@ -2570,102 +2765,254 @@ export const useAppState = create<AppState>()(
         throw new Error("No counterparty liquidity available. There are no active limit orders on the book and the AMM pool has zero reserves. Please place a LIMIT ORDER instead to seed the book.");
       }
 
-      if (orderType === 'buy') {
-        const maxUsdcSpent = BigInt(Math.round(maxUsdcSpentOrMinReceived * 1e6));
-        
-        // Approve router for USDC
-        const allowance = await publicClient.readContract({
-          address: usdcAddress,
-          abi: [{
-            name: 'allowance',
-            type: 'function',
-            stateMutability: 'view',
-            inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
-            outputs: [{ name: '', type: 'uint256' }]
-          }] as const,
-          functionName: 'allowance',
-          args: [wallet.address as `0x${string}`, routerAddress]
-        });
+      let tradeTxHash: `0x${string}` = '0x';
 
-        if (allowance < maxUsdcSpent) {
-          const { request: approveReq } = await publicClient.simulateContract({
+      if (makerOrders.length === 0) {
+        if (orderType === 'buy') {
+          const maxUsdcSpent = BigInt(Math.round(maxUsdcSpentOrMinReceived * 1e6));
+          
+          // Approve pool directly for USDC
+          const allowance = await publicClient.readContract({
             address: usdcAddress,
             abi: [{
-              name: 'approve',
+              name: 'allowance',
               type: 'function',
-              stateMutability: 'nonpayable',
-              inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
-              outputs: [{ name: '', type: 'bool' }]
+              stateMutability: 'view',
+              inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+              outputs: [{ name: '', type: 'uint256' }]
             }] as const,
-            functionName: 'approve',
-            args: [routerAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+            functionName: 'allowance',
+            args: [wallet.address as `0x${string}`, poolAddress]
+          });
+
+          if (allowance < maxUsdcSpent) {
+            const { request: approveReq } = await publicClient.simulateContract({
+              address: usdcAddress,
+              abi: [{
+                name: 'approve',
+                type: 'function',
+                stateMutability: 'nonpayable',
+                inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
+                outputs: [{ name: '', type: 'bool' }]
+              }] as const,
+              functionName: 'approve',
+              args: [poolAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+              account: wallet.address as `0x${string}`
+            });
+            const approveHash = await evmWalletClient.writeContract({
+              ...approveReq,
+              gas: BigInt(150000)
+            });
+            await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          }
+
+          // Direct buyShares on AMPool
+          const { request } = await publicClient.simulateContract({
+            address: poolAddress,
+            abi: AM_POOL_ABI,
+            functionName: 'buyShares',
+            args: [outcomeIndex, maxUsdcSpent],
             account: wallet.address as `0x${string}`
           });
-          const approveHash = await evmWalletClient.writeContract({
-            ...approveReq,
-            gas: BigInt(100000)
+
+          tradeTxHash = await evmWalletClient.writeContract({
+            ...request,
+            gas: BigInt(600000)
           });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
-        }
+          await publicClient.waitForTransactionReceipt({ hash: tradeTxHash });
 
-        const { request } = await publicClient.simulateContract({
-          address: routerAddress,
-          abi: PREDICTION_ROUTER_ABI,
-          functionName: 'routeBuyShares',
-          args: [poolAddress, outcomeIndex, amountSharesScaled, maxUsdcSpent, makerOrders, signatures as `0x${string}`[], fillAmounts],
-          account: wallet.address as `0x${string}`
-        });
+        } else {
+          // Direct AMM Sell
+          const amountSharesToSell = amountSharesScaled;
 
-        const txHash = await evmWalletClient.writeContract({
-          ...request,
-          gas: BigInt(600000)
-        });
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
-
-      } else {
-        // Market Sell
-        const minUsdcReceived = BigInt(Math.round(maxUsdcSpentOrMinReceived * 1e6));
-        const amountSharesToSell = amountSharesScaled;
-
-        // Approve router for conditional tokens
-        const isApproved = await publicClient.readContract({
-          address: tokensAddress,
-          abi: CONDITIONAL_TOKENS_ABI,
-          functionName: 'isApprovedForAll',
-          args: [wallet.address as `0x${string}`, routerAddress]
-        }) as boolean;
-
-        if (!isApproved) {
-          const { request: approveReq } = await publicClient.simulateContract({
+          const isApproved = await publicClient.readContract({
             address: tokensAddress,
             abi: CONDITIONAL_TOKENS_ABI,
-            functionName: 'setApprovalForAll',
-            args: [routerAddress, true],
+            functionName: 'isApprovedForAll',
+            args: [wallet.address as `0x${string}`, poolAddress]
+          }) as boolean;
+
+          if (!isApproved) {
+            const { request: approveReq } = await publicClient.simulateContract({
+              address: tokensAddress,
+              abi: CONDITIONAL_TOKENS_ABI,
+              functionName: 'setApprovalForAll',
+              args: [poolAddress, true],
+              account: wallet.address as `0x${string}`
+            });
+            const approveHash = await evmWalletClient.writeContract({
+              ...approveReq,
+              gas: BigInt(150000)
+            });
+            await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          }
+
+          const { request } = await publicClient.simulateContract({
+            address: poolAddress,
+            abi: AM_POOL_ABI,
+            functionName: 'sellShares',
+            args: [outcomeIndex, amountSharesToSell],
             account: wallet.address as `0x${string}`
           });
-          const approveHash = await evmWalletClient.writeContract({
-            ...approveReq,
-            gas: BigInt(100000)
+
+          tradeTxHash = await evmWalletClient.writeContract({
+            ...request,
+            gas: BigInt(600000)
           });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          await publicClient.waitForTransactionReceipt({ hash: tradeTxHash });
         }
+      } else {
+        if (orderType === 'buy') {
+          const maxUsdcSpent = BigInt(Math.round(maxUsdcSpentOrMinReceived * 1e6));
+          
+          // Approve router for USDC
+          const allowance = await publicClient.readContract({
+            address: usdcAddress,
+            abi: [{
+              name: 'allowance',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+              outputs: [{ name: '', type: 'uint256' }]
+            }] as const,
+            functionName: 'allowance',
+            args: [wallet.address as `0x${string}`, routerAddress]
+          });
 
-        const { request } = await publicClient.simulateContract({
-          address: routerAddress,
-          abi: PREDICTION_ROUTER_ABI,
-          functionName: 'routeSellShares',
-          args: [poolAddress, outcomeIndex, amountSharesToSell, minUsdcReceived, makerOrders, signatures as `0x${string}`[], fillAmounts],
-          account: wallet.address as `0x${string}`
-        });
+          if (allowance < maxUsdcSpent) {
+            const { request: approveReq } = await publicClient.simulateContract({
+              address: usdcAddress,
+              abi: [{
+                name: 'approve',
+                type: 'function',
+                stateMutability: 'nonpayable',
+                inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
+                outputs: [{ name: '', type: 'bool' }]
+              }] as const,
+              functionName: 'approve',
+              args: [routerAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+              account: wallet.address as `0x${string}`
+            });
+            const approveHash = await evmWalletClient.writeContract({
+              ...approveReq,
+              gas: BigInt(150000)
+            });
+            await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          }
 
-        const txHash = await evmWalletClient.writeContract({
-          ...request,
-          gas: BigInt(600000)
-        });
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
+          const { request } = await publicClient.simulateContract({
+            address: routerAddress,
+            abi: PREDICTION_ROUTER_ABI,
+            functionName: 'routeBuyShares',
+            args: [poolAddress, outcomeIndex, amountSharesScaled, maxUsdcSpent, makerOrders, signatures as `0x${string}`[], fillAmounts],
+            account: wallet.address as `0x${string}`
+          });
+
+          tradeTxHash = await evmWalletClient.writeContract({
+            ...request,
+            gas: BigInt(600000)
+          });
+          await publicClient.waitForTransactionReceipt({ hash: tradeTxHash });
+
+        } else {
+          // Market Sell
+          const minUsdcReceived = BigInt(Math.round(maxUsdcSpentOrMinReceived * 1e6));
+          const amountSharesToSell = amountSharesScaled;
+
+          // Approve router for conditional tokens
+          const isApproved = await publicClient.readContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'isApprovedForAll',
+            args: [wallet.address as `0x${string}`, routerAddress]
+          }) as boolean;
+
+          if (!isApproved) {
+            const { request: approveReq } = await publicClient.simulateContract({
+              address: tokensAddress,
+              abi: CONDITIONAL_TOKENS_ABI,
+              functionName: 'setApprovalForAll',
+              args: [routerAddress, true],
+              account: wallet.address as `0x${string}`
+            });
+            const approveHash = await evmWalletClient.writeContract({
+              ...approveReq,
+              gas: BigInt(150000)
+            });
+            await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          }
+
+          const { request } = await publicClient.simulateContract({
+            address: routerAddress,
+            abi: PREDICTION_ROUTER_ABI,
+            functionName: 'routeSellShares',
+            args: [poolAddress, outcomeIndex, amountSharesToSell, minUsdcReceived, makerOrders, signatures as `0x${string}`[], fillAmounts],
+            account: wallet.address as `0x${string}`
+          });
+
+          tradeTxHash = await evmWalletClient.writeContract({
+            ...request,
+            gas: BigInt(600000)
+          });
+          await publicClient.waitForTransactionReceipt({ hash: tradeTxHash });
+        }
       }
 
-      get().updateToast(toastId, { type: 'success', message: 'MARKET ORDER COMPLETED', description: 'Transaction successfully settled on Avalanche Fuji.' });
+      // Record trade position in user state and post to indexer
+      const newBetRecord: Bet = {
+        id: `bet-evm-${Date.now()}`,
+        roomId,
+        user: wallet.address,
+        currentOwner: wallet.address,
+        side,
+        amount: Math.round(maxUsdcSpentOrMinReceived * 100) / 100,
+        claimed: false,
+        timestamp: Date.now(),
+        txSig: tradeTxHash,
+        shares: amountShares,
+      };
+
+      set((state) => {
+        const currentUser = state.user;
+        const updatedRooms = state.rooms.map((r) => {
+          if (isSameRoom(r.id, roomId)) {
+            const addedUsdc = maxUsdcSpentOrMinReceived;
+            return {
+              ...r,
+              moonPool: side === 'moon' ? (r.moonPool || 0) + addedUsdc : (r.moonPool || 0),
+              jeetPool: side === 'jeet' ? (r.jeetPool || 0) + addedUsdc : (r.jeetPool || 0),
+            };
+          }
+          return r;
+        });
+
+        if (!currentUser) return { rooms: updatedRooms };
+        const existingBets = currentUser.bets || [];
+        return {
+          rooms: updatedRooms,
+          user: {
+            ...currentUser,
+            stats: {
+              ...currentUser.stats,
+              totalBets: ((currentUser.stats?.totalBets || 0) + 1)
+            },
+            bets: [newBetRecord, ...existingBets.filter(b => b.id !== newBetRecord.id)]
+          }
+        };
+      });
+
+      fetch(`${INDEXER_URL}/api/rooms/${roomId}/bets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userPubkey: wallet.address,
+          side,
+          amount: Math.round(maxUsdcSpentOrMinReceived * 1e6),
+          txSig: tradeTxHash
+        })
+      }).catch(err => console.warn("Failed to log bet to indexer:", err));
+
+      get().updateToast(toastId, { type: 'success', message: 'MARKET ORDER COMPLETED', description: 'Transaction successfully settled on Avalanche Fuji.', txSig: tradeTxHash });
       await get().fetchBalance();
       await get().fetchSingleRoom(roomId);
     } catch (err: any) {
@@ -2920,7 +3267,20 @@ export const useAppState = create<AppState>()(
       
       const isEvmRoom = roomId.startsWith('0x');
       if (isEvmRoom) {
-        const tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x75537828f2ce51be7289709686A69CbFDbB714F1') as `0x${string}`;
+        const marketFactoryAddress = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS || '0x139E2Bd8A802f6fb37C8f1eE1ff798271f623167') as `0x${string}`;
+        let tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A') as `0x${string}`;
+        try {
+          const factoryCt = await publicClient.readContract({
+            address: marketFactoryAddress,
+            abi: MARKET_FACTORY_ABI,
+            functionName: 'conditionalTokens'
+          }) as `0x${string}`;
+          if (factoryCt && factoryCt !== '0x0000000000000000000000000000000000000000') {
+            tokensAddress = factoryCt;
+          }
+        } catch (ctErr) {
+          console.warn("Could not read conditionalTokens in claimWinnings:", ctErr);
+        }
 
         const tokenId0 = await publicClient.readContract({
           address: tokensAddress,

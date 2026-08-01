@@ -467,8 +467,8 @@ export default function CreateRoomPage() {
       tokenAddress = creatorAddress;
     }
 
-    const moonSeed = seedSide === 'moon' ? seedAmount : 0;
-    const jeetSeed = seedSide === 'jeet' ? seedAmount : 0;
+    const moonSeed = seedAmount;
+    const jeetSeed = seedAmount;
 
     const targetOpeningPrice = arenaType === 'debate' 
       ? 1.0 
@@ -490,8 +490,8 @@ export default function CreateRoomPage() {
         pairAddress: tokenInfo?.pairAddress || ''
       },
       creator: creatorAddress,
-      moonPool: moonSeed > 0 ? moonSeed : 0,
-      jeetPool: jeetSeed > 0 ? jeetSeed : 0,
+      moonPool: moonSeed,
+      jeetPool: jeetSeed,
       expiry: Date.now() + duration * 60000,
       status: 'active',
       createdAt: Date.now(),
@@ -508,7 +508,7 @@ export default function CreateRoomPage() {
       const res = await createRoom(newRoom, openingPriceType === 'set' || arenaType === 'debate');
       
       const isEvm = res && res.roomPda && res.roomPda.startsWith('0x');
-      if (res && !res.alreadyExists) {
+      if (res && !res.alreadyExists && !isEvm) {
         try {
           await placeBet(res.roomPda, seedSide as any, seedAmount, true, `/room/${res.roomPda}`);
         } catch (betErr) {

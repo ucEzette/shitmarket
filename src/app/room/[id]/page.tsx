@@ -1312,7 +1312,7 @@ export default function RoomDetailPage() {
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pl-4 pr-4">
                     <div className="space-y-1.5 flex-1">
                       <span className="font-mono text-[9px] text-neon-moon font-extrabold uppercase tracking-widest block animate-pulse">
-                        🔮 ACTIVE TARGET PREDICTION QUESTION
+                        ACTIVE TARGET PREDICTION QUESTION
                       </span>
                       <h2 className="font-staatliches text-2xl sm:text-3xl text-white tracking-wide uppercase leading-tight">
                         Will {room ? room.token.name : 'Token'} ({room ? formatCashtag(room.token.symbol) : 'TKN'}) end above ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} on {new Date(expirySafe).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}?
@@ -1576,7 +1576,7 @@ export default function RoomDetailPage() {
             <div className="flex items-center justify-between border-b border-trench-sandbag pb-3 mb-4">
               <div className="flex items-center gap-2 text-neon-moon font-staatliches text-lg sm:text-xl font-bold uppercase tracking-wider">
                 <span className="w-2.5 h-2.5 rounded-full bg-neon-moon animate-pulse shrink-0 shadow-glow-moon" />
-                <span>⚡ EXIT TRENCH POSITION MARKETPLACE</span>
+                <span>EXIT TRENCH POSITION MARKETPLACE</span>
               </div>
               <span className="font-mono text-[9px] font-bold text-trench-gasmask bg-trench-mud border border-[#1d3515] px-2 py-0.5 rounded uppercase">
                 TRADE FEE: 0.5%
@@ -1724,8 +1724,8 @@ export default function RoomDetailPage() {
               className="rounded-full mx-auto mb-3" 
             />
             
-            <h3 className="font-staatliches text-2xl text-white tracking-wide uppercase">Deploy Capital</h3>
-            <p className="font-mono text-[9px] text-trench-gasmask font-bold mt-0.5 uppercase tracking-widest">SELECT AMMUNITION YIELD</p>
+            <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wide uppercase">Deploy Capital</h3>
+            <p className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask font-bold mt-0.5 uppercase tracking-widest">SELECT AMMUNITION YIELD</p>
           </div>
 
           {/* Win Streak Indicator inside the Stance Configurator sidebar (Wallet Balance removed) */}
@@ -2354,42 +2354,42 @@ export default function RoomDetailPage() {
 
                 return (
                   <div className="space-y-2 mb-4 font-mono text-xs border-b border-trench-sandbag/40 pb-3">
-                    <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                    <div className="flex justify-between text-slate-500 dark:text-trench-gasmask uppercase font-bold">
                       <span>EXECUTION PRICE</span>
-                      <span className="text-white font-bold">
+                      <span className="text-slate-900 dark:text-white font-bold">
                         {price === Infinity ? 'N/A' : `${price.toFixed(2)} USDC / share`}
                       </span>
                     </div>
                     {orderType === 'buy' ? (
                       <>
-                        <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                        <div className="flex justify-between text-slate-500 dark:text-trench-gasmask uppercase font-bold">
                           <span>TOTAL SWAP COST</span>
-                          <span className="text-white font-bold">
+                          <span className="text-slate-900 dark:text-white font-bold">
                             {cost === Infinity ? 'EXCEEDS RESERVES' : `${cost.toFixed(2)} USDC`}
                           </span>
                         </div>
-                        <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                        <div className="flex justify-between text-slate-500 dark:text-trench-gasmask uppercase font-bold">
                           <span>MAX PAYOUT (WIN)</span>
-                          <span className="text-neon-moon font-bold">+{maxPayout.toFixed(2)} USDC</span>
+                          <span className="text-[#00796B] dark:text-neon-moon font-bold">+{maxPayout.toFixed(2)} USDC</span>
                         </div>
-                        <div className="flex justify-between text-trench-gasmask/80 uppercase font-bold text-[11px]">
+                        <div className="flex justify-between text-slate-500/80 dark:text-trench-gasmask/80 uppercase font-bold text-[11px]">
                           <span>NET PROFIT</span>
-                          <span className="text-yellow-400 font-bold">
+                          <span className="text-amber-700 dark:text-yellow-400 font-bold">
                             {cost === Infinity ? 'N/A' : `+${profit.toFixed(2)} USDC (+${roiPercent.toFixed(0)}%)`}
                           </span>
                         </div>
                       </>
                     ) : (
                       <>
-                        <div className="flex justify-between text-trench-gasmask uppercase font-bold">
+                        <div className="flex justify-between text-slate-500 dark:text-trench-gasmask uppercase font-bold">
                           <span>IMMEDIATE PAYOUT</span>
-                          <span className="text-neon-moon font-bold">
+                          <span className="text-[#00796B] dark:text-neon-moon font-bold">
                             {cost === Infinity ? '0.00 USDC' : `+${cost.toFixed(2)} USDC`}
                           </span>
                         </div>
                       </>
                     )}
-                    <div className="flex justify-between text-trench-gasmask/60 text-[9px] uppercase font-bold">
+                    <div className="flex justify-between text-slate-500/60 dark:text-trench-gasmask/60 text-[9px] uppercase font-bold">
                       <span>FEE & SLIPPAGE</span>
                       <span>0.00% (AMM SWAP)</span>
                     </div>
@@ -2406,7 +2406,7 @@ export default function RoomDetailPage() {
                   <Loader2 className="animate-spin text-black shrink-0" size={20} />
                 ) : (
                   <span className="relative z-10 flex items-center gap-1.5 justify-center font-bold">
-                    <Sparkles size={20} className="text-black shrink-0 animate-pulse" />
+                    <Coins size={20} className="text-black shrink-0 animate-pulse" />
                     EXECUTE IMMEDIATE SWAP
                   </span>
                 )}
@@ -2628,11 +2628,11 @@ export default function RoomDetailPage() {
           {/* Bet History */}
           <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
             <div className="flex items-center justify-between border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
-              <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-xs sm:text-sm font-bold uppercase">
-                <Terminal className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500" />
+              <div className="flex items-center gap-1.5 text-amber-700 dark:text-yellow-500 font-staatliches text-xs sm:text-sm font-bold uppercase">
+                <Terminal className="w-3 h-3 sm:w-4 sm:h-4 text-amber-700 dark:text-yellow-500" />
                 <span>&gt;_ BET HISTORY (ALL SECTOR TRANS)</span>
               </div>
-              <span className="text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">LATEST {allSectorBets.length} ACTIONS</span>
+              <span className="text-slate-500 dark:text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">LATEST {allSectorBets.length} ACTIONS</span>
             </div>
 
             <div 
@@ -2659,7 +2659,7 @@ export default function RoomDetailPage() {
                               synthSound('bet');
                             }
                           }}
-                          className="text-trench-gasmask cursor-pointer hover:underline"
+                          className="text-slate-500 dark:text-trench-gasmask cursor-pointer hover:underline"
                         >
                           [{formattedUser}]
                         </span>
@@ -2668,8 +2668,8 @@ export default function RoomDetailPage() {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-white font-bold">{bet.amount.toFixed(2)} {currencySymbol}</span>
-                        <span className="text-trench-gasmask/70 text-[8px] sm:text-[9px]">{timeString}</span>
+                        <span className="text-slate-900 dark:text-white font-bold">{bet.amount.toFixed(2)} {currencySymbol}</span>
+                        <span className="text-slate-500 dark:text-trench-gasmask/70 text-[8px] sm:text-[9px]">{timeString}</span>
                       </div>
                     </div>
                   );
@@ -2688,7 +2688,7 @@ export default function RoomDetailPage() {
                 <Swords className="w-3 h-3 text-neon-moon animate-pulse" />
                 <span>Your Active Combat Positions</span>
               </div>
-              <span className="text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">NO HOUSE FEES (PURE PVP AMM)</span>
+              <span className="text-slate-500 dark:text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">NO HOUSE FEES (PURE PVP AMM)</span>
             </div>
 
             <div className="flex-1 overflow-y-auto scrollbar">
@@ -2714,7 +2714,7 @@ export default function RoomDetailPage() {
                     <div className="overflow-x-auto w-full">
                       <table className="w-full text-left font-mono text-[10px] uppercase">
                         <thead>
-                          <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[9px] font-bold">
+                          <tr className="border-b border-trench-sandbag/45 text-slate-500 dark:text-trench-gasmask text-[9px] font-bold">
                             <th className="py-1.5 px-2">SIDE</th>
                             <th className="py-1.5 px-2">QTY SHARES</th>
                             <th className="py-1.5 px-2">AVG PRICE</th>
@@ -2726,13 +2726,13 @@ export default function RoomDetailPage() {
                           {positions.map((pos) => (
                             <tr key={pos.side} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
                               <td className="py-2 px-2 font-bold font-staatliches text-xs">
-                                <span className={pos.side === 'moon' ? 'text-neon-moon' : 'text-jeet-red'}>
+                                <span className={pos.side === 'moon' ? 'text-[#00796B] dark:text-neon-moon' : 'text-[#C62828] dark:text-jeet-red'}>
                                   {pos.side === 'moon' ? '🚀 MOON (YES)' : '💀 JEET (NO)'}
                                 </span>
                               </td>
-                              <td className="py-2 px-2 text-white font-bold">{pos.shares.toFixed(0)}</td>
-                              <td className="py-2 px-2 text-gray-300 font-bold">{pos.avgPrice.toFixed(2)} USDC</td>
-                              <td className="py-2 px-2 text-gray-300 font-bold">{pos.totalSpent.toFixed(2)} USDC</td>
+                              <td className="py-2 px-2 text-slate-900 dark:text-white font-bold">{pos.shares.toFixed(0)}</td>
+                              <td className="py-2 px-2 text-slate-700 dark:text-gray-300 font-bold">{pos.avgPrice.toFixed(2)} USDC</td>
+                              <td className="py-2 px-2 text-slate-700 dark:text-gray-300 font-bold">{pos.totalSpent.toFixed(2)} USDC</td>
                               <td className="py-2 px-2 text-right">
                                 <button
                                   onClick={() => {

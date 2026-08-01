@@ -934,7 +934,7 @@ export default function RoomsPage() {
 
           {/* Quick Bet Stake Input */}
           <div className="flex items-center gap-1.5 bg-cyan-50/60 dark:bg-trench-black/80 border border-cyan-200 dark:border-trench-sandbag/60 rounded-lg px-2 py-1 h-9 font-mono text-xs text-slate-900 dark:text-white shrink-0" title="Quick Bet Stake Amount">
-            <span className="text-[#00796B] dark:text-neon-moon font-bold animate-pulse select-none">⚡</span>
+            <Flame size={14} className="text-[#00796B] dark:text-neon-moon shrink-0 animate-pulse select-none" />
             <input
               type="number"
               step="any"

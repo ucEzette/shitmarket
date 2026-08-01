@@ -5,7 +5,7 @@ import { useAppState } from '@/store/useAppState';
 import { synthSound } from '@/components/ClientWrapper';
 import { useRouter } from 'next/navigation';
 import { DEGEN_QUOTES, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
-import { Download, Copy, Check, X, Loader2, Sparkles } from 'lucide-react';
+import { Download, Copy, Check, X, Loader2, Coins } from 'lucide-react';
 
 const formatExactExpiry = (expiryMs?: number) => {
   if (!expiryMs) return 'UNKNOWN';
@@ -233,7 +233,7 @@ export const ShareCardModal: React.FC = () => {
     // 6. Typography
     ctx.fillStyle = '#8B9BAA';
     ctx.font = 'bold 20px "JetBrains Mono", monospace';
-    ctx.fillText('⚡ SHITMARKET TACTICAL INTEL', 80, 85);
+    ctx.fillText('SHITMARKET TACTICAL INTEL', 80, 85);
 
     // Main header
     ctx.fillStyle = '#FFFFFF';
@@ -408,7 +408,7 @@ export const ShareCardModal: React.FC = () => {
         {/* Modal Header */}
         <div className="text-center">
           <h3 className="font-staatliches text-3xl text-white tracking-widest flex items-center justify-center gap-1.5 uppercase StencilShadow">
-            <Sparkles className={isMoonTheme ? 'text-neon-moon' : 'text-jeet-red'} size={24} />
+            <Coins className={isMoonTheme ? 'text-neon-moon' : 'text-jeet-red'} size={24} />
             WAR ROOM TRANSMISSION READY
           </h3>
           <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold mt-1 tracking-widest">

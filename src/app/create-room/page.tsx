@@ -471,8 +471,8 @@ export default function CreateRoomPage() {
       tokenAddress = creatorAddress;
     }
 
-    const moonSeed = seedAmount;
-    const jeetSeed = seedAmount;
+    const moonSeed = seedSide === 'moon' ? seedAmount : 0;
+    const jeetSeed = seedSide === 'jeet' ? seedAmount : 0;
 
     const targetOpeningPrice = arenaType === 'debate' 
       ? 1.0 
@@ -749,7 +749,7 @@ export default function CreateRoomPage() {
                   </p>
                   <div className="mt-4 flex items-center gap-2">
                     <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 font-mono text-[9px] text-neon-moon uppercase font-bold">
-                      ⚡ Trustless TWAP
+                      Trustless TWAP
                     </span>
                     <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 font-mono text-[9px] text-gray-300 uppercase font-bold">
                       0 USDC Fee

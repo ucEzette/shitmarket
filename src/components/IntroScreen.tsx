@@ -590,7 +590,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                   {/* Ticking Bomb */}
                   {scene3Ticking ? (
                     <div className="flex items-center gap-2 bg-red-950 p-2 rounded border border-red-500 animate-pulse">
-                      <span className="font-mono text-red-500 font-bold">💣 BOMB DETONATING</span>
+                      <span className="font-mono text-red-500 font-bold">COUNTDOWN DETONATING</span>
                       <span className="font-mono text-xl font-bold text-red-400">0:0{scene3Timer}</span>
                     </div>
                   ) : (
@@ -868,7 +868,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 className="w-full max-w-4xl bg-trench-mud border-8 border-double border-yellow-500 rounded-2xl p-6 text-center shadow-[0_0_40px_rgba(234,179,8,0.3)] relative overflow-hidden scanlines"
               >
                 <div className="absolute top-3 right-3 bg-red-600 border-2 border-red-400 text-white font-staatliches text-xs px-3 py-1 rounded animate-bounce shadow-lg">
-                  🛡️ 100% RUGPROOF SOLDIER
+                  100% ON-CHAIN VERIFIED
                 </div>
                 
                 <h1 className="font-staatliches text-4xl sm:text-5xl text-yellow-500 tracking-wider mb-2 uppercase text-shadow-[0_2px_4px_black]">

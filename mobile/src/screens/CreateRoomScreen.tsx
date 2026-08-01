@@ -267,7 +267,7 @@ export default function CreateRoomScreen({ navigation }: any) {
                 onPress={() => setSeedSide('moon')}
               >
                 <Text style={[styles.sideText, seedSide === 'moon' ? styles.sideMoonActiveText : null]}>
-                  SEED MOON 🚀
+                  SEED MOON
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -275,7 +275,7 @@ export default function CreateRoomScreen({ navigation }: any) {
                 onPress={() => setSeedSide('jeet')}
               >
                 <Text style={[styles.sideText, seedSide === 'jeet' ? styles.sideJeetActiveText : null]}>
-                  SEED JEET 💀
+                  SEED JEET
                 </Text>
               </TouchableOpacity>
             </View>
@@ -305,7 +305,7 @@ export default function CreateRoomScreen({ navigation }: any) {
                 onPress={() => setOpeningPriceType('market')}
               >
                 <Text style={[styles.sideText, openingPriceType === 'market' ? styles.sideMoonActiveText : null]}>
-                  MARKET PRICE ⚡
+                  MARKET PRICE
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity

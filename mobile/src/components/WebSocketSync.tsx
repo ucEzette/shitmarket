@@ -127,7 +127,7 @@ export const WebSocketSync: React.FC = () => {
                 roomId: roomPubkey,
                 side: 'all',
                 user: 'KEEPER SYSTEM',
-                message: `⚡ ARENA SETTLED! WINNER: ${data.winner.toUpperCase()} at TWAP ${Number(data.twapFinalPrice) / 1e12} USD ⚡`,
+                message: `ARENA SETTLED! WINNER: ${data.winner.toUpperCase()} at TWAP ${Number(data.twapFinalPrice) / 1e12} USD`,
                 timestamp: Date.now(),
               });
             }

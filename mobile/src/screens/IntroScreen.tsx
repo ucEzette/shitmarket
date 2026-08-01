@@ -415,7 +415,7 @@ export default function IntroScreen({ onComplete }: IntroScreenProps) {
             <View style={styles.sceneContainer}>
               <View style={[styles.characterCard, { borderColor: '#7f1d1d', padding: 15 }]}>
                 <Text style={[styles.taskTitle, { textAlign: 'center', color: COLORS.neonMoon }]}>
-                  ⚡ TERMINAL CHEAT DECODER DETECTED
+                  TERMINAL CHEAT DECODER DETECTED
                 </Text>
 
                 <View style={styles.terminalBox}>

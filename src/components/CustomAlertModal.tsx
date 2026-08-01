@@ -129,8 +129,8 @@ export const CustomAlertModal: React.FC = () => {
 
   return (
     <div 
-      className={`fixed inset-0 z-[10000] p-4 select-none scanlines transition-colors duration-200 ${
-        isAnchored ? 'bg-black/10 pointer-events-auto' : 'bg-black/90 backdrop-blur-md flex items-center justify-center'
+      className={`fixed inset-0 z-[10000] p-4 select-none dark:scanlines transition-colors duration-200 ${
+        isAnchored ? 'bg-black/10 pointer-events-auto' : 'bg-slate-900/40 dark:bg-black/90 backdrop-blur-md flex items-center justify-center'
       }`}
       onClick={handleDismiss}
     >
@@ -140,8 +140,8 @@ export const CustomAlertModal: React.FC = () => {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={isAnchored ? { opacity: 0, scale: 0.85 } : { opacity: 0, scale: 0.9, y: 10 }}
         transition={{ type: 'spring', damping: 25, stiffness: 280 }}
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the card
-        className={`w-[320px] max-w-full border-2 rounded-lg p-5 flex flex-col relative overflow-visible ${borderColor} ${bgColor} ${glowShadow}`}
+        onClick={(e) => e.stopPropagation()}
+        className={`w-[320px] max-w-full border-2 rounded-xl p-5 flex flex-col relative overflow-visible bg-white dark:bg-[#090b0e] text-slate-800 dark:text-white shadow-xl dark:shadow-2xl ${borderColor}`}
         style={isAnchored ? {
           position: 'fixed',
           top: `${coords.top}px`,
@@ -196,7 +196,7 @@ export const CustomAlertModal: React.FC = () => {
         </div>
 
         {/* Message Content */}
-        <div className="font-mono text-[10px] uppercase text-gray-300 leading-relaxed font-bold tracking-wide break-words max-h-48 overflow-y-auto mb-5 pr-1">
+        <div className="font-mono text-[10px] uppercase text-slate-700 dark:text-gray-300 leading-relaxed font-bold tracking-wide break-words max-h-48 overflow-y-auto mb-5 pr-1">
           {message}
         </div>
 

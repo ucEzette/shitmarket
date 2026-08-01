@@ -7,10 +7,11 @@ import { useWalletContext } from './WalletProvider';
 import { WalletPanel } from './WalletPanel';
 import { useAppState } from '@/store/useAppState';
 import { PepePortrait, PEPE_ASSETS } from './MemeAssets';
-import { LogOut, Loader2, Coins, Settings, X } from 'lucide-react';
+import { LogOut, Loader2, Coins, Settings, X, Sun, Moon, Zap } from 'lucide-react';
 import { NotificationBell } from './NotificationBell';
 import { connection } from '@/utils/solanaClient';
 import { usePrivy } from '@privy-io/react-auth';
+import { useTheme } from './ThemeProvider';
 
 const navItems = [
   { label: 'WAR ROOM', href: '/rooms' },
@@ -19,6 +20,23 @@ const navItems = [
   { label: 'PARLAYS', href: '/parlays' },
   { label: 'LEADERBOARD', href: '/leaderboard' },
 ];
+
+export const ThemeToggle: React.FC = () => {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <button
+      onClick={toggleTheme}
+      className="p-1 bg-cyan-100/70 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/40 rounded hover:bg-cyan-200 dark:hover:bg-trench-mud transition-all flex items-center justify-center cursor-pointer text-slate-700 dark:text-trench-gasmask shrink-0"
+      title={theme === 'light' ? 'SWITCH TO DARK MODE (TRENCH)' : 'SWITCH TO LIGHT MODE'}
+    >
+      {theme === 'light' ? (
+        <Moon size={14} className="text-indigo-700 hover:text-indigo-900" />
+      ) : (
+        <Sun size={14} className="text-amber-400 hover:text-amber-300" />
+      )}
+    </button>
+  );
+};
 
 export const HeaderSettings: React.FC = () => {
   const { settings, updateSettings } = useAppState();
@@ -176,30 +194,30 @@ export const HeaderSettings: React.FC = () => {
     <div className="relative shrink-0 flex items-center" ref={dropdownRef}>
       <button 
         onClick={handleToggle}
-        className="p-1 bg-trench-black border border-trench-sandbag/40 rounded hover:bg-trench-mud transition-all flex items-center justify-center cursor-pointer"
+        className="p-1 bg-cyan-100/70 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/40 rounded hover:bg-cyan-200 dark:hover:bg-trench-mud transition-all flex items-center justify-center cursor-pointer"
         title="TACTICAL CONFIG"
       >
-        <Settings size={14} className={`text-trench-gasmask ${isOpen ? 'rotate-45 text-neon-moon' : ''} transition-all`} />
+        <Settings size={14} className={`text-slate-700 dark:text-trench-gasmask ${isOpen ? 'rotate-45 text-teal-600 dark:text-neon-moon' : ''} transition-all`} />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-8 mt-2 w-72 bg-trench-black border-4 border-trench-sandbag rounded shadow-2xl z-[9999] p-4 scanlines">
-          <div className="flex justify-between items-center border-b border-trench-sandbag/45 pb-2 mb-3">
-            <span className="font-staatliches tracking-wider text-neon-moon text-lg uppercase font-bold">TACTICAL CONTROLS</span>
-            <button onClick={() => setIsOpen(false)} className="text-trench-gasmask hover:text-white cursor-pointer">
+        <div className="absolute right-0 top-8 mt-2 w-72 bg-white dark:bg-trench-black border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-xl shadow-2xl z-[9999] p-4 dark:scanlines text-slate-800 dark:text-white">
+          <div className="flex justify-between items-center border-b border-cyan-200 dark:border-trench-sandbag/45 pb-2 mb-3">
+            <span className="font-staatliches tracking-wider text-teal-700 dark:text-neon-moon text-lg uppercase font-bold">TACTICAL CONTROLS</span>
+            <button onClick={() => setIsOpen(false)} className="text-slate-500 hover:text-slate-800 dark:text-trench-gasmask dark:hover:text-white cursor-pointer">
               <X size={16} />
             </button>
           </div>
 
-          <div className="space-y-4 font-mono text-[10px] text-white">
+          <div className="space-y-4 font-mono text-[10px] text-slate-800 dark:text-white">
             {/* Network Congestion Widget */}
-            <div className="flex justify-between items-center bg-trench-mud border border-trench-sandbag/30 rounded p-1.5 mb-2">
-              <span className="text-[8px] text-trench-gasmask uppercase font-bold">NETWORK CONGESTION:</span>
+            <div className="flex justify-between items-center bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/30 rounded p-1.5 mb-2">
+              <span className="text-[8px] text-slate-500 dark:text-trench-gasmask uppercase font-bold">NETWORK CONGESTION:</span>
               <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
-                congestionStatus === 'LOW' ? 'bg-green-500/20 text-green-400' :
-                congestionStatus === 'NORMAL' ? 'bg-blue-500/20 text-blue-400' :
-                congestionStatus === 'CONGESTED' ? 'bg-yellow-500/20 text-yellow-400' :
-                'bg-red-500/20 text-red-400 animate-pulse'
+                congestionStatus === 'LOW' ? 'bg-green-500/20 text-green-700 dark:text-green-400' :
+                congestionStatus === 'NORMAL' ? 'bg-blue-500/20 text-blue-700 dark:text-blue-400' :
+                congestionStatus === 'CONGESTED' ? 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400' :
+                'bg-red-500/20 text-red-700 dark:text-red-400 animate-pulse'
               }`}>
                 {congestionStatus} {isFetchingFees && '🔄'}
               </span>
@@ -207,7 +225,7 @@ export const HeaderSettings: React.FC = () => {
 
             {/* Priority Fee Section */}
             <div>
-              <span className="font-bold uppercase tracking-wider text-trench-gasmask block mb-2 text-[8px]">AMMUNITION SPEED (PRIORITY FEE)</span>
+              <span className="font-bold uppercase tracking-wider text-slate-600 dark:text-trench-gasmask block mb-2 text-[8px]">AMMUNITION SPEED (PRIORITY FEE)</span>
               <div className="grid grid-cols-5 gap-1">
                 {priorityPresets.map((preset) => {
                   const isActive = settings.priorityFeeType === preset.value;
@@ -217,8 +235,8 @@ export const HeaderSettings: React.FC = () => {
                       onClick={() => handlePrioritySelect(preset.value)}
                       className={`py-1 rounded text-[6.5px] border font-bold uppercase transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)]'
-                          : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white'
+                          ? 'bg-teal-600/10 dark:bg-neon-moon/20 border-teal-600 dark:border-neon-moon text-teal-700 dark:text-neon-moon shadow-sm dark:shadow-[0_0_8px_rgba(57,255,20,0.3)]'
+                          : 'bg-cyan-50 dark:bg-trench-mud border-cyan-200 dark:border-trench-sandbag/45 text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       {preset.label}
@@ -227,13 +245,13 @@ export const HeaderSettings: React.FC = () => {
                 })}
               </div>
               {settings.priorityFeeType === 'custom' && (
-                <div className="mt-2 flex items-center gap-2 bg-trench-mud border border-trench-sandbag/40 rounded p-1.5">
-                  <span className="text-[8px] text-trench-gasmask uppercase font-bold shrink-0">Micro-lamports:</span>
+                <div className="mt-2 flex items-center gap-2 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/40 rounded p-1.5">
+                  <span className="text-[8px] text-slate-600 dark:text-trench-gasmask uppercase font-bold shrink-0">Micro-lamports:</span>
                   <input
                     type="number"
                     value={customFeeVal}
                     onChange={handleCustomFeeChange}
-                    className="flex-1 min-w-0 bg-black text-neon-moon font-mono text-[10px] px-1 py-0.5 border border-trench-sandbag rounded focus:outline-none focus:border-neon-moon"
+                    className="flex-1 min-w-0 bg-white dark:bg-black text-teal-700 dark:text-neon-moon font-mono text-[10px] px-1 py-0.5 border border-cyan-300 dark:border-trench-sandbag rounded focus:outline-none focus:border-teal-600 dark:focus:border-neon-moon"
                   />
                 </div>
               )}
@@ -241,7 +259,7 @@ export const HeaderSettings: React.FC = () => {
 
             {/* Slippage Tolerance Section */}
             <div>
-              <span className="font-bold uppercase tracking-wider text-trench-gasmask block mb-2 text-[8px]">TARGET VARIANCE (SLIPPAGE LIMIT)</span>
+              <span className="font-bold uppercase tracking-wider text-slate-600 dark:text-trench-gasmask block mb-2 text-[8px]">TARGET VARIANCE (SLIPPAGE LIMIT)</span>
               <div className="grid grid-cols-4 gap-1">
                 {slippagePresets.map((preset) => {
                   const isActive = preset.value === 'custom' ? isCustomSlip : (!isCustomSlip && settings.slippage === preset.value);
@@ -251,8 +269,8 @@ export const HeaderSettings: React.FC = () => {
                       onClick={() => handleSlippageSelect(preset.value)}
                       className={`py-1 rounded text-[7px] border font-bold uppercase transition-all cursor-pointer ${
                         isActive
-                          ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)]'
-                          : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white'
+                          ? 'bg-teal-600/10 dark:bg-neon-moon/20 border-teal-600 dark:border-neon-moon text-teal-700 dark:text-neon-moon shadow-sm dark:shadow-[0_0_8px_rgba(57,255,20,0.3)]'
+                          : 'bg-cyan-50 dark:bg-trench-mud border-cyan-200 dark:border-trench-sandbag/45 text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       {preset.label}
@@ -261,8 +279,8 @@ export const HeaderSettings: React.FC = () => {
                 })}
               </div>
               {isCustomSlip && (
-                <div className="mt-2 flex items-center gap-2 bg-trench-mud border border-trench-sandbag/40 rounded p-1.5">
-                  <span className="text-[8px] text-trench-gasmask uppercase font-bold shrink-0">Max Slippage %:</span>
+                <div className="mt-2 flex items-center gap-2 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/40 rounded p-1.5">
+                  <span className="text-[8px] text-slate-600 dark:text-trench-gasmask uppercase font-bold shrink-0">Max Slippage %:</span>
                   <input
                     type="number"
                     step="0.1"
@@ -270,7 +288,7 @@ export const HeaderSettings: React.FC = () => {
                     max="100"
                     value={customSlipVal}
                     onChange={handleCustomSlipChange}
-                    className="flex-1 min-w-0 bg-black text-neon-moon font-mono text-[10px] px-1 py-0.5 border border-trench-sandbag rounded focus:outline-none focus:border-neon-moon"
+                    className="flex-1 min-w-0 bg-white dark:bg-black text-teal-700 dark:text-neon-moon font-mono text-[10px] px-1 py-0.5 border border-cyan-300 dark:border-trench-sandbag rounded focus:outline-none focus:border-teal-600 dark:focus:border-neon-moon"
                   />
                 </div>
               )}
@@ -278,15 +296,15 @@ export const HeaderSettings: React.FC = () => {
               {getSlippageWarning(settings.slippage) && (
                 <div className={`mt-2 p-1.5 rounded border text-[7px] font-bold leading-normal uppercase ${
                   getSlippageWarning(settings.slippage)?.type === 'danger'
-                    ? 'bg-red-500/10 border-red-500/40 text-red-400 shadow-[0_0_6px_rgba(239,68,68,0.15)]'
-                    : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-400 shadow-[0_0_6px_rgba(234,179,8,0.15)]'
+                    ? 'bg-red-500/10 border-red-500/40 text-red-600 dark:text-red-400'
+                    : 'bg-yellow-500/10 border-yellow-500/40 text-yellow-700 dark:text-yellow-400'
                 }`}>
                   {getSlippageWarning(settings.slippage)?.text}
                 </div>
               )}
             </div>
 
-            <div className="pt-2 border-t border-trench-sandbag/30 text-[8px] text-trench-gasmask uppercase leading-relaxed font-bold">
+            <div className="pt-2 border-t border-cyan-200 dark:border-trench-sandbag/30 text-[8px] text-slate-500 dark:text-trench-gasmask uppercase leading-relaxed font-bold">
               Config adjustments persist locally on this terminal console deck.
             </div>
           </div>
@@ -331,7 +349,7 @@ export const Header: React.FC<{
   }, [disconnect]);
 
   return (
-    <header className="sticky top-0 z-[100] w-full border-b border-trench-sandbag bg-black px-2 h-10 sm:h-11 flex items-center retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0" style={{ overflow: 'visible' }}>
+    <header className="sticky top-0 z-[100] w-full border-b border-cyan-200 dark:border-trench-sandbag bg-white dark:bg-black px-2 h-10 sm:h-11 flex items-center retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0 shadow-sm dark:shadow-none" style={{ overflow: 'visible' }}>
       <div className="w-full mx-auto px-2 sm:px-4 flex flex-row items-center justify-between gap-2 relative animate-fadeIn" style={{ overflow: 'visible' }}>
         {/* Left Aligned branding and navigation section */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">
@@ -345,9 +363,9 @@ export const Header: React.FC<{
               decoding="sync"
             />
             <span className="font-staatliches text-[13px] sm:text-base tracking-wider font-extrabold flex items-center select-none ml-1">
-              <span className="text-white">SHIT</span>
-              <span className="text-[#39ff14]">MARKET</span>
-              <span className="text-[#ff073a]">.</span>
+              <span className="text-[#0A1A2A] dark:text-white">SHIT</span>
+              <span className="text-[#00796B] dark:text-[#39ff14]">MARKET</span>
+              <span className="text-[#C62828] dark:text-[#ff073a]">.</span>
             </span>
           </Link>
 
@@ -359,10 +377,10 @@ export const Header: React.FC<{
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`font-mono text-[10px] tracking-wider uppercase transition-all px-2 py-0.5 rounded-sm border-b-2 ${
+                  className={`font-mono text-[10px] tracking-wider uppercase transition-all px-2 py-0.5 rounded-md border-b-2 font-bold ${
                     isActive
-                      ? 'bg-trench-black text-neon-moon border-neon-moon font-extrabold shadow-[0_1px_4px_rgba(57,255,20,0.08)]'
-                      : 'text-trench-gasmask border-transparent hover:text-white hover:bg-trench-black/40'
+                      ? 'bg-cyan-50 dark:bg-trench-black text-[#00796B] dark:text-neon-moon border-[#00796B] dark:border-neon-moon font-extrabold shadow-sm dark:shadow-[0_1px_4px_rgba(57,255,20,0.08)]'
+                      : 'text-[#2C3E50] dark:text-trench-gasmask border-transparent hover:text-[#0A1A2A] dark:hover:text-white hover:bg-cyan-50/60 dark:hover:bg-trench-black/40'
                   }`}
                 >
                   {item.label}
@@ -375,13 +393,16 @@ export const Header: React.FC<{
         {/* Wallet Connection / Ammo Status */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
           <Link href="/?play_intro=true" className="hidden sm:block">
-            <button className="px-1.5 py-0.5 retro-btn retro-btn-neutral border border-trench-sandbag/60 rounded font-staatliches text-[8px] sm:text-[9px] tracking-wider uppercase transition-colors shrink-0 font-bold flex items-center gap-0.5">
-              Briefing
+            <button className="px-1.5 py-0.5 retro-btn retro-btn-neutral border border-amber-300 dark:border-trench-sandbag/60 rounded font-staatliches text-[8px] sm:text-[9px] tracking-wider uppercase transition-colors shrink-0 font-bold flex items-center gap-0.5">
+              Guide
             </button>
           </Link>
+
+          {/* Theme Toggle Button */}
+          <ThemeToggle />
           
           {activeWalletAddress ? (
-            <div className="flex items-center gap-1 bg-black border border-trench-sandbag/50 rounded p-0.5">
+            <div className="flex items-center gap-1 bg-cyan-50 dark:bg-black border border-cyan-200 dark:border-trench-sandbag/50 rounded p-0.5">
               {/* Notification Bell */}
               <NotificationBell />
 
@@ -392,22 +413,30 @@ export const Header: React.FC<{
               <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowWalletPanel(!showWalletPanel)}
-                  className="flex items-center gap-1 px-1.5 py-0.5 bg-trench-mud hover:bg-trench-mud/85 border border-trench-sandbag/40 rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+                  className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-50 dark:bg-trench-mud hover:bg-amber-100 dark:hover:bg-trench-mud/85 border border-amber-200 dark:border-trench-sandbag/40 rounded-sm cursor-pointer transition-all active:translate-y-0.5"
                 >
-                  <Coins size={9} className="text-moon-gold font-bold" />
-                  <span className="font-mono text-[8px] sm:text-[9px] font-bold text-moon-gold">
+                  <Coins size={9} className="text-amber-600 dark:text-moon-gold font-bold" />
+                  <span className="font-mono text-[8px] sm:text-[9px] font-bold text-amber-800 dark:text-moon-gold">
                     <span className="hidden sm:inline">AMMO: </span><span className="glow-gold font-bold">{(user?.balance ?? balance).toFixed(2)} {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' || useAppState.getState().isEvm ? 'USDC' : 'SOL'}</span>
                   </span>
                 </button>
                 {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' && (
                   <button
                     onClick={() => useAppState.getState().mintTestnetUsdc(1000)}
-                    className="hidden sm:inline-block px-1.5 py-0.5 bg-neon-moon/20 hover:bg-neon-moon text-neon-moon hover:text-black border border-neon-moon/50 font-mono text-[8px] font-bold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+                    className="hidden sm:inline-block px-1.5 py-0.5 bg-teal-600/20 hover:bg-teal-600 dark:bg-neon-moon/20 dark:hover:bg-neon-moon text-teal-700 hover:text-white dark:text-neon-moon dark:hover:text-black border border-teal-600/50 dark:border-neon-moon/50 font-mono text-[8px] font-bold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
                     title="Get 1,000 Free Testnet USDC"
                   >
                     +1K USDC
                   </button>
                 )}
+                <button
+                  onClick={() => useAppState.getState().openRelayDepositModal()}
+                  className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#00796B]/15 dark:bg-neon-moon/20 hover:bg-[#00796B] dark:hover:bg-neon-moon text-[#00796B] hover:text-white dark:text-neon-moon dark:hover:text-black border border-[#00796B]/50 dark:border-neon-moon/50 font-mono text-[8px] font-extrabold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+                  title="Deposit from Base, Arbitrum, Mainnet, etc. via Relay Protocol"
+                >
+                  <Zap size={8} />
+                  <span>+ CROSS-CHAIN</span>
+                </button>
               </div>
 
               {/* Connected wallet profile image linking to profile */}
@@ -428,7 +457,7 @@ export const Header: React.FC<{
               <button
                 onClick={handleDisconnect}
                 title="RESERVE FORCES (DISCONNECT)"
-                className="p-0.5 text-trench-gasmask hover:text-white hover:bg-red-500/20 transition-all rounded border border-trench-sandbag/40 bg-trench-black cursor-pointer"
+                className="p-0.5 text-slate-600 dark:text-trench-gasmask hover:text-red-600 dark:hover:text-white hover:bg-red-500/20 transition-all rounded border border-cyan-200 dark:border-trench-sandbag/40 bg-white dark:bg-trench-black cursor-pointer"
               >
                 <LogOut size={10} />
               </button>
@@ -436,7 +465,7 @@ export const Header: React.FC<{
           ) : (
             <button
               onClick={handleConnect}
-              className="relative flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1 font-staatliches text-[10px] sm:text-xs tracking-wider uppercase text-black active:translate-y-0.5 transition-all rounded font-bold retro-btn retro-btn-moon cursor-pointer"
+              className="relative flex items-center gap-1 px-2 py-0.5 sm:px-3 sm:py-1 font-staatliches text-[10px] sm:text-xs tracking-wider uppercase text-white dark:text-black active:translate-y-0.5 transition-all rounded font-bold retro-btn retro-btn-moon cursor-pointer"
             >
               <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={11} loading="eager" className="rounded-full animate-bounce sm:size-[13px]" />
               <span>SIGN IN / SIGN UP</span>

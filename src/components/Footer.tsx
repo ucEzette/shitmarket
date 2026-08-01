@@ -7,7 +7,7 @@ import { ShieldAlert, MessageSquareCode, HelpCircle } from 'lucide-react';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="relative mt-auto w-full bg-trench-black border-t-4 border-trench-sandbag pb-6 pt-4">
+    <footer className="relative mt-auto w-full bg-white dark:bg-trench-black border-t-2 border-cyan-200 dark:border-t-4 dark:border-trench-sandbag pb-6 pt-4 text-slate-800 dark:text-white transition-colors duration-200">
       {/* Barbed Wire Divider */}
       <div className="absolute -top-[10px] left-0 right-0 w-full overflow-hidden z-10 pointer-events-none">
         <PixelBarbedWire height={16} />
@@ -23,46 +23,46 @@ export const Footer: React.FC = () => {
               className="h-[22px] w-auto object-contain"
             />
             <span className="font-staatliches text-base tracking-wider font-extrabold flex items-center select-none ml-1">
-              <span className="text-white">SHIT</span>
-              <span className="text-[#39ff14]">MARKET</span>
-              <span className="text-[#ff073a]">.</span>
+              <span className="text-[#0A1A2A] dark:text-white">SHIT</span>
+              <span className="text-[#00796B] dark:text-[#39ff14]">MARKET</span>
+              <span className="text-[#C62828] dark:text-[#ff073a]">.</span>
             </span>
-            <span className="font-staatliches text-base text-neon-moon tracking-wider ml-1">
+            <span className="font-staatliches text-base text-[#00796B] dark:text-neon-moon tracking-wider ml-1">
               • COMBAT HQ
             </span>
           </div>
-          <p className="font-mono text-[10px] text-trench-gasmask">
+          <p className="font-mono text-[10px] text-slate-500 dark:text-trench-gasmask">
             NO RUGS. JUST BETS. PURE DEGEN DEFI WARFARE.
           </p>
         </div>
 
         {/* Dynamic Status Badges / Settlement Engine */}
-        <div className="flex items-center gap-2 bg-trench-mud border border-trench-sandbag/60 rounded px-3 py-1 shadow-md">
-          <div className="w-1.5 h-1.5 rounded-full bg-jeet-red animate-pulse" />
-          <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase">SETTLEMENT ENGINE:</span>
-          <span className="font-staatliches text-sm text-jeet-red tracking-wider">SECURE PvP</span>
+        <div className="flex items-center gap-2 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/60 rounded px-3 py-1 shadow-sm dark:shadow-md">
+          <div className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-jeet-red animate-pulse" />
+          <span className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask font-bold uppercase">SETTLEMENT ENGINE:</span>
+          <span className="font-staatliches text-sm text-red-600 dark:text-jeet-red tracking-wider">SECURE PvP</span>
         </div>
 
         {/* Warning Banner */}
-        <div className="flex items-center gap-1.5 bg-trench-mud/40 border border-trench-sandbag/30 rounded px-2.5 py-1 max-w-xs sm:max-w-md">
-          <ShieldAlert size={10} className="text-jeet-red animate-pulse shrink-0" />
-          <span className="font-mono text-[9px] text-jeet-red/90 font-bold uppercase tracking-wider text-center lg:text-left">
+        <div className="flex items-center gap-1.5 bg-cyan-50/60 dark:bg-trench-mud/40 border border-cyan-200 dark:border-trench-sandbag/30 rounded px-2.5 py-1 max-w-xs sm:max-w-md">
+          <ShieldAlert size={10} className="text-red-600 dark:text-jeet-red animate-pulse shrink-0" />
+          <span className="font-mono text-[9px] text-red-700 dark:text-jeet-red/90 font-bold uppercase tracking-wider text-center lg:text-left">
             Warning: 100% Leverage, zero seatbelts. Stake at your own peril.
           </span>
         </div>
 
         {/* Social / Recruit Links */}
         <div className="flex items-center gap-3">
-          <span className="font-mono text-[9px] text-trench-gasmask font-bold tracking-wider uppercase hidden xl:inline">
+          <span className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask font-bold tracking-wider uppercase hidden xl:inline">
             RECRUIT CHANNELS:
           </span>
           <div className="flex items-center gap-2">
             {/* Mobile App Coming Soon Status */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-trench-mud border border-trench-sandbag/60 rounded font-mono text-[9.5px] font-bold text-trench-gasmask shadow-inner select-none">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/60 rounded font-mono text-[9.5px] font-bold text-slate-600 dark:text-trench-gasmask shadow-inner select-none">
               <span>MOBILE CLIENT:</span>
-              <span className="text-neon-moon flex items-center gap-1">
+              <span className="text-[#00796B] dark:text-neon-moon flex items-center gap-1">
                 COMING SOON
-                <span className="w-1.5 h-1.5 rounded-full bg-neon-moon animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00796B] dark:bg-neon-moon animate-pulse" />
               </span>
             </div>
 
@@ -70,7 +70,7 @@ export const Footer: React.FC = () => {
               href="https://x.com/shitmarketlol"
               target="_blank"
               rel="noreferrer"
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-trench-mud border border-trench-sandbag hover:border-neon-moon text-trench-gasmask hover:text-neon-moon transition-all rounded font-mono text-[9.5px] font-bold"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag hover:border-[#00796B] dark:hover:border-neon-moon text-slate-600 dark:text-trench-gasmask hover:text-[#00796B] dark:hover:text-neon-moon transition-all rounded font-mono text-[9.5px] font-bold"
               title="X (Twitter)"
             >
               <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24">
@@ -82,14 +82,14 @@ export const Footer: React.FC = () => {
               href="https://discord.com"
               target="_blank"
               rel="noreferrer"
-              className="p-1.5 bg-trench-mud border border-trench-sandbag hover:border-neon-moon text-trench-gasmask hover:text-neon-moon transition-all rounded shadow-inner"
+              className="p-1.5 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag hover:border-[#00796B] dark:hover:border-neon-moon text-slate-600 dark:text-trench-gasmask hover:text-[#00796B] dark:hover:text-neon-moon transition-all rounded shadow-inner"
               title="Discord Bunker Chat"
             >
               <MessageSquareCode size={13} />
             </a>
             <Link
               href="/rules"
-              className="p-1.5 bg-trench-mud border border-trench-sandbag hover:border-neon-moon text-trench-gasmask hover:text-neon-moon transition-all rounded shadow-inner"
+              className="p-1.5 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag hover:border-[#00796B] dark:hover:border-neon-moon text-slate-600 dark:text-trench-gasmask hover:text-[#00796B] dark:hover:text-neon-moon transition-all rounded shadow-inner"
               title="War Manual"
             >
               <HelpCircle size={13} />
@@ -98,11 +98,11 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      <div className="mx-auto max-w-full px-4 md:px-8 mt-4 text-center border-t border-trench-sandbag/20 pt-3">
-        <p className="font-mono text-[9px] text-neon-moon uppercase tracking-wider font-bold mb-1">
-          HQ RADIO COURIER: <a href="mailto:contact@shitmarket.lol" className="underline hover:text-white transition-colors">contact@shitmarket.lol</a>
+      <div className="mx-auto max-w-full px-4 md:px-8 mt-4 text-center border-t border-cyan-200 dark:border-trench-sandbag/20 pt-3">
+        <p className="font-mono text-[9px] text-[#00796B] dark:text-neon-moon uppercase tracking-wider font-bold mb-1">
+          HQ RADIO COURIER: <a href="mailto:contact@shitmarket.lol" className="underline hover:text-slate-900 dark:hover:text-white transition-colors">contact@shitmarket.lol</a>
         </p>
-        <p className="font-mono text-[8px] text-trench-gasmask/50">
+        <p className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask/50">
           © {new Date().getFullYear()} ShitMarket. Created by and for degenerate trench commanders. Built with no corporate support whatsoever.
         </p>
       </div>

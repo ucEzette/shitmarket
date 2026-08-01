@@ -3,12 +3,12 @@
 import React, { useState } from 'react';
 import { useWalletContext } from './WalletProvider';
 import { useExportWallet } from '@privy-io/react-auth/solana';
-import { Copy, Check, QrCode, LogOut, Key, Plus, ChevronDown, ShieldAlert, Sparkles, RefreshCw, Coins } from 'lucide-react';
+import { Zap, Copy, Check, QrCode, LogOut, Key, Plus, ChevronDown, ShieldAlert, Sparkles, RefreshCw, Coins } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAppState } from '@/store/useAppState';
 
 export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
-  const { user, mintTestnetUsdc } = useAppState();
+  const { user, mintTestnetUsdc, openRelayDepositModal } = useAppState();
   const [isMintingUsdc, setIsMintingUsdc] = useState(false);
   const {
     walletType,
@@ -81,26 +81,26 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
   const displayAddress = `${activeWalletAddress.substring(0, 6)}...${activeWalletAddress.slice(-4)}`;
 
   return (
-    <div className="p-4 bg-trench-black border-4 border-trench-sandbag rounded shadow-2xl space-y-4 max-w-sm w-full scanlines font-mono">
+    <div className="p-4 bg-white dark:bg-trench-black border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-xl shadow-xl dark:shadow-2xl space-y-4 max-w-sm w-full dark:scanlines font-mono text-slate-800 dark:text-white transition-colors duration-200">
       {/* Wallet Type Badge */}
-      <div className="flex justify-between items-center border-b border-trench-sandbag/45 pb-2">
-        <span className="font-staatliches tracking-wider text-trench-gasmask text-sm uppercase font-bold">
+      <div className="flex justify-between items-center border-b border-cyan-200 dark:border-trench-sandbag/45 pb-2">
+        <span className="font-staatliches tracking-wider text-slate-500 dark:text-trench-gasmask text-sm uppercase font-bold">
           TERMINAL ADAPTER
         </span>
         <span className={`text-[9px] font-bold px-2 py-0.5 rounded border uppercase ${
           walletType === 'embedded'
-            ? 'bg-neon-moon/15 border-neon-moon text-neon-moon'
+            ? 'bg-teal-600/15 dark:bg-neon-moon/15 border-teal-600 dark:border-neon-moon text-teal-700 dark:text-neon-moon'
             : walletType === 'imported'
-            ? 'bg-red-500/15 border-red-500 text-red-500 animate-pulse'
-            : 'bg-moon-gold/15 border-moon-gold text-moon-gold'
+            ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-500 animate-pulse'
+            : 'bg-amber-500/15 border-amber-500 text-amber-700 dark:text-moon-gold'
         }`}>
           {walletType === 'imported' ? '🔥 HOT WALLET' : walletType === 'embedded' ? '⚡ EMBEDDED' : '🔌 EXTERNAL'}
         </span>
       </div>
 
       {/* Primary Wallet Selector */}
-      <div className="space-y-1.5 border-b border-trench-sandbag/30 pb-3">
-        <span className="font-bold uppercase tracking-wider text-trench-gasmask block text-[8.5px]">
+      <div className="space-y-1.5 border-b border-cyan-200 dark:border-trench-sandbag/30 pb-3">
+        <span className="font-bold uppercase tracking-wider text-slate-500 dark:text-trench-gasmask block text-[8.5px]">
           DESIGNATED PRIMARY WALLET
         </span>
         <div className="grid grid-cols-3 gap-1">
@@ -110,8 +110,8 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
             disabled={!embeddedWallets.length}
             className={`py-1 rounded text-[7.5px] border font-bold uppercase transition-all cursor-pointer ${
               walletType === 'embedded'
-                ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)] font-extrabold'
-                : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white disabled:opacity-30 disabled:cursor-not-allowed'
+                ? 'bg-teal-600/10 dark:bg-neon-moon/20 border-teal-600 dark:border-neon-moon text-teal-700 dark:text-neon-moon shadow-sm font-extrabold'
+                : 'bg-cyan-50 dark:bg-trench-mud border-cyan-200 dark:border-trench-sandbag/45 text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white disabled:opacity-30 disabled:cursor-not-allowed'
             }`}
             title="Use Privy Embedded Wallet"
           >
@@ -124,8 +124,8 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
               onClick={() => setWalletType('external')}
               className={`py-1 rounded text-[7.5px] border font-bold uppercase transition-all cursor-pointer ${
                 walletType === 'external'
-                  ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)] font-extrabold'
-                  : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white'
+                  ? 'bg-teal-600/10 dark:bg-neon-moon/20 border-teal-600 dark:border-neon-moon text-teal-700 dark:text-neon-moon shadow-sm font-extrabold'
+                  : 'bg-cyan-50 dark:bg-trench-mud border-cyan-200 dark:border-trench-sandbag/45 text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
               }`}
               title="Use Connected External Wallet"
             >
@@ -134,7 +134,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
           ) : (
             <button
               onClick={linkExternalWallet}
-              className="py-1 rounded text-[7px] border border-dashed border-neon-moon/30 hover:border-neon-moon/60 text-neon-moon bg-neon-moon/5 hover:bg-neon-moon/10 font-bold uppercase transition-all cursor-pointer"
+              className="py-1 rounded text-[7px] border border-dashed border-teal-600/40 dark:border-neon-moon/30 hover:border-teal-600 dark:hover:border-neon-moon/60 text-teal-700 dark:text-neon-moon bg-teal-600/5 dark:bg-neon-moon/5 font-bold uppercase transition-all cursor-pointer"
               title="Link External Wallet"
             >
               + Link Ext
@@ -147,15 +147,15 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
               onClick={() => setWalletType('imported')}
               className={`py-1 rounded text-[7.5px] border font-bold uppercase transition-all cursor-pointer ${
                 walletType === 'imported'
-                  ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-[0_0_8px_rgba(57,255,20,0.3)] font-extrabold'
-                  : 'bg-trench-mud border-trench-sandbag/45 text-trench-gasmask hover:text-white'
+                  ? 'bg-teal-600/10 dark:bg-neon-moon/20 border-teal-600 dark:border-neon-moon text-teal-700 dark:text-neon-moon shadow-sm font-extrabold'
+                  : 'bg-cyan-50 dark:bg-trench-mud border-cyan-200 dark:border-trench-sandbag/45 text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
               }`}
               title="Use Imported Hot Wallet"
             >
               🔥 Hot Wallet
             </button>
           ) : (
-            <span className="py-1 rounded text-[7.5px] border border-trench-sandbag/20 text-trench-gasmask/30 text-center uppercase select-none flex items-center justify-center">
+            <span className="py-1 rounded text-[7.5px] border border-cyan-200 dark:border-trench-sandbag/20 text-slate-400 dark:text-trench-gasmask/30 text-center uppercase select-none flex items-center justify-center">
               No Hot Key
             </span>
           )}
@@ -163,25 +163,25 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
       </div>
 
       {/* Address & Balance */}
-      <div className="bg-black/60 border border-trench-sandbag/30 rounded p-3 space-y-2">
+      <div className="bg-cyan-50 dark:bg-black/60 border border-cyan-200 dark:border-trench-sandbag/30 rounded p-3 space-y-2">
         <div className="flex justify-between items-center text-xs">
-          <span className="text-trench-gasmask uppercase text-[9px] font-bold">Address:</span>
+          <span className="text-slate-500 dark:text-trench-gasmask uppercase text-[9px] font-bold">Address:</span>
           <div className="flex items-center gap-1.5">
-            <span className="text-white font-bold select-all text-[10px]">{displayAddress}</span>
+            <span className="text-slate-900 dark:text-white font-bold select-all text-[10px]">{displayAddress}</span>
             <button
               onClick={handleCopy}
-              className="text-trench-gasmask hover:text-white transition-colors cursor-pointer"
+              className="text-slate-500 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
               title="Copy Address"
             >
-              {copied ? <Check size={12} className="text-neon-moon" /> : <Copy size={12} />}
+              {copied ? <Check size={12} className="text-teal-700 dark:text-neon-moon" /> : <Copy size={12} />}
             </button>
           </div>
         </div>
 
-        <div className="flex justify-between items-center border-t border-trench-sandbag/20 pt-2 text-xs">
-          <span className="text-trench-gasmask uppercase text-[9px] font-bold">Balance:</span>
+        <div className="flex justify-between items-center border-t border-cyan-200 dark:border-trench-sandbag/20 pt-2 text-xs">
+          <span className="text-slate-500 dark:text-trench-gasmask uppercase text-[9px] font-bold">Balance:</span>
           <div className="flex items-center gap-2">
-            <span className="text-moon-gold font-bold glow-gold text-sm">{(user?.balance ?? balance).toFixed(2)} {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
+            <span className="text-amber-700 dark:text-moon-gold font-bold glow-gold text-sm">{(user?.balance ?? balance).toFixed(2)} {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
             {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' && (
               <button
                 type="button"
@@ -194,7 +194,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
                     setIsMintingUsdc(false);
                   }
                 }}
-                className="px-2 py-0.5 bg-neon-moon/20 border border-neon-moon/60 hover:bg-neon-moon text-neon-moon hover:text-black font-mono text-[9px] uppercase font-bold rounded transition-all cursor-pointer flex items-center gap-1 active:scale-95"
+                className="px-2 py-0.5 bg-teal-600/10 dark:bg-neon-moon/20 border border-teal-600/50 dark:border-neon-moon/60 hover:bg-teal-600 dark:hover:bg-neon-moon text-teal-700 hover:text-white dark:text-neon-moon dark:hover:text-black font-mono text-[9px] uppercase font-bold rounded transition-all cursor-pointer flex items-center gap-1 active:scale-95"
                 title="Mint 1,000 Free Testnet USDC on Avalanche Fuji"
               >
                 {isMintingUsdc ? <RefreshCw size={10} className="animate-spin" /> : <Coins size={10} />}
@@ -205,10 +205,23 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
         </div>
       </div>
 
+      {/* 1-Click Cross-Chain Deposit (Relay Protocol) Button */}
+      <button
+        type="button"
+        onClick={() => {
+          openRelayDepositModal();
+          if (onClose) onClose();
+        }}
+        className="w-full py-2.5 bg-[#00796B] dark:bg-neon-moon hover:bg-[#004D40] dark:hover:bg-green-400 text-white dark:text-black font-staatliches text-sm rounded-xl uppercase tracking-wider font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+      >
+        <Zap size={16} />
+        <span>⚡ 1-CLICK CROSS-CHAIN DEPOSIT (RELAY)</span>
+      </button>
+
       {/* Warning for Hot Wallet */}
       {walletType === 'imported' && (
-        <div className="bg-red-500/10 border border-red-500/30 text-red-400 p-2.5 rounded text-[8px] leading-normal flex items-start gap-2">
-          <ShieldAlert size={14} className="shrink-0 text-red-500 animate-pulse" />
+        <div className="bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 p-2.5 rounded text-[8px] leading-normal flex items-start gap-2">
+          <ShieldAlert size={14} className="shrink-0 text-red-600 dark:text-red-500 animate-pulse" />
           <span>
             HOT WALLET WARNING: KEYS HELD LOCALLY IN RUNTIME MEMORY. REMOVE OR REPLACE BEFORE CLOSING THIS SESSION.
           </span>
@@ -217,17 +230,17 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
 
       {/* Session Key Status for Embedded */}
       {walletType === 'embedded' && (
-        <div className="flex justify-between items-center bg-black/40 border border-trench-sandbag/25 rounded p-2 text-[9px]">
-          <span className="text-trench-gasmask uppercase font-bold">Session Auto-Signing:</span>
+        <div className="flex justify-between items-center bg-cyan-50 dark:bg-black/40 border border-cyan-200 dark:border-trench-sandbag/25 rounded p-2 text-[9px]">
+          <span className="text-slate-500 dark:text-trench-gasmask uppercase font-bold">Session Auto-Signing:</span>
           <div className="flex items-center gap-1.5">
-            <span className={`font-bold ${session ? 'text-neon-moon' : 'text-yellow-500 animate-pulse'}`}>
+            <span className={`font-bold ${session ? 'text-teal-700 dark:text-neon-moon' : 'text-amber-600 dark:text-yellow-500 animate-pulse'}`}>
               {session ? 'ENABLED (1-CLICK)' : 'NOT AUTHD'}
             </span>
             {!session && (
               <button
                 onClick={handleCreateSession}
                 disabled={isCreatingSession}
-                className="px-1.5 py-0.5 bg-yellow-500 hover:bg-yellow-600 text-black font-bold uppercase rounded text-[8px] cursor-pointer flex items-center gap-0.5"
+                className="px-1.5 py-0.5 bg-amber-500 hover:bg-amber-600 text-white dark:text-black font-bold uppercase rounded text-[8px] cursor-pointer flex items-center gap-0.5"
               >
                 {isCreatingSession ? <RefreshCw size={8} className="animate-spin" /> : <Sparkles size={8} />}
                 <span>Authorize</span>
@@ -240,15 +253,15 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
       {/* Multi-wallet Dropdown Selector for Embedded */}
       {walletType === 'embedded' && embeddedWallets.length > 1 && (
         <div className="relative">
-          <span className="font-bold uppercase tracking-wider text-trench-gasmask block mb-1 text-[8px]">
+          <span className="font-bold uppercase tracking-wider text-slate-500 dark:text-trench-gasmask block mb-1 text-[8px]">
             SWITCH EMBEDDED ACCOUNT
           </span>
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="w-full bg-black hover:bg-black/80 text-white border border-trench-sandbag/40 rounded px-2.5 py-1.5 flex justify-between items-center text-[10px] transition-all cursor-pointer"
+            className="w-full bg-cyan-50 dark:bg-black hover:bg-cyan-100 dark:hover:bg-black/80 text-slate-800 dark:text-white border border-cyan-200 dark:border-trench-sandbag/40 rounded px-2.5 py-1.5 flex justify-between items-center text-[10px] transition-all cursor-pointer"
           >
             <span>{activeEmbeddedWallet?.address.substring(0, 8)}...{activeEmbeddedWallet?.address.slice(-6)}</span>
-            <ChevronDown size={12} className={`text-trench-gasmask transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+            <ChevronDown size={12} className={`text-slate-500 dark:text-trench-gasmask transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
           </button>
 
           <AnimatePresence>
@@ -257,7 +270,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
-                className="absolute left-0 right-0 mt-1 bg-trench-black border border-trench-sandbag rounded shadow-xl z-50 max-h-36 overflow-y-auto"
+                className="absolute left-0 right-0 mt-1 bg-white dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded shadow-xl z-50 max-h-36 overflow-y-auto"
               >
                 {embeddedWallets.map((w) => {
                   const isActive = w.address === activeEmbeddedWallet?.address;
@@ -268,8 +281,8 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
                         setActiveEmbeddedWalletAddress(w.address);
                         setShowDropdown(false);
                       }}
-                      className={`w-full text-left px-3 py-1.5 text-[9px] hover:bg-trench-mud border-b border-trench-sandbag/10 last:border-b-0 flex justify-between items-center transition-colors cursor-pointer ${
-                        isActive ? 'text-neon-moon font-bold bg-trench-mud/20' : 'text-trench-gasmask'
+                      className={`w-full text-left px-3 py-1.5 text-[9px] hover:bg-cyan-50 dark:hover:bg-trench-mud border-b border-cyan-100 dark:border-trench-sandbag/10 last:border-b-0 flex justify-between items-center transition-colors cursor-pointer ${
+                        isActive ? 'text-teal-700 dark:text-neon-moon font-bold bg-cyan-50 dark:bg-trench-mud/20' : 'text-slate-600 dark:text-trench-gasmask'
                       }`}
                     >
                       <span>{w.address.substring(0, 10)}...{w.address.slice(-8)}</span>
@@ -286,15 +299,15 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
       {/* Multi-wallet Dropdown Selector for External */}
       {walletType === 'external' && externalWallets.length > 1 && (
         <div className="relative">
-          <span className="font-bold uppercase tracking-wider text-trench-gasmask block mb-1 text-[8px]">
+          <span className="font-bold uppercase tracking-wider text-slate-500 dark:text-trench-gasmask block mb-1 text-[8px]">
             SWITCH EXTERNAL ACCOUNT
           </span>
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="w-full bg-black hover:bg-black/80 text-white border border-trench-sandbag/40 rounded px-2.5 py-1.5 flex justify-between items-center text-[10px] transition-all cursor-pointer"
+            className="w-full bg-cyan-50 dark:bg-black hover:bg-cyan-100 dark:hover:bg-black/80 text-slate-800 dark:text-white border border-cyan-200 dark:border-trench-sandbag/40 rounded px-2.5 py-1.5 flex justify-between items-center text-[10px] transition-all cursor-pointer"
           >
             <span>{activeExternalWallet?.address.substring(0, 8)}...{activeExternalWallet?.address.slice(-6)}</span>
-            <ChevronDown size={12} className={`text-trench-gasmask transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
+            <ChevronDown size={12} className={`text-slate-500 dark:text-trench-gasmask transition-transform ${showDropdown ? 'rotate-180' : ''}`} />
           </button>
 
           <AnimatePresence>
@@ -303,7 +316,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
-                className="absolute left-0 right-0 mt-1 bg-trench-black border border-trench-sandbag rounded shadow-xl z-50 max-h-36 overflow-y-auto"
+                className="absolute left-0 right-0 mt-1 bg-white dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded shadow-xl z-50 max-h-36 overflow-y-auto"
               >
                 {externalWallets.map((w) => {
                   const isActive = w.address === activeExternalWallet?.address;
@@ -314,8 +327,8 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
                         setActiveExternalWalletAddress(w.address);
                         setShowDropdown(false);
                       }}
-                      className={`w-full text-left px-3 py-1.5 text-[9px] hover:bg-trench-mud border-b border-trench-sandbag/10 last:border-b-0 flex justify-between items-center transition-colors cursor-pointer ${
-                        isActive ? 'text-neon-moon font-bold bg-trench-mud/20' : 'text-trench-gasmask'
+                      className={`w-full text-left px-3 py-1.5 text-[9px] hover:bg-cyan-50 dark:hover:bg-trench-mud border-b border-cyan-100 dark:border-trench-sandbag/10 last:border-b-0 flex justify-between items-center transition-colors cursor-pointer ${
+                        isActive ? 'text-teal-700 dark:text-neon-moon font-bold bg-cyan-50 dark:bg-trench-mud/20' : 'text-slate-600 dark:text-trench-gasmask'
                       }`}
                     >
                       <span>{w.address.substring(0, 10)}...{w.address.slice(-8)}</span>
@@ -336,8 +349,8 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
           onClick={() => setShowQr(!showQr)}
           className={`py-1.5 font-staatliches text-xs uppercase rounded cursor-pointer border flex items-center justify-center gap-1 transition-all ${
             showQr
-              ? 'bg-neon-moon/20 border-neon-moon text-neon-moon'
-              : 'bg-trench-mud hover:bg-trench-mud/80 border-trench-sandbag text-white'
+              ? 'bg-teal-600/10 dark:bg-neon-moon/20 border-teal-600 dark:border-neon-moon text-teal-700 dark:text-neon-moon'
+              : 'bg-cyan-50 hover:bg-cyan-100 dark:bg-trench-mud dark:hover:bg-trench-mud/80 border-cyan-200 dark:border-trench-sandbag text-slate-800 dark:text-white'
           }`}
         >
           <QrCode size={12} />
@@ -348,7 +361,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
         {walletType === 'embedded' ? (
           <button
             onClick={handleExport}
-            className="py-1.5 font-staatliches text-xs uppercase rounded cursor-pointer border bg-trench-mud hover:bg-trench-mud/80 border-trench-sandbag text-white flex items-center justify-center gap-1 transition-all"
+            className="py-1.5 font-staatliches text-xs uppercase rounded cursor-pointer border bg-cyan-50 hover:bg-cyan-100 dark:bg-trench-mud dark:hover:bg-trench-mud/80 border-cyan-200 dark:border-trench-sandbag text-slate-800 dark:text-white flex items-center justify-center gap-1 transition-all"
           >
             <Key size={12} />
             <span>Export Key</span>
@@ -359,7 +372,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
               await disconnect();
               if (onClose) onClose();
             }}
-            className="py-1.5 font-staatliches text-xs uppercase rounded cursor-pointer border border-red-500/50 hover:bg-red-500/10 text-red-400 flex items-center justify-center gap-1 transition-all"
+            className="py-1.5 font-staatliches text-xs uppercase rounded cursor-pointer border border-red-500/50 hover:bg-red-500/10 text-red-600 dark:text-red-400 flex items-center justify-center gap-1 transition-all"
           >
             <LogOut size={12} />
             <span>Forget Wallet</span>
@@ -372,7 +385,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
         <button
           onClick={handleCreateAdditional}
           disabled={isCreatingWallet}
-          className="w-full py-1.5 font-staatliches text-xs border border-dashed border-neon-moon/40 hover:border-neon-moon/80 text-neon-moon bg-neon-moon/5 hover:bg-neon-moon/10 rounded cursor-pointer flex items-center justify-center gap-1 transition-all uppercase"
+          className="w-full py-1.5 font-staatliches text-xs border border-dashed border-teal-600/50 dark:border-neon-moon/40 hover:border-teal-600 dark:hover:border-neon-moon/80 text-teal-700 dark:text-neon-moon bg-teal-600/5 dark:bg-neon-moon/5 rounded cursor-pointer flex items-center justify-center gap-1 transition-all uppercase"
         >
           {isCreatingWallet ? <RefreshCw size={10} className="animate-spin" /> : <Plus size={10} />}
           <span>Generate Additional Account</span>
@@ -386,7 +399,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
             await disconnect();
             if (onClose) onClose();
           }}
-          className="w-full py-1.5 font-staatliches text-xs border border-red-500/40 hover:border-red-500/80 text-red-400 bg-red-500/5 hover:bg-red-500/10 rounded cursor-pointer flex items-center justify-center gap-1 transition-all uppercase"
+          className="w-full py-1.5 font-staatliches text-xs border border-red-500/40 hover:border-red-500/80 text-red-600 dark:text-red-400 bg-red-500/5 hover:bg-red-500/10 rounded cursor-pointer flex items-center justify-center gap-1 transition-all uppercase"
         >
           <LogOut size={12} />
           <span>Disconnect Adapter</span>
@@ -400,16 +413,16 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="border border-trench-sandbag/40 bg-black/75 rounded p-3 flex flex-col items-center gap-2 overflow-hidden"
+            className="border border-cyan-200 dark:border-trench-sandbag/40 bg-cyan-50 dark:bg-black/75 rounded p-3 flex flex-col items-center gap-2 overflow-hidden"
           >
             <img
               src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${activeWalletAddress}`}
               alt="Deposit QR Code"
-              className="w-28 h-28 border border-white/10 rounded"
+              className="w-28 h-28 border border-cyan-200 dark:border-white/10 rounded"
               loading="lazy"
             />
-            <span className="text-[7.5px] text-trench-gasmask text-center max-w-xs break-all leading-normal uppercase">
-              Send USDC or Testnet mock tokens to: <strong className="text-white font-bold select-all">{activeWalletAddress}</strong>
+            <span className="text-[7.5px] text-slate-600 dark:text-trench-gasmask text-center max-w-xs break-all leading-normal uppercase">
+              Send USDC or Testnet mock tokens to: <strong className="text-slate-900 dark:text-white font-bold select-all">{activeWalletAddress}</strong>
             </span>
           </motion.div>
         )}

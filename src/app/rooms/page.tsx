@@ -304,17 +304,17 @@ export default function RoomsPage() {
       <div
         key={room.id}
         onClick={() => router.push(`/room/${room.id}`)}
-        className={`bg-trench-mud border rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 select-none relative group hover:-translate-y-0.5 ${
+        className={`bg-white dark:bg-trench-mud border rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 select-none relative group hover:-translate-y-0.5 shadow-md dark:shadow-none text-slate-800 dark:text-white ${
           isMoonLeading
-            ? 'border-neon-moon/30 shadow-glow-moon hover:border-neon-moon/70 hover:shadow-glow-moon-strong'
-            : 'border-jeet-red/30 shadow-glow-jeet hover:border-jeet-red/70 hover:shadow-glow-jeet-strong'
+            ? 'border-teal-600/30 dark:border-neon-moon/30 shadow-sm dark:shadow-glow-moon hover:border-teal-600 dark:hover:border-neon-moon/70'
+            : 'border-red-600/30 dark:border-jeet-red/30 shadow-sm dark:shadow-glow-jeet hover:border-red-600 dark:hover:border-jeet-red/70'
         }`}
       >
         {/* Card Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-start gap-3">
             {/* Icon */}
-            <div className="relative bg-trench-black border border-trench-sandbag rounded-xl overflow-hidden shrink-0 w-10 h-10 flex items-center justify-center">
+            <div className="relative bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag rounded-xl overflow-hidden shrink-0 w-10 h-10 flex items-center justify-center">
               {room.token.icon && (room.token.icon.startsWith('http') || room.token.icon.startsWith('data:') || room.token.icon.startsWith('blob:')) ? (
                 <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded-lg" />
               ) : (
@@ -338,7 +338,7 @@ export default function RoomsPage() {
             </div>
             {/* Question */}
             <div className="min-w-0">
-              <h4 className="font-bold text-sm text-slate-100 line-clamp-2 leading-snug tracking-wide group-hover:text-white transition-colors">
+              <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug tracking-wide group-hover:text-teal-700 dark:group-hover:text-white transition-colors">
                 {isDebateRoom 
                   ? (room.resolutionCriteria ? room.resolutionCriteria.split('| Ref:')[0].split('Ref:')[0].trim() : room.token.name)
                   : `Will ${room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} end above ${room.openingPrice !== undefined && formatPrice(room.openingPrice) !== 'N/A' ? `$${formatPrice(room.openingPrice)}` : '$1.00'}?`}
@@ -350,7 +350,7 @@ export default function RoomsPage() {
                     navigator.clipboard.writeText(room.token.address);
                     addToast("CONTRACT COPIED!", 'success');
                   }}
-                  className="font-mono text-[9px] text-trench-gasmask hover:text-slate-300 transition-colors cursor-pointer select-all truncate mt-0.5 inline-block max-w-[150px]"
+                  className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask hover:text-slate-800 dark:hover:text-slate-300 transition-colors cursor-pointer select-all truncate mt-0.5 inline-block max-w-[150px]"
                   title="Click to copy CA"
                 >
                   CA: {room.token.address.slice(0, 6)}...{room.token.address.slice(-4)}
@@ -365,22 +365,22 @@ export default function RoomsPage() {
           {/* Moon Outcome Row */}
           <div className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
             isSettled && room.winner === 'moon'
-              ? 'bg-green-950/20 border-green-500/30'
+              ? 'bg-teal-50 dark:bg-green-950/20 border-teal-500/40 dark:border-green-500/30'
               : isSettled && room.winner !== 'moon'
               ? 'opacity-40 border-transparent'
-              : 'bg-trench-black/40 border-trench-sandbag/40 hover:border-trench-sandbag'
+              : 'bg-cyan-50/50 dark:bg-trench-black/40 border-cyan-200/60 dark:border-trench-sandbag/40 hover:border-cyan-300 dark:hover:border-trench-sandbag'
           }`}>
             <div className="flex items-center gap-2">
               <span className="text-sm">🚀</span>
-              <span className="font-bold text-xs text-slate-200">MOON</span>
-              {isSettled && room.winner === 'moon' && <span className="text-[10px] text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded font-mono font-bold">WINNER</span>}
+              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">MOON</span>
+              {isSettled && room.winner === 'moon' && <span className="text-[10px] text-teal-700 dark:text-green-500 bg-teal-100 dark:bg-green-500/10 px-1.5 py-0.5 rounded font-mono font-bold">WINNER</span>}
             </div>
             <div className="flex items-center gap-3">
-              <span className="font-bold text-sm text-slate-100">{moonPercentage.toFixed(0)}%</span>
+              <span className="font-bold text-sm text-slate-900 dark:text-slate-100">{moonPercentage.toFixed(0)}%</span>
               {!isSettled && !isDisputed ? (
                 <button
                   onClick={(e) => handleQuickBet(e, room.id, 'moon', quickAmount)}
-                  className="px-3.5 py-1 bg-green-600/10 text-green-500 hover:bg-green-600 hover:text-white border border-green-600/30 transition-all rounded-lg font-bold text-xs min-w-[70px] text-center"
+                  className="px-3.5 py-1 bg-[#00796B] dark:bg-green-600/10 text-white dark:text-green-500 hover:bg-[#004D40] dark:hover:bg-green-600 dark:hover:text-white border border-[#00796B] dark:border-green-600/30 transition-all rounded-lg font-bold text-xs min-w-[70px] text-center"
                 >
                   MOON
                 </button>
@@ -393,22 +393,22 @@ export default function RoomsPage() {
           {/* Jeet Outcome Row */}
           <div className={`flex items-center justify-between p-2 rounded-xl border transition-all ${
             isSettled && room.winner === 'jeet'
-              ? 'bg-red-950/20 border-red-500/30'
+              ? 'bg-red-50 dark:bg-red-950/20 border-red-500/40 dark:border-red-500/30'
               : isSettled && room.winner !== 'jeet'
               ? 'opacity-40 border-transparent'
-              : 'bg-trench-black/40 border-trench-sandbag/40 hover:border-trench-sandbag'
+              : 'bg-cyan-50/50 dark:bg-trench-black/40 border-cyan-200/60 dark:border-trench-sandbag/40 hover:border-cyan-300 dark:hover:border-trench-sandbag'
           }`}>
             <div className="flex items-center gap-2">
               <span className="text-sm">💀</span>
-              <span className="font-bold text-xs text-slate-200">JEET</span>
-              {isSettled && room.winner === 'jeet' && <span className="text-[10px] text-red-500 bg-red-500/10 px-1.5 py-0.5 rounded font-mono font-bold">WINNER</span>}
+              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">JEET</span>
+              {isSettled && room.winner === 'jeet' && <span className="text-[10px] text-red-700 dark:text-red-500 bg-red-100 dark:bg-red-500/10 px-1.5 py-0.5 rounded font-mono font-bold">WINNER</span>}
             </div>
             <div className="flex items-center gap-3">
-              <span className="font-bold text-sm text-slate-100">{jeetPercentage.toFixed(0)}%</span>
+              <span className="font-bold text-sm text-slate-900 dark:text-slate-100">{jeetPercentage.toFixed(0)}%</span>
               {!isSettled && !isDisputed ? (
                 <button
                   onClick={(e) => handleQuickBet(e, room.id, 'jeet', quickAmount)}
-                  className="px-3.5 py-1 bg-red-600/10 text-red-500 hover:bg-red-600 hover:text-white border border-red-600/30 transition-all rounded-lg font-bold text-xs min-w-[70px] text-center"
+                  className="px-3.5 py-1 bg-[#C62828] dark:bg-red-600/10 text-white dark:text-red-500 hover:bg-[#B71C1C] dark:hover:bg-red-600 dark:hover:text-white border border-[#C62828] dark:border-red-600/30 transition-all rounded-lg font-bold text-xs min-w-[70px] text-center"
                 >
                   JEET
                 </button>
@@ -420,13 +420,13 @@ export default function RoomsPage() {
         </div>
 
         {/* Card Footer */}
-        <div className="flex items-center justify-between border-t border-trench-sandbag/40 pt-3 mt-auto text-[10px] font-mono text-trench-gasmask">
+        <div className="flex items-center justify-between border-t border-cyan-200 dark:border-trench-sandbag/40 pt-3 mt-auto text-[10px] font-mono text-slate-600 dark:text-trench-gasmask">
           {/* Left Info Badges */}
           <div className="flex items-center gap-2 flex-wrap">
             {/* Network */}
-            <div className="flex items-center gap-1 bg-trench-black/60 px-1.5 py-0.5 rounded border border-trench-sandbag/40 shrink-0">
+            <div className="flex items-center gap-1 bg-cyan-50 dark:bg-trench-black/60 px-1.5 py-0.5 rounded border border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
               <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
-              <span className="uppercase text-[9px] font-bold text-slate-300">
+              <span className="uppercase text-[9px] font-bold text-slate-700 dark:text-slate-300">
                 {(room.token.chainId || 'solana').slice(0, 5)}
               </span>
             </div>
@@ -434,7 +434,7 @@ export default function RoomsPage() {
             <span>·</span>
 
             {/* Volume */}
-            <span className="font-bold text-slate-300">
+            <span className="font-bold text-slate-700 dark:text-slate-300">
               ${totalPot.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} {room.token.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'} Vol.
             </span>
 
@@ -442,12 +442,12 @@ export default function RoomsPage() {
 
             {/* Status */}
             {isDisputed ? (
-              <span className="text-red-500 font-bold animate-pulse">⚠️ DISPUTED</span>
+              <span className="text-red-600 dark:text-red-500 font-bold animate-pulse">⚠️ DISPUTED</span>
             ) : isSettled ? (
-              <span className="text-moon-gold font-bold">💀 SETTLED</span>
+              <span className="text-amber-700 dark:text-moon-gold font-bold">💀 SETTLED</span>
             ) : (
-              <div className="flex items-center gap-1 text-green-500 font-bold">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <div className="flex items-center gap-1 text-[#00796B] dark:text-green-500 font-bold">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00796B] dark:bg-green-500 animate-pulse" />
                 <span>{timeText}</span>
               </div>
             )}
@@ -461,12 +461,12 @@ export default function RoomsPage() {
               toggleBookmark(room.id);
               synthSound('bet');
             }}
-            className="p-1 hover:bg-trench-black border border-trench-sandbag/40 text-trench-gasmask hover:text-white rounded transition-colors"
+            className="p-1 hover:bg-cyan-100 dark:hover:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/40 text-slate-500 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white rounded transition-colors"
             title={watchlistedIds.includes(room.id) ? "Remove Bookmark" : "Bookmark Room"}
           >
             <Bookmark 
               size={11} 
-              className={watchlistedIds.includes(room.id) ? "fill-neon-moon text-neon-moon animate-pulse" : ""} 
+              className={watchlistedIds.includes(room.id) ? "fill-[#00796B] text-[#00796B] dark:fill-neon-moon dark:text-neon-moon animate-pulse" : ""} 
             />
           </button>
         </div>
@@ -477,15 +477,15 @@ export default function RoomsPage() {
   const renderGridSkeleton = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-pulse">
       {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-        <div key={n} className="bg-trench-mud border border-trench-sandbag rounded-2xl p-4 h-48" />
+        <div key={n} className="bg-white dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag rounded-2xl p-4 h-48" />
       ))}
     </div>
   );
 
   const renderEmptyGrid = () => (
-    <div className="flex flex-col items-center justify-center py-20 text-center text-trench-gasmask border-2 border-dashed border-trench-sandbag/40 rounded-2xl p-8 font-mono text-xs uppercase font-bold w-full bg-trench-mud/30">
-      <p className="text-slate-400 text-sm">No Active Markets Found</p>
-      <p className="mt-2 text-[10px] text-trench-gasmask">Try adjusting your filters or search query.</p>
+    <div className="flex flex-col items-center justify-center py-20 text-center text-slate-500 dark:text-trench-gasmask border-2 border-dashed border-cyan-200 dark:border-trench-sandbag/40 rounded-2xl p-8 font-mono text-xs uppercase font-bold w-full bg-white/50 dark:bg-trench-mud/30">
+      <p className="text-slate-700 dark:text-slate-400 text-sm">No Active Markets Found</p>
+      <p className="mt-2 text-[10px] text-slate-500 dark:text-trench-gasmask">Try adjusting your filters or search query.</p>
     </div>
   );
 
@@ -497,7 +497,7 @@ export default function RoomsPage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-50">
         <div className="flex items-center gap-6">
-          <h2 className="font-staatliches text-4xl text-white tracking-wider font-bold">
+          <h2 className="font-staatliches text-4xl text-[#0A1A2A] dark:text-white tracking-wider font-bold">
             War Room
           </h2>
           {/* Network Selection Icons */}
@@ -522,11 +522,11 @@ export default function RoomsPage() {
                 onClick={() => {
                   synthSound('bet');
                 }}
-                className="focus:outline-none transition-transform active:scale-95 flex items-center gap-1 bg-trench-black px-2 py-0.5 rounded border border-neon-moon/60 scale-95"
+                className="focus:outline-none transition-transform active:scale-95 flex items-center gap-1 bg-white dark:bg-trench-black px-2 py-0.5 rounded border border-[#00796B]/60 dark:border-neon-moon/60 scale-95"
                 title={`Network: ${selectedNetwork.toUpperCase()}`}
               >
                 <NetworkLogo chainId={selectedNetwork} active={true} className="w-5 h-5" />
-                <span className="font-mono text-[9px] text-neon-moon font-bold uppercase">{selectedNetwork}</span>
+                <span className="font-mono text-[9px] text-[#00796B] dark:text-neon-moon font-bold uppercase">{selectedNetwork}</span>
               </button>
             )}
 
@@ -537,10 +537,10 @@ export default function RoomsPage() {
                   setShowOtherNetworksDrawer(prev => !prev);
                   synthSound('bet');
                 }}
-                className={`focus:outline-none transition-all active:scale-95 w-7 h-7 rounded-full border flex items-center justify-center text-trench-gasmask hover:text-white hover:border-white ${
+                className={`focus:outline-none transition-all active:scale-95 w-7 h-7 rounded-full border flex items-center justify-center text-slate-500 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white ${
                   showOtherNetworksDrawer 
-                    ? 'bg-trench-sandbag text-white border-white scale-110 shadow-glow-moon' 
-                    : 'bg-trench-black/40 border-trench-sandbag/40'
+                    ? 'bg-cyan-100 dark:bg-trench-sandbag text-slate-900 dark:text-white border-cyan-300 dark:border-white scale-110 shadow-sm dark:shadow-glow-moon' 
+                    : 'bg-white dark:bg-trench-black/40 border-cyan-200 dark:border-trench-sandbag/40'
                 }`}
                 title="More Networks"
               >
@@ -557,21 +557,21 @@ export default function RoomsPage() {
                   
                   {/* Communications Bay Dropdown */}
                   <div 
-                    className="!absolute right-0 top-full mt-2 w-80 bg-trench-mud border-4 border-trench-sandbag z-[999] flex flex-col shadow-2xl scanlines rounded-lg overflow-hidden animate-fadeIn"
+                    className="!absolute right-0 top-full mt-2 w-80 bg-white dark:bg-trench-mud border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag z-[999] flex flex-col shadow-2xl dark:scanlines rounded-xl overflow-hidden animate-fadeIn text-slate-800 dark:text-white"
                     style={{ maxHeight: '60vh' }}
                   >
                     {/* Header */}
-                    <div className="p-3 border-b-2 border-trench-sandbag/40 bg-trench-black/60 flex items-center justify-between shrink-0">
+                    <div className="p-3 border-b border-cyan-200 dark:border-trench-sandbag/40 bg-cyan-50/80 dark:bg-trench-black/60 flex items-center justify-between shrink-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-neon-moon shadow-[0_0_6px_#39ff14] animate-pulse" />
-                        <h3 className="font-staatliches text-base tracking-widest text-white uppercase">COMMUNICATIONS BAY</h3>
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#00796B] dark:bg-neon-moon animate-pulse" />
+                        <h3 className="font-staatliches text-base tracking-widest text-slate-900 dark:text-white uppercase">COMMUNICATIONS BAY</h3>
                       </div>
                       <button 
                         onClick={() => {
                           setShowOtherNetworksDrawer(false);
                           synthSound('bet');
                         }}
-                        className="p-1 hover:bg-trench-black border border-trench-sandbag/40 text-trench-gasmask hover:text-white rounded transition-colors"
+                        className="p-1 hover:bg-cyan-100 dark:hover:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/40 text-slate-500 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white rounded transition-colors"
                         title="Abort Connection"
                       >
                         <X size={12} className="stroke-[2.5]" />
@@ -579,22 +579,22 @@ export default function RoomsPage() {
                     </div>
 
                     {/* Search Bar */}
-                    <div className="p-2.5 border-b border-trench-sandbag/20 bg-trench-black/20 shrink-0">
+                    <div className="p-2.5 border-b border-cyan-200 dark:border-trench-sandbag/20 bg-cyan-50/40 dark:bg-trench-black/20 shrink-0">
                       <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-trench-gasmask" />
+                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-trench-gasmask" />
                         <input
                           type="text"
                           placeholder="SEARCH NETWORK CHANNEL..."
                           value={drawerSearch}
                           onChange={(e) => setDrawerSearch(e.target.value)}
-                          className="w-full pl-8 pr-3 py-1.5 bg-trench-black/80 border border-trench-sandbag/40 text-white font-mono text-[9px] placeholder-trench-gasmask/60 rounded focus:border-neon-moon focus:outline-none uppercase tracking-wider font-bold"
+                          className="w-full pl-8 pr-3 py-1.5 bg-white dark:bg-trench-black/80 border border-cyan-200 dark:border-trench-sandbag/40 text-slate-900 dark:text-white font-mono text-[9px] placeholder-slate-400 dark:placeholder-trench-gasmask/60 rounded focus:border-[#00796B] dark:focus:border-neon-moon focus:outline-none uppercase tracking-wider font-bold"
                         />
                       </div>
                     </div>
 
                     {/* Drawer Content */}
                     <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0 custom-scrollbar">
-                      <span className="font-mono text-[8px] text-trench-gasmask font-bold uppercase tracking-wider block mb-1">
+                      <span className="font-mono text-[8px] text-slate-500 dark:text-trench-gasmask font-bold uppercase tracking-wider block mb-1">
                         SELECT ALTERNATIVE TRENCH NETWORK:
                       </span>
 
@@ -614,15 +614,15 @@ export default function RoomsPage() {
                                 }}
                                 className={`p-1.5 rounded border flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 group hover:-translate-y-0.5 ${
                                   isActive
-                                    ? 'bg-neon-moon/10 border-neon-moon text-neon-moon shadow-glow-moon'
-                                    : 'bg-trench-black/60 border-trench-sandbag/40 text-trench-gasmask hover:text-white hover:border-trench-sandbag'
+                                    ? 'bg-[#00796B]/15 dark:bg-neon-moon/10 border-[#00796B] dark:border-neon-moon text-[#00796B] dark:text-neon-moon'
+                                    : 'bg-white dark:bg-trench-black/60 border-cyan-200 dark:border-trench-sandbag/40 text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
                                 }`}
                               >
                                 <img
                                   src={`https://dd.dexscreener.com/ds-data/chains/${net.id}.png`}
                                   alt={net.name}
                                   className={`w-6 h-6 object-contain rounded-full transition-transform group-hover:scale-105 ${
-                                    isActive ? 'filter drop-shadow-[0_0_4px_#39ff14]' : 'opacity-70 group-hover:opacity-100'
+                                    isActive ? 'filter drop-shadow-[0_0_4px_rgba(0,121,107,0.5)] dark:drop-shadow-[0_0_4px_#39ff14]' : 'opacity-70 group-hover:opacity-100'
                                   }`}
                                   onError={(e) => {
                                     e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
@@ -644,7 +644,7 @@ export default function RoomsPage() {
                             setShowOtherNetworksDrawer(false);
                             synthSound('bet');
                           }}
-                          className="w-full mt-4 py-2 border-2 border-dashed border-trench-sandbag/60 text-trench-gasmask hover:text-white hover:border-white rounded font-mono text-[10px] uppercase font-bold text-center transition-colors block"
+                          className="w-full mt-4 py-2 border-2 border-dashed border-cyan-300 dark:border-trench-sandbag/60 text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white hover:border-slate-400 rounded font-mono text-[10px] uppercase font-bold text-center transition-colors block"
                         >
                           CLEAR CHANNEL FILTERS [ALL NETWORKS]
                         </button>
@@ -652,7 +652,7 @@ export default function RoomsPage() {
                     </div>
 
                     {/* Drawer Footer */}
-                    <div className="p-3 border-t border-trench-sandbag/40 bg-trench-black/40 text-center font-mono text-[7px] text-trench-gasmask uppercase tracking-wider shrink-0 select-none">
+                    <div className="p-3 border-t border-cyan-200 dark:border-trench-sandbag/40 bg-cyan-50/50 dark:bg-trench-black/40 text-center font-mono text-[7px] text-slate-500 dark:text-trench-gasmask uppercase tracking-wider shrink-0 select-none">
                       SYSTEM SCANNING ACTIVE // SECURE CONCOM
                     </div>
                   </div>
@@ -673,14 +673,14 @@ export default function RoomsPage() {
               }}
               className={`p-2 rounded border-2 flex items-center justify-center transition-all h-11 w-11 shrink-0 relative hover:-translate-y-0.5 select-none ${
                 showWatchlistDrawer
-                  ? 'bg-trench-sandbag text-white border-white scale-105 shadow-glow-moon'
-                  : 'bg-trench-black/40 border-trench-sandbag/40 text-trench-gasmask hover:text-white hover:border-white'
+                  ? 'bg-cyan-100 dark:bg-trench-sandbag text-slate-900 dark:text-white border-cyan-300 dark:border-white scale-105 shadow-sm dark:shadow-glow-moon'
+                  : 'bg-white dark:bg-trench-black/40 border-cyan-200 dark:border-trench-sandbag/40 text-slate-500 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
               }`}
               title="Targeted Watchlist"
             >
-              <Bookmark size={20} className={watchlistedIds.length > 0 ? "fill-neon-moon text-neon-moon" : ""} />
+              <Bookmark size={20} className={watchlistedIds.length > 0 ? "fill-[#00796B] text-[#00796B] dark:fill-neon-moon dark:text-neon-moon" : ""} />
               {watchlistedIds.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-jeet-red text-white text-[9px] font-bold h-4 w-4 rounded-full border border-trench-black flex items-center justify-center font-mono">
+                <span className="absolute -top-1.5 -right-1.5 bg-[#C62828] dark:bg-jeet-red text-white text-[9px] font-bold h-4 w-4 rounded-full border border-white dark:border-trench-black flex items-center justify-center font-mono">
                   {watchlistedIds.length}
                 </span>
               )}
@@ -697,21 +697,21 @@ export default function RoomsPage() {
                 
                 {/* Dropdown Panel */}
                 <div 
-                  className="!absolute right-0 top-full mt-2 w-80 bg-trench-mud border-4 border-trench-sandbag z-[999] flex flex-col shadow-2xl scanlines rounded-lg overflow-hidden animate-fadeIn"
+                  className="!absolute right-0 top-full mt-2 w-80 bg-white dark:bg-trench-mud border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag z-[999] flex flex-col shadow-2xl dark:scanlines rounded-xl overflow-hidden animate-fadeIn text-slate-800 dark:text-white"
                   style={{ maxHeight: '60vh' }}
                 >
                   {/* Header */}
-                  <div className="p-3 border-b-2 border-trench-sandbag/40 bg-trench-black/60 flex items-center justify-between shrink-0">
+                  <div className="p-3 border-b border-cyan-200 dark:border-trench-sandbag/40 bg-cyan-50/80 dark:bg-trench-black/60 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-1.5">
-                      <Bookmark size={14} className="text-neon-moon fill-neon-moon animate-pulse" />
-                      <h3 className="font-staatliches text-base tracking-widest text-white uppercase">WATCHLIST CONSOLE</h3>
+                      <Bookmark size={14} className="text-[#00796B] dark:text-neon-moon fill-[#00796B] dark:fill-neon-moon animate-pulse" />
+                      <h3 className="font-staatliches text-base tracking-widest text-slate-900 dark:text-white uppercase">WATCHLIST CONSOLE</h3>
                     </div>
                     <button 
                       onClick={() => {
                         setShowWatchlistDrawer(false);
                         synthSound('bet');
                       }}
-                      className="p-1 hover:bg-trench-black border border-trench-sandbag/40 text-trench-gasmask hover:text-white rounded transition-colors"
+                      className="p-1 hover:bg-cyan-100 dark:hover:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/40 text-slate-500 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white rounded transition-colors"
                       title="Close Watchlist"
                     >
                       <X size={12} className="stroke-[2.5]" />
@@ -719,11 +719,11 @@ export default function RoomsPage() {
                   </div>
 
                   {/* Watchlist content list */}
-                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0 custom-scrollbar bg-trench-black/20">
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2.5 min-h-0 custom-scrollbar bg-cyan-50/30 dark:bg-trench-black/20">
                     {watchlistedIds.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-8 text-center text-trench-gasmask font-mono text-[9px] font-bold uppercase tracking-wider leading-relaxed">
+                      <div className="flex flex-col items-center justify-center py-8 text-center text-slate-500 dark:text-trench-gasmask font-mono text-[9px] font-bold uppercase tracking-wider leading-relaxed">
                         <p>No Token Channels Targeted</p>
-                        <p className="mt-1 text-[8px] text-trench-gasmask/60">Bookmark active rooms to lock radar tracking</p>
+                        <p className="mt-1 text-[8px] text-slate-400 dark:text-trench-gasmask/60">Bookmark active rooms to lock radar tracking</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
@@ -742,10 +742,10 @@ export default function RoomsPage() {
                                   router.push(`/room/${r.id}`);
                                   setShowWatchlistDrawer(false);
                                 }}
-                                className="p-2 bg-trench-black/60 border border-trench-sandbag/40 hover:border-neon-moon rounded flex items-center justify-between gap-2 cursor-pointer transition-colors"
+                                className="p-2 bg-white dark:bg-trench-black/60 border border-cyan-200 dark:border-trench-sandbag/40 hover:border-[#00796B] dark:hover:border-neon-moon rounded-lg flex items-center justify-between gap-2 cursor-pointer transition-colors shadow-sm dark:shadow-none"
                               >
                                 <div className="flex items-center gap-2 min-w-0">
-                                  <div className="relative shrink-0 w-6 h-6 bg-trench-black border border-trench-sandbag/30 rounded flex items-center justify-center">
+                                  <div className="relative shrink-0 w-6 h-6 bg-cyan-50 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/30 rounded flex items-center justify-center">
                                     {r.token.icon && (r.token.icon.startsWith('http') || r.token.icon.startsWith('data:') || r.token.icon.startsWith('blob:')) ? (
                                       <img src={r.token.icon} alt={r.token.name} className="w-full h-full object-cover rounded" />
                                     ) : (
@@ -767,17 +767,17 @@ export default function RoomsPage() {
                                     )}
                                   </div>
                                   <div className="min-w-0">
-                                    <span className="font-staatliches text-xs text-white block truncate leading-tight">
+                                    <span className="font-staatliches text-xs text-slate-900 dark:text-white block truncate leading-tight">
                                       {r.token.name}
                                     </span>
-                                    <span className="font-mono text-[8px] text-neon-moon font-bold block leading-none">
+                                    <span className="font-mono text-[8px] text-[#00796B] dark:text-neon-moon font-bold block leading-none">
                                       {formatCashtag(r.token.symbol)} // {totalPot.toFixed(1)} {r.token.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'} POT
                                     </span>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-1.5 shrink-0">
-                                  <div className={`font-mono text-[8px] font-bold px-1 py-0.5 rounded border border-trench-sandbag/20 ${
-                                    isSettled ? 'text-moon-gold' : 'text-neon-moon'
+                                  <div className={`font-mono text-[8px] font-bold px-1 py-0.5 rounded border border-cyan-200 dark:border-trench-sandbag/20 ${
+                                    isSettled ? 'text-amber-700 dark:text-moon-gold' : 'text-[#00796B] dark:text-neon-moon'
                                   }`}>
                                     {isSettled ? 'SETTLED' : timeText}
                                   </div>
@@ -788,7 +788,7 @@ export default function RoomsPage() {
                                       toggleBookmark(r.id);
                                       synthSound('bet');
                                     }}
-                                    className="p-1 hover:bg-red-500/20 text-trench-gasmask hover:text-jeet-red rounded border border-transparent hover:border-jeet-red/30 transition-all"
+                                    className="p-1 hover:bg-red-100 dark:hover:bg-red-500/20 text-slate-400 dark:text-trench-gasmask hover:text-red-700 dark:hover:text-jeet-red rounded border border-transparent hover:border-red-300 dark:hover:border-jeet-red/30 transition-all"
                                     title="Unbookmark Channel"
                                   >
                                     <X size={10} className="stroke-[2.5]" />
@@ -802,7 +802,7 @@ export default function RoomsPage() {
                   </div>
 
                   {/* Drawer Footer */}
-                  <div className="p-2 border-t border-trench-sandbag/40 bg-trench-black/40 text-center font-mono text-[7px] text-trench-gasmask uppercase tracking-wider shrink-0 select-none">
+                  <div className="p-2 border-t border-cyan-200 dark:border-trench-sandbag/40 bg-cyan-50/50 dark:bg-trench-black/40 text-center font-mono text-[7px] text-slate-500 dark:text-trench-gasmask uppercase tracking-wider shrink-0 select-none">
                     RADAR TRACKING CONSOLE ACTIVE // TARGET LOCK
                   </div>
                 </div>
@@ -811,8 +811,8 @@ export default function RoomsPage() {
           </div>
           {/* Rocket Deploy Button */}
           <Link href="/create-room" className="w-full md:w-auto">
-            <button className="w-full py-2 px-4 font-staatliches text-lg tracking-wider text-black bg-neon-moon hover:bg-green-500 rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-1 transition-all flex items-center justify-center gap-2 uppercase font-bold h-11 text-center">
-              <Rocket size={18} className="animate-bounce text-black" />
+            <button className="w-full py-2 px-4 font-staatliches text-lg tracking-wider text-white dark:text-black bg-[#00796B] dark:bg-neon-moon hover:bg-[#004D40] dark:hover:bg-green-500 rounded-lg shadow-md dark:shadow-glow-moon active:translate-y-0.5 transition-all flex items-center justify-center gap-2 uppercase font-bold h-11 text-center">
+              <Rocket size={18} className="animate-bounce text-white dark:text-black" />
               <span>DEPLOY ROOM</span>
             </button>
           </Link>
@@ -820,7 +820,7 @@ export default function RoomsPage() {
       </div>
 
       {/* Category Selector Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none border-b border-trench-sandbag/40 shrink-0">
+      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none border-b border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.id;
           return (
@@ -832,8 +832,8 @@ export default function RoomsPage() {
               }}
               className={`px-3 py-1.5 rounded-lg border font-staatliches text-xs tracking-wider uppercase transition-all duration-150 flex items-center gap-1.5 shrink-0 select-none ${
                 isActive
-                  ? 'bg-neon-moon/20 border-neon-moon text-neon-moon shadow-glow-moon scale-105 font-bold'
-                  : 'bg-trench-black/60 border-trench-sandbag/40 text-trench-gasmask hover:text-white hover:border-gray-500'
+                  ? 'bg-[#00796B]/15 dark:bg-neon-moon/20 border-[#00796B] dark:border-neon-moon text-[#00796B] dark:text-neon-moon shadow-sm dark:shadow-glow-moon scale-105 font-bold'
+                  : 'bg-white dark:bg-trench-black/60 border-cyan-200 dark:border-trench-sandbag/40 text-slate-700 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <span className="text-sm">{cat.icon}</span>
@@ -844,12 +844,12 @@ export default function RoomsPage() {
       </div>
 
       {/* Unified Search & Filters Toolbar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-trench-mud border border-trench-sandbag rounded-2xl p-3.5 mb-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag rounded-2xl p-3.5 mb-6 shadow-sm dark:shadow-none">
         <div className="flex items-center gap-2">
-          <span className="font-staatliches text-xl text-white tracking-wider font-bold uppercase">
+          <span className="font-staatliches text-xl text-slate-900 dark:text-white tracking-wider font-bold uppercase">
             All Markets
           </span>
-          <span className="font-mono text-xs text-trench-gasmask bg-trench-black border border-trench-sandbag/80 px-2 py-0.5 rounded-full font-bold">
+          <span className="font-mono text-xs text-slate-600 dark:text-trench-gasmask bg-cyan-100 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/80 px-2 py-0.5 rounded-full font-bold">
             {filteredRooms.length}
           </span>
         </div>
@@ -857,18 +857,18 @@ export default function RoomsPage() {
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
           {/* Search */}
           <div className="relative flex-1 md:flex-initial min-w-[200px] max-w-full">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-trench-gasmask" />
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-trench-gasmask" />
             <input
               type="text"
               placeholder="Search markets..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-trench-black/80 border border-trench-sandbag/60 text-white font-mono text-xs placeholder-trench-gasmask/50 rounded-lg focus:border-neon-moon focus:outline-none uppercase font-bold tracking-wider"
+              className="w-full pl-9 pr-3 py-1.5 bg-cyan-50/60 dark:bg-trench-black/80 border border-cyan-200 dark:border-trench-sandbag/60 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 dark:placeholder-trench-gasmask/50 rounded-lg focus:border-[#00796B] dark:focus:border-neon-moon focus:outline-none uppercase font-bold tracking-wider"
             />
           </div>
 
           {/* Sort */}
-          <div className="flex items-center bg-trench-black/80 border border-trench-sandbag/60 rounded-lg p-0.5 h-9 shrink-0">
+          <div className="flex items-center bg-cyan-50/60 dark:bg-trench-black/80 border border-cyan-200 dark:border-trench-sandbag/60 rounded-lg p-0.5 h-9 shrink-0">
             {(['newest', 'expiry', 'pot'] as const).map((opt) => (
               <button
                 key={opt}
@@ -878,8 +878,8 @@ export default function RoomsPage() {
                 }}
                 className={`px-3 py-1 rounded-md text-[10px] font-mono font-bold uppercase transition-all ${
                   sortBy === opt
-                    ? 'bg-trench-sandbag text-neon-moon border border-neon-moon/40'
-                    : 'text-trench-gasmask hover:text-slate-200'
+                    ? 'bg-white dark:bg-trench-sandbag text-[#00796B] dark:text-neon-moon border border-cyan-300 dark:border-neon-moon/40 shadow-xs'
+                    : 'text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
                 {opt === 'newest' ? 'NEW' : opt === 'expiry' ? 'TIME' : 'POT'}
@@ -888,7 +888,7 @@ export default function RoomsPage() {
           </div>
 
           {/* Status filter */}
-          <div className="flex items-center bg-trench-black/80 border border-trench-sandbag/60 rounded-lg p-0.5 h-9 shrink-0">
+          <div className="flex items-center bg-cyan-50/60 dark:bg-trench-black/80 border border-cyan-200 dark:border-trench-sandbag/60 rounded-lg p-0.5 h-9 shrink-0">
             {(['live', 'expired'] as const).map((opt) => (
               <button
                 key={opt}
@@ -898,18 +898,23 @@ export default function RoomsPage() {
                 }}
                 className={`px-3 py-1 rounded-md text-[10px] font-mono font-bold uppercase transition-all ${
                   statusFilter === opt
-                    ? 'bg-trench-sandbag text-neon-moon border border-neon-moon/40'
-                    : 'text-trench-gasmask hover:text-slate-200'
+                    ? 'bg-white dark:bg-trench-sandbag text-[#00796B] dark:text-neon-moon border border-cyan-300 dark:border-neon-moon/40 shadow-xs'
+                    : 'text-slate-600 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-slate-200'
                 }`}
               >
-                {opt === 'live' ? '🟢 LIVE' : '💀 EXPIRED'}
+                {opt === 'live' ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#00796B] dark:bg-neon-moon animate-pulse" />
+                    <span>LIVE</span>
+                  </span>
+                ) : 'EXPIRED'}
               </button>
             ))}
           </div>
 
           {/* Quick Bet Stake Input */}
-          <div className="flex items-center gap-1.5 bg-trench-black/80 border border-trench-sandbag/60 rounded-lg px-2 py-1 h-9 font-mono text-xs text-white shrink-0" title="Quick Bet Stake Amount">
-            <span className="text-neon-moon font-bold animate-pulse select-none">⚡</span>
+          <div className="flex items-center gap-1.5 bg-cyan-50/60 dark:bg-trench-black/80 border border-cyan-200 dark:border-trench-sandbag/60 rounded-lg px-2 py-1 h-9 font-mono text-xs text-slate-900 dark:text-white shrink-0" title="Quick Bet Stake Amount">
+            <span className="text-[#00796B] dark:text-neon-moon font-bold animate-pulse select-none">⚡</span>
             <input
               type="number"
               step="any"
@@ -919,9 +924,9 @@ export default function RoomsPage() {
                 const val = parseFloat(e.target.value);
                 setQuickAmount(isNaN(val) ? 0 : val);
               }}
-              className="w-10 bg-transparent text-white font-bold focus:outline-none text-center"
+              className="w-10 bg-transparent text-slate-900 dark:text-white font-bold focus:outline-none text-center"
             />
-            <span className="font-staatliches text-xs text-neon-moon font-bold tracking-wider select-none">
+            <span className="font-staatliches text-xs text-[#00796B] dark:text-neon-moon font-bold tracking-wider select-none">
               {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}
             </span>
           </div>
@@ -943,11 +948,11 @@ export default function RoomsPage() {
 
       {/* Wallet Connection Helper Prompter */}
       {!user && (
-        <div className="bg-trench-mud/50 border-2 border-trench-sandbag rounded-lg p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md mb-6">
+        <div className="bg-white dark:bg-trench-mud/50 border border-cyan-200 dark:border-2 dark:border-trench-sandbag rounded-xl p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md mb-6 text-slate-800 dark:text-white">
           <div className="flex items-center gap-3">
             <PepePortrait src={PEPE_ASSETS.neonWojak} size={56} glowColor="jeet" animated className="rounded-lg" />
             <div>
-              <h4 className="font-staatliches text-lg text-white tracking-wide uppercase">
+              <h4 className="font-staatliches text-lg text-slate-900 dark:text-white tracking-wide uppercase">
                 FIGHT IN COLD BLOOD? CONNECT YOUR AMMO WALLET!
               </h4>
               <p className="font-mono text-xs text-trench-gasmask font-bold uppercase mt-0.5">

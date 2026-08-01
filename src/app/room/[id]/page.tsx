@@ -837,7 +837,7 @@ export default function RoomDetailPage() {
   const hasUnclaimed = isSettled && (userWon || (isDrawOrVoid && userBetsInRoom.length > 0)) && userBetsInRoom.some((b) => !b.claimed);
 
   return (
-    <div className={`w-full flex-1 flex flex-col select-none relative overflow-x-hidden transition-transform duration-100 bg-transparent min-h-screen text-white font-mono ${
+    <div className={`w-full flex-1 flex flex-col select-none relative overflow-x-hidden transition-transform duration-100 bg-[#A8EEFF] dark:bg-transparent min-h-screen text-[#0A1A2A] dark:text-white font-mono ${
       localShake ? 'animate-[shake_0.5s_ease-in-out]' : ''
     }`}>
       
@@ -971,19 +971,19 @@ export default function RoomDetailPage() {
       ` }} />
 
       {/* 1. AUTO-SCROLLING HORIZONTAL TREND SLIDER */}
-      <div className="w-full bg-[#050803] border-b border-[#193012] py-2.5 overflow-hidden font-mono relative z-20 shadow-inner">
+      <div className="w-full bg-white/80 dark:bg-[#050803] border-b border-cyan-200 dark:border-[#193012] py-2.5 overflow-hidden font-mono relative z-20 shadow-xs dark:shadow-inner text-[#0A1A2A] dark:text-white">
         <div className="flex animate-marquee whitespace-nowrap gap-8 min-w-full">
           {Array.from({ length: 2 }).map((_, loopIdx) => (
             <div key={loopIdx} className="flex gap-8 items-center shrink-0">
               {top10Tokens.map((tok, idx) => {
                 const isPositive = tok.change.startsWith('+');
-                const badgeColor = isPositive ? 'text-[#16a34a] glow-moon' : 'text-[#ff535a] glow-jeet';
+                const badgeColor = isPositive ? 'text-[#00796B] dark:text-[#16a34a]' : 'text-[#C62828] dark:text-[#ff535a]';
                 const arrow = isPositive ? '↗' : '↘';
                 return (
-                  <div key={`${loopIdx}-${idx}`} className="flex items-center gap-2.5 bg-black/50 border border-[#172c12] px-3.5 py-1.5 rounded-md text-xs select-none">
-                    <span className="font-staatliches tracking-wider text-white uppercase">{tok.name}</span>
-                    <span className="text-[10px] text-trench-gasmask font-bold">({formatCashtag(tok.symbol)})</span>
-                    <span className="text-yellow-500 font-bold ml-1">{tok.price}</span>
+                  <div key={`${loopIdx}-${idx}`} className="flex items-center gap-2.5 bg-cyan-50/80 dark:bg-black/50 border border-cyan-200 dark:border-[#172c12] px-3.5 py-1.5 rounded-md text-xs select-none">
+                    <span className="font-staatliches tracking-wider text-[#0A1A2A] dark:text-white uppercase">{tok.name}</span>
+                    <span className="text-[10px] text-slate-500 dark:text-trench-gasmask font-bold">({formatCashtag(tok.symbol)})</span>
+                    <span className="text-amber-700 dark:text-yellow-500 font-bold ml-1">{tok.price}</span>
                     <span className={`font-extrabold ml-1.5 ${badgeColor}`}>{arrow} {tok.change}</span>
                   </div>
                 );
@@ -994,7 +994,7 @@ export default function RoomDetailPage() {
       </div>
 
       {/* Top Navigation Bar */}
-      <div className="w-full px-2 sm:px-4 md:px-6 pt-4 pb-2 z-20 relative bg-[#020501]">
+      <div className="w-full px-2 sm:px-4 md:px-6 pt-4 pb-2 z-20 relative bg-[#A8EEFF] dark:bg-[#020501]">
         <HeaderPanel 
           backHref="/rooms" 
           missionHref="/?play_intro=true" 
@@ -1414,7 +1414,7 @@ export default function RoomDetailPage() {
                 <div className="bg-trench-black border-2 border-trench-sandbag p-4 rounded-lg font-mono text-xs shadow-2xl relative space-y-4">
                   <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm font-bold uppercase border-b border-trench-sandbag pb-2">
                     <Terminal className="w-4 h-4 text-yellow-500 animate-pulse" />
-                    <span>{isDebateMarket ? '🛡️ DEBATE INTEL BRIEFING & ORACLE SPECIFICATION' : '🛡️ TARGET AREA TELEMETRY & COIN BRIEFING'}</span>
+                    <span>{isDebateMarket ? 'DEBATE SPECIFICATION & ORACLE DATA' : 'MARKET INTEL & PRICE SPECIFICATION'}</span>
                   </div>
 
                   {isDebateMarket ? (
@@ -1925,7 +1925,7 @@ export default function RoomDetailPage() {
                   <span className="text-[7px] text-neon-moon font-bold tracking-wider">VERIFIED ON-CHAIN</span>
                 </div>
                 <h4 className="font-staatliches text-xs text-white tracking-widest border-b border-trench-sandbag pb-1.5 mb-2 flex items-center gap-1 font-bold">
-                  🛡️ {isDebateMarket ? 'ORACLE DECISION RECEIPT' : 'EVIDENCE RECEIPT'}
+                  {isDebateMarket ? 'ORACLE DECISION RECEIPT' : 'EVIDENCE RECEIPT'}
                 </h4>
                 {isDebateMarket ? (
                   <>
@@ -2218,7 +2218,7 @@ export default function RoomDetailPage() {
                   >
                     <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
                     <span className="now">MOON</span>
-                    <span className="play">BID MOON 🚀</span>
+                    <span className="play">BUY MOON (BULL)</span>
                   </button>
                   <button
                     onClick={() => {
@@ -2233,7 +2233,7 @@ export default function RoomDetailPage() {
                   >
                     <img src="/pepes/jeet-skeleton.png" className="btn-icon object-contain" alt="Pepe" />
                     <span className="now">JEET</span>
-                    <span className="play">BID JEET 💀</span>
+                    <span className="play">BUY JEET (BEAR)</span>
                   </button>
                 </div>
               </div>

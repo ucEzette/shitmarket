@@ -2960,18 +2960,59 @@ export const useAppState = create<AppState>()(
         const currentUser = state.user;
         const updatedRooms = state.rooms.map((r) => {
           if (isSameRoom(r.id, roomId)) {
-            const addedUsdc = maxUsdcSpentOrMinReceived;
+            const addedUsdc = orderType === 'buy' ? maxUsdcSpentOrMinReceived : -maxUsdcSpentOrMinReceived;
             return {
               ...r,
-              moonPool: side === 'moon' ? (r.moonPool || 0) + addedUsdc : (r.moonPool || 0),
-              jeetPool: side === 'jeet' ? (r.jeetPool || 0) + addedUsdc : (r.jeetPool || 0),
+              moonPool: side === 'moon' ? Math.max(0, (r.moonPool || 0) + addedUsdc) : (r.moonPool || 0),
+              jeetPool: side === 'jeet' ? Math.max(0, (r.jeetPool || 0) + addedUsdc) : (r.jeetPool || 0),
             };
           }
           return r;
         });
 
         if (!currentUser) return { rooms: updatedRooms };
-        const existingBets = currentUser.bets || [];
+        let existingBets = currentUser.bets || [];
+
+        if (orderType === 'buy') {
+          // Find if there is an existing active bet for this room and side
+          const existingBetIdx = existingBets.findIndex(b => b.roomId === roomId && b.side === side && !b.claimed);
+          if (existingBetIdx !== -1) {
+            const existingBet = { ...existingBets[existingBetIdx] };
+            const oldShares = existingBet.shares || 0;
+            const oldCost = existingBet.amount;
+            const newShares = oldShares + amountShares;
+            const newCost = oldCost + maxUsdcSpentOrMinReceived;
+
+            existingBet.shares = newShares;
+            existingBet.amount = newCost;
+            existingBet.pricePaid = newShares > 0 ? newCost / newShares : 0.5;
+            existingBets = [
+              ...existingBets.slice(0, existingBetIdx),
+              existingBet,
+              ...existingBets.slice(existingBetIdx + 1)
+            ];
+          } else {
+            existingBets = [newBetRecord, ...existingBets];
+          }
+        } else {
+          // Sell order: deduct shares from existing bet records
+          let remainingToDeduct = amountShares;
+          existingBets = existingBets.map((b) => {
+            if (b.roomId === roomId && b.side === side && !b.claimed && (b.shares || 0) > 0 && remainingToDeduct > 0) {
+              const deduct = Math.min(remainingToDeduct, b.shares || 0);
+              remainingToDeduct -= deduct;
+              const newShares = (b.shares || 0) - deduct;
+              const newCost = Math.max(0, b.amount - (deduct * (b.pricePaid || (maxUsdcSpentOrMinReceived / amountShares))));
+              return {
+                ...b,
+                shares: newShares,
+                amount: newCost
+              };
+            }
+            return b;
+          }).filter(b => (b.shares || 0) > 0 || b.amount > 0 || b.claimed);
+        }
+
         return {
           rooms: updatedRooms,
           user: {
@@ -2980,7 +3021,7 @@ export const useAppState = create<AppState>()(
               ...currentUser.stats,
               totalBets: ((currentUser.stats?.totalBets || 0) + 1)
             },
-            bets: [newBetRecord, ...existingBets.filter(b => b.id !== newBetRecord.id)]
+            bets: existingBets
           }
         };
       });
@@ -2991,8 +3032,9 @@ export const useAppState = create<AppState>()(
         body: JSON.stringify({
           userPubkey: wallet.address,
           side,
-          amount: Math.round(maxUsdcSpentOrMinReceived * 1e6),
-          txSig: tradeTxHash
+          amount: Math.round((orderType === 'buy' ? maxUsdcSpentOrMinReceived : -maxUsdcSpentOrMinReceived) * 1e6),
+          txSig: tradeTxHash,
+          action: orderType
         })
       }).catch(err => console.warn("Failed to log bet to indexer:", err));
 

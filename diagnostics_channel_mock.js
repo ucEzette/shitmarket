@@ -1,4 +1,4 @@
-export function tracingChannel() {
+function tracingChannel() {
   return {
     traceSync: (fn) => fn(),
     tracePromise: (fn) => fn(),
@@ -6,7 +6,8 @@ export function tracingChannel() {
     hasSubscribers: false,
   };
 }
-export function channel() {
+
+function channel() {
   return {
     subscribe: () => {},
     unsubscribe: () => {},
@@ -14,11 +15,21 @@ export function channel() {
     publish: () => {},
   };
 }
-export function hasSubscribers() {
+
+function hasSubscribers() {
   return false;
 }
-export default {
+
+const mock = {
   tracingChannel,
   channel,
   hasSubscribers,
 };
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = mock;
+  module.exports.default = mock;
+  module.exports.tracingChannel = tracingChannel;
+  module.exports.channel = channel;
+  module.exports.hasSubscribers = hasSubscribers;
+}

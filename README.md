@@ -239,11 +239,27 @@ To switch the indexer and keeper services to Avalanche mode:
    NEXT_PUBLIC_CORE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
    NEXT_PUBLIC_AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
    ```
-3. Start the indexer backend:
-   ```bash
-   cd indexer
-   npm run dev
-   ```
+---
+
+## Two-Sided AMM Seeding & Liquidity Mechanics (CPMM Architecture)
+
+ShitMarket adopts a **Two-Sided Constant Product Market Maker (CPMM) AMM Seeding Mechanism** based on Gnosis Conditional Tokens Framework (CTF):
+
+### 1. Underlying Collateral & Reserve Mechanics
+- **1:1 Collateral Ratio**: Every 1 USDC deposited into the prediction market is backed 100% on-chain by splitting into **1 MOON (YES) outcome share + 1 JEET (NO) outcome share**.
+- **Balanced AMM Pool Reserves**: When a room creator seeds a market with 100 USDC, the `AMPool.sol` smart contract splits the collateral to mint **100 MOON + 100 JEET** outcome tokens directly into the AMM pool reserves.
+- **50/50 Fair Price Discovery**: This ensures the market instantly opens with a fair 50/50 probability ($0.50 starting price per share), allowing degens to immediately trade either side without waiting for manual limit order counterparties.
+
+### 2. Room Creator Benefits & Fee Yield Capture
+- **LP Token Ownership**: The room creator receives 100 LP Shares representing ownership of the pool.
+- **Continuous Swap Fee Accrual**: On every BUY and SELL order executed against the pool by traders, a **0.30%–1.00% swap fee** accrues directly to the liquidity provider (the room creator).
+
+### 3. Exit & Settlement Mechanics
+- **Early Exit (Anytime)**: Room creators and traders do **not** have to wait for room expiry. They can remove LP liquidity or sell outcome shares back to the pool at any time to lock in profits and accrued swap fees.
+- **Settlement Redemption**: At market expiry, the oracle settles the market:
+  - Each winning outcome share redeems for **$1.00 USDC**.
+  - Each losing outcome share redeems for **$0.00 USDC**.
+  - Winning share holders claim the full payout pot from the losing side.
 
 ---
 

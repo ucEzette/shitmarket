@@ -601,27 +601,24 @@ export default function CreateRoomPage() {
     <div className="mx-auto max-w-5xl w-full px-4 py-8 flex-1 flex flex-col items-center select-none">
       
       {/* Main Wizard Container */}
-      <div className="w-full bg-[#080B11] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden relative">
+      <div className="w-full bg-white dark:bg-[#080B11] border border-cyan-200 dark:border-gray-800 rounded-2xl shadow-xl dark:shadow-2xl overflow-hidden relative text-slate-800 dark:text-white transition-colors duration-200">
         
         {/* Top Gradient Banner & Header */}
-        <div className="bg-gradient-to-r from-gray-900 via-[#0E1525] to-gray-900 border-b border-gray-800 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-cyan-100 via-sky-50 to-cyan-100 dark:from-gray-900 dark:via-[#0E1525] dark:to-gray-900 border-b border-cyan-200 dark:border-gray-800 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-gray-500 font-mono text-xs">• PERMISSIONLESS DEPLOYMENT</span>
-            </div>
-            <h1 className="font-staatliches text-4xl text-white tracking-wider uppercase font-bold flex items-center gap-2">
-              DEPLOY PREDICTION ARENA
+            <h1 className="font-staatliches text-4xl text-[#0A1A2A] dark:text-white tracking-wider uppercase font-bold flex items-center gap-2">
+              CREATE PREDICTION ARENA
             </h1>
-            <p className="font-sans text-xs text-gray-400 mt-1 max-w-xl">
+            <p className="font-sans text-xs text-slate-600 dark:text-gray-400 mt-1 max-w-xl">
               Create instant prediction markets on live price action or custom qualitative events. Resolved on-chain by automated price feeds or AI oracle nodes.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 bg-[#05080E] p-3 rounded-xl border border-gray-800/80">
+          <div className="flex items-center gap-3 bg-white/80 dark:bg-[#05080E] p-3 rounded-xl border border-cyan-200 dark:border-gray-800/80 shadow-xs">
             <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={42} glowColor="moon" className="rounded-lg" />
             <div>
-              <span className="font-mono text-[10px] text-gray-400 block uppercase font-bold">COMMAND CREATOR</span>
-              <span className="font-mono text-xs text-white font-bold select-all">
+              <span className="font-mono text-[10px] text-slate-500 dark:text-gray-400 block uppercase font-bold">CREATOR WALLET</span>
+              <span className="font-mono text-xs text-slate-900 dark:text-white font-bold select-all">
                 {wallet?.address ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}` : 'WALLET NOT CONNECTED'}
               </span>
             </div>
@@ -629,7 +626,7 @@ export default function CreateRoomPage() {
         </div>
 
         {/* Step Indicator */}
-        <div className="bg-[#0b101a] border-b border-gray-800/80 px-6 py-4">
+        <div className="bg-cyan-50/80 dark:bg-[#0b101a] border-b border-cyan-200 dark:border-gray-800/80 px-6 py-4">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
             
             {/* Step 1 Button */}
@@ -639,22 +636,22 @@ export default function CreateRoomPage() {
             >
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-staatliches text-lg font-bold border transition-all ${
                 step === 1
-                  ? 'bg-neon-moon text-black border-neon-moon shadow-[0_0_12px_rgba(57,255,20,0.3)]'
+                  ? 'bg-[#00796B] dark:bg-neon-moon text-white dark:text-black border-[#00796B] dark:border-neon-moon shadow-sm dark:shadow-[0_0_12px_rgba(57,255,20,0.3)]'
                   : step > 1
-                  ? 'bg-emerald-950 text-neon-moon border-neon-moon/60'
-                  : 'bg-gray-900 text-gray-500 border-gray-800'
+                  ? 'bg-teal-100 dark:bg-emerald-950 text-[#00796B] dark:text-neon-moon border-[#00796B]/60 dark:border-neon-moon/60'
+                  : 'bg-white dark:bg-gray-900 text-slate-400 dark:text-gray-500 border-cyan-200 dark:border-gray-800'
               }`}>
                 {step > 1 ? <Check size={18} className="stroke-[3]" /> : '1'}
               </div>
               <div className="text-left hidden sm:block">
-                <span className="font-mono text-[9px] text-gray-400 uppercase font-bold block">STEP 1</span>
-                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 1 ? 'text-white font-bold' : 'text-gray-400'}`}>
+                <span className="font-mono text-[9px] text-slate-500 dark:text-gray-400 uppercase font-bold block">STEP 1</span>
+                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 1 ? 'text-[#0A1A2A] dark:text-white font-bold' : 'text-slate-400 dark:text-gray-400'}`}>
                   TARGET MARKET
                 </span>
               </div>
             </button>
 
-            <div className={`h-0.5 flex-1 mx-4 transition-colors ${step >= 2 ? 'bg-neon-moon/60' : 'bg-gray-800'}`} />
+            <div className={`h-0.5 flex-1 mx-4 transition-colors ${step >= 2 ? 'bg-[#00796B] dark:bg-neon-moon/60' : 'bg-cyan-200 dark:bg-gray-800'}`} />
 
             {/* Step 2 Button */}
             <button
@@ -663,35 +660,35 @@ export default function CreateRoomPage() {
             >
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-staatliches text-lg font-bold border transition-all ${
                 step === 2
-                  ? 'bg-neon-moon text-black border-neon-moon shadow-[0_0_12px_rgba(57,255,20,0.3)]'
+                  ? 'bg-[#00796B] dark:bg-neon-moon text-white dark:text-black border-[#00796B] dark:border-neon-moon shadow-sm dark:shadow-[0_0_12px_rgba(57,255,20,0.3)]'
                   : step > 2
-                  ? 'bg-emerald-950 text-neon-moon border-neon-moon/60'
-                  : 'bg-gray-900 text-gray-500 border-gray-800'
+                  ? 'bg-teal-100 dark:bg-emerald-950 text-[#00796B] dark:text-neon-moon border-[#00796B]/60 dark:border-neon-moon/60'
+                  : 'bg-white dark:bg-gray-900 text-slate-400 dark:text-gray-500 border-cyan-200 dark:border-gray-800'
               }`}>
                 {step > 2 ? <Check size={18} className="stroke-[3]" /> : '2'}
               </div>
               <div className="text-left hidden sm:block">
-                <span className="font-mono text-[9px] text-gray-400 uppercase font-bold block">STEP 2</span>
-                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 2 ? 'text-white font-bold' : 'text-gray-400'}`}>
+                <span className="font-mono text-[9px] text-slate-500 dark:text-gray-400 uppercase font-bold block">STEP 2</span>
+                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 2 ? 'text-[#0A1A2A] dark:text-white font-bold' : 'text-slate-400 dark:text-gray-400'}`}>
                   ORACLE PROTOCOL
                 </span>
               </div>
             </button>
 
-            <div className={`h-0.5 flex-1 mx-4 transition-colors ${step >= 3 ? 'bg-neon-moon/60' : 'bg-gray-800'}`} />
+            <div className={`h-0.5 flex-1 mx-4 transition-colors ${step >= 3 ? 'bg-[#00796B] dark:bg-neon-moon/60' : 'bg-cyan-200 dark:bg-gray-800'}`} />
 
             {/* Step 3 Button */}
             <div className="flex items-center gap-3">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-staatliches text-lg font-bold border transition-all ${
                 step === 3
-                  ? 'bg-neon-moon text-black border-neon-moon shadow-[0_0_12px_rgba(57,255,20,0.3)]'
-                  : 'bg-gray-900 text-gray-500 border-gray-800'
+                  ? 'bg-[#00796B] dark:bg-neon-moon text-white dark:text-black border-[#00796B] dark:border-neon-moon shadow-sm dark:shadow-[0_0_12px_rgba(57,255,20,0.3)]'
+                  : 'bg-white dark:bg-gray-900 text-slate-400 dark:text-gray-500 border-cyan-200 dark:border-gray-800'
               }`}>
                 3
               </div>
               <div className="text-left hidden sm:block">
-                <span className="font-mono text-[9px] text-gray-400 uppercase font-bold block">STEP 3</span>
-                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 3 ? 'text-white font-bold' : 'text-gray-400'}`}>
+                <span className="font-mono text-[9px] text-slate-500 dark:text-gray-400 uppercase font-bold block">STEP 3</span>
+                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 3 ? 'text-[#0A1A2A] dark:text-white font-bold' : 'text-slate-400 dark:text-gray-400'}`}>
                   LIQUIDITY & LAUNCH
                 </span>
               </div>

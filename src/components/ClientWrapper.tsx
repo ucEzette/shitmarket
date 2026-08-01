@@ -739,10 +739,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
         </div>
       )}
 
-      {/* Devnet Warning Notice */}
-      <div className="w-full bg-[#fcd34d] text-black font-mono text-[10px] sm:text-xs tracking-wider uppercase py-1.5 px-4 text-center border-b border-yellow-600 flex items-center justify-center gap-2 z-[110] relative font-bold shadow-[0_2px_8px_rgba(251,191,36,0.15)]">
-        <span>⚠️ NOTICE: THE PLATFORM IS RUNNING ON AVALANCHE C-CHAIN / MULTI-CHAIN TESTNET. ALL STAKED ASSETS ARE MOCK FAUCET ASSETS.</span>
-      </div>
+
 
       {/* Main Header */}
       <Header isRoomPage={isRoomPage} onMenuToggle={() => setDrawerOpen(!drawerOpen)} />
@@ -789,11 +786,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
         })}
       </nav>
 
-      {/* Floating Tactical Pepe */}
-      <FloatingPepe />
 
-      {/* Random Degen Meme Popups */}
-      <MemePopup triggerInterval={20000} />
 
       {/* Shareable Wager Card Telemetry Modal */}
       <ShareCardModal />

@@ -434,8 +434,7 @@ export const Header: React.FC<{
                   className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#00796B]/15 dark:bg-neon-moon/20 hover:bg-[#00796B] dark:hover:bg-neon-moon text-[#00796B] hover:text-white dark:text-neon-moon dark:hover:text-black border border-[#00796B]/50 dark:border-neon-moon/50 font-mono text-[8px] font-extrabold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
                   title="Deposit from Base, Arbitrum, Mainnet, etc. via Relay Protocol"
                 >
-                  <Zap size={8} />
-                  <span>+ CROSS-CHAIN</span>
+                  <span>+ DEPOSIT</span>
                 </button>
               </div>
 

@@ -663,6 +663,12 @@ export interface AppState {
   placeLimitOrder: (roomId: string, side: 'buy' | 'sell', outcomeIndex: number, price: number, amount: number) => Promise<any>;
   executeEvmMarketTrade: (roomId: string, side: 'moon' | 'jeet', amountShares: number, orderType: 'buy' | 'sell', maxUsdcSpentOrMinReceived: number) => Promise<void>;
 
+  // Relay Protocol Cross-Chain Deposit Modal
+  isRelayDepositOpen: boolean;
+  relayInitialOriginChainId?: number;
+  openRelayDepositModal: (originChainId?: number) => void;
+  closeRelayDepositModal: () => void;
+
   // Real-time synchronization actions
   addRoom: (room: Room) => void;
   updateRoomPools: (roomId: string, moonPool: number, jeetPool: number) => void;
@@ -984,6 +990,10 @@ export const useAppState = create<AppState>()(
   shareCardData: null,
   setShareCardData: (data) => set({ shareCardData: data }),
 
+  isRelayDepositOpen: false,
+  relayInitialOriginChainId: undefined,
+  openRelayDepositModal: (originChainId?: number) => set({ isRelayDepositOpen: true, relayInitialOriginChainId: originChainId }),
+  closeRelayDepositModal: () => set({ isRelayDepositOpen: false, relayInitialOriginChainId: undefined }),
 
   wallet: null,
   isTransactionLoading: false,

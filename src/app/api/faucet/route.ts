@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
         if (avaxBal < parseEther('0.05')) {
           const avaxTx = await walletClient.sendTransaction({
             to: address as `0x${string}`,
-            value: parseEther('0.05')
+            value: parseEther('0.05'),
+            gas: BigInt(21000)
           });
           txHashes.push(avaxTx);
         }
@@ -60,7 +61,8 @@ export async function POST(req: NextRequest) {
           stateMutability: 'nonpayable'
         }] as const,
         functionName: 'mint',
-        args: [address as `0x${string}`, amountUSDC]
+        args: [address as `0x${string}`, amountUSDC],
+        gas: BigInt(250000)
       });
       txHashes.push(usdcTx);
 

@@ -50,13 +50,15 @@ export const metadata: Metadata = {
   },
 };
 
+import { ThemeProvider } from '@/components/ThemeProvider';
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="light">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -69,13 +71,15 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className="antialiased selection:bg-neon-moon selection:text-black bg-[#071105] text-white">
+      <body className="antialiased selection:bg-neon-moon selection:text-black bg-background text-foreground transition-colors duration-200">
         <ErrorBoundary>
-          <SolanaWalletProvider>
-            <ClientWrapper>
-              {children}
-            </ClientWrapper>
-          </SolanaWalletProvider>
+          <ThemeProvider>
+            <SolanaWalletProvider>
+              <ClientWrapper>
+                {children}
+              </ClientWrapper>
+            </SolanaWalletProvider>
+          </ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

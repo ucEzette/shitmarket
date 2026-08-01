@@ -11,6 +11,7 @@ import { MemePopup, PepePortrait, PEPE_ASSETS, DegenQuoteBanner } from './MemeAs
 import { ShareCardModal } from './ShareCardModal';
 import { ComplianceModal } from './ComplianceModal';
 import { CustomAlertModal } from './CustomAlertModal';
+import { RelayDepositModal } from './RelayDepositModal';
 import { Volume2, VolumeX, Flame, Radiation, Sparkles, Home, List, Hammer, Layers, Trophy, User, Coins, Briefcase, Info, X, ExternalLink, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -765,7 +766,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       </div>
 
       {/* Mobile Bottom Bar Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-1.5 bg-trench-mud border-t-4 border-trench-sandbag z-50 shadow-[0_-4px_12px_rgba(0,0,0,0.6)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-1.5 bg-white dark:bg-trench-mud border-t-2 border-cyan-200 dark:border-trench-sandbag z-50 shadow-md dark:shadow-[0_-4px_12px_rgba(0,0,0,0.6)]">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
@@ -775,11 +776,11 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
               href={item.href}
               className={`flex flex-col items-center justify-center py-1 px-2.5 transition-all rounded ${
                 isActive 
-                  ? 'bg-trench-black text-neon-moon border border-trench-sandbag scale-95' 
-                  : 'text-trench-gasmask hover:text-white'
+                  ? 'bg-cyan-50 dark:bg-trench-black text-[#00796B] dark:text-neon-moon border border-cyan-200 dark:border-trench-sandbag scale-95 font-bold' 
+                  : 'text-slate-500 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
               }`}
             >
-              <Icon size={18} className={isActive ? 'text-neon-moon' : 'text-trench-gasmask'} />
+              <Icon size={18} className={isActive ? 'text-[#00796B] dark:text-neon-moon' : 'text-slate-500 dark:text-trench-gasmask'} />
               <span className="font-staatliches text-[9px] tracking-wider mt-0.5 uppercase">
                 {item.label.split(' ')[0]}
               </span>
@@ -796,6 +797,9 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
 
       {/* Shareable Wager Card Telemetry Modal */}
       <ShareCardModal />
+
+      {/* Relay Protocol 1-Click Cross-Chain Deposit Modal */}
+      <RelayDepositModal />
 
       {/* Floating Toast Notification Tray */}
       <div className="fixed top-12 right-4 z-[9999] flex flex-col gap-2 max-w-sm w-full pointer-events-none">

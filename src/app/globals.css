@@ -3,8 +3,41 @@
 @tailwind utilities;
 
 :root {
+  --background: #A8EEFF;
+  --foreground: #0A1A2A;
+  --card-bg: #FFFFFF;
+  --card-secondary: #F0FAFE;
+  --text-primary: #0A1A2A;
+  --text-secondary: #2C3E50;
+  --text-muted: #546E7A;
+  --moon-color: #00796B;
+  --jeet-color: #C62828;
+  --gold-color: #F4A261;
+  --border-color: #B2EBF2;
+  --input-bg: #FFFFFF;
+  --input-text: #4A4A4A;
+  --input-border: #B0BEC5;
+  --header-bg: #FFFFFF;
+  --footer-bg: #E0F7FA;
+}
+
+.dark {
   --background: #0D0D0A;
   --foreground: #EDEDED;
+  --card-bg: #0F1016;
+  --card-secondary: #1E222D;
+  --text-primary: #EDEDED;
+  --text-secondary: #94A3B8;
+  --text-muted: #8B8B7A;
+  --moon-color: #39FF14;
+  --jeet-color: #FF073A;
+  --gold-color: #FFD700;
+  --border-color: #5C5244;
+  --input-bg: #05050A;
+  --input-text: #EDEDED;
+  --input-border: #8B8B7A;
+  --header-bg: #000000;
+  --footer-bg: #0F1016;
 }
 
 body {
@@ -12,9 +45,20 @@ body {
   background: var(--background);
   font-family: var(--font-jetbrains-mono), monospace;
   overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .bg-muddy-map {
+  background-color: #A8EEFF;
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(0, 121, 107, 0.08), transparent 30%),
+    radial-gradient(circle at 85% 30%, rgba(198, 40, 40, 0.08), transparent 30%),
+    linear-gradient(to right, rgba(178, 235, 242, 0.5) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(178, 235, 242, 0.5) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+}
+
+.dark .bg-muddy-map {
   background-color: #05050A;
   background-image: 
     radial-gradient(circle at 15% 50%, rgba(0, 255, 102, 0.05), transparent 25%),
@@ -26,72 +70,117 @@ body {
 
 /* Retro CRT Panel */
 .retro-panel {
-  background-color: #000000;
-  border: 4px solid #1E222D; /* border-trench-sandbag */
-  border-radius: 0.75rem; /* rounded-xl */
-  box-shadow: 0 0 10px rgba(22, 163, 74, 0.05); /* very subtle green CRT glow */
+  background-color: #FFFFFF;
+  border: 2px solid #B2EBF2;
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 20px rgba(0, 121, 107, 0.08);
   position: relative;
   overflow: hidden;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
-/* Custom Scrollbar - Gritty Tactician Rail */
+.dark .retro-panel {
+  background-color: #000000;
+  border: 4px solid #1E222D;
+  border-radius: 0.75rem;
+  box-shadow: 0 0 10px rgba(22, 163, 74, 0.05);
+}
+
+/* Custom Scrollbar - Gritty Tactician Rail in Dark, Clean Cyan Rail in Light */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 ::-webkit-scrollbar-track {
+  background: #E0F7FA;
+  border-left: 1px solid #B2EBF2;
+}
+::-webkit-scrollbar-thumb {
+  background: #80DEEA;
+  border: 1px solid #4DD0E1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #00796B;
+}
+
+.dark ::-webkit-scrollbar-track {
   background: #0D0D0A;
   border-left: 2px solid #5C5244;
 }
-::-webkit-scrollbar-thumb {
+.dark ::-webkit-scrollbar-thumb {
   background: #5C5244;
   border: 1px solid #8B8B7A;
   border-radius: 2px;
 }
-::-webkit-scrollbar-thumb:hover {
+.dark ::-webkit-scrollbar-thumb:hover {
   background: #8B8B7A;
 }
 
 /* Glowing Neon Moon (Green) */
 .glow-moon {
+  text-shadow: 0 0 5px rgba(0, 121, 107, 0.4);
+}
+.dark .glow-moon {
   text-shadow: 0 0 5px rgba(22, 163, 74, 0.5);
 }
 
 .shadow-glow-moon {
+  box-shadow: 0 4px 14px rgba(0, 121, 107, 0.15);
+}
+.dark .shadow-glow-moon {
   box-shadow: 0 0 8px rgba(22, 163, 74, 0.2);
 }
 
 .shadow-glow-moon-strong {
+  box-shadow: 0 6px 20px rgba(0, 121, 107, 0.25);
+}
+.dark .shadow-glow-moon-strong {
   box-shadow: 0 0 15px rgba(22, 163, 74, 0.3);
 }
 
 /* Glowing Neon Jeet (Red) */
 .glow-jeet {
+  text-shadow: 0 0 5px rgba(198, 40, 40, 0.4);
+}
+.dark .glow-jeet {
   text-shadow: 0 0 5px rgba(255, 7, 58, 0.5);
 }
 
 .shadow-glow-jeet {
+  box-shadow: 0 4px 14px rgba(198, 40, 40, 0.15);
+}
+.dark .shadow-glow-jeet {
   box-shadow: 0 0 8px rgba(255, 7, 58, 0.2);
 }
 
 .shadow-glow-jeet-strong {
+  box-shadow: 0 6px 20px rgba(198, 40, 40, 0.25);
+}
+.dark .shadow-glow-jeet-strong {
   box-shadow: 0 0 15px rgba(255, 7, 58, 0.3);
 }
 
 /* Glowing Gold */
 .glow-gold {
+  text-shadow: 0 0 5px rgba(244, 162, 97, 0.4);
+}
+.dark .glow-gold {
   text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
 }
 
 .shadow-glow-gold {
+  box-shadow: 0 4px 14px rgba(244, 162, 97, 0.2);
+}
+.dark .shadow-glow-gold {
   box-shadow: 0 0 8px rgba(255, 215, 0, 0.2);
 }
 
-/* Gritty scanlines for tactical monitor feel */
+/* Scanlines apply only in Dark Mode */
 .scanlines {
   position: relative;
 }
-.scanlines::before {
+.dark .scanlines::before {
   content: "";
   display: block;
   position: absolute;
@@ -109,47 +198,71 @@ body {
   opacity: 0.3;
 }
 
-/* Retro Terminal Buttons */
+/* Buttons */
 .retro-btn {
   font-family: var(--font-staatliches), sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  font-weight: 800; /* extrabold */
+  font-weight: 800;
   transition: transform 0.1s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.1s linear, box-shadow 0.1s linear;
-  border-radius: 0.25rem;
+  border-radius: 0.5rem;
 }
 .retro-btn:active {
   transform: scale(0.95);
 }
 
 .retro-btn-moon {
+  background-color: #00796B;
+  color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(0, 121, 107, 0.25);
+}
+.retro-btn-moon:hover {
+  background-color: #004D40;
+}
+.dark .retro-btn-moon {
   background-color: #16A34A;
   color: #000000;
   box-shadow: 0 0 5px rgba(22, 163, 74, 0.5);
+  border-radius: 0.25rem;
 }
-.retro-btn-moon:hover {
-  background-color: #15803D; /* slightly darker/flatter on hover */
+.dark .retro-btn-moon:hover {
+  background-color: #15803D;
 }
 
 .retro-btn-jeet {
-  background-color: #DC2626; /* red-600 */
+  background-color: #C62828;
   color: #FFFFFF;
+  box-shadow: 0 2px 8px rgba(198, 40, 40, 0.25);
 }
 .retro-btn-jeet:hover {
-  background-color: #EF4444; /* red-500 */
+  background-color: #B71C1C;
+}
+.dark .retro-btn-jeet {
+  background-color: #DC2626;
+  color: #FFFFFF;
+  border-radius: 0.25rem;
+}
+.dark .retro-btn-jeet:hover {
+  background-color: #EF4444;
 }
 
 .retro-btn-neutral {
-  background-color: #FACC15; /* yellow-400 */
-  color: #000000;
-  box-shadow: 0 3px 0 #9A7D00;
-}
-.retro-btn-neutral:active {
-  transform: translateY(2px);
-  box-shadow: 0 1px 0 #9A7D00;
+  background-color: #F4A261;
+  color: #0A1A2A;
+  box-shadow: 0 3px 0 #E76F51;
 }
 .retro-btn-neutral:hover {
-  background-color: #EAB308; /* yellow-500 */
+  background-color: #E76F51;
+  color: #FFFFFF;
+}
+.dark .retro-btn-neutral {
+  background-color: #FACC15;
+  color: #000000;
+  box-shadow: 0 3px 0 #9A7D00;
+  border-radius: 0.25rem;
+}
+.dark .retro-btn-neutral:hover {
+  background-color: #EAB308;
 }
 
 /* Stencil Text Shadow for Heading Panels */

@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: 'class',
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -24,8 +25,26 @@ const config: Config = {
         moon: {
           gold: "#FBBF24", // Premium amber/gold
         },
+        light: {
+          bg: "#A8EEFF",
+          card: "#FFFFFF",
+          secondary: "#F0FAFE",
+          text: "#0A1A2A",
+          muted: "#2C3E50",
+          moon: "#00796B",
+          jeet: "#C62828",
+          gold: "#F4A261",
+          border: "#B2EBF2",
+          inputBg: "#FFFFFF",
+          inputText: "#4A4A4A",
+          inputBorder: "#B0BEC5",
+        },
         background: "var(--background)",
         foreground: "var(--foreground)",
+        card: "var(--card-bg)",
+        cardBorder: "var(--border-color)",
+        primaryText: "var(--text-primary)",
+        secondaryText: "var(--text-secondary)",
       },
       fontFamily: {
         staatliches: ["var(--font-staatliches)", "sans-serif"],

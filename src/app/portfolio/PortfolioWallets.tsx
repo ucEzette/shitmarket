@@ -566,396 +566,28 @@ export default function PortfolioWallets() {
   return (
     <div className="flex-1 flex flex-col gap-8 mt-2 select-none">
       
-      {/* SECTION 1: TOP CROSS-CHAIN USDC BRIDGE & FAUCET BANNER */}
-      <div className="bg-trench-mud border-4 border-trench-sandbag rounded-xl p-5 shadow-2xl relative scanlines overflow-hidden">
-        
-        {/* Visual Attestation Relayer Overlay */}
-        {isRelaying && (
-          <div className="absolute inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-6 animate-fadeIn">
-            <div className="max-w-md w-full border-4 border-trench-sandbag bg-trench-black rounded-lg p-5 text-center shadow-2xl relative scanlines">
-              <h4 className="font-staatliches text-2xl text-neon-moon tracking-wider uppercase mb-4 flex items-center justify-center gap-2">
-                <Globe className="animate-spin text-neon-moon" size={24} />
-                Circle CCTP Cross-Chain Relayer
-              </h4>
-              
-              <div className="space-y-4 font-mono text-[11px] text-white text-left">
-                {/* Step 1 */}
-                <div className="flex items-center justify-between border-b border-trench-sandbag/45 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={relayerStep >= 1 ? "text-neon-moon" : "text-trench-gasmask"}>
-                      {relayerStep > 1 ? "🟢" : relayerStep === 1 ? "🔄" : "⚪"}
-                    </span>
-                    <span className="uppercase font-bold">1. Detect Transaction on {selectedChainId.toUpperCase()}</span>
-                  </div>
-                  {sourceTxHash && (
-                    <a
-                      href={selectedChainId === 'solana' ? `https://solscan.io/tx/${sourceTxHash}` : `${SUPPORTED_CHAINS.find(c => c.id === selectedChainId)?.explorerUrl}/tx/${sourceTxHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-neon-moon hover:underline truncate max-w-[120px]"
-                    >
-                      {sourceTxHash.slice(0, 10)}...
-                    </a>
-                  )}
-                </div>
-
-                {/* Step 2 */}
-                <div className="flex items-center justify-between border-b border-trench-sandbag/45 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={relayerStep >= 2 ? "text-neon-moon" : "text-trench-gasmask"}>
-                      {relayerStep > 2 ? "🟢" : relayerStep === 2 ? "🔄" : "⚪"}
-                    </span>
-                    <span className="uppercase font-bold">2. Circle CCTP Signatures Attestation</span>
-                  </div>
-                  {relayerStep === 2 && <Loader2 className="animate-spin text-neon-moon" size={12} />}
-                </div>
-
-                {/* Step 3 */}
-                <div className="flex items-center justify-between border-b border-trench-sandbag/45 pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={relayerStep >= 3 ? "text-neon-moon" : "text-trench-gasmask"}>
-                      {relayerStep > 3 ? "🟢" : relayerStep === 3 ? "🔄" : "⚪"}
-                    </span>
-                    <span className="uppercase font-bold">3. Minting AVAX USDC on Target Platform</span>
-                  </div>
-                  {relayerStep === 3 && <Loader2 className="animate-spin text-neon-moon" size={12} />}
-                </div>
-
-                {/* Step 4 */}
-                <div className="flex items-center justify-between pb-2">
-                  <div className="flex items-center gap-2">
-                    <span className={relayerStep >= 4 ? "text-neon-moon" : "text-trench-gasmask"}>
-                      {relayerStep >= 4 ? "🟢" : "⚪"}
-                    </span>
-                    <span className="uppercase font-bold">4. Complete & Balance Credited</span>
-                  </div>
-                  {destTxHash && (
-                    <a
-                      href={`https://testnet.snowtrace.io/tx/${destTxHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-neon-moon hover:underline truncate max-w-[120px]"
-                    >
-                      {destTxHash.slice(0, 10)}...
-                    </a>
-                  )}
-                </div>
-              </div>
-
-              {/* Progress visual */}
-              <div className="mt-5 w-full bg-trench-mud border border-trench-sandbag h-4 rounded overflow-hidden p-0.5">
-                <div 
-                  className="bg-neon-moon h-full transition-all duration-500 rounded-sm shadow-glow-moon" 
-                  style={{ width: `${(relayerStep / 4) * 100}%` }}
-                />
-              </div>
-              <p className="mt-4 font-mono text-[9px] text-trench-gasmask uppercase font-bold text-center">
-                {relayerStep === 1 && "SCANNING SOURCE TRANSACTION MEMPOOL..."}
-                {relayerStep === 2 && "BURNING TOKENS & REQUESTING CIRCLE ATTESTATION SIGNATURES..."}
-                {relayerStep === 3 && "VERIFYING ATTESTATION & DRIPPING FUJI GAS + MINTING USDC..."}
-                {relayerStep >= 4 && "CROSS-CHAIN DEPOSIT SECURED & BALANCE CREDITED!"}
-              </p>
-            </div>
-          </div>
-        )}
-
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-trench-sandbag/40 pb-4 mb-4">
+      {/* SECTION 1: TOP CROSS-CHAIN USDC BRIDGE BANNER */}
+      <div className="bg-white dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag rounded-xl p-5 shadow-sm dark:shadow-2xl relative">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <div className="flex items-center gap-2">
-              <Globe className="text-neon-moon animate-spin" size={20} />
-              <h3 className="font-staatliches text-2xl text-white tracking-wider uppercase leading-none">
-                MULTI-CHAIN USDC BRIDGE & AMMO FAUCET
-              </h3>
-            </div>
-            <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold mt-1">
-              Deposit & Withdraw USDC across Solana, Ethereum, Base, Arbitrum & Polygon via Circle CCTP zero-slippage relayer.
+            <h3 className="font-staatliches text-2xl text-slate-900 dark:text-slate-900 dark:text-white tracking-wider uppercase leading-none">
+              Cross-Chain Deposits
+            </h3>
+            <p className="font-mono text-[10px] text-slate-500 dark:text-trench-gasmask uppercase font-bold mt-1">
+              Fund your portfolio from Base, Arbitrum, Mainnet, Optimism or Polygon via Relay Protocol.
             </p>
           </div>
 
           <div className="flex gap-2">
             <button
-              onClick={() => mintTestnetUsdc(1000)}
-              className="px-4 py-2 bg-neon-moon hover:bg-green-400 text-black font-staatliches text-base uppercase rounded border-b-2 border-trench-black shadow-glow-moon active:translate-y-0.5 transition-all flex items-center gap-1.5 cursor-pointer font-extrabold"
+              onClick={() => useAppState.getState().openRelayDepositModal()}
+              className="px-6 py-2.5 bg-[#00796B] dark:bg-neon-moon hover:bg-[#004D40] dark:hover:bg-green-400 text-slate-900 dark:text-white dark:text-black font-staatliches text-lg uppercase rounded shadow-md dark:shadow-glow-moon active:translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer font-extrabold"
             >
-              <Coins size={16} />
-              <span>AIRDROP 1,000 FREE USDC</span>
+              <span>+ DEPOSIT VIA RELAY</span>
             </button>
           </div>
         </div>
-
-        {/* Bridge Mode Switcher (Deposit / Withdraw) */}
-        <div className="flex border-b border-trench-sandbag/35 pb-4 mb-4 gap-2">
-          <button
-            onClick={() => setBridgeMode('deposit')}
-            className={`px-4 py-1.5 font-staatliches text-sm uppercase rounded transition-all border ${
-              bridgeMode === 'deposit' 
-                ? 'bg-neon-moon border-neon-moon text-black font-bold shadow-glow-moon' 
-                : 'bg-trench-black border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-            }`}
-          >
-            📥 Deposit Funds
-          </button>
-          <button
-            onClick={() => setBridgeMode('withdraw')}
-            className={`px-4 py-1.5 font-staatliches text-sm uppercase rounded transition-all border ${
-              bridgeMode === 'withdraw' 
-                ? 'bg-jeet-red border-jeet-red text-white font-bold shadow-glow-jeet' 
-                : 'bg-trench-black border-trench-sandbag/40 text-trench-gasmask hover:text-white'
-            }`}
-          >
-            📤 Withdraw Funds
-          </button>
-        </div>
-
-        {/* Deposit Terminal Interface */}
-        {bridgeMode === 'deposit' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            
-            {/* Left Inputs Pane */}
-            <div className="lg:col-span-7 flex flex-col gap-4">
-              
-              {/* Deposit Method Sub-selector */}
-              <div className="flex bg-trench-black border border-trench-sandbag rounded p-1">
-                <button
-                  onClick={() => setDepositMethod('wallet')}
-                  className={`flex-1 py-1.5 font-staatliches text-xs uppercase rounded transition-all ${
-                    depositMethod === 'wallet' ? 'bg-trench-sandbag text-neon-moon font-bold shadow-glow-moon' : 'text-trench-gasmask hover:text-white'
-                  }`}
-                >
-                  🔗 Connected Wallet
-                </button>
-                <button
-                  onClick={() => setDepositMethod('manual')}
-                  className={`flex-1 py-1.5 font-staatliches text-xs uppercase rounded transition-all ${
-                    depositMethod === 'manual' ? 'bg-trench-sandbag text-neon-moon font-bold shadow-glow-moon' : 'text-trench-gasmask hover:text-white'
-                  }`}
-                >
-                  📋 Manual / QR Deposit
-                </button>
-              </div>
-
-              {/* Source Network & Token Selector Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[9px] text-trench-gasmask uppercase font-bold">Source Network:</label>
-                  <select
-                    value={selectedChainId}
-                    onChange={(e) => setSelectedChainId(e.target.value)}
-                    className="w-full bg-trench-black text-white border border-trench-sandbag rounded px-3 py-2 font-mono text-xs uppercase font-bold outline-none cursor-pointer hover:border-white/50"
-                  >
-                    {SUPPORTED_CHAINS.map((chain) => (
-                      <option key={chain.id} value={chain.id}>
-                        {chain.icon} {chain.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="font-mono text-[9px] text-trench-gasmask uppercase font-bold">Currency:</label>
-                  <select
-                    value={selectedCurrency}
-                    onChange={(e) => setSelectedCurrency(e.target.value as any)}
-                    className="w-full bg-trench-black text-white border border-trench-sandbag rounded px-3 py-2 font-mono text-xs uppercase font-bold outline-none cursor-pointer hover:border-white/50"
-                  >
-                    <option value="USDC">💵 USDC</option>
-                    <option value="USDT">🪙 USDT</option>
-                    {selectedChainId === 'solana' ? (
-                      <option value="SOL">🟣 SOL</option>
-                    ) : (
-                      <option value="ETH">🔷 ETH</option>
-                    )}
-                  </select>
-                </div>
-              </div>
-
-              {/* Amount input */}
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[9px] text-trench-gasmask uppercase font-bold">Deposit Amount:</label>
-                <div className="flex items-center bg-trench-black border border-trench-sandbag rounded overflow-hidden focus-within:border-neon-moon">
-                  <input
-                    type="number"
-                    value={bridgeAmount}
-                    onChange={(e) => setBridgeAmount(e.target.value)}
-                    placeholder="10"
-                    className="flex-1 bg-transparent text-white px-3 py-2 font-mono text-xs uppercase font-bold outline-none"
-                  />
-                  <span className="bg-trench-mud px-3 py-2 font-mono text-xs text-trench-gasmask font-bold border-l border-trench-sandbag">
-                    {selectedCurrency}
-                  </span>
-                </div>
-              </div>
-
-              {/* Connected Wallet Form Actions */}
-              {depositMethod === 'wallet' && (
-                <div className="mt-2">
-                  {(() => {
-                    const extWallet = wallets.find(
-                      (w) => w.walletClientType !== 'privy' && w.connectorType !== 'embedded'
-                    );
-                    if (!extWallet) {
-                      return (
-                        <div className="bg-trench-black border border-trench-sandbag/45 rounded p-3 text-center">
-                          <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold mb-3">
-                            No external Web3 wallet detected. Connect MetaMask, Phantom, or Coinbase Wallet to deposit directly.
-                          </p>
-                          <button
-                            onClick={() => walletContext.linkExternalWallet()}
-                            className="px-4 py-2 bg-neon-moon/20 hover:bg-neon-moon text-neon-moon hover:text-black border border-neon-moon/40 rounded font-staatliches text-sm uppercase transition-all cursor-pointer font-bold inline-flex items-center gap-1.5"
-                          >
-                            <Key size={14} />
-                            Connect Source Wallet
-                          </button>
-                        </div>
-                      );
-                    }
-                    return (
-                      <div className="flex flex-col gap-3">
-                        <div className="flex items-center justify-between bg-trench-black/55 border border-trench-sandbag/40 rounded p-2.5 font-mono text-[10px] text-white">
-                          <span className="text-trench-gasmask font-bold uppercase">Source Wallet Address:</span>
-                          <span className="font-bold text-neon-moon">
-                            {extWallet.address.slice(0, 6)}...{extWallet.address.slice(-6)}
-                          </span>
-                        </div>
-                        <button
-                          onClick={handleExecuteBridge}
-                          disabled={isBridging}
-                          className="w-full py-2.5 bg-neon-moon hover:bg-green-400 text-black font-staatliches text-lg uppercase rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer font-extrabold disabled:opacity-50"
-                        >
-                          {isBridging ? <Loader2 className="animate-spin" size={18} /> : <Download size={18} />}
-                          <span>Execute Deposit & Bridge</span>
-                        </button>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Manual Deposit Form Actions */}
-              {depositMethod === 'manual' && (
-                <div className="flex flex-col gap-3 mt-2">
-                  <button
-                    onClick={handleCheckManualDeposit}
-                    disabled={isBridging}
-                    className="w-full py-2.5 bg-neon-moon hover:bg-green-400 text-black font-staatliches text-lg uppercase rounded border-b-4 border-green-800 shadow-glow-moon active:translate-y-0.5 transition-all flex items-center justify-center gap-2 cursor-pointer font-extrabold disabled:opacity-50"
-                  >
-                    {isBridging ? <Loader2 className="animate-spin" size={18} /> : <ShieldCheck size={18} />}
-                    <span>🔎 Check Deposit Status</span>
-                  </button>
-                </div>
-              )}
-
-            </div>
-
-            {/* Right Instructions / QR Pane */}
-            <div className="lg:col-span-5 border-l border-trench-sandbag/30 pl-0 lg:pl-6 flex flex-col items-center justify-center text-center">
-              {depositMethod === 'manual' ? (
-                <div className="w-full flex flex-col items-center">
-                  <div className="bg-white p-2 rounded-lg shadow-2xl mb-3 border-4 border-trench-sandbag">
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=140x140&color=000&bgcolor=fff&data=${activeWalletAddress || '0x0000000000000000000000000000000000000000'}`} 
-                      alt="Platform Deposit Address QR"
-                      className="w-[140px] h-[140px] block"
-                    />
-                  </div>
-
-                  <div className="w-full bg-trench-black border border-trench-sandbag/50 rounded px-2.5 py-1.5 flex items-center justify-between mb-3">
-                    <span className="font-mono text-[9px] text-white truncate max-w-[200px]">
-                      {activeWalletAddress}
-                    </span>
-                    <button
-                      onClick={() => {
-                        if (activeWalletAddress) {
-                          navigator.clipboard.writeText(activeWalletAddress);
-                          addToast('Address copied to clipboard', 'success');
-                          synthSound('bet');
-                        }
-                      }}
-                      className="p-1 bg-trench-mud hover:bg-trench-sandbag/30 rounded border border-trench-sandbag text-trench-gasmask hover:text-white transition-all cursor-pointer"
-                      title="Copy Address"
-                    >
-                      <Copy size={12} />
-                    </button>
-                  </div>
-
-                  <div className="bg-trench-black/45 border border-trench-sandbag/30 rounded p-2.5 font-mono text-[8px] text-trench-gasmask uppercase text-left leading-normal space-y-1 w-full">
-                    <p className="font-bold text-white mb-1">📋 Transfer Instructions:</p>
-                    <p>1. Send {selectedCurrency} on the {selectedChainId.toUpperCase()} network to this address.</p>
-                    <p>2. Ensure the transfer is sent on the exact source network selected.</p>
-                    <p>3. Once confirmed on-chain, click "Check Deposit Status" above to sweep/bridge and credit your platform balance.</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center p-4">
-                  <div className="w-14 h-14 rounded-full bg-neon-moon/10 border border-neon-moon flex items-center justify-center text-neon-moon mb-3 shadow-glow-moon">
-                    <ShieldCheck size={28} />
-                  </div>
-                  <h4 className="font-staatliches text-lg text-white tracking-wider uppercase mb-1">Direct Wallet Deposits</h4>
-                  <p className="font-mono text-[9px] text-trench-gasmask uppercase leading-relaxed max-w-xs">
-                    Connect your wallet, enter an amount, and execute. The dApp will handle network switching and CCTP attestations automatically to credit your platform wallet.
-                  </p>
-                </div>
-              )}
-            </div>
-
-          </div>
-        ) : (
-          /* Withdrawal Terminal Interface */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-            {/* Target Chain */}
-            <div className="lg:col-span-3 flex flex-col gap-1.5">
-              <label className="font-mono text-[9px] text-trench-gasmask uppercase font-bold">Destination Network:</label>
-              <select
-                value={selectedChainId}
-                onChange={(e) => setSelectedChainId(e.target.value)}
-                className="w-full bg-trench-black text-white border border-trench-sandbag rounded px-3 py-2 font-mono text-xs uppercase font-bold outline-none cursor-pointer hover:border-white/50"
-              >
-                {SUPPORTED_CHAINS.map((chain) => (
-                  <option key={chain.id} value={chain.id}>
-                    {chain.icon} {chain.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Destination Address */}
-            <div className="lg:col-span-5 flex flex-col gap-1.5">
-              <label className="font-mono text-[9px] text-trench-gasmask uppercase font-bold">Recipient Address:</label>
-              <input
-                type="text"
-                value={bridgeRecipient}
-                onChange={(e) => setBridgeRecipient(e.target.value)}
-                placeholder="Recipient wallet address on target chain..."
-                className="w-full bg-trench-black text-white border border-trench-sandbag rounded px-3 py-2 font-mono text-xs uppercase font-bold outline-none focus:border-white"
-              />
-            </div>
-
-            {/* Withdraw Amount */}
-            <div className="lg:col-span-2 flex flex-col gap-1.5">
-              <label className="font-mono text-[9px] text-trench-gasmask uppercase font-bold">Withdraw Amount (USDC):</label>
-              <input
-                type="number"
-                value={bridgeAmount}
-                onChange={(e) => setBridgeAmount(e.target.value)}
-                placeholder="10"
-                className="w-full bg-trench-black text-white border border-trench-sandbag rounded px-3 py-2 font-mono text-xs uppercase font-bold outline-none focus:border-white"
-              />
-            </div>
-
-            {/* Action Button */}
-            <div className="lg:col-span-2 flex flex-col justify-end">
-              <label className="font-mono text-[9px] opacity-0 block">Action</label>
-              <button
-                onClick={handleExecuteBridge}
-                disabled={isBridging}
-                className="w-full py-2 bg-jeet-red hover:bg-red-700 text-white font-staatliches text-base uppercase rounded shadow-glow-jeet transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 border border-red-950"
-              >
-                {isBridging ? <Loader2 className="animate-spin" size={16} /> : <ArrowLeftRight size={16} />}
-                <span>Bridge Withdraw Out</span>
-              </button>
-            </div>
-          </div>
-        )}
+      </div>
 
       </div>
 
@@ -964,7 +596,7 @@ export default function PortfolioWallets() {
         
         {/* LEFT PANE: YOUR EVM WALLETS */}
         <div className="w-full md:w-1/2 flex flex-col gap-6">
-          <h3 className="font-staatliches text-2xl text-white tracking-wider uppercase">YOUR EVM EMBEDDED WALLETS</h3>
+          <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase">YOUR EVM EMBEDDED WALLETS</h3>
           
           {/* Trading Wallets */}
           <div>
@@ -992,7 +624,7 @@ export default function PortfolioWallets() {
                     <th className="py-2 px-3 font-normal uppercase text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-trench-sandbag/40 text-white">
+                <tbody className="divide-y divide-trench-sandbag/40 text-slate-900 dark:text-white">
                   {tradingWallets.map((wallet, idx) => {
                     const usdcBal = usdcBalances[wallet.address] || 0;
                     const avaxBal = avaxBalances[wallet.address] || 0;
@@ -1011,21 +643,21 @@ export default function PortfolioWallets() {
                                     type="text" 
                                     value={editName}
                                     onChange={(e) => setEditName(e.target.value)}
-                                    className="bg-trench-black border border-trench-sandbag rounded px-1 text-xs text-white outline-none"
+                                    className="bg-trench-black border border-trench-sandbag rounded px-1 text-xs text-slate-900 dark:text-white outline-none"
                                     autoFocus
                                     onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
                                   />
                                   <Check size={12} className="text-neon-moon cursor-pointer" onClick={handleSaveName} />
                                 </div>
                               ) : (
-                                <span className="block text-white font-bold flex items-center justify-between">
+                                <span className="block text-slate-900 dark:text-white font-bold flex items-center justify-between">
                                   <span>
                                     {walletNames[wallet.address] || (isEmbedded ? `EVM Embedded ${idx + 1}` : 'External EVM Wallet')}
                                     {isActive && <span className="ml-2 text-[8px] bg-neon-moon text-black px-1 rounded uppercase tracking-wider">Active</span>}
                                   </span>
                                 </span>
                               )}
-                              <span className="block text-[9px] text-trench-gasmask cursor-pointer hover:text-white flex items-center gap-1 mt-0.5" onClick={() => handleCopy(wallet.address)}>
+                              <span className="block text-[9px] text-trench-gasmask cursor-pointer hover:text-slate-900 dark:text-white flex items-center gap-1 mt-0.5" onClick={() => handleCopy(wallet.address)}>
                                 {wallet.address.slice(0, 6)}...{wallet.address.slice(-6)} <Copy size={8} />
                               </span>
                             </div>
@@ -1040,9 +672,9 @@ export default function PortfolioWallets() {
                         <td className="py-3 px-3 text-right w-1/4">
                           <div className="flex items-center justify-end gap-2 text-trench-gasmask">
                             <button onClick={() => { setSourceAddress(wallet.address); synthSound('bet'); }} title="Set as Source" className="hover:text-neon-moon transition-colors"><Upload size={12} /></button>
-                            <button onClick={() => { setEditingWallet(wallet.address); setEditName(walletNames[wallet.address] || ''); }} title="Rename" className="hover:text-white transition-colors"><Edit2 size={12} /></button>
+                            <button onClick={() => { setEditingWallet(wallet.address); setEditName(walletNames[wallet.address] || ''); }} title="Rename" className="hover:text-slate-900 dark:text-white transition-colors"><Edit2 size={12} /></button>
                             {!isActive && (
-                              <button onClick={() => handleArchive(wallet.address)} title="Archive" className="hover:text-white transition-colors"><Archive size={12} /></button>
+                              <button onClick={() => handleArchive(wallet.address)} title="Archive" className="hover:text-slate-900 dark:text-white transition-colors"><Archive size={12} /></button>
                             )}
                           </div>
                         </td>
@@ -1062,7 +694,7 @@ export default function PortfolioWallets() {
               </span>
               <button 
                 onClick={() => setShowAddWithdrawal(!showAddWithdrawal)}
-                className="flex items-center gap-1.5 px-3 py-1 bg-trench-black border border-trench-sandbag rounded text-trench-gasmask hover:text-white hover:border-white transition-colors font-mono text-[9px] uppercase font-bold"
+                className="flex items-center gap-1.5 px-3 py-1 bg-trench-black border border-trench-sandbag rounded text-trench-gasmask hover:text-slate-900 dark:text-white hover:border-white transition-colors font-mono text-[9px] uppercase font-bold"
               >
                 <Plus size={10} /> Add Target
               </button>
@@ -1070,13 +702,13 @@ export default function PortfolioWallets() {
             
             {showAddWithdrawal && (
               <div className="bg-trench-black border border-trench-sandbag rounded-lg p-3 mb-3 flex flex-col gap-2">
-                <input type="text" placeholder="Name (e.g. Cold Wallet Ledger)" value={newWithdrawalName} onChange={e => setNewWithdrawalName(e.target.value)} className="bg-transparent border border-trench-sandbag rounded p-2 text-xs text-white outline-none" />
-                <select value={newWithdrawalChain} onChange={e => setNewWithdrawalChain(e.target.value)} className="bg-trench-mud border border-trench-sandbag rounded p-2 text-xs text-white outline-none">
+                <input type="text" placeholder="Name (e.g. Cold Wallet Ledger)" value={newWithdrawalName} onChange={e => setNewWithdrawalName(e.target.value)} className="bg-transparent border border-trench-sandbag rounded p-2 text-xs text-slate-900 dark:text-white outline-none" />
+                <select value={newWithdrawalChain} onChange={e => setNewWithdrawalChain(e.target.value)} className="bg-trench-mud border border-trench-sandbag rounded p-2 text-xs text-slate-900 dark:text-white outline-none">
                   {SUPPORTED_CHAINS.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
-                <input type="text" placeholder="Wallet Address (0x... or Solana)" value={newWithdrawalAddress} onChange={e => setNewWithdrawalAddress(e.target.value)} className="bg-transparent border border-trench-sandbag rounded p-2 text-xs text-white outline-none" />
+                <input type="text" placeholder="Wallet Address (0x... or Solana)" value={newWithdrawalAddress} onChange={e => setNewWithdrawalAddress(e.target.value)} className="bg-transparent border border-trench-sandbag rounded p-2 text-xs text-slate-900 dark:text-white outline-none" />
                 <div className="flex justify-end gap-2 mt-1">
-                  <button onClick={() => setShowAddWithdrawal(false)} className="px-3 py-1 text-[10px] uppercase text-trench-gasmask hover:text-white transition-colors">Cancel</button>
+                  <button onClick={() => setShowAddWithdrawal(false)} className="px-3 py-1 text-[10px] uppercase text-trench-gasmask hover:text-slate-900 dark:text-white transition-colors">Cancel</button>
                   <button onClick={handleAddWithdrawalWallet} className="px-3 py-1 text-[10px] uppercase bg-neon-moon text-black font-bold rounded">Save</button>
                 </div>
               </div>
@@ -1089,11 +721,11 @@ export default function PortfolioWallets() {
             ) : (
               <div className="bg-trench-black border border-trench-sandbag rounded-lg overflow-x-auto">
                 <table className="w-full text-left font-mono text-[10px] min-w-[320px]">
-                  <tbody className="divide-y divide-trench-sandbag/40 text-white">
+                  <tbody className="divide-y divide-trench-sandbag/40 text-slate-900 dark:text-white">
                     {withdrawalWallets.map((w, idx) => (
                       <tr key={idx} className="hover:bg-trench-mud/30 transition-colors">
                         <td className="py-3 px-3">
-                          <span className="block text-white font-bold">{w.name} ({(w.chainId || 'avalanche').toUpperCase()})</span>
+                          <span className="block text-slate-900 dark:text-white font-bold">{w.name} ({(w.chainId || 'avalanche').toUpperCase()})</span>
                           <span className="block text-[9px] text-trench-gasmask">{w.address.slice(0,6)}...{w.address.slice(-6)}</span>
                         </td>
                         <td className="py-3 px-3 text-right">
@@ -1113,7 +745,7 @@ export default function PortfolioWallets() {
 
         {/* RIGHT PANE: TRANSFER EVM ASSETS */}
         <div className="w-full md:w-1/2 flex flex-col gap-6">
-          <h3 className="font-staatliches text-2xl text-white tracking-wider uppercase">DIRECT EVM ON-CHAIN TRANSFER</h3>
+          <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase">DIRECT EVM ON-CHAIN TRANSFER</h3>
           
           <div className="flex flex-col gap-4 bg-trench-mud/30 border border-trench-sandbag rounded-lg p-4 h-full relative">
             
@@ -1150,7 +782,7 @@ export default function PortfolioWallets() {
                   value={sourceAddress}
                   onChange={(e) => setSourceAddress(e.target.value)}
                   placeholder="Select active wallet (0x...)"
-                  className="bg-transparent outline-none text-white font-mono text-xs w-full placeholder:text-trench-gasmask/50"
+                  className="bg-transparent outline-none text-slate-900 dark:text-white font-mono text-xs w-full placeholder:text-trench-gasmask/50"
                 />
               </div>
               {sourceAddress && sourceAddress.toLowerCase() !== activeWalletAddress?.toLowerCase() && (
@@ -1174,7 +806,7 @@ export default function PortfolioWallets() {
                   value={destAddress}
                   onChange={(e) => setDestAddress(e.target.value)}
                   placeholder="Enter recipient 0x address"
-                  className="bg-transparent outline-none text-white font-mono text-xs w-full placeholder:text-trench-gasmask/50"
+                  className="bg-transparent outline-none text-slate-900 dark:text-white font-mono text-xs w-full placeholder:text-trench-gasmask/50"
                 />
               </div>
             </div>
@@ -1195,7 +827,7 @@ export default function PortfolioWallets() {
                   placeholder="0.00"
                   min="0"
                   step="0.01"
-                  className="bg-transparent outline-none text-white font-mono text-lg w-full placeholder:text-trench-gasmask/50"
+                  className="bg-transparent outline-none text-slate-900 dark:text-white font-mono text-lg w-full placeholder:text-trench-gasmask/50"
                 />
                 <span className="text-trench-gasmask font-staatliches text-xl">{transferToken}</span>
               </div>

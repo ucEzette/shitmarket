@@ -423,13 +423,21 @@ export default function RoomsPage() {
         <div className="flex items-center justify-between border-t border-cyan-200 dark:border-trench-sandbag/40 pt-3 mt-auto text-[10px] font-mono text-slate-600 dark:text-trench-gasmask">
           {/* Left Info Badges */}
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Network */}
-            <div className="flex items-center gap-1 bg-cyan-50 dark:bg-trench-black/60 px-1.5 py-0.5 rounded border border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
-              <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
-              <span className="uppercase text-[9px] font-bold text-slate-700 dark:text-slate-300">
-                {(room.token.chainId || 'solana').slice(0, 5)}
-              </span>
-            </div>
+            {/* Market Type / Network Tag */}
+            {room.marketType === 'debate' ? (
+              <div className="flex items-center gap-1 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-700/50 shrink-0">
+                <span className="uppercase text-[9px] font-bold text-purple-700 dark:text-purple-300">
+                  🛡️ DEBATE
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 bg-cyan-50 dark:bg-trench-black/60 px-1.5 py-0.5 rounded border border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
+                <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
+                <span className="uppercase text-[9px] font-bold text-slate-700 dark:text-slate-300">
+                  {room.marketType === 'token' ? 'TOKEN' : room.marketType === 'meme' ? 'MEME' : ''} • {(room.token.chainId || 'solana').slice(0, 5)}
+                </span>
+              </div>
+            )}
 
             <span>·</span>
 
@@ -820,7 +828,7 @@ export default function RoomsPage() {
       </div>
 
       {/* Category Selector Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-none border-b border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
+      <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-3 mb-6 scrollbar-none border-b border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.id;
           return (

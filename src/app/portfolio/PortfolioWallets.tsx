@@ -570,7 +570,7 @@ export default function PortfolioWallets() {
       <div className="bg-white dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag rounded-xl p-5 shadow-sm dark:shadow-2xl relative">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h3 className="font-staatliches text-2xl text-slate-900 dark:text-slate-900 dark:text-white tracking-wider uppercase leading-none">
+            <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase leading-none">
               Cross-Chain Deposits
             </h3>
             <p className="font-mono text-[10px] text-slate-500 dark:text-trench-gasmask uppercase font-bold mt-1">
@@ -581,14 +581,12 @@ export default function PortfolioWallets() {
           <div className="flex gap-2">
             <button
               onClick={() => useAppState.getState().openRelayDepositModal()}
-              className="px-6 py-2.5 bg-[#00796B] dark:bg-neon-moon hover:bg-[#004D40] dark:hover:bg-green-400 text-slate-900 dark:text-white dark:text-black font-staatliches text-lg uppercase rounded shadow-md dark:shadow-glow-moon active:translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer font-extrabold"
+              className="px-6 py-2.5 bg-[#00796B] dark:bg-neon-moon hover:bg-[#004D40] dark:hover:bg-green-400 text-white dark:text-black font-staatliches text-lg uppercase rounded shadow-md dark:shadow-glow-moon active:translate-y-0.5 transition-all flex items-center gap-2 cursor-pointer font-extrabold"
             >
               <span>+ DEPOSIT VIA RELAY</span>
             </button>
           </div>
         </div>
-      </div>
-
       </div>
 
       {/* SECTION 2: TWO COLUMN WALLETS & TRANSFERS */}

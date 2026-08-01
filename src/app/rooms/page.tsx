@@ -424,20 +424,32 @@ export default function RoomsPage() {
           {/* Left Info Badges */}
           <div className="flex items-center gap-2 flex-wrap">
             {/* Market Type / Network Tag */}
-            {room.marketType === 'debate' ? (
-              <div className="flex items-center gap-1 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-700/50 shrink-0">
-                <span className="uppercase text-[9px] font-bold text-purple-700 dark:text-purple-300">
-                  🛡️ DEBATE
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-1 bg-cyan-50 dark:bg-trench-black/60 px-1.5 py-0.5 rounded border border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
-                <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
-                <span className="uppercase text-[9px] font-bold text-slate-700 dark:text-slate-300">
-                  {room.marketType === 'token' ? 'TOKEN' : room.marketType === 'meme' ? 'MEME' : ''} • {(room.token.chainId || 'solana').slice(0, 5)}
-                </span>
-              </div>
-            )}
+            {(() => {
+              const isDebate = (room.category as string) === 'debate' || 
+                (room.category as string) === 'prediction' || 
+                (!!room.resolutionCriteria && room.resolutionCriteria.length > 0 && (!room.token.pairAddress || room.token.pairAddress === '')) ||
+                room.token.address === room.creator;
+              const isMeme = room.category === 'meme' || room.category === 'pop_culture' || (room.token.liquidity && room.token.liquidity < 100000);
+
+              if (isDebate) {
+                return (
+                  <div className="flex items-center gap-1 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-700/50 shrink-0">
+                    <span className="uppercase text-[9px] font-bold text-purple-700 dark:text-purple-300">
+                      DEBATE
+                    </span>
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="flex items-center gap-1 bg-cyan-50 dark:bg-trench-black/60 px-1.5 py-0.5 rounded border border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
+                    <NetworkLogo chainId={room.token.chainId || (process.env.NEXT_PUBLIC_CORE_CHAIN || 'avalanche')} active={true} className="w-3.5 h-3.5" />
+                    <span className="uppercase text-[9px] font-bold text-slate-700 dark:text-slate-300">
+                      {isMeme ? 'MEME' : 'TOKEN'}
+                    </span>
+                  </div>
+                );
+              }
+            })()}
 
             <span>·</span>
 

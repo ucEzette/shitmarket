@@ -81,7 +81,11 @@ export default function CreateRoomPage() {
   const [keeperAddress, setKeeperAddress] = useState('');
 
   // Form State - Config & Seeding
-  const [duration, setDuration] = useState<number>(30);
+  const [expiryDate, setExpiryDate] = useState<string>(() => {
+    const defaultDate = new Date(Date.now() + 60 * 60 * 1000);
+    const tzOffset = defaultDate.getTimezoneOffset() * 60000;
+    return new Date(defaultDate.getTime() - tzOffset).toISOString().slice(0, 16);
+  });
   const [seedSide, setSeedSide] = useState<'moon' | 'jeet'>('moon');
   const [seedAmount, setSeedAmount] = useState<number>(10);
   const [openingPriceType, setOpeningPriceType] = useState<'market' | 'set'>('market');
@@ -476,6 +480,10 @@ export default function CreateRoomPage() {
 
     const generatedId = String(Date.now());
 
+    const selectedExpiry = new Date(expiryDate).getTime();
+    const computedDuration = Math.max(60, Math.floor((selectedExpiry - Date.now()) / 60000));
+    const finalExpiryMs = Date.now() + computedDuration * 60000;
+
     const newRoom: Room = {
       id: generatedId,
       category: detectCategory(tokenNameStr, tokenSymbolStr, finalCriteriaText),
@@ -492,10 +500,10 @@ export default function CreateRoomPage() {
       creator: creatorAddress,
       moonPool: moonSeed,
       jeetPool: jeetSeed,
-      expiry: Date.now() + duration * 60000,
+      expiry: finalExpiryMs,
       status: 'active',
       createdAt: Date.now(),
-      duration: duration,
+      duration: computedDuration,
       openingPrice: targetOpeningPrice,
       
       // Oracle layer details
@@ -706,7 +714,7 @@ export default function CreateRoomPage() {
               
               {/* Type Selection Header */}
               <div>
-                <h3 className="font-staatliches text-2xl text-white tracking-wider uppercase flex items-center gap-2">
+                <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase flex items-center gap-2">
                   <Layers size={22} className="text-neon-moon" />
                   <span>SELECT PREDICTION MARKET STRUCTURE</span>
                 </h3>
@@ -786,7 +794,7 @@ export default function CreateRoomPage() {
               {arenaType === 'token' && (
                 <div className="space-y-6 pt-2">
                   <div className="space-y-2">
-                    <label className="block font-mono text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center justify-between">
+                    <label className="block font-mono text-xs font-bold text-slate-800 dark:text-gray-200 uppercase tracking-wider flex items-center justify-between">
                       <span>Token Contract Address (Solana / EVM):</span>
                       <span className="text-[10px] text-gray-400">DexScreener Verified</span>
                     </label>
@@ -877,7 +885,7 @@ export default function CreateRoomPage() {
                   
                   {/* Title / Statement */}
                   <div className="space-y-2">
-                    <label className="block font-mono text-xs font-bold text-gray-200 uppercase tracking-wider">
+                    <label className="block font-mono text-xs font-bold text-slate-800 dark:text-gray-200 uppercase tracking-wider">
                       Prediction Question / Statement Title:
                     </label>
                     <input
@@ -891,7 +899,7 @@ export default function CreateRoomPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="block font-mono text-xs font-bold text-gray-200 uppercase tracking-wider">
+                      <label className="block font-mono text-xs font-bold text-slate-800 dark:text-gray-200 uppercase tracking-wider">
                         Virtual Market Ticker Symbol:
                       </label>
                       <input
@@ -905,7 +913,7 @@ export default function CreateRoomPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <label className="block font-mono text-xs font-bold text-gray-200 uppercase tracking-wider">
+                      <label className="block font-mono text-xs font-bold text-slate-800 dark:text-gray-200 uppercase tracking-wider">
                         Market Image / Avatar:
                       </label>
                       <div className="flex items-center gap-2">
@@ -1062,7 +1070,7 @@ export default function CreateRoomPage() {
             <div className="space-y-8 animate-fadeIn">
               
               <div>
-                <h3 className="font-staatliches text-2xl text-white tracking-wider uppercase flex items-center gap-2">
+                <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase flex items-center gap-2">
                   <Brain size={22} className="text-neon-moon" />
                   <span>SELECT RESOLUTION ORACLE PROTOCOL</span>
                 </h3>
@@ -1254,7 +1262,7 @@ export default function CreateRoomPage() {
             <div className="space-y-8 animate-fadeIn">
               
               <div>
-                <h3 className="font-staatliches text-2xl text-white tracking-wider uppercase flex items-center gap-2">
+                <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase flex items-center gap-2">
                   <Coins size={22} className="text-neon-moon" />
                   <span>CONFIGURE DURATION & SEED AMMO</span>
                 </h3>
@@ -1270,43 +1278,24 @@ export default function CreateRoomPage() {
                     BATTLE EXPIRY DURATION:
                   </label>
                   <span className="font-mono text-sm text-neon-moon font-extrabold bg-emerald-950/60 px-3 py-1 border border-neon-moon/40 rounded-lg">
-                    {duration >= 1440 ? `${(duration / 1440).toFixed(1)} DAYS` : duration >= 60 ? `${(duration / 60).toFixed(1)} HOURS` : `${duration} MINS`}
+                    {(() => {
+                      const diffMs = new Date(expiryDate).getTime() - Date.now();
+                      const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+                      if (diffMins >= 1440) return `${(diffMins / 1440).toFixed(1)} DAYS`;
+                      if (diffMins >= 60) return `${(diffMins / 60).toFixed(1)} HOURS`;
+                      return `${diffMins} MINS`;
+                    })()}
                   </span>
                 </div>
 
                 <input 
-                  type="range" 
-                  min="5" 
-                  max="10080" 
-                  step="5"
-                  value={duration} 
-                  onChange={(e) => setDuration(Math.max(5, parseInt(e.target.value) || 5))}
-                  className="w-full accent-neon-moon cursor-pointer"
+                  type="datetime-local"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 60 * 60000).toISOString().slice(0, 16)}
+                  max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 365 * 24 * 60 * 60000).toISOString().slice(0, 16)}
+                  className="w-full bg-[#0A0E17] border border-gray-800 text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-neon-moon focus:outline-none font-bold cursor-pointer"
                 />
-
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">
-                  {[
-                    { time: 5, label: '5 MIN' },
-                    { time: 30, label: '30 MIN' },
-                    { time: 60, label: '60 MIN' },
-                    { time: 240, label: '4 HRS' },
-                    { time: 1440, label: '24 HRS' },
-                    { time: 10080, label: '1 WEEK' }
-                  ].map((opt) => (
-                    <button
-                      key={opt.time}
-                      type="button"
-                      onClick={() => { setDuration(opt.time); synthSound('bet'); }}
-                      className={`py-2 rounded-xl font-mono text-xs font-bold transition-all ${
-                        duration === opt.time
-                          ? 'bg-neon-moon text-black font-extrabold shadow-[0_0_12px_rgba(57,255,20,0.3)]'
-                          : 'bg-[#0A0E17] border border-gray-800 text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Initial Ammo Seeding Box */}

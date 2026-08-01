@@ -94,7 +94,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
             ? 'bg-red-500/15 border-red-500 text-red-600 dark:text-red-500 animate-pulse'
             : 'bg-amber-500/15 border-amber-500 text-amber-700 dark:text-moon-gold'
         }`}>
-          {walletType === 'imported' ? '🔥 HOT WALLET' : walletType === 'embedded' ? '⚡ EMBEDDED' : '🔌 EXTERNAL'}
+          {walletType === 'imported' ? '🔥 HOT WALLET' : walletType === 'embedded' ? 'EMBEDDED' : '🔌 EXTERNAL'}
         </span>
       </div>
 
@@ -115,7 +115,7 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
             }`}
             title="Use Privy Embedded Wallet"
           >
-            ⚡ Embedded
+            Embedded
           </button>
 
           {/* External Option */}
@@ -214,8 +214,8 @@ export const WalletPanel: React.FC<{ onClose?: () => void }> = ({ onClose }) => 
         }}
         className="w-full py-2.5 bg-[#00796B] dark:bg-neon-moon hover:bg-[#004D40] dark:hover:bg-green-400 text-white dark:text-black font-staatliches text-sm rounded-xl uppercase tracking-wider font-extrabold shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
       >
-        <Zap size={16} />
-        <span>⚡ 1-CLICK CROSS-CHAIN DEPOSIT (RELAY)</span>
+        <Coins size={16} />
+        <span>1-CLICK CROSS-CHAIN DEPOSIT (RELAY)</span>
       </button>
 
       {/* Warning for Hot Wallet */}

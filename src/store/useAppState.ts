@@ -329,6 +329,16 @@ export const AM_POOL_ABI = [
     stateMutability: 'view',
     inputs: [{ name: '', type: 'uint256' }],
     outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    type: 'error',
+    name: 'ERC1155InsufficientBalance',
+    inputs: [
+      { name: 'sender', type: 'address' },
+      { name: 'balance', type: 'uint256' },
+      { name: 'needed', type: 'uint256' },
+      { name: 'tokenId', type: 'uint256' }
+    ]
   }
 ] as const;
 
@@ -433,7 +443,7 @@ export const CATEGORIES: { id: MarketCategory; label: string; icon: string }[] =
   { id: 'crypto', label: 'CRYPTO & MEMES', icon: '🪙' },
   { id: 'sports', label: 'SPORTS', icon: '⚽' },
   { id: 'politics', label: 'POLITICS', icon: '🏛️' },
-  { id: 'ai_tech', label: 'AI & TECH', icon: '🤖' },
+  { id: 'ai_tech', label: 'AI & TECH', icon: '' },
   { id: 'pop_culture', label: 'POP CULTURE', icon: '🎬' },
   { id: 'macro', label: 'MACRO & FINANCE', icon: '📈' },
 ];
@@ -1914,7 +1924,6 @@ export const useAppState = create<AppState>()(
         // Two-Sided AMM Seeding: 100 USDC seeding mints 100 MOON + 100 JEET tokens into CPMM reserves
         const moonSeed = room.moonPool || seedAmount;
         const jeetSeed = room.jeetPool || seedAmount;
-        const seedSide = 'moon';
 
         const optimisticRoom: Room = {
           ...room,
@@ -1925,32 +1934,9 @@ export const useAppState = create<AppState>()(
         };
         const updatedRooms = [optimisticRoom, ...get().rooms.filter(r => !isSameRoom(r.id, optimisticRoom.id))];
         
-        // Log creator initial bet position
-        const initialBet: Bet = {
-          id: `bet-evm-${Date.now()}`,
-          roomId: actualRoomId,
-          user: wallet.address,
-          currentOwner: wallet.address,
-          side: seedSide,
-          amount: seedAmount,
-          claimed: false,
-          timestamp: Date.now(),
-          txSig: txHash,
-          shares: seedAmount,
-        };
-
         const currentUser = get().user;
-        const existingBets = currentUser?.bets || [];
         set({
-          rooms: updatedRooms,
-          user: currentUser ? {
-            ...currentUser,
-            stats: {
-              ...currentUser.stats,
-              totalBets: ((currentUser.stats?.totalBets || 0) + 1)
-            },
-            bets: [initialBet, ...existingBets.filter(b => b.id !== initialBet.id)]
-          } : undefined
+          rooms: updatedRooms
         });
         savePersistedRooms(updatedRooms);
 
@@ -1976,18 +1962,6 @@ export const useAppState = create<AppState>()(
             duration: room.duration,
             status: 'active'
           })
-        }).then(async () => {
-          // Log initial seeding bet position to database
-          await fetch(`${INDEXER_URL}/api/rooms/${actualRoomId}/bets`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              userPubkey: wallet.address,
-              side: seedSide,
-              amount: Math.round(seedAmount * 1e6),
-              txSig: txHash
-            })
-          }).catch(err => console.warn("Failed to post initial seeding bet to indexer:", err));
         }).catch(err => console.warn("Failed to post EVM room to indexer:", err));
         
         get().updateToast(toastId, {
@@ -3027,7 +3001,11 @@ export const useAppState = create<AppState>()(
       await get().fetchSingleRoom(roomId);
     } catch (err: any) {
       console.error(err);
-      get().updateToast(toastId, { type: 'error', message: 'MARKET ORDER FAILED', description: err.message });
+      let errorMsg = err.message || 'Unknown error occurred.';
+      if (err.message && err.message.includes('ERC1155InsufficientBalance')) {
+        errorMsg = 'You do not have enough shares to sell.';
+      }
+      get().updateToast(toastId, { type: 'error', message: 'MARKET ORDER FAILED', description: errorMsg });
       throw err;
     }
   },

@@ -439,7 +439,7 @@ export const RelayDepositModal: React.FC = () => {
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="font-mono text-[9px] text-[#00796B] dark:text-neon-moon font-extrabold bg-teal-50 dark:bg-neon-moon/10 px-2 py-0.5 border border-[#00796B]/30 rounded uppercase tracking-wider">
-                  ⚡ CROSS-CHAIN DEPOSIT ({allChains.length} CHAINS)
+                  CROSS-CHAIN DEPOSIT ({allChains.length} CHAINS)
                 </span>
               </div>
               <h3 className="font-staatliches text-2xl text-[#0A1A2A] dark:text-white uppercase tracking-wide leading-none mt-1">
@@ -605,8 +605,8 @@ export const RelayDepositModal: React.FC = () => {
                           : 'text-slate-600 dark:text-gray-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
-                      <Zap size={15} />
-                      <span>⚡ 1-CLICK WALLET</span>
+                      <Wallet size={15} />
+                      <span>1-CLICK WALLET</span>
                     </button>
 
                     <button
@@ -714,7 +714,7 @@ export const RelayDepositModal: React.FC = () => {
                   <div className="bg-cyan-50/60 dark:bg-[#05080E] border border-cyan-200 dark:border-gray-800 rounded-xl p-4 space-y-3">
                     <div className="flex items-center justify-between border-b border-cyan-200 dark:border-gray-800/80 pb-2.5">
                       <div className="flex items-center gap-2">
-                        <Zap size={16} className="text-[#00796B] dark:text-neon-moon" />
+                        <Wallet size={16} className="text-[#00796B] dark:text-neon-moon" />
                         <span className="font-staatliches text-base text-[#0A1A2A] dark:text-white uppercase tracking-wider">
                           TARGET: AVALANCHE USDC
                         </span>
@@ -815,7 +815,7 @@ export const RelayDepositModal: React.FC = () => {
                       </div>
 
                       <p className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask uppercase font-bold leading-normal pt-1">
-                        ⚡ Send from any external wallet, exchange (Binance/Coinbase), or mobile app on <strong className="text-slate-900 dark:text-white">{selectedChain.displayName}</strong>. Funds will automatically bridge and credit your Avalanche USDC balance upon broadcast!
+                        Send from any external wallet, exchange (Binance/Coinbase), or mobile app on <strong className="text-slate-900 dark:text-white">{selectedChain.displayName}</strong>. Funds will automatically bridge and credit your Avalanche USDC balance upon broadcast!
                       </p>
                     </div>
                   ) : (
@@ -826,7 +826,7 @@ export const RelayDepositModal: React.FC = () => {
                       disabled={!quoteData || quoteLoading || !!quoteError}
                       className="w-full py-3.5 bg-[#00796B] dark:bg-neon-moon hover:bg-[#004D40] dark:hover:bg-green-400 text-white dark:text-black font-staatliches text-2xl rounded-xl uppercase tracking-wider font-extrabold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md cursor-pointer"
                     >
-                      <Zap size={22} />
+                      <Wallet size={22} />
                       <span>1-CLICK CROSS-CHAIN DEPOSIT</span>
                     </button>
                   )}

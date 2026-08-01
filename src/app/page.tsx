@@ -7,7 +7,6 @@ import { motion } from 'framer-motion';
 import { PixelBarbedWire } from '@/components/PixelArt';
 import { useAppState } from '@/store/useAppState';
 import { PEPE_ASSETS, DegenQuoteBanner, PepePortrait, WarPropaganda, MascotRow } from '@/components/MemeAssets';
-import { AgentKeyAlphaZone } from '@/components/AgentKeyAlphaZone';
 import { IntroScreen } from '@/components/IntroScreen';
 import { FloatingCoins } from '@/components/FloatingCoins';
 import { Flame, ShieldAlert, Award, ArrowUpRight, Zap, Target, Users, Swords, Skull, Rocket, Smartphone, Bell } from 'lucide-react';
@@ -233,10 +232,6 @@ function HomeContent() {
         </div>
       </div>
 
-      {/* 2.5 ALPHA ZONE */}
-      <section className="mx-auto max-w-7xl w-full px-4 pt-12 pb-4">
-        <AgentKeyAlphaZone />
-      </section>
 
       {/* 3. MASCOT PARADE / CHARACTER LINEUP */}
       <section className="mx-auto max-w-7xl w-full px-4 py-12">

@@ -782,3 +782,54 @@ roomsRouter.get('/token-price/:mintAddress', async (req, res) => {
     return res.status(500).json({ success: false, error: 'Internal server error' });
   }
 });
+
+// ── POST /api/rooms/:pubkey/bets ──────────────────────────────────────────────
+roomsRouter.post('/:pubkey/bets', async (req, res) => {
+  try {
+    const { pubkey } = req.params;
+    const { userPubkey, side, amount, txSig } = req.body;
+
+    if (!userPubkey || !side || !amount) {
+      return res.status(400).json({ success: false, error: 'Missing required bet fields' });
+    }
+
+    const normPubkey = pubkey.startsWith('0x') ? pubkey.toLowerCase() : pubkey;
+    const normUser = userPubkey.startsWith('0x') ? userPubkey.toLowerCase() : userPubkey;
+
+    const roomExists = await prisma.room.findUnique({
+      where: { roomPubkey: normPubkey }
+    });
+
+    if (!roomExists) {
+      return res.status(404).json({ success: false, error: 'Room not found' });
+    }
+
+    const createdBet = await prisma.bet.create({
+      data: {
+        roomPubkey: normPubkey,
+        userPubkey: normUser,
+        side,
+        amount: BigInt(amount),
+        txSig: txSig || null
+      }
+    });
+
+    await prisma.userProfile.upsert({
+      where: { userPubkey: normUser },
+      create: {
+        userPubkey: normUser,
+        totalBets: 1,
+        referralCode: normUser.slice(0, 6) + Math.floor(1000 + Math.random() * 9000),
+      },
+      update: {
+        totalBets: { increment: 1 }
+      }
+    });
+
+    logger.info({ msg: 'Bet logged via API', betId: createdBet.id, roomPubkey: normPubkey, userPubkey: normUser });
+    return res.json({ success: true, data: { ...createdBet, amount: createdBet.amount.toString() } });
+  } catch (err: any) {
+    logger.error({ msg: 'POST /api/rooms/:pubkey/bets error', err: err?.message });
+    return res.status(500).json({ success: false, error: 'Failed to record bet' });
+  }
+});

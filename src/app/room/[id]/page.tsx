@@ -579,19 +579,39 @@ export default function RoomDetailPage() {
   const allSectorBets = useMemo(() => {
     const map = new Map<string, any>();
 
+    const getBetKey = (b: any) => {
+      if (b.txSig && b.txSig !== '0x' && b.txSig !== '') {
+        return `tx-${b.txSig}`;
+      }
+      const timeBucket = Math.floor((b.timestamp || 0) / 10000); // 10-second window
+      const userClean = (b.user || b.currentOwner || '').toLowerCase();
+      const sideStr = (b.side || 'moon').toLowerCase();
+      const amountRounded = Math.round(Number(b.amount || 0) * 100);
+      return `${userClean}-${sideStr}-${amountRounded}-${timeBucket}`;
+    };
+
     roomBets.forEach((b) => {
-      map.set(b.id || `${b.user}-${b.timestamp}`, b);
+      const key = getBetKey(b);
+      map.set(key, {
+        id: b.id || key,
+        user: b.user,
+        side: b.side,
+        amount: b.amount,
+        timestamp: b.timestamp || Date.now(),
+        txSig: b.txSig
+      });
     });
 
     displayBets.forEach((b) => {
-      const key = b.pubkey || b.id;
+      const key = getBetKey(b);
       if (!map.has(key)) {
         map.set(key, {
-          id: key,
+          id: b.pubkey || b.id || key,
           user: b.user || b.currentOwner || 'Recruit',
           side: b.side,
           amount: b.amount,
-          timestamp: b.timestamp || Date.now()
+          timestamp: b.timestamp || Date.now(),
+          txSig: b.txSig
         });
       }
     });

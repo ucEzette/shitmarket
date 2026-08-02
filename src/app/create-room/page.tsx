@@ -361,6 +361,52 @@ export default function CreateRoomPage() {
     }
   };
 
+  // Expiry configuration helpers
+  const getExpiryHours = (): number => {
+    const diffMs = new Date(expiryDate).getTime() - Date.now();
+    return Math.max(0, diffMs / (60 * 60 * 1000));
+  };
+
+  const sliderValToHours = (v: number): number => {
+    if (v <= 25) {
+      return Math.round(1 + (v / 25) * 23);
+    } else if (v <= 50) {
+      return Math.round(24 + ((v - 25) / 25) * 144);
+    } else if (v <= 75) {
+      return Math.round(168 + ((v - 50) / 25) * (720 - 168));
+    } else {
+      return Math.round(720 + ((v - 75) / 25) * (8760 - 720));
+    }
+  };
+
+  const hoursToSliderVal = (h: number): number => {
+    if (h <= 24) {
+      return ((Math.max(1, h) - 1) / 23) * 25;
+    } else if (h <= 168) {
+      return 25 + ((h - 24) / 144) * 25;
+    } else if (h <= 720) {
+      return 50 + ((h - 168) / (720 - 168)) * 25;
+    } else {
+      return 75 + ((h - 720) / (8760 - 720)) * 25;
+    }
+  };
+
+  const handleSliderChange = (valPercent: number) => {
+    const hours = sliderValToHours(valPercent);
+    const targetDate = new Date(Date.now() + hours * 60 * 60 * 1000);
+    const tzOffset = targetDate.getTimezoneOffset() * 60000;
+    const dateStr = new Date(targetDate.getTime() - tzOffset).toISOString().slice(0, 16);
+    setExpiryDate(dateStr);
+  };
+
+  const handlePresetSelect = (hours: number) => {
+    const targetDate = new Date(Date.now() + hours * 60 * 60 * 1000);
+    const tzOffset = targetDate.getTimezoneOffset() * 60000;
+    const dateStr = new Date(targetDate.getTime() - tzOffset).toISOString().slice(0, 16);
+    setExpiryDate(dateStr);
+    synthSound('bet');
+  };
+
   const nextStep = () => {
     if (step === 1) {
       if (arenaType === 'token' && !tokenInfo) {
@@ -425,6 +471,20 @@ export default function CreateRoomPage() {
       return;
     }
 
+    const selectedExpiry = new Date(expiryDate).getTime();
+    const minExpiry = Date.now() + 55 * 60000; // 55 mins buffer
+    const maxExpiry = Date.now() + 366 * 24 * 60 * 60000; // 1 year max
+
+    if (selectedExpiry < minExpiry) {
+      showAlert('MINIMUM BATTLE DURATION IS 1 HOUR!', 'warning', 'VALIDATION ERROR', undefined, rect);
+      return;
+    }
+
+    if (selectedExpiry > maxExpiry) {
+      showAlert('MAXIMUM BATTLE DURATION IS 1 YEAR!', 'warning', 'VALIDATION ERROR', undefined, rect);
+      return;
+    }
+
     if (seedAmount < 1) {
       showAlert('MINIMUM ARENA SEEDING IS 1 USDC!', 'warning', 'VALIDATION ERROR', undefined, rect);
       return;
@@ -480,7 +540,6 @@ export default function CreateRoomPage() {
 
     const generatedId = String(Date.now());
 
-    const selectedExpiry = new Date(expiryDate).getTime();
     const computedDuration = Math.max(60, Math.floor((selectedExpiry - Date.now()) / 60000));
     const finalExpiryMs = Date.now() + computedDuration * 60000;
 
@@ -1272,15 +1331,19 @@ export default function CreateRoomPage() {
               </div>
 
               {/* Duration Presets & Slider */}
-              <div className="bg-[#05080E] border border-gray-800 rounded-2xl p-6 space-y-4">
+              <div className="bg-[#05080E] border border-gray-800 rounded-2xl p-6 space-y-6">
                 <div className="flex justify-between items-center">
-                  <label className="font-staatliches text-xl text-white tracking-wider uppercase">
-                    BATTLE EXPIRY DURATION:
+                  <label className="font-staatliches text-xl text-white tracking-wider uppercase flex items-center gap-2">
+                    <Clock size={18} className="text-neon-moon animate-pulse" />
+                    <span>BATTLE EXPIRY DURATION:</span>
                   </label>
                   <span className="font-mono text-sm text-neon-moon font-extrabold bg-emerald-950/60 px-3 py-1 border border-neon-moon/40 rounded-lg">
                     {(() => {
                       const diffMs = new Date(expiryDate).getTime() - Date.now();
                       const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+                      if (diffMins >= 525600) return '1.0 YEAR (MAX)';
+                      if (diffMins >= 43200) return `${(diffMins / 43200).toFixed(1)} MONTHS`;
+                      if (diffMins >= 10080) return `${(diffMins / 10080).toFixed(1)} WEEKS`;
                       if (diffMins >= 1440) return `${(diffMins / 1440).toFixed(1)} DAYS`;
                       if (diffMins >= 60) return `${(diffMins / 60).toFixed(1)} HOURS`;
                       return `${diffMins} MINS`;
@@ -1288,14 +1351,81 @@ export default function CreateRoomPage() {
                   </span>
                 </div>
 
-                <input 
-                  type="datetime-local"
-                  value={expiryDate}
-                  onChange={(e) => setExpiryDate(e.target.value)}
-                  min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 60 * 60000).toISOString().slice(0, 16)}
-                  max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 365 * 24 * 60 * 60000).toISOString().slice(0, 16)}
-                  className="w-full bg-[#0A0E17] border border-gray-800 text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-neon-moon focus:outline-none font-bold cursor-pointer"
-                />
+                {/* Preset Buttons Grid */}
+                <div className="grid grid-cols-5 gap-2">
+                  {[
+                    { label: '1 HR', hours: 1 },
+                    { label: '12 HRS', hours: 12 },
+                    { label: '24 HRS', hours: 24 },
+                    { label: '1 WEEK', hours: 168 },
+                    { label: '1 MONTH', hours: 720 },
+                  ].map((preset) => {
+                    const currentHours = getExpiryHours();
+                    const isSelected = Math.abs(currentHours - preset.hours) < 0.15;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() => handlePresetSelect(preset.hours)}
+                        className={`py-2 rounded-lg font-staatliches text-sm tracking-wider uppercase transition-all border font-bold ${
+                          isSelected
+                            ? 'bg-neon-moon text-black border-neon-moon shadow-[0_0_12px_rgba(57,255,20,0.25)]'
+                            : 'bg-[#0A0E17] border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Range Slider */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[10px] text-gray-500 font-mono font-bold">
+                    <span>1 HOUR</span>
+                    <span>1 WEEK</span>
+                    <span>1 MONTH</span>
+                    <span>1 YEAR (MAX)</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={hoursToSliderVal(getExpiryHours())}
+                    onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
+                    className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-neon-moon focus:outline-none"
+                    style={{
+                      background: `linear-gradient(to right, #39FF14 ${hoursToSliderVal(getExpiryHours())}%, #1F2937 ${hoursToSliderVal(getExpiryHours())}%)`
+                    }}
+                  />
+                </div>
+
+                {/* Manual Date/Time Picker */}
+                <div className="space-y-2 pt-2 border-t border-gray-900">
+                  <span className="text-[10px] text-gray-500 font-mono font-bold uppercase block">
+                    MANUAL EXACT EXPIRY TIME (MAX 1 YEAR LIMIT):
+                  </span>
+                  <input 
+                    type="datetime-local"
+                    value={expiryDate}
+                    onChange={(e) => {
+                      const selectedVal = e.target.value;
+                      const selectedTime = new Date(selectedVal).getTime();
+                      const maxTime = Date.now() + 365 * 24 * 60 * 60000;
+                      if (selectedTime > maxTime) {
+                        const maxDate = new Date(maxTime);
+                        const tzOffset = maxDate.getTimezoneOffset() * 60000;
+                        setExpiryDate(new Date(maxDate.getTime() - tzOffset).toISOString().slice(0, 16));
+                      } else {
+                        setExpiryDate(selectedVal);
+                      }
+                    }}
+                    min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 60 * 60000).toISOString().slice(0, 16)}
+                    max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 365 * 24 * 60 * 60000).toISOString().slice(0, 16)}
+                    className="w-full bg-[#0A0E17] border border-gray-800 text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-neon-moon focus:outline-none font-bold cursor-pointer"
+                  />
+                </div>
               </div>
 
               {/* Initial Ammo Seeding Box */}

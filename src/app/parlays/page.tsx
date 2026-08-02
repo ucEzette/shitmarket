@@ -168,7 +168,7 @@ export default function ParlaysPage() {
             <PepePortrait src={PEPE_ASSETS.neonWojak} size={52} glowColor="moon" animated className="rounded-lg shrink-0" />
             <div>
               <h2 className="font-staatliches text-4xl text-white tracking-wider flex items-center gap-2 uppercase leading-none">
-                MULTIPLY DEGEN: PvP PARLAYS
+                MULTIPLY DEGEN: PARLAYS
               </h2>
               <p className="font-mono text-xs text-trench-gasmask uppercase font-bold mt-1.5">
                 Assemble multiple active arena room wagers into a single tactical strike. All targets must settle in your favor to claim the aggregated multiplier!
@@ -179,7 +179,7 @@ export default function ParlaysPage() {
           {/* Simulated Training Deck Alert Banner */}
           <div className="mb-4 border border-yellow-500/40 bg-yellow-500/5 p-3 rounded text-[9px] font-mono text-yellow-500 uppercase font-bold tracking-wider animate-pulse flex items-center gap-2">
             <span>⚠️</span>
-            <span>SIMULATED TRAINING DECK: ATOMIC PARLAYS RUN IN MOCK ENVIRONMENT. MULTI-LEG PVP PREDICTIONS DO NOT EXECUTE ON-CHAIN TRANSACTIONS ON MAINNET.</span>
+            <span>SIMULATED TRAINING DECK: ATOMIC PARLAYS RUN IN MOCK ENVIRONMENT. MULTI-LEG PREDICTIONS DO NOT EXECUTE ON-CHAIN TRANSACTIONS ON MAINNET.</span>
           </div>
 
           {/* Warning badge */}
@@ -188,7 +188,7 @@ export default function ParlaysPage() {
             <div>
               <span className="font-staatliches text-lg text-moon-gold tracking-wide block uppercase leading-none">HIGH LEVERAGE HAZARD ZONE</span>
               <p className="font-mono text-[9px] uppercase font-bold mt-1 leading-normal">
-                If a single prediction on your parlay ticket settles against your side, the entire ammunition stake is forfeit to the PvP pool.
+                If a single prediction on your parlay ticket settles against your side, the entire ammunition stake is forfeit to the prediction pool.
               </p>
             </div>
           </div>
@@ -350,7 +350,7 @@ export default function ParlaysPage() {
           <div>
             {/* Massive Payout Banner */}
             <div className="bg-trench-black p-4 border border-trench-sandbag rounded text-center my-6 shadow-inner">
-              <span className="font-mono text-[9px] text-trench-gasmask block uppercase font-bold">POTENTIAL PVP PAYOUT (SOL)</span>
+              <span className="font-mono text-[9px] text-trench-gasmask block uppercase font-bold">POTENTIAL PREDICTION PAYOUT (SOL)</span>
               <span className="font-staatliches text-4xl text-neon-moon tracking-widest glow-moon block mt-1 font-bold">
                 {calculatePayout().toFixed(3)} SOL
               </span>

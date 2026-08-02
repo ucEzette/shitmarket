@@ -17,8 +17,8 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://shitmarket";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: "ShitMarket | Degen Meme Coin PvP Prediction Markets",
-  description: "Pure PvP predictions for meme coins. Bet Moon or Jeet on 5, 15, or 60-minute rooms. Rug-free, adrenaline-packed crypto betting.",
+  title: "ShitMarket | Degen Meme Coin Prediction Markets",
+  description: "Pure predictions for meme coins. Bet Moon or Jeet on 5, 15, or 60-minute rooms. Rug-free, adrenaline-packed crypto betting.",
   icons: {
     icon: [
       { url: "/pepes/logo-main.png", sizes: "288x285", type: "image/png" },
@@ -27,8 +27,8 @@ export const metadata: Metadata = {
     apple: [{ url: "/pepes/logo-main.png", sizes: "288x285", type: "image/png" }],
   },
   openGraph: {
-    title: "ShitMarket | Degen Meme Coin PvP Prediction Markets",
-    description: "Degen Meme Coin PvP Prediction Markets",
+    title: "ShitMarket | Degen Meme Coin Prediction Markets",
+    description: "Degen Meme Coin Prediction Markets",
     url: "https://shitmarket",
     siteName: "ShitMarket",
     images: [
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
         url: "https://shitmarket/og-image.png",
         width: 1200,
         height: 630,
-        alt: "ShitMarket - Degen Meme Coin PvP",
+        alt: "ShitMarket - Degen Meme Coin Predictions",
       },
     ],
     locale: "en_US",
@@ -44,8 +44,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ShitMarket | Degen Meme Coin PvP Prediction Markets",
-    description: "Pure PvP predictions for meme coins. Bet Moon or Jeet on 5, 15, or 60-minute rooms.",
+    title: "ShitMarket | Degen Meme Coin Prediction Markets",
+    description: "Pure predictions for meme coins. Bet Moon or Jeet on 5, 15, or 60-minute rooms.",
     images: ["/pepes/screen1.png"],
   },
 };

@@ -13,7 +13,7 @@ import { PublicProfileModal } from '@/components/PublicProfileModal';
 import { 
   Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, Brain,
   AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal, Bookmark,
-  ExternalLink, Scale, FileText, CheckCircle2
+  ExternalLink, Scale, FileText, CheckCircle2, ChevronDown
 } from 'lucide-react';
 import * as Slider from '@radix-ui/react-slider';
 import confetti from 'canvas-confetti';
@@ -233,6 +233,8 @@ export default function RoomDetailPage() {
   const [limitPrice, setLimitPrice] = useState<number>(0.50);
   const [sharesInput, setSharesInput] = useState<number>(10);
   const [selectedProfileAddress, setSelectedProfileAddress] = useState<string | null>(null);
+  const [activeRulesTab, setActiveRulesTab] = useState<'rules' | 'context'>('rules');
+  const [activeMainTab, setActiveMainTab] = useState<'comments' | 'holders' | 'positions' | 'activity'>('positions');
   const [localShake, setLocalShake] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [livePrice, setLivePrice] = useState<number | null>(null);
@@ -618,6 +620,49 @@ export default function RoomDetailPage() {
 
     return Array.from(map.values()).sort((a, b) => b.timestamp - a.timestamp);
   }, [roomBets, displayBets]);
+
+  // Memoized top holders list derived from real live transaction logs (strictly no mocks)
+  const topHolders = useMemo(() => {
+    const yesMap = new Map<string, { user: string; shares: number; totalSpent: number }>();
+    const noMap = new Map<string, { user: string; shares: number; totalSpent: number }>();
+
+    // Process real transaction logs
+    allSectorBets.forEach((bet) => {
+      const u = bet.user || bet.currentOwner;
+      if (!u) return;
+      
+      const side = bet.side;
+      const amount = bet.amount; // already scaled to SOL/USDC
+
+      // Estimate shares from amount spent (shares = amount / 0.50 if not specified)
+      const shares = bet.shares || (amount / 0.5);
+
+      if (side === 'moon') {
+        const existing = yesMap.get(u) || { user: u, shares: 0, totalSpent: 0 };
+        existing.shares += shares;
+        existing.totalSpent += amount;
+        yesMap.set(u, existing);
+      } else {
+        const existing = noMap.get(u) || { user: u, shares: 0, totalSpent: 0 };
+        existing.shares += shares;
+        existing.totalSpent += amount;
+        noMap.set(u, existing);
+      }
+    });
+
+    // Clean up negative or zero balance positions (e.g. from sells)
+    const yesList = Array.from(yesMap.values())
+      .filter(item => item.shares > 0.01 && item.totalSpent > 0.01)
+      .sort((a, b) => b.shares - a.shares)
+      .slice(0, 10);
+
+    const noList = Array.from(noMap.values())
+      .filter(item => item.shares > 0.01 && item.totalSpent > 0.01)
+      .sort((a, b) => b.shares - a.shares)
+      .slice(0, 10);
+    
+    return { yesList, noList };
+  }, [allSectorBets]);
 
   if (isLoading && !room) {
     return (
@@ -1198,103 +1243,6 @@ export default function RoomDetailPage() {
                       </div>
                     </div>
                   </div>
-
-                  {/* 2. Official Resolution Rules & Evidence Panel */}
-                  <div className="bg-[#080B11] border border-yellow-500/30 rounded-2xl p-6 space-y-4">
-                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
-                      <div className="flex items-center gap-2 text-yellow-400 font-staatliches text-xl font-bold uppercase">
-                        <Scale size={22} className="text-yellow-400" />
-                        <span>OFFICIAL MARKET RESOLUTION RULES</span>
-                      </div>
-                      {refUrl && (
-                        <a
-                          href={refUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="px-3 py-1 bg-gray-900 hover:bg-gray-800 border border-gray-700 text-cyan-400 font-mono text-xs rounded-lg flex items-center gap-1.5 font-bold transition-colors"
-                        >
-                          <span>VERIFY REFERENCE URL</span>
-                          <ExternalLink size={12} />
-                        </a>
-                      )}
-                    </div>
-
-                    <div className="bg-[#04060A] border border-yellow-500/40 p-5 rounded-xl font-mono text-xs text-gray-100 leading-relaxed space-y-3 shadow-inner">
-                      <p className="font-bold uppercase text-white tracking-wide text-sm">
-                        {criteriaText || 'Resolves MOON (YES) if the specified statement evaluates TRUE according to oracle rules. Resolves JEET (NO) if FALSE.'}
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                      <div className="bg-[#050A06] border border-emerald-900/60 p-4 rounded-xl space-y-1">
-                        <span className="font-staatliches text-lg text-neon-moon uppercase tracking-wider block">
-                          MOON (YES) OUTCOME CONDITION
-                        </span>
-                        <p className="font-mono text-xs text-gray-300">
-                          Resolves MOON if statement is confirmed TRUE before market expiry timestamp.
-                        </p>
-                      </div>
-
-                      <div className="bg-[#0F0506] border border-red-900/60 p-4 rounded-xl space-y-1">
-                        <span className="font-staatliches text-lg text-jeet-red uppercase tracking-wider block">
-                          JEET (NO) OUTCOME CONDITION
-                        </span>
-                        <p className="font-mono text-xs text-gray-300">
-                          Resolves JEET if statement is confirmed FALSE or condition remains unfulfilled.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 3. Oracle Telemetry & Verification Card */}
-                  <div className="bg-[#080B11] border border-gray-800 rounded-2xl p-6 space-y-4">
-                    <div className="flex items-center justify-between border-b border-gray-800 pb-3">
-                      <div className="flex items-center gap-2 text-neon-moon font-staatliches text-xl font-bold uppercase">
-                        <Brain size={22} />
-                        <span>ORACLE PROTOCOL TELEMETRY</span>
-                      </div>
-                      <span className="px-2.5 py-0.5 rounded bg-emerald-950 border border-neon-moon/40 font-mono text-[10px] text-neon-moon font-bold uppercase">
-                        PERMISSIONLESS SETTLEMENT
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
-                      <div className="bg-[#04060A] border border-gray-800 p-3.5 rounded-xl">
-                        <span className="text-gray-500 uppercase block font-bold text-[9px]">ORACLE MECHANISM</span>
-                        <span className="text-white font-bold block truncate mt-1">
-                          {room.resolutionCriteria?.includes('DAO JURY') ? 'Community DAO Jury' : 'Autonomous AI Node'}
-                        </span>
-                      </div>
-
-                      <div className="bg-[#04060A] border border-gray-800 p-3.5 rounded-xl">
-                        <span className="text-gray-500 uppercase block font-bold text-[9px]">ORACLE SIGNER KEY</span>
-                        <span className="text-neon-moon font-bold block truncate mt-1 select-all" title={room.oracleAddress}>
-                          {room.oracleAddress ? `${room.oracleAddress.slice(0, 6)}...${room.oracleAddress.slice(-4)}` : 'DEFAULT KEEPER'}
-                        </span>
-                      </div>
-
-                      <div className="bg-[#04060A] border border-gray-800 p-3.5 rounded-xl">
-                        <span className="text-gray-500 uppercase block font-bold text-[9px]">ORACLE FEE</span>
-                        <span className="text-yellow-400 font-bold block mt-1">
-                          {room.oracleFeeLamports ? `${(room.oracleFeeLamports / 1e6).toFixed(3)} USDC` : '0 USDC'}
-                        </span>
-                      </div>
-
-                      <div className="bg-[#04060A] border border-gray-800 p-3.5 rounded-xl">
-                        <span className="text-gray-500 uppercase block font-bold text-[9px]">EVALUATION STATUS</span>
-                        <span className="text-cyan-400 font-bold block mt-1">
-                          {room.status === 'settled' ? 'VERIFIED ON-CHAIN' : 'MONITORING SOURCES'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {room.oracleLogs && (
-                      <div className="bg-[#04060A] border border-gray-800 p-4 rounded-xl space-y-1.5 font-mono text-xs">
-                        <span className="text-neon-moon font-bold uppercase text-[10px] block">ORACLE LOG AUDIT TRAIL:</span>
-                        <p className="text-gray-300 whitespace-pre-wrap">{room.oracleLogs}</p>
-                      </div>
-                    )}
-                  </div>
                 </div>
               );
             }
@@ -1678,7 +1626,494 @@ export default function RoomDetailPage() {
               ) : (
                 <div className="flex flex-col items-center justify-center py-8 text-center text-trench-gasmask/60 font-mono text-[9px] font-bold uppercase leading-relaxed bg-[#050803] border border-trench-sandbag/20 rounded-lg p-4">
                   📢 NO POSITION TICKET LISTINGS REPORTED IN THE EXIT TRENCH.
-                  <span className="text-gray-500 text-[8px] mt-1 normal-case font-medium">PLACED A BET? LIST IT FROM YOUR LOCKED POSITIONS PANEL AT THE FOOTER TO SELL IT EARLY.</span>
+                  <span className="text-gray-500 text-[8px] mt-1 normal-case font-medium">PLACED A BET? LIST IT FROM YOUR LOCKED POSITIONS PANEL TO SELL IT EARLY.</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 📋 RULES & MARKET CONTEXT TABS */}
+          <div className="bg-trench-black border-2 border-trench-sandbag rounded-xl shadow-2xl overflow-hidden font-mono text-xs text-left relative z-10 scanlines">
+            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/45" />
+            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/45" />
+            
+            {/* Tab Bar */}
+            <div className="flex border-b border-trench-sandbag bg-trench-mud">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRulesTab('rules');
+                  synthSound('bet');
+                }}
+                className={`px-6 py-3 font-staatliches text-lg tracking-wider uppercase transition-all ${
+                  activeRulesTab === 'rules'
+                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
+                    : 'text-trench-gasmask hover:text-white'
+                }`}
+              >
+                Rules
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRulesTab('context');
+                  synthSound('bet');
+                }}
+                className={`px-6 py-3 font-staatliches text-lg tracking-wider uppercase transition-all ${
+                  activeRulesTab === 'context'
+                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
+                    : 'text-trench-gasmask hover:text-white'
+                }`}
+              >
+                Market Context
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-5 space-y-4">
+              {activeRulesTab === 'rules' ? (
+                <div className="space-y-4">
+                  <p className="text-white text-xs font-bold leading-relaxed uppercase">
+                    {isDebateMarket 
+                      ? (room.resolutionCriteria || room.token.name)
+                      : `This market will resolve to YES (MOON) if the spot price of ${room.token.symbol} is higher than the entry price ($${formatPrice(openingPriceSafe || 0)}) upon final countdown settlement. Otherwise, this market will resolve to NO (JEET).`}
+                  </p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                    <div className="bg-[#050A06] border border-emerald-950 p-4 rounded-xl space-y-1.5">
+                      <span className="font-staatliches text-sm text-neon-moon uppercase tracking-wider block">
+                        YES (MOON) CONDITION
+                      </span>
+                      <p className="text-[10px] text-gray-300 leading-normal">
+                        {isDebateMarket
+                          ? "Resolves YES if statement is confirmed TRUE before market expiry timestamp."
+                          : `Resolves YES if the price of ${room.token.symbol} ends higher than $${formatPrice(openingPriceSafe || 0)}.`}
+                      </p>
+                    </div>
+
+                    <div className="bg-[#0F0506] border border-red-950 p-4 rounded-xl space-y-1.5">
+                      <span className="font-staatliches text-sm text-jeet-red uppercase tracking-wider block">
+                        NO (JEET) CONDITION
+                      </span>
+                      <p className="text-[10px] text-gray-300 leading-normal">
+                        {isDebateMarket
+                          ? "Resolves NO if statement is confirmed FALSE or condition remains unfulfilled."
+                          : `Resolves NO if the price of ${room.token.symbol} ends equal to or lower than $${formatPrice(openingPriceSafe || 0)}.`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
+                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">CREATOR</span>
+                    <span className="text-white font-bold block mt-0.5 truncate select-all">{cleanEvmAddress(room.creator)}</span>
+                  </div>
+                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
+                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">EXPIRATION</span>
+                    <span className="text-white font-bold block mt-0.5">{new Date(room.expiry).toLocaleString()}</span>
+                  </div>
+                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
+                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">RESOLUTION ID</span>
+                    <span className="text-white font-bold block mt-0.5 truncate">{formatCashtag(room.token.symbol || 'UNKNWN')}</span>
+                  </div>
+                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
+                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROUND DURATION</span>
+                    <span className="text-white font-bold block mt-0.5">{durationSafe ? `${durationSafe} MINS` : '60 MINS'}</span>
+                  </div>
+                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
+                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ORACLE VAL ADDR</span>
+                    <span className="text-white font-bold block mt-0.5 truncate select-all">{cleanEvmAddress(room.oracleAddress || room.creator)}</span>
+                  </div>
+                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded flex flex-col justify-between">
+                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">CONTRACT ADDRESS</span>
+                    <div className="flex items-center justify-between gap-1.5 mt-0.5">
+                      <span className="text-white font-bold truncate min-w-0">{cleanEvmAddress(room.token.address)}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(cleanEvmAddress(room.token.address));
+                          addToast("CONTRACT ADDRESS COPIED TO CLIPBOARD!", 'success');
+                        }}
+                        className="text-neon-moon hover:text-white font-bold font-staatliches text-[10px] tracking-wider uppercase bg-trench-black border border-neon-moon/40 px-1.5 py-0.5 rounded active:scale-95 transition-transform shrink-0"
+                      >
+                        [COPY]
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 💬 DISCUSSION, HOLDERS, POSITIONS & ACTIVITY TAB GROUP */}
+          <div className="bg-trench-black border-2 border-trench-sandbag rounded-xl shadow-2xl overflow-hidden font-mono text-xs text-left relative z-10 scanlines">
+            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/45" />
+            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/45" />
+            
+            {/* Tab Bar */}
+            <div className="flex border-b border-trench-sandbag bg-trench-mud overflow-x-auto scrollbar">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMainTab('comments');
+                  synthSound('bet');
+                }}
+                className={`px-5 py-3 font-staatliches text-lg tracking-wider uppercase transition-all whitespace-nowrap ${
+                  activeMainTab === 'comments'
+                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
+                    : 'text-trench-gasmask hover:text-white'
+                }`}
+              >
+                Comments ({activeRoomChats.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMainTab('holders');
+                  synthSound('bet');
+                }}
+                className={`px-5 py-3 font-staatliches text-lg tracking-wider uppercase transition-all whitespace-nowrap ${
+                  activeMainTab === 'holders'
+                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
+                    : 'text-trench-gasmask hover:text-white'
+                }`}
+              >
+                Top Holders
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMainTab('positions');
+                  synthSound('bet');
+                }}
+                className={`px-5 py-3 font-staatliches text-lg tracking-wider uppercase transition-all whitespace-nowrap ${
+                  activeMainTab === 'positions'
+                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
+                    : 'text-trench-gasmask hover:text-white'
+                }`}
+              >
+                Positions
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMainTab('activity');
+                  synthSound('bet');
+                }}
+                className={`px-5 py-3 font-staatliches text-lg tracking-wider uppercase transition-all whitespace-nowrap ${
+                  activeMainTab === 'activity'
+                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
+                    : 'text-trench-gasmask hover:text-white'
+                }`}
+              >
+                Activity
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-5">
+              {/* 1. COMMENTS (Chat Comms Radar) */}
+              {activeMainTab === 'comments' && (
+                <div className="h-80 flex flex-col justify-between relative">
+                  {/* Faction chat squad selectors */}
+                  <div className="flex gap-2 mb-3 pb-2 border-b border-trench-sandbag/35">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveChatTab('moon');
+                        synthSound('bet');
+                      }}
+                      className={`px-3 py-1 font-staatliches text-xs tracking-wider uppercase border rounded transition-all ${
+                        activeChatTab === 'moon'
+                          ? 'bg-neon-moon/10 text-neon-moon border-neon-moon/50 shadow-glow-moon'
+                          : 'text-trench-gasmask border-trench-sandbag/45 hover:text-white'
+                      }`}
+                    >
+                      🚀 Moon Squad Chat
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveChatTab('jeet');
+                        synthSound('bet');
+                      }}
+                      className={`px-3 py-1 font-staatliches text-xs tracking-wider uppercase border rounded transition-all ${
+                        activeChatTab === 'jeet'
+                          ? 'bg-jeet-red/10 text-jeet-red border-jeet-red/50 shadow-glow-jeet'
+                          : 'text-trench-gasmask border-trench-sandbag/45 hover:text-white'
+                      }`}
+                    >
+                      💀 Jeet Squad Chat
+                    </button>
+                  </div>
+
+                  <div
+                    ref={chatScrollRef}
+                    className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px] select-text scrollbar"
+                  >
+                    <div className="flex gap-1.5 items-start text-neon-moon font-bold uppercase">
+                      <span>📡</span>
+                      <span>[COMMS LOG] Scanning squad dialogue...</span>
+                    </div>
+                    {activeRoomChats.length > 0 ? (
+                      activeRoomChats.map((msg, index) => {
+                        const isHQ = msg.user.includes('HQ') || msg.user.includes('COMMAND') || msg.user.includes('SYSTEM');
+                        const bubbleColor = isHQ
+                          ? 'text-yellow-500'
+                          : msg.side === 'moon'
+                          ? 'text-[#16A34A]'
+                          : 'text-[#ff535a]';
+
+                        const displayUser = msg.user.startsWith('0x') && msg.user.length > 15
+                          ? `${msg.user.substring(0, 6)}...${msg.user.substring(msg.user.length - 4)}`
+                          : msg.user;
+
+                        return (
+                          <div key={index} className="flex gap-1.5 items-start font-bold uppercase leading-tight">
+                            <span>📡</span>
+                            <span>
+                              <span
+                                onClick={() => {
+                                  if (!isHQ && msg.user.startsWith('0x')) {
+                                    setSelectedProfileAddress(msg.user);
+                                    synthSound('bet');
+                                  }
+                                }}
+                                className={`${bubbleColor} font-bold mr-1.5 cursor-pointer hover:underline`}
+                              >
+                                [{displayUser}]
+                              </span>
+                              <span className="text-gray-300">{msg.message}</span>
+                            </span>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="flex gap-1.5 items-start text-gray-500 font-bold uppercase">
+                        <span>📡</span>
+                        <span>[RADAR LOG] Waiting for user chat broadcasts...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <form onSubmit={handleSendChat} className="mt-4 pt-2 border-t border-trench-sandbag flex gap-2">
+                    <input
+                      type="text"
+                      placeholder={`SEND BROADCAST MESSAGE TO ${activeChatTab.toUpperCase()} SQUAD...`}
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      className="flex-1 min-w-0 px-3 py-1.5 bg-trench-black border border-trench-sandbag text-white text-[10px] font-mono rounded focus:border-neon-moon focus:outline-none uppercase placeholder-trench-gasmask/50 font-bold"
+                    />
+                    <button
+                      type="submit"
+                      className="px-4 py-1.5 bg-trench-sandbag hover:bg-trench-gasmask text-white rounded transition-colors flex items-center justify-center"
+                    >
+                      <Send size={12} />
+                    </button>
+                  </form>
+                </div>
+              )}
+
+              {/* 2. TOP HOLDERS */}
+              {activeMainTab === 'holders' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* YES/MOON side */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center border-b border-trench-sandbag/45 pb-1 font-staatliches text-base text-neon-moon uppercase font-bold">
+                      <span>YES HOLDERS</span>
+                      <span className="text-[10px] font-mono text-trench-gasmask">SHARES</span>
+                    </div>
+                    <div className="space-y-2 max-h-72 overflow-y-auto scrollbar pr-1">
+                      {topHolders.yesList.length > 0 ? (
+                        topHolders.yesList.map((holder, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-1 hover:bg-trench-mud/10 px-1 rounded transition-colors">
+                            <span className="text-gray-300 font-bold uppercase truncate max-w-[150px]">
+                              {holder.user.startsWith('0x') ? `${holder.user.slice(0, 6)}...${holder.user.slice(-4)}` : holder.user}
+                            </span>
+                            <span className="text-white font-bold">{holder.shares.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-trench-gasmask/60 uppercase text-[10px] py-4 text-center">No holders recorded</div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* NO/JEET side */}
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center border-b border-trench-sandbag/45 pb-1 font-staatliches text-base text-jeet-red uppercase font-bold">
+                      <span>NO HOLDERS</span>
+                      <span className="text-[10px] font-mono text-trench-gasmask">SHARES</span>
+                    </div>
+                    <div className="space-y-2 max-h-72 overflow-y-auto scrollbar pr-1">
+                      {topHolders.noList.length > 0 ? (
+                        topHolders.noList.map((holder, idx) => (
+                          <div key={idx} className="flex justify-between items-center py-1 hover:bg-trench-mud/10 px-1 rounded transition-colors">
+                            <span className="text-gray-300 font-bold uppercase truncate max-w-[150px]">
+                              {holder.user.startsWith('0x') ? `${holder.user.slice(0, 6)}...${holder.user.slice(-4)}` : holder.user}
+                            </span>
+                            <span className="text-white font-bold">{holder.shares.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-trench-gasmask/60 uppercase text-[10px] py-4 text-center">No holders recorded</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 3. POSITIONS */}
+              {activeMainTab === 'positions' && (() => {
+                const isCurrentUser = (userAddress: string) => {
+                  if (!userAddress) return false;
+                  const cleanAddr = userAddress.toLowerCase();
+                  return (
+                    wallet?.publicKey?.toBase58().toLowerCase() === cleanAddr ||
+                    user?.wallet?.toLowerCase() === cleanAddr
+                  );
+                };
+                return (
+                  <div className="space-y-4">
+                    {/* Header bar controls as shown in the screenshot */}
+                    <div className="flex justify-between items-center pb-2 border-b border-gray-900">
+                      {/* Left selector */}
+                      <div className="flex items-center bg-[#0C121F] border border-gray-800 rounded px-2.5 py-1 cursor-pointer hover:bg-[#121b2f] transition-all">
+                        <span className="text-white font-bold text-[10px] uppercase">July 31</span>
+                        <ChevronDown size={12} className="text-gray-400 ml-1.5" />
+                      </div>
+                      {/* Right filters */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-[#0C121F] border border-gray-800 rounded px-2.5 py-1 cursor-pointer hover:bg-[#121b2f] transition-all">
+                          <span className="text-gray-300 font-bold text-[10px] uppercase">All</span>
+                          <ChevronDown size={12} className="text-gray-400 ml-1.5" />
+                        </div>
+                        <div className="flex items-center bg-[#0C121F] border border-gray-800 rounded px-2.5 py-1 cursor-pointer hover:bg-[#121b2f] transition-all">
+                          <span className="text-gray-300 font-bold text-[10px] uppercase">Desc</span>
+                          <ChevronDown size={12} className="text-gray-400 ml-1.5" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* YES and NO side lists */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* YES/MOON Positions list */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center font-staatliches text-base text-neon-moon uppercase font-bold">
+                          <span>YES</span>
+                          <span className="text-[10px] font-mono text-trench-gasmask">PNL</span>
+                        </div>
+                        <div className="space-y-2 max-h-72 overflow-y-auto scrollbar pr-1">
+                          {topHolders.yesList.length > 0 ? (
+                            topHolders.yesList.map((pos, idx) => {
+                              const isUser = isCurrentUser(pos.user);
+                              return (
+                                <div key={idx} className={`flex justify-between items-center p-2 rounded transition-colors ${
+                                  isUser ? 'bg-[#1b3515]/30 border border-[#16A34A]/50' : 'hover:bg-trench-mud/10'
+                                }`}>
+                                  <div className="flex flex-col">
+                                    <span className="text-gray-300 font-bold uppercase truncate max-w-[150px]">
+                                      {pos.user.startsWith('0x') ? `${pos.user.slice(0, 6)}...${pos.user.slice(-4)}` : pos.user}
+                                    </span>
+                                    <span className="text-trench-gasmask text-[9px] font-bold">
+                                      avg {(pos.shares > 0 ? (pos.totalSpent / pos.shares) * 100 : 0).toFixed(1)}¢
+                                    </span>
+                                  </div>
+                                  <span className="text-[#16A34A] font-staatliches text-sm font-bold">
+                                    ${pos.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-trench-gasmask/60 uppercase text-[10px] py-4 text-center">No YES positions active</div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* NO/JEET Positions list */}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center font-staatliches text-base text-jeet-red uppercase font-bold">
+                          <span>NO</span>
+                          <span className="text-[10px] font-mono text-trench-gasmask">PNL</span>
+                        </div>
+                        <div className="space-y-2 max-h-72 overflow-y-auto scrollbar pr-1">
+                          {topHolders.noList.length > 0 ? (
+                            topHolders.noList.map((pos, idx) => {
+                              const isUser = isCurrentUser(pos.user);
+                              return (
+                                <div key={idx} className={`flex justify-between items-center p-2 rounded transition-colors ${
+                                  isUser ? 'bg-[#3b1213]/30 border border-jeet-red/50' : 'hover:bg-trench-mud/10'
+                                }`}>
+                                  <div className="flex flex-col">
+                                    <span className="text-gray-300 font-bold uppercase truncate max-w-[150px]">
+                                      {pos.user.startsWith('0x') ? `${pos.user.slice(0, 6)}...${pos.user.slice(-4)}` : pos.user}
+                                    </span>
+                                    <span className="text-trench-gasmask text-[9px] font-bold">
+                                      avg {(pos.shares > 0 ? (pos.totalSpent / pos.shares) * 100 : 0).toFixed(1)}¢
+                                    </span>
+                                  </div>
+                                  <span className="text-jeet-red font-staatliches text-sm font-bold">
+                                    ${pos.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </span>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <div className="text-trench-gasmask/60 uppercase text-[10px] py-4 text-center">No NO positions active</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* 4. ACTIVITY (Bet History) */}
+              {activeMainTab === 'activity' && (
+                <div className="h-72 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px] select-text scrollbar">
+                  {allSectorBets.length > 0 ? (
+                    allSectorBets.map((bet) => {
+                      const formattedUser = bet.user ? (bet.user.length > 8 ? bet.user.slice(0, 4) + '...' + bet.user.slice(-4) : bet.user) : 'RECRUIT';
+                      const isMoon = bet.side === 'moon';
+                      const colorClass = isMoon ? 'text-[#16A34A] glow-moon' : 'text-jeet-red glow-jeet';
+                      const timeString = new Date(bet.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                      const currencySymbol = (room.token.chainId === 'solana' || !room.id.startsWith('0x')) ? 'SOL' : 'USDC';
+
+                      return (
+                        <div key={bet.id} className="flex items-center justify-between font-bold uppercase hover:bg-trench-mud/20 px-1 py-0.5 rounded transition-colors">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className={isMoon ? 'animate-pulse' : ''}>
+                              {isMoon ? '🚀' : '💀'}
+                            </span>
+                            <span
+                              onClick={() => {
+                                if (bet.user && bet.user.startsWith('0x')) {
+                                  setSelectedProfileAddress(bet.user);
+                                  synthSound('bet');
+                                }
+                              }}
+                              className="text-trench-gasmask cursor-pointer hover:underline"
+                            >
+                              [{formattedUser}]
+                            </span>
+                            <span className={`${colorClass} font-extrabold tracking-wide`}>
+                              {isMoon ? 'MOON' : 'JEET'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-white font-bold">{bet.amount.toFixed(2)} {currencySymbol}</span>
+                            <span className="text-trench-gasmask/70 text-[8px] sm:text-[9px]">{timeString}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="flex gap-1.5 items-center justify-center h-full text-trench-gasmask/50 font-bold uppercase animate-pulse">
+                      <span>AWAITING TRANSACTION LOGS...</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -2475,7 +2910,7 @@ export default function RoomDetailPage() {
               <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold text-left">
                 <ShieldAlert size={16} className="text-jeet-red shrink-0 mt-0.5" />
                 <p>
-                  'Pure PvP execution. Order limits lock USDC collateral. Exit positions early by placing opposing sell orders.'
+                  'Pure prediction execution. Order limits lock USDC collateral. Exit positions early by placing opposing sell orders.'
                 </p>
               </div>
             </>
@@ -2498,275 +2933,7 @@ export default function RoomDetailPage() {
 
         </section>
 
-
-
       </main>
-
-      {/* 3. BOTTOM LOGS PANEL (tactical radar feed bars side-by-side) */}
-      <footer className="max-w-none w-full px-2 sm:px-4 md:px-6 py-2 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 relative z-10 mb-8 font-mono text-[10px]">
-        
-        {/* Left Bottom Bar: Jeet Communications Radar (Chat and system announcements integrated live) */}
-        <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 sm:gap-0 border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
-            <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-xs sm:text-sm font-bold uppercase">
-              <Radio className="w-3 h-3 sm:w-4 sm:h-4 text-yellow-500 animate-pulse shrink-0" />
-              <span className="truncate">((o)) COMMS RADAR</span>
-            </div>
-            
-            {/* Dialogue faction filter tabs */}
-            <div className="flex gap-1.5 sm:gap-2 text-[8px] uppercase shrink-0">
-              <button 
-                onClick={() => {
-                  setActiveChatTab('moon');
-                  synthSound('bet');
-                }}
-                className={`px-1.5 sm:px-2 py-0.5 rounded border ${
-                  activeChatTab === 'moon' 
-                    ? 'bg-neon-moon border-neon-moon text-black font-bold' 
-                    : 'border-trench-sandbag text-trench-gasmask hover:text-white'
-                }`}
-              >
-                Moon
-              </button>
-              <button 
-                onClick={() => {
-                  setActiveChatTab('jeet');
-                  synthSound('bet');
-                }}
-                className={`px-1.5 sm:px-2 py-0.5 rounded border ${
-                  activeChatTab === 'jeet' 
-                    ? 'bg-jeet-red border-jeet-red text-white font-bold' 
-                    : 'border-trench-sandbag text-trench-gasmask hover:text-white'
-                }`}
-              >
-                Jeet
-              </button>
-            </div>
-          </div>
-
-          <div
-            ref={chatScrollRef}
-            className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px] select-text scrollbar"
-          >
-            {/* Always seed a static system status entry at the top */}
-            <div className="flex gap-1.5 items-start text-neon-moon font-bold uppercase">
-              <span>📡</span>
-              <span>[RADAR LOG] Scanning decentralized sector {formatCashtag(room.token.symbol)} for combat activities...</span>
-            </div>
-            <div className="flex gap-1.5 items-start text-jeet-red font-bold animate-pulse uppercase">
-              <span>⚠️</span>
-              <span>[GAS WAR] Network congested; base fee calculated dynamically.</span>
-            </div>
-
-            {activeRoomChats.length > 0 ? (
-              activeRoomChats.map((msg, index) => {
-                const isHQ = msg.user.includes('HQ') || msg.user.includes('COMMAND') || msg.user.includes('SYSTEM');
-                const bubbleColor = isHQ
-                  ? 'text-yellow-500'
-                  : msg.side === 'moon'
-                  ? 'text-[#16A34A]'
-                  : 'text-[#ff535a]';
-
-                const displayUser = msg.user.startsWith('0x') && msg.user.length > 15
-                  ? `${msg.user.substring(0, 6)}...${msg.user.substring(msg.user.length - 4)}`
-                  : msg.user;
-
-                return (
-                  <div
-                    key={index}
-                    className="flex gap-1.5 items-start font-bold uppercase leading-tight"
-                  >
-                    <span>📡</span>
-                    <span>
-                      <span
-                        onClick={() => {
-                          if (!isHQ && msg.user.startsWith('0x')) {
-                            setSelectedProfileAddress(msg.user);
-                            synthSound('bet');
-                          }
-                        }}
-                        className={`${bubbleColor} font-bold mr-1.5 cursor-pointer hover:underline`}
-                      >
-                        [{displayUser}]
-                      </span>
-                      <span className="text-gray-300">{msg.message}</span>
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="flex gap-1.5 items-start text-gray-500 font-bold uppercase">
-                <span>📡</span>
-                <span>[RADAR LOG] Waiting for user chat broadcasts on this channel...</span>
-              </div>
-            )}
-          </div>
-
-          {/* Inline Chat Send Input */}
-          <form
-            onSubmit={handleSendChat}
-            className="mt-2 pt-2 border-t border-trench-sandbag flex gap-2"
-          >
-            <input
-              type="text"
-              placeholder={`SEND BROADCAST MESSAGE TO ${activeChatTab.toUpperCase()} SQUAD...`}
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              className="flex-1 min-w-0 px-3 py-1 bg-trench-black border border-trench-sandbag text-white text-[10px] font-mono rounded focus:border-neon-moon focus:outline-none uppercase placeholder-trench-gasmask/50 font-bold"
-            />
-            <button
-              type="submit"
-              className="px-3 py-1 bg-trench-sandbag hover:bg-trench-gasmask text-white rounded transition-colors flex items-center justify-center"
-            >
-              <Send size={10} />
-            </button>
-          </form>
-        </div>
-
-        {/* Right column: Bet History & Locked Market Positions stacked */}
-        <div className="flex flex-col gap-4 w-full">
-          {/* Bet History */}
-          <div className="retro-panel p-2 sm:p-3 h-52 flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
-            <div className="flex items-center justify-between border-b border-trench-sandbag pb-1.5 mb-2 font-mono">
-              <div className="flex items-center gap-1.5 text-amber-700 dark:text-yellow-500 font-staatliches text-xs sm:text-sm font-bold uppercase">
-                <Terminal className="w-3 h-3 sm:w-4 sm:h-4 text-amber-700 dark:text-yellow-500" />
-                <span>&gt;_ BET HISTORY (ALL SECTOR TRANS)</span>
-              </div>
-              <span className="text-slate-500 dark:text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">LATEST {allSectorBets.length} ACTIONS</span>
-            </div>
-
-            <div 
-              className="flex-1 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px] select-text scrollbar"
-            >
-              {allSectorBets.length > 0 ? (
-                allSectorBets.map((bet) => {
-                  const formattedUser = bet.user ? (bet.user.length > 8 ? bet.user.slice(0, 4) + '...' + bet.user.slice(-4) : bet.user) : 'RECRUIT';
-                  const isMoon = bet.side === 'moon';
-                  const colorClass = isMoon ? 'text-[#16A34A] glow-moon' : 'text-jeet-red glow-jeet';
-                  const timeString = new Date(bet.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                  const currencySymbol = (room.token.chainId === 'solana' || !room.id.startsWith('0x')) ? 'SOL' : 'USDC';
-
-                  return (
-                    <div key={bet.id} className="flex items-center justify-between font-bold uppercase hover:bg-trench-mud/20 px-1 py-0.5 rounded transition-colors">
-                      <div className="flex items-center gap-1.5 truncate">
-                        <span className={isMoon ? 'animate-pulse' : ''}>
-                          {isMoon ? '🚀' : '💀'}
-                        </span>
-                        <span
-                          onClick={() => {
-                            if (bet.user && bet.user.startsWith('0x')) {
-                              setSelectedProfileAddress(bet.user);
-                              synthSound('bet');
-                            }
-                          }}
-                          className="text-slate-500 dark:text-trench-gasmask cursor-pointer hover:underline"
-                        >
-                          [{formattedUser}]
-                        </span>
-                        <span className={`${colorClass} font-extrabold tracking-wide`}>
-                          {isMoon ? 'MOON' : 'JEET'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-slate-900 dark:text-white font-bold">{bet.amount.toFixed(2)} {currencySymbol}</span>
-                        <span className="text-slate-500 dark:text-trench-gasmask/70 text-[8px] sm:text-[9px]">{timeString}</span>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="flex gap-1.5 items-center justify-center h-full text-trench-gasmask/50 font-bold uppercase animate-pulse">
-                  <span>AWAITING DEPLOYMENTS ON THIS CHANNEL...</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="retro-panel p-2 sm:p-3 min-h-[13rem] flex flex-col justify-between relative scanlines rounded-xl min-w-0 w-full overflow-hidden">
-            <div className="flex items-center justify-between border-b border-trench-sandbag/40 pb-1.5 mb-2 font-mono">
-              <div className="flex items-center gap-1 font-staatliches text-xs sm:text-sm font-bold uppercase pb-0.5 px-1">
-                <Swords className="w-3 h-3 text-neon-moon animate-pulse" />
-                <span>Your Active Combat Positions</span>
-              </div>
-              <span className="text-slate-500 dark:text-trench-gasmask text-[8px] sm:text-[9px] font-bold uppercase">NO HOUSE FEES (PURE PVP AMM)</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto scrollbar">
-              {(() => {
-                const userBetsInRoom = user ? user.bets.filter(b => b.roomId === room.id) : [];
-                const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || 0), 0);
-                const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || 0), 0);
-                const totalSpentMoon = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + b.amount, 0);
-                const avgMoonPrice = moonSharesOwned > 0 ? totalSpentMoon / moonSharesOwned : 0;
-                const totalSpentJeet = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + b.amount, 0);
-                const avgJeetPrice = jeetSharesOwned > 0 ? totalSpentJeet / jeetSharesOwned : 0;
-
-                const positions = [];
-                if (moonSharesOwned > 0) {
-                  positions.push({ side: 'moon', shares: moonSharesOwned, avgPrice: avgMoonPrice, totalSpent: totalSpentMoon });
-                }
-                if (jeetSharesOwned > 0) {
-                  positions.push({ side: 'jeet', shares: jeetSharesOwned, avgPrice: avgJeetPrice, totalSpent: totalSpentJeet });
-                }
-
-                if (positions.length > 0) {
-                  return (
-                    <div className="overflow-x-auto w-full">
-                      <table className="w-full text-left font-mono text-[10px] uppercase">
-                        <thead>
-                          <tr className="border-b border-trench-sandbag/45 text-slate-500 dark:text-trench-gasmask text-[9px] font-bold">
-                            <th className="py-1.5 px-2">SIDE</th>
-                            <th className="py-1.5 px-2">QTY SHARES</th>
-                            <th className="py-1.5 px-2">AVG PRICE</th>
-                            <th className="py-1.5 px-2">TOTAL COST</th>
-                            <th className="py-1.5 px-2 text-right">ACTION</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {positions.map((pos) => (
-                            <tr key={pos.side} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
-                              <td className="py-2 px-2 font-bold font-staatliches text-xs">
-                                <span className={pos.side === 'moon' ? 'text-[#00796B] dark:text-neon-moon' : 'text-[#C62828] dark:text-jeet-red'}>
-                                  {pos.side === 'moon' ? '🚀 MOON (YES)' : '💀 JEET (NO)'}
-                                </span>
-                              </td>
-                              <td className="py-2 px-2 text-slate-900 dark:text-white font-bold">{pos.shares.toFixed(0)}</td>
-                              <td className="py-2 px-2 text-slate-700 dark:text-gray-300 font-bold">{pos.avgPrice.toFixed(2)} USDC</td>
-                              <td className="py-2 px-2 text-slate-700 dark:text-gray-300 font-bold">{pos.totalSpent.toFixed(2)} USDC</td>
-                              <td className="py-2 px-2 text-right">
-                                <button
-                                  onClick={() => {
-                                    setSelectedSide(pos.side as any);
-                                    setOrderType('sell');
-                                    setSharesInput(pos.shares);
-                                    synthSound('bet');
-                                    const betPanel = document.getElementById('bet-panel');
-                                    if (betPanel) betPanel.scrollIntoView({ behavior: 'smooth' });
-                                  }}
-                                  className="px-2 py-0.5 bg-red-950/40 text-jeet-red hover:bg-jeet-red hover:text-white border border-jeet-red/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all"
-                                >
-                                  EXIT POSITION
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div className="flex items-center justify-center h-full py-6 text-center text-trench-gasmask/50 font-mono text-[9px] font-bold uppercase leading-relaxed">
-                    📢 NO ACTIVE POSITION SHARES. ACQUIRE MOON OR JEET SHARES TO JOIN THE BATTLE.
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-
-      </footer>
 
       {selectedProfileAddress && (
         <PublicProfileModal

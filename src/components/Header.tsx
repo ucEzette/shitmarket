@@ -392,12 +392,6 @@ export const Header: React.FC<{
 
         {/* Wallet Connection / Ammo Status */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-          <Link href="/?play_intro=true" className="hidden sm:block">
-            <button className="px-1.5 py-0.5 retro-btn retro-btn-neutral border border-amber-300 dark:border-trench-sandbag/60 rounded font-staatliches text-[8px] sm:text-[9px] tracking-wider uppercase transition-colors shrink-0 font-bold flex items-center gap-0.5">
-              Guide
-            </button>
-          </Link>
-
           {/* Theme Toggle Button */}
           <ThemeToggle />
           

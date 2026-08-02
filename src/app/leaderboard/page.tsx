@@ -240,10 +240,10 @@ export default function LeaderboardPage() {
               <tr className="bg-cyan-50 dark:bg-trench-black text-slate-600 dark:text-trench-gasmask border-b-2 border-cyan-200 dark:border-trench-sandbag uppercase font-bold">
                 <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-slate-900 dark:text-white">RANK</th>
                 <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-slate-900 dark:text-white">TRADER</th>
-                <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-slate-900 dark:text-white text-right">ELO RATING</th>
+                <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-slate-900 dark:text-white text-right hidden sm:table-cell">ELO RATING</th>
                 <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-slate-900 dark:text-white text-right">NET PROFIT</th>
                 <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-slate-900 dark:text-white text-right">WIN RATE</th>
-                <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-slate-900 dark:text-white text-right">RECORD (W/L)</th>
+                <th className="py-3.5 px-4 font-staatliches text-base tracking-wider text-slate-900 dark:text-white text-right hidden sm:table-cell">RECORD (W/L)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-cyan-100 dark:divide-trench-sandbag/40">
@@ -293,7 +293,7 @@ export default function LeaderboardPage() {
                     </td>
 
                     {/* ELO Rating */}
-                    <td className="py-4 px-4 text-right">
+                    <td className="py-4 px-4 text-right hidden sm:table-cell">
                       <span className={`font-staatliches text-lg ${classInfo.color} block leading-none`}>
                         {elo}
                       </span>
@@ -317,7 +317,7 @@ export default function LeaderboardPage() {
                     </td>
 
                     {/* Win Streak */}
-                    <td className="py-4 px-4 text-right">
+                    <td className="py-4 px-4 text-right hidden sm:table-cell">
                       <span className="font-staatliches text-base text-[#00796B] dark:text-neon-moon dark:glow-moon font-bold">
                         {leader.wins || 0}W - {leader.losses || 0}L
                       </span>

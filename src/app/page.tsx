@@ -56,7 +56,7 @@ const HomepageRoomCard = ({ room }: { room: Room }) => {
           (window as any).synthSound('bet');
         }
       }}
-      className={`bg-white dark:bg-trench-mud border rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 select-none relative group hover:-translate-y-0.5 shadow-md dark:shadow-none text-slate-800 dark:text-white shrink-0 w-72 ${
+      className={`bg-white dark:bg-trench-mud border rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 select-none relative group hover:-translate-y-0.5 shadow-md dark:shadow-none text-slate-800 dark:text-white shrink-0 snap-start w-[280px] sm:w-[320px] md:w-auto ${
         isMoonLeading
           ? 'border-teal-600/30 dark:border-neon-moon/30 shadow-sm dark:shadow-glow-moon hover:border-teal-600 dark:hover:border-neon-moon/70'
           : 'border-red-600/30 dark:border-jeet-red/30 shadow-sm dark:shadow-glow-jeet hover:border-red-600 dark:hover:border-jeet-red/70'
@@ -206,7 +206,7 @@ function HomeContent() {
               <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-cyan-200 dark:bg-trench-black border border-cyan-300 dark:border-trench-sandbag/30 z-20" />
               <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-cyan-200 dark:bg-trench-black border border-cyan-300 dark:border-trench-sandbag/30 z-20" />
 
-              <div className="relative overflow-hidden w-full aspect-[3/1] h-28 sm:h-44 md:h-52 rounded-xl border border-cyan-200 dark:border-trench-sandbag/30 bg-black/60 shadow-inner">
+              <div className="relative overflow-hidden w-full aspect-[3/1] rounded-xl border border-cyan-200 dark:border-trench-sandbag/30 bg-black/60 shadow-inner">
                 <video
                   src="/pepes/Chad_soldiers_and_Wojak_soldier_202606070100.mp4"
                   autoPlay
@@ -369,7 +369,7 @@ function HomeContent() {
               }
 
               return (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="flex md:grid overflow-x-auto md:overflow-x-visible md:grid-cols-3 lg:grid-cols-4 gap-6 pb-4 md:pb-0 scrollbar-none snap-x select-text">
                   {currentList.map(room => (
                     <HomepageRoomCard key={room.id} room={room} />
                   ))}

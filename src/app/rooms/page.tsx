@@ -304,7 +304,7 @@ export default function RoomsPage() {
       <div
         key={room.id}
         onClick={() => router.push(`/room/${room.id}`)}
-        className={`bg-white dark:bg-trench-mud border rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 select-none relative group hover:-translate-y-0.5 shadow-md dark:shadow-none text-slate-800 dark:text-white ${
+        className={`bg-white dark:bg-trench-mud border rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 select-none relative group hover:-translate-y-0.5 shadow-md dark:shadow-none text-slate-800 dark:text-white shrink-0 snap-start w-[280px] sm:w-[320px] md:w-auto ${
           isMoonLeading
             ? 'border-teal-600/30 dark:border-neon-moon/30 shadow-sm dark:shadow-glow-moon hover:border-teal-600 dark:hover:border-neon-moon/70'
             : 'border-red-600/30 dark:border-jeet-red/30 shadow-sm dark:shadow-glow-jeet hover:border-red-600 dark:hover:border-jeet-red/70'
@@ -874,9 +874,9 @@ export default function RoomsPage() {
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {/* Search */}
-          <div className="relative flex-1 md:flex-initial min-w-[200px] max-w-full">
+          <div className="relative flex-1 min-w-[140px]">
             <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-trench-gasmask" />
             <input
               type="text"
@@ -944,9 +944,9 @@ export default function RoomsPage() {
                 const val = parseFloat(e.target.value);
                 setQuickAmount(isNaN(val) ? 0 : val);
               }}
-              className="w-10 bg-transparent text-slate-900 dark:text-white font-bold focus:outline-none text-center"
+              className="w-12 bg-transparent text-slate-900 dark:text-white font-bold focus:outline-none text-center"
             />
-            <span className="font-staatliches text-xs text-[#00796B] dark:text-neon-moon font-bold tracking-wider select-none">
+            <span className="font-staatliches text-xs text-[#00796B] dark:text-neon-moon font-bold tracking-wider select-none hidden sm:inline">
               {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}
             </span>
           </div>
@@ -958,7 +958,7 @@ export default function RoomsPage() {
         {showSkeleton ? (
           renderGridSkeleton()
         ) : filteredRooms.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="flex md:grid overflow-x-auto md:overflow-x-visible md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-4 md:pb-0 scrollbar-none snap-x select-text">
             {filteredRooms.map((room) => renderRoomCard(room, quickAmount))}
           </div>
         ) : (

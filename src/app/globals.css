@@ -2,6 +2,39 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  /* Hide scrollbar while keeping scroll functionality */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Mobile horizontal card scroll container */
+  .cards-scroll-x {
+    display: flex;
+    overflow-x: auto;
+    gap: 1rem;
+    padding-bottom: 1rem;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .cards-scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Snap card item */
+  .snap-card {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+  }
+}
+
+
 :root {
   --background: #A8EEFF;
   --foreground: #0A1A2A;

@@ -1389,7 +1389,13 @@ export default function CreateRoomPage() {
                   <div className="bg-[#0A0F1A] border border-gray-800 p-3 rounded-xl">
                     <span className="text-gray-500 uppercase block font-bold text-[9px]">EXPIRY TIME</span>
                     <span className="text-white font-bold block mt-0.5">
-                      {duration} MINS
+                      {(() => {
+                        const diffMs = new Date(expiryDate).getTime() - Date.now();
+                        const diffMins = Math.max(0, Math.floor(diffMs / 60000));
+                        if (diffMins >= 1440) return `${(diffMins / 1440).toFixed(1)} DAYS`;
+                        if (diffMins >= 60) return `${(diffMins / 60).toFixed(1)} HOURS`;
+                        return `${diffMins} MINS`;
+                      })()}
                     </span>
                   </div>
                   <div className="bg-[#0A0F1A] border border-gray-800 p-3 rounded-xl">

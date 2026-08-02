@@ -53,7 +53,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
       'GIGA CHAD: "You don\'t buy the coin. You bet on its SOUL. Welcome to SHITMARKET.LOL"'
     ],
     3: [
-      'NARRATOR: "Introducing ShitMarket—the permissionless PvP prediction arena where you stake USDC on whether a meme coin pumps... or dumps."',
+      'NARRATOR: "Introducing ShitMarket—the permissionless prediction arena where you stake USDC on whether a meme coin pumps... or dumps."',
       'NARRATOR: "If you\'re right, you eat the losers\' lunch. If you\'re wrong... well..."',
       'JEET SKELETON: "CALLED THE DUMP! GET REKT, NERD! HAHAHA!"',
       'PEPE: "Worth it. No rug. No gas war. Just pure, unadulterated gambling."'
@@ -371,7 +371,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
           <div className="flex items-center gap-2">
             <Skull className="w-5 h-5 text-red-500 animate-pulse" />
             <span className="font-staatliches text-lg sm:text-xl tracking-wider text-yellow-500 uppercase">
-              PVP MEMECOIN TRENCHES COMMS
+              MEMECOIN PREDICTION MARKET COMMS
             </span>
           </div>
           
@@ -582,7 +582,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-trench-sandbag pb-2 mb-2">
                   <div>
                     <h2 className="font-staatliches text-2xl sm:text-3xl text-yellow-500 uppercase tracking-widest">
-                      PvP PREDICTION MATRICES
+                      PREDICTION MATRICES
                     </h2>
                     <p className="font-mono text-[10px] text-gray-400">Sample game mechanics simulation</p>
                   </div>
@@ -608,7 +608,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                     className="w-full h-28 sm:h-36 object-cover opacity-85 transition-opacity hover:opacity-100"
                   />
                   <div className="absolute top-2 left-2 bg-black/80 px-2 py-0.5 border border-[#16A34A] text-[#16A34A] font-mono text-[8px] uppercase tracking-wider rounded">
-                    map: pvp_trenches_countdown.tga
+                    map: trenches_countdown.tga
                   </div>
                 </div>
 
@@ -620,7 +620,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 }`}>
                   {!scatFired && (
                     <div className="absolute -top-3 left-4 bg-yellow-500 text-black px-2 py-0.5 font-bold font-mono text-[9px] rounded uppercase animate-bounce z-30">
-                      🚨 PvP Prediction Duel Required to Proceed
+                      🚨 Prediction Duel Required to Proceed
                     </div>
                   )}
                   
@@ -681,7 +681,7 @@ export function IntroScreen({ onComplete }: IntroScreenProps) {
                 <div className="mt-4 text-center">
                   {!scatFired ? (
                     <div className="text-[11px] font-mono text-yellow-400 italic animate-pulse">
-                      💡 Click one of the buttons to trigger the PvP Prediction Countdown!
+                      💡 Click one of the buttons to trigger the Prediction Countdown!
                     </div>
                   ) : (
                     <div className="text-green-500 text-xs font-bold font-mono">

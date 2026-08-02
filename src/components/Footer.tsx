@@ -40,7 +40,7 @@ export const Footer: React.FC = () => {
         <div className="flex items-center gap-2 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/60 rounded px-3 py-1 shadow-sm dark:shadow-md">
           <div className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-jeet-red animate-pulse" />
           <span className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask font-bold uppercase">SETTLEMENT ENGINE:</span>
-          <span className="font-staatliches text-sm text-red-600 dark:text-jeet-red tracking-wider">SECURE PvP</span>
+          <span className="font-staatliches text-sm text-red-600 dark:text-jeet-red tracking-wider">SECURE PREDICTIONS</span>
         </div>
 
         {/* Warning Banner */}

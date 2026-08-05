@@ -707,7 +707,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [konamiProgress, fullDegenMode, setFullDegenMode]);
 
   return (
-    <div className={`min-h-screen flex flex-col relative ${fullDegenMode ? 'full-degen-rainbow scanlines' : ''}`}>
+    <div className={`sm-shell min-h-screen flex flex-col relative ${fullDegenMode ? 'full-degen-rainbow scanlines' : ''}`}>
       
       {/* Wallet Adapter Bridge - syncs Solana wallet to Zustand state */}
       <WalletAdapterBridge />
@@ -763,7 +763,7 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
       </div>
 
       {/* Mobile Bottom Bar Nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-1.5 bg-white dark:bg-trench-mud border-t-2 border-cyan-200 dark:border-trench-sandbag z-50 shadow-md dark:shadow-[0_-4px_12px_rgba(0,0,0,0.6)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-2 py-2 bg-trench-black/95 border-t border-trench-sandbag z-50 shadow-[0_-8px_24px_rgba(0,0,0,0.35)] backdrop-blur-sm">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;

@@ -349,7 +349,7 @@ export const Header: React.FC<{
   }, [disconnect]);
 
   return (
-    <header className="sticky top-0 z-[100] w-full border-b border-cyan-200 dark:border-trench-sandbag bg-white dark:bg-black px-2 h-10 sm:h-11 flex items-center retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0 shadow-sm dark:shadow-none" style={{ overflow: 'visible' }}>
+    <header className="sticky top-0 z-[100] w-full border-b border-trench-sandbag/70 bg-trench-black/95 px-3 h-14 flex items-center !overflow-visible rounded-none border-t-0 border-l-0 border-r-0 shadow-[0_8px_24px_rgba(0,0,0,0.24)] backdrop-blur-sm" style={{ overflow: 'visible' }}>
       <div className="w-full mx-auto px-2 sm:px-4 flex flex-row items-center justify-between gap-2 relative animate-fadeIn" style={{ overflow: 'visible' }}>
         {/* Left Aligned branding and navigation section */}
         <div className="flex items-center gap-2 sm:gap-4 shrink-0">

@@ -11,19 +11,19 @@ const config: Config = {
     extend: {
       colors: {
         trench: {
-          black: "#05050A",
-          mud: "#0F1016",
-          sandbag: "#1E222D",
-          gasmask: "#94A3B8",
+          black: "#0D0D0A",
+          mud: "#2A241A",
+          sandbag: "#5C5244",
+          gasmask: "#8B8B7A",
         },
         neon: {
-          moon: "#16A34A", // Darker toxic green matching the logo
+          moon: "#39FF14",
         },
         jeet: {
-          red: "#FF2A4D", // More vibrant, less harsh red
+          red: "#FF073A",
         },
         moon: {
-          gold: "#FBBF24", // Premium amber/gold
+          gold: "#FFD700",
         },
         light: {
           bg: "#A8EEFF",
@@ -50,6 +50,9 @@ const config: Config = {
         staatliches: ["var(--font-staatliches)", "sans-serif"],
         mono: ["var(--font-jetbrains-mono)", "monospace"],
         marker: ["var(--font-permanent-marker)", "cursive"],
+        anybody: ["var(--font-anybody)", "sans-serif"],
+        space: ["var(--font-space-mono)", "monospace"],
+        syne: ["var(--font-syne)", "sans-serif"],
       },
       animation: {
         'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',

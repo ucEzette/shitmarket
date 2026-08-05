@@ -139,10 +139,10 @@ function HomeContent() {
 
 
   return (
-    <div className="relative flex flex-col w-full overflow-hidden select-none">
+    <main className="sm-shell relative flex flex-col w-full overflow-hidden select-none">
 
       {/* 1. HERO SECTION — PREDICTION ARENA */}
-      <section className="relative w-full py-16 md:py-20 border-b border-cyan-200 dark:border-white/10 overflow-hidden min-h-[550px] flex items-center justify-center bg-[#A8EEFF] dark:bg-[#07080d] transition-colors duration-200">
+      <section className="relative w-full overflow-hidden border-b border-border-color py-16 md:py-24 min-h-[600px] flex items-center justify-center bg-trench-black transition-colors duration-200">
         <div className="absolute inset-0 z-0 flex w-full h-full">
           <div className="w-1/2 h-full relative overflow-hidden border-r border-[#193012]/30">
             <img 
@@ -182,7 +182,7 @@ function HomeContent() {
             transition={{ duration: 0.8, ease: 'easeOut' }}
             className="font-staatliches text-4xl sm:text-6xl md:text-7xl leading-none text-[#0A1A2A] dark:text-white tracking-widest text-center mb-4 drop-shadow-[0_2px_8px_rgba(0,0,0,0.1)] dark:drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]"
           >
-            PICK A SIDE. <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#00796B] to-emerald-600 dark:from-neon-moon dark:to-emerald-400">BET THE TRENCH.</span>
+            PICK A SIDE. <span className="text-neon-moon">BET THE TRENCH.</span>
           </motion.h1>
           <motion.h2
             initial={{ y: -10, opacity: 0 }}
@@ -380,7 +380,44 @@ function HomeContent() {
         </div>
       </section>
 
-      {/* 5. MOBILE APP COMING SOON (SIMPLIFIED VERSION) */}
+      {/* 5. HOW THE ARENA WORKS */}
+      <section className="mx-auto grid w-full max-w-7xl gap-4 px-4 py-8 md:grid-cols-[1.4fr_0.6fr]">
+        <div className="sm-panel-raised p-5 md:p-6">
+          <div className="mb-5 flex items-end justify-between gap-4">
+            <div>
+              <p className="sm-kicker text-neon-moon">Field manual / 004</p>
+              <h2 className="sm-display mt-2 text-2xl font-bold text-foreground md:text-3xl">A clean fight, start to finish.</h2>
+            </div>
+            <span className="sm-badge text-trench-gasmask">No custody</span>
+          </div>
+          <div className="grid gap-3 md:grid-cols-4">
+            {[
+              ['01', 'Choose a side', 'Read the market. Pick MOON or JEET.'],
+              ['02', 'Stake ammo', 'Commit USDC to the pool before cutoff.'],
+              ['03', 'Oracle settles', 'Price data closes the room without a committee.'],
+              ['04', 'Claim the bag', 'Winners collect their share. Losers get lore.'],
+            ].map(([number, title, copy]) => (
+              <div key={number} className="border-l border-sandbag/70 pl-3">
+                <p className="sm-kicker text-moon-gold">{number}</p>
+                <h3 className="mt-2 text-sm font-bold text-foreground">{title}</h3>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">{copy}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="sm-panel flex flex-col justify-between gap-5 p-5 md:p-6">
+          <div>
+            <p className="sm-kicker text-jeet-red">Protocol posture</p>
+            <p className="mt-3 font-syne text-xl font-extrabold leading-tight text-foreground">Permissionless by design. Ruthless by nature.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div className="border-t border-border-color pt-3"><span className="sm-kicker text-muted-foreground">Settlement</span><p className="mt-1 font-bold text-neon-moon">AUTOMATED</p></div>
+            <div className="border-t border-border-color pt-3"><span className="sm-kicker text-muted-foreground">House edge</span><p className="mt-1 font-bold text-moon-gold">2.0%</p></div>
+          </div>
+        </div>
+      </section>
+
+      {/* 6. MOBILE APP COMING SOON (SIMPLIFIED VERSION) */}
       <section className="mx-auto max-w-4xl w-full px-4 py-12 text-center">
         <div className="premium-glass-card p-8 rounded-[24px] relative shadow-2xl border border-cyan-200 dark:border-white/10 overflow-hidden">
           <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-cyan-200 dark:bg-trench-black border border-cyan-300 dark:border-trench-sandbag/30 z-20" />
@@ -460,7 +497,7 @@ function HomeContent() {
         <PixelBarbedWire height={16} />
       </div>
 
-    </div>
+    </main>
   );
 }
 

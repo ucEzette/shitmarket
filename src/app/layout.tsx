@@ -58,16 +58,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="light">
+    <html lang="en" className="dark bg-background">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Staatliches&family=JetBrains+Mono:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Anybody:wght@600;700;800&family=JetBrains+Mono:wght@400;600;700&family=Permanent+Marker&family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
         <style>{`
           :root {
-            --font-staatliches: 'Staatliches', sans-serif;
+            --font-anybody: 'Anybody', sans-serif;
+            --font-space-mono: 'Space Mono', monospace;
+            --font-staatliches: 'Anybody', sans-serif;
             --font-jetbrains-mono: 'JetBrains Mono', monospace;
             --font-permanent-marker: 'Permanent Marker', cursive;
+            --font-syne: 'Syne', sans-serif;
           }
         `}</style>
       </head>

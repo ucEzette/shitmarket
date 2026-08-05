@@ -1,7 +1,7 @@
 [package]
 name = "shitmarket"
 version = "0.1.0"
-description = "ShitMarket — PvP meme coin prediction market"
+description = "ShitMarket — Permissionless meme coin prediction market"
 edition = "2021"
 
 [lib]

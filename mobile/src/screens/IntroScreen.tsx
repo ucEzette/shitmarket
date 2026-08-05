@@ -51,7 +51,7 @@ export default function IntroScreen({ onComplete }: IntroScreenProps) {
       'GIGA CHAD: "You don\'t buy the coin. You bet on its SOUL. Welcome to SHITMARKET.LOL"'
     ],
     3: [
-      'NARRATOR: "Introducing ShitMarket—the PvP prediction arena where you stake SOL on whether a meme coin pumps... or dumps."',
+      'NARRATOR: "Introducing ShitMarket—the prediction arena where you stake SOL on whether a meme coin pumps... or dumps."',
       'NARRATOR: "If you\'re right, you eat the losers\' lunch. If you\'re wrong... well..."',
       'JEET SKELETON: "CALLED THE DUMP! GET REKT, NERD! HAHAHA!"',
       'PEPE: "Worth it. No rug. No gas war. Just pure, unadulterated gambling."'
@@ -318,7 +318,7 @@ export default function IntroScreen({ onComplete }: IntroScreenProps) {
               <View style={[styles.characterCard, { borderColor: COLORS.sandbag, padding: 15 }]}>
                 <View style={styles.duelHeader}>
                   <View>
-                    <Text style={styles.duelTitle}>PvP PREDICTION MATRICES</Text>
+                    <Text style={styles.duelTitle}>PREDICTION MATRICES</Text>
                     <Text style={styles.duelSubtitle}>Sample game mechanics simulation</Text>
                   </View>
                   {scene3Ticking ? (
@@ -339,7 +339,7 @@ export default function IntroScreen({ onComplete }: IntroScreenProps) {
                 </View>
 
                 <View style={[styles.interactiveBox, { borderColor: !scatFired ? COLORS.gold : COLORS.neonMoon }]}>
-                  {!scatFired && <Text style={styles.taskTitle}>🎯 PvP Prediction Duel Required to Proceed</Text>}
+                  {!scatFired && <Text style={styles.taskTitle}>🎯 Prediction Duel Required to Proceed</Text>}
 
                   <View style={styles.flexRowCenter}>
                     <TouchableOpacity
@@ -367,7 +367,7 @@ export default function IntroScreen({ onComplete }: IntroScreenProps) {
                 </View>
 
                 <Text style={styles.instructionPrompt}>
-                  {!scatFired ? "💡 Click one of the buttons to trigger the PvP Prediction Countdown!" : "✅ BATTLE DETONATED! Pepe is rekt."}
+                  {!scatFired ? "💡 Click one of the buttons to trigger the Prediction Countdown!" : "✅ BATTLE DETONATED! Pepe is rekt."}
                 </Text>
               </View>
             </View>

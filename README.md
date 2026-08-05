@@ -1,276 +1,138 @@
-# ShitMarket — Permissionless PvP Prediction Market
+# ShitMarket — Permissionless Prediction Protocol
 
-Permissionless PvP prediction market for memecoins and any argument verifiable via our multi-oracle price aggregator (Pyth Network, Chainlink, DexScreener, Birdeye). Core smart contracts deployed on Avalanche C-Chain with Solana/multi-chain cross-chain deposit support (Circle CCTP). This repo contains:
-
-| Directory | Description |
-|---|---|
-| `contracts/` | Core Solidity smart contract ([ShitMarketCore.sol](file:///Users/adam/Documents/shitmarket/contracts/ShitMarketCore.sol)) with Pyth on-chain verification |
-| `evm/` | Hardhat deployment scripts, local EVM testing environment, and contract verification configs |
-| `indexer/` | TypeScript event indexer, settlement keeper, CCTP relayer, REST API, and WebSocket server |
-| `src/` | Next.js frontend web app with Privy multi-chain authentication & Viem Web3 state management |
-| `program/` | Legacy Solana Anchor program (maintained for dual-chain compatibility) |
+ShitMarket is a state-of-the-art, chain-agnostic prediction market platform built to bring high-adrenaline, permissionless wagering to meme coins, trending topics, and real-world arguments. Deployed on the high-performance **Avalanche C-Chain** and powered by gasless smart accounts, ShitMarket makes predictive speculation fast, cheap, and accessible to anyone, anywhere.
 
 ---
 
-## Architecture
+## What is ShitMarket?
 
-```
-┌─────────────────────────────────────────────────┐
-│             Solana Blockchain                   │
-│  ShitMarket Program (Anchor)                    │
-│  • initialize / create_room / place_bet         │
-│  • settle_room (keeper-signed)                  │
-│  • claim_winnings                               │
-└───────────────────┬─────────────────────────────┘
-                    │ logsSubscribe (WebSocket)
-                    ▼
-┌─────────────────────────────────────────────────┐
-│           Event Listener (TypeScript)           │
-│  Decode Anchor events → fan out to:             │
-│    PostgreSQL (durable storage)                 │
-│    Redis (live cache + Pub/Sub)                 │
-└──────────┬────────────────┬────────────────────┘
-           │                │
-           ▼                ▼
-  ┌────────────────┐  ┌────────────────────┐
-  │  Settlement    │  │  WebSocket Server  │
-  │  Keeper (cron) │  │  (room broadcasts) │
-  └────────────────┘  └────────────────────┘
-           │                │
-           ▼                ▼
-  ┌─────────────────────────────────────────┐
-  │           REST API (Express)            │
-  │  GET /api/rooms   /api/profile          │
-  │  GET /api/leaderboard  /metrics /health │
-  └─────────────────────────────────────────┘
-```
+At its core, ShitMarket allows anyone to create or trade binary prediction pools ("sectors") based on whether an asset's price will end above a target threshold, or whether a specific real-world event will resolve in a certain way. Traders choose their side:
+* **🚀 MOON**: Bullish / YES outcome
+* **💀 JEET**: Bearish / NO outcome
 
-**Settlement model:** Keeper wallet aggregates prices from DexScreener + Birdeye (median TWAP), then submits `settle_room` signed with the keeper keypair. The on-chain program verifies the keeper's signature — no Pyth dependency, works for ANY meme coin.
+Unlike traditional order-book prediction platforms that suffer from low liquidity and slow execution, ShitMarket introduces on-chain **Two-Sided Constant Product Market Maker (CPMM)** pools. This ensures instant liquidity, zero wait times for counterparties, and dynamic probability pricing ($0.01 to $0.99) driven entirely by market demand.
 
 ---
 
-## Quick Start — Local Development
+## Why ShitMarket Stands Out
 
-### Prerequisites
+### 1. Zero Friction User Experience (Web2-to-Web3 Seamless)
+* **Social Login & Instant Wallets**: Users can sign in using Google, Twitter, Farcaster, Discord, or Email via Privy. No seed phrases, browser extensions, or upfront Web3 knowledge required.
+* **Gasless Trades**: Platform paymasters sponsor transaction fees. Users sign trade executions without spending AVAX or handling gas calculations.
+* **Universal Multi-Chain Deposits**: Through native **Circle CCTP** integration and Relay Protocol, players can deposit funds directly from Ethereum, Base, Arbitrum, Optimism, or Solana. The funds are bridged and converted into USDC on Avalanche automatically.
 
-- [Rust + Solana CLI](https://docs.solana.com/cli/install-solana-cli-tools) (1.18+)
-- [Anchor CLI](https://www.anchor-lang.com/docs/installation) (0.30+)
-- Node.js 20+
-- Docker + Docker Compose
+### 2. Deep, Instant Liquidity (CPMM Architecture)
+* **Two-Sided AMM Seeding**: Room creators seed markets with USDC, which is automatically split into 1:1 backed outcome tokens (1 MOON + 1 JEET per USDC).
+* **Fair Price Discovery**: Every market starts at an intuitive 50/50 probability ($0.50 starting price per share), allowing immediate trading on both sides.
+* **Early Exits**: Traders do not need to wait for market expiry. They can sell outcome tokens back to the AMM pool at any time to take profit or cut losses.
 
-### 1. Build the Solana Program
+### 3. Yield for Market Creators
+* **Swap Fee Accrual**: By seeding a room with liquidity, creators earn a **0.30% to 1.00% swap fee** on every single buy and sell order routed through their pool.
 
-```bash
-cd program
-anchor build
+### 4. Rug-Free, Tamper-Proof Settlement
+* **Multi-Oracle TWAP Aggregator**: Settlement prices are verified by aggregating and averaging data across DexScreener, Birdeye, Chainlink, and Pyth Network. A 20% outlier shield automatically filters out abnormal price spikes or flash loans.
+* **Arbitration & Dispute Window**: Once a market resolves, a 30-minute public dispute window opens. Anyone can challenge the settlement by posting a dispute bond, sending disputed events to admin arbitration for final verification.
+* **Locked Funds**: The smart contract locks pool capital until settlement. There are no admin-claim or cancel backdoors on active pools.
+
+---
+
+## Benefits for Users
+
+* **Meme Creators & Communities**: Create custom prediction rooms for your community's native tokens and capture trade volume fees.
+* **Day Traders**: Speculate on highly volatile micro-cap tokens with leveraged payout profiles based on outcome probability.
+* **Arbitrageurs**: Capitalize on discrepancies between the implied prediction probability and real-time external data feeds.
+* **Affiliates**: Generate lifetime passive yield through ShitMarket's on-chain referral program. Earn a percentage of all wagers placed by players referred to the platform.
+
+---
+---
+
+## Technical Architecture & Specifications
+
+### Repository Layout
+```
+shitmarket/
+├── contracts/              # Solidity Smart Contracts (Avalanche C-Chain)
+│   └── ShitMarketCore.sol  # Main protocol controller, room state, and claim logic
+├── indexer/                # TypeScript Node.js Services (Listener, API, WS, Keeper)
+│   ├── src/
+│   │   ├── api/            # Express REST endpoint handlers
+│   │   ├── listener/       # Avalanche EVM chain event subscriber
+│   │   ├── keeper/         # Price aggregator and auto-settlement keeper (cron)
+│   │   ├── relayer/        # Circle CCTP deposit relayer
+│   │   └── websocket/      # Real-time WebSocket room updates
+│   └── prisma/             # PostgreSQL database schemas and migrations
+└── src/                    # Next.js 14 Web Application Frontend
+    ├── app/                # Next.js App Router views
+    ├── components/         # Tailwind CSS & Framer Motion UI Components
+    └── store/
+        └── useAppState.ts  # Global Zustand client state and Viem Web3 interfaces
 ```
 
-This generates:
-- `target/deploy/shitmarket.so` — deployable BPF binary
-- `target/idl/shitmarket.json` — IDL used by the indexer
+### Protocol Mechanics
+* **Collateral Asset**: USDC (6 decimals)
+* **Outcome Shares**: 1:1 fully collateralized ERC-1155 tokens
+* **Price Scale**: Scaled as integer `int64` with 6 decimal places ($1.00 USDC = `1_000_000`)
+* **Settlement Fee**: **1.25%** platform fee deducted from the total losing pool on final claim execution
 
-### 2. Start Local Validator & Run Tests
+---
 
-```bash
-cd program
-anchor test
-```
+## Developer Quick Start
 
-> **Note:** Time-dependent tests (settlement after expiry) require waiting for the 5-minute room to expire. Pass `--timeout 400000` to mocha. For faster iteration, use `solana-test-validator --warp-slot` or modify the room duration to 1 minute in tests.
-
-### 3. Deploy to Devnet
+### 1. Build and Test Smart Contracts
+Requirements: [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/)
 
 ```bash
-# Fund your deployer wallet
-solana airdrop 2 --url devnet
-
-cd program
-anchor deploy --provider.cluster devnet
+# Compile contracts and run Hardhat tests
+cd evm
+npm install
+npx hardhat test
 ```
 
-Copy the deployed Program ID into `program/Anchor.toml` and `indexer/.env`.
-
-### 4. Start Indexer Services
+### 2. Run Indexer & Databases Locally
+The indexer monitors the contracts, runs the settlement keeper, and provides the API/WebSocket feeds.
 
 ```bash
 cd indexer
 cp .env.example .env
-# Edit .env — set PROGRAM_ID, KEEPER_PRIVATE_KEY, SOLANA_RPC_URL
+# Edit .env and supply your EVM_KEEPER_PRIVATE_KEY, database, and RPC configurations
 
-# Start Postgres + Redis
+# Start PostgreSQL and Redis containers
 docker-compose up postgres redis -d
 
-# Install dependencies & generate Prisma client
+# Generate Prisma Client & run migrations
 npm install
 npm run db:generate
 npm run db:migrate
 
-# Run in development mode
+# Start the indexer service
 npm run dev
 ```
 
-Services available:
-| Service | URL |
-|---|---|
-| REST API | http://localhost:3001/api |
-| WebSocket | ws://localhost:3002 |
-| Health | http://localhost:3001/health |
-| Prometheus | http://localhost:3001/metrics |
-
-### 5. Run Integration Tests
-
+### 3. Launch the Frontend
 ```bash
-cd indexer
-# Ensure localnet is running and .env is configured
-npm test
+# In the project root folder
+cp .env.example .env.local
+# Set NEXT_PUBLIC_CORE_CHAIN=avalanche
+# Set NEXT_PUBLIC_CORE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
+# Set NEXT_PUBLIC_INDEXER_API_URL=http://localhost:3001
+# Set NEXT_PUBLIC_WS_URL=ws://localhost:3002
+
+npm install
+npm run dev
 ```
+The application will run locally at `http://localhost:3000`.
 
 ---
 
-## Docker Production Deployment
+## API & WebSocket Reference
 
-```bash
-cd indexer
-cp .env.example .env
-# Fill in production values
+### REST API
+* `GET /api/rooms` — Query active or settled prediction rooms (supports filter by ending, biggest, latest)
+* `GET /api/rooms/:id` — Retrieve detailed statistics, order books, and bet history for a specific room
+* `GET /api/leaderboard` — Returns the season's top traders ranked by ELO, profit, and accuracy
+* `GET /api/profile/:wallet` — Returns stats, trade logs, and referral records for a user wallet address
 
-docker-compose up -d
-```
-
-All services (PostgreSQL, Redis, indexer) are containerised. The indexer runs migrations automatically on startup.
-
----
-
-## Mainnet Deployment Checklist
-
-1. **Deploy program to mainnet-beta:**
-   ```bash
-   anchor deploy --provider.cluster mainnet
-   ```
-
-2. **Call `initialize`** to create `PlatformConfig` with your admin, treasury, and keeper wallets.
-
-3. **Set environment variables:**
-   - `SOLANA_RPC_URL` — Use a dedicated RPC (Helius, Triton) for reliability
-   - `KEEPER_PRIVATE_KEY` — Keeper wallet with ≥0.1 SOL for transaction fees
-   - `BIRDEYE_API_KEY` — For price aggregation quality
-   - `DATABASE_URL` — Managed Postgres (e.g., Supabase, Railway, Neon)
-   - `REDIS_URL` — Managed Redis (e.g., Upstash)
-
-4. **Fund the keeper wallet** — each settlement costs ~5000 lamports in fees.
-
-5. **Scale:** The keeper can be run by multiple parties simultaneously; the on-chain contract handles the race condition gracefully (already-settled error is caught).
-
----
-
-## API Reference
-
-### `GET /api/rooms`
-Query params: `filter` (ending|biggest|latest), `status` (active|settled), `limit` (max 100)
-
-### `GET /api/rooms/:pubkey`
-Full room details with bets and computed payouts.
-
-### `GET /api/leaderboard`
-Query params: `sortBy` (profit|wins|winRate), `limit`
-
-### `GET /api/profile/:wallet`
-User stats, win rate, and last 20 bets.
-
-### `GET /api/rooms/config/pyth-feeds`
-Returns the token mint → Pyth feed pubkey mapping (for UI use).
-
----
-
-## WebSocket Protocol
-
-```js
-const ws = new WebSocket('ws://localhost:3002');
-
-// Subscribe to a room
-ws.send(JSON.stringify({ type: 'subscribe', room: '<roomPubkey>' }));
-
-// Subscribe to global new-room feed
-ws.send(JSON.stringify({ type: 'subscribe_global' }));
-
-// Receive updates
-ws.onmessage = (e) => {
-  const { type, roomPubkey, ...data } = JSON.parse(e.data);
-  // type: 'room_update' | 'new_room' | 'subscribed' | 'pong' | 'error'
-};
-```
-
----
-
-## Price Encoding
-
-All prices stored as `i64` with 6 decimal places:
-```
-$0.000042 USD → 42
-$1.00 USD     → 1_000_000
-$100.00 USD   → 100_000_000
-```
-
-Winner: `final_price > opening_price` → Moon wins. Otherwise Jeet wins.
-
----
-
-## Avalanche Multi-Chain Integration
-
-ShitMarket has been upgraded to run as a **chain-agnostic prediction protocol** with its core state engine on the **Avalanche C-Chain** (wagering in USDC) while supporting deposits and withdrawals from Solana and other chains.
-
-### Dual-Chain Architecture
-*   **Hub (Avalanche C-Chain)**: The core Solidity contract [ShitMarketCore.sol](file:///Users/adam/Documents/shitmarket/contracts/ShitMarketCore.sol) manages prediction room states, betting pools, claims, and the ticket marketplace.
-*   **Spokes (Solana, Base, Ethereum)**: Host deposit gateways that burn USDC via Circle CCTP, which are then relayed to mint/credit equivalent USDC on Avalanche.
-*   **User UX**: Privy embedded wallets provision an EVM smart account on the fly for any logged-in Solana or social user, supporting gasless transaction signatures sponsored by a platform Paymaster.
-
-### Run in Avalanche Mode
-To switch the indexer and keeper services to Avalanche mode:
-1. Configure environment variables in `indexer/.env`:
-   ```bash
-   CORE_CHAIN=avalanche
-   AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
-   CORE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
-   EVM_KEEPER_PRIVATE_KEY=0xYourEVMKeeperPrivateKey
-   ```
-2. Configure frontend env settings in `.env.local`:
-   ```bash
-   NEXT_PUBLIC_CORE_CHAIN=avalanche
-   NEXT_PUBLIC_CORE_CONTRACT_ADDRESS=0xYourDeployedContractAddress
-   NEXT_PUBLIC_AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
-   ```
----
-
-## Two-Sided AMM Seeding & Liquidity Mechanics (CPMM Architecture)
-
-ShitMarket adopts a **Two-Sided Constant Product Market Maker (CPMM) AMM Seeding Mechanism** based on Gnosis Conditional Tokens Framework (CTF):
-
-### 1. Underlying Collateral & Reserve Mechanics
-- **1:1 Collateral Ratio**: Every 1 USDC deposited into the prediction market is backed 100% on-chain by splitting into **1 MOON (YES) outcome share + 1 JEET (NO) outcome share**.
-- **Balanced AMM Pool Reserves**: When a room creator seeds a market with 100 USDC, the `AMPool.sol` smart contract splits the collateral to mint **100 MOON + 100 JEET** outcome tokens directly into the AMM pool reserves.
-- **50/50 Fair Price Discovery**: This ensures the market instantly opens with a fair 50/50 probability ($0.50 starting price per share), allowing degens to immediately trade either side without waiting for manual limit order counterparties.
-
-### 2. Room Creator Benefits & Fee Yield Capture
-- **LP Token Ownership**: The room creator receives 100 LP Shares representing ownership of the pool.
-- **Continuous Swap Fee Accrual**: On every BUY and SELL order executed against the pool by traders, a **0.30%–1.00% swap fee** accrues directly to the liquidity provider (the room creator).
-
-### 3. Exit & Settlement Mechanics
-- **Early Exit (Anytime)**: Room creators and traders do **not** have to wait for room expiry. They can remove LP liquidity or sell outcome shares back to the pool at any time to lock in profits and accrued swap fees.
-- **Settlement Redemption**: At market expiry, the oracle settles the market:
-  - Each winning outcome share redeems for **$1.00 USDC**.
-  - Each losing outcome share redeems for **$0.00 USDC**.
-  - Winning share holders claim the full payout pot from the losing side.
-
----
-
-## Security Model
-
-| Threat | Mitigation |
-|---|---|
-| Reentrancy on claim | `claimed = true` set before transfer/callback (Anchor and Solidity) |
-| Duplicate settlement | `RoomStatus::Active` checked before settlement |
-| Rogue keeper | Keeper address stored in `PlatformConfig`; only admin can change it |
-| Admin rug | No `cancel_room` or admin-claim actions exist during active pools; funds locked until settlement |
-| Arithmetic overflow | Checked math functions utilized (Anchor safe math, Solidity 0.8+ native check) |
-| Stale prices | Keeper aggregates from 4+ sources (DexScreener, Birdeye, Jupiter, Chainlink) with 20% outlier shield |
-| Double-processing events | Transaction signatures/hashes cached in Redis (48h TTL) |
+### WebSocket Gateway
+Connect to `ws://localhost:3002` to subscribe to real-time events:
+* `{ "type": "subscribe", "room": "<roomId>" }` — Subscribe to instant pool size changes, chat messages, and trade activities
+* `{ "type": "subscribe_global" }` — Subscribe to a feed of new rooms created on-chain

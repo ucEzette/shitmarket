@@ -161,18 +161,18 @@ export default function ParlaysScreen() {
         <View style={styles.bannerAlert}>
           <Text style={styles.bannerAlertEmoji}>⚠️</Text>
           <Text style={styles.bannerAlertText}>
-            SIMULATED TRAINING DECK: ATOMIC PARLAYS RUN IN MOCK ENVIRONMENT. MULTI-LEG PVP PREDICTIONS DO NOT EXECUTE ON-CHAIN TRANSACTIONS ON SOLANA MAINNET.
+            SIMULATED TRAINING DECK: ATOMIC PARLAYS RUN IN MOCK ENVIRONMENT. MULTI-LEG PREDICTIONS DO NOT EXECUTE ON-CHAIN TRANSACTIONS ON SOLANA MAINNET.
           </Text>
         </View>
 
         {/* Hazard Zone details */}
         <View style={[COMMON_STYLES.premiumCard, styles.headerCard]}>
-          <Text style={styles.headerTitle}>PvP PARLAY TICKETS</Text>
+          <Text style={styles.headerTitle}>PARLAY TICKETS</Text>
           <Text style={styles.headerSubtitle}>ASSEMBLE MULTIPLE TARGET ARENAS TO MULTIPLY PAYOUT</Text>
           <View style={styles.hazardBox}>
             <Text style={styles.hazardTitle}>⚠️ HIGH LEVERAGE HAZARD ZONE</Text>
             <Text style={styles.hazardText}>
-              If a single prediction settles against your side, the entire ammunition stake is forfeit to the PvP pool. All legs must hit!
+              If a single prediction settles against your side, the entire ammunition stake is forfeit to the pool. All legs must hit!
             </Text>
           </View>
         </View>
@@ -325,7 +325,7 @@ export default function ParlaysScreen() {
           </View>
 
           <View style={styles.payoutCard}>
-            <Text style={styles.payoutLabel}>POTENTIAL PvP PAYOUT (SOL):</Text>
+            <Text style={styles.payoutLabel}>POTENTIAL PAYOUT (SOL):</Text>
             <Text style={styles.payoutVal}>{calculatePayout().toFixed(3)} SOL</Text>
           </View>
 

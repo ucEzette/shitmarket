@@ -16,7 +16,7 @@ export default function RulesScreen({ navigation }: any) {
       title: '1. PREDICTIVE ARENAS (ROOMS)',
       emoji: '⚔️',
       color: COLORS.neonMoon,
-      desc: 'Commanders construct prediction arenas by scanning and pasting any active Solana token contract address. Each room represents a localized PvP battlefield.'
+      desc: 'Commanders construct prediction arenas by scanning and pasting any active Solana token contract address. Each room represents a localized battlefield.'
     },
     {
       title: '2. INITIAL SEEDING (REQUIRED)',
@@ -67,7 +67,7 @@ export default function RulesScreen({ navigation }: any) {
           <View style={styles.manualHeader}>
             <Text style={styles.generalEmoji}>🦧</Text>
             <Text style={styles.manualTitle}>TRENCH WAR MANUAL</Text>
-            <Text style={styles.manualSub}>OFFICIAL PvP ARENA OPERATIONAL RULES</Text>
+            <Text style={styles.manualSub}>OFFICIAL ARENA OPERATIONAL RULES</Text>
           </View>
 
           {/* Rules items list */}

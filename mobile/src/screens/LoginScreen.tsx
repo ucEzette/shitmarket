@@ -164,7 +164,7 @@ export default function LoginScreen() {
           <View style={[COMMON_STYLES.premiumCard, styles.card]}>
             <Text style={styles.cardHeader}>ENLIST YOUR CRYPTO HELMET</Text>
             <Text style={styles.cardInfo}>
-              Join the PVP prediction trenches. Mirror credentials from the web or setup a localized hot wallet.
+              Join the prediction trenches. Mirror credentials from the web or setup a localized hot wallet.
             </Text>
 
             {isProcessLoading ? (

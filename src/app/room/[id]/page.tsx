@@ -882,7 +882,7 @@ export default function RoomDetailPage() {
   const hasUnclaimed = isSettled && (userWon || (isDrawOrVoid && userBetsInRoom.length > 0)) && userBetsInRoom.some((b) => !b.claimed);
 
   return (
-    <div className={`w-full flex-1 flex flex-col select-none relative overflow-x-hidden transition-transform duration-100 bg-[#A8EEFF] dark:bg-transparent min-h-screen text-[#0A1A2A] dark:text-white font-mono ${
+    <div className={`w-full flex-1 flex flex-col select-none relative overflow-x-hidden transition-transform duration-100 bg-slate-50 dark:bg-slate-950 min-h-screen text-slate-900 dark:text-white font-mono ${
       localShake ? 'animate-[shake_0.5s_ease-in-out]' : ''
     }`}>
       

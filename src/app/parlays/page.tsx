@@ -150,57 +150,52 @@ export default function ParlaysPage() {
     <div className="mx-auto max-w-4xl w-full px-4 py-8 flex-1 flex flex-col select-none relative">
       {/* Back button */}
       <div className="mb-4">
-        <Link href="/rooms" className="inline-flex items-center gap-1 text-trench-gasmask hover:text-white font-mono text-xs uppercase font-bold">
-          <ArrowLeft size={14} /> Back to War Table
+        <Link href="/rooms" className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-900 dark:hover:text-white font-mono text-xs uppercase font-bold">
+          <ArrowLeft size={14} /> Back to Markets
         </Link>
       </div>
 
       {/* Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Interactive Multi-Leg UI Simulator (7 cols) */}
-        <div className="lg:col-span-8 bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 relative shadow-lg scanlines">
-          <div className="absolute top-[-18px] left-[50%] -translate-x-[50%] bg-[#5C5244] border-2 border-[#8B8B7A] text-white px-6 py-1 rounded font-staatliches text-sm tracking-widest shadow uppercase flex items-center gap-1.5 font-bold z-10">
-            <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={20} className="rounded-full animate-pulse" />
-            <span>LIVE SIMULATOR</span>
-          </div>
-
+        <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 relative shadow-sm">
           <div className="mb-6 mt-4 flex items-center gap-4">
             <PepePortrait src={PEPE_ASSETS.neonWojak} size={52} glowColor="moon" animated className="rounded-lg shrink-0" />
             <div>
-              <h2 className="font-staatliches text-4xl text-white tracking-wider flex items-center gap-2 uppercase leading-none">
-                MULTIPLY DEGEN: PARLAYS
+              <h2 className="font-sans text-3xl text-slate-900 dark:text-white tracking-tight font-extrabold flex items-center gap-2 uppercase leading-none">
+                PARLAYS
               </h2>
-              <p className="font-mono text-xs text-trench-gasmask uppercase font-bold mt-1.5">
-                Assemble multiple active arena room wagers into a single tactical strike. All targets must settle in your favor to claim the aggregated multiplier!
+              <p className="font-mono text-xs text-slate-500 dark:text-slate-400 uppercase font-bold mt-2">
+                Assemble multiple active prediction room wagers into a single ticket. All targets must settle in your favor to claim the aggregated multiplier!
               </p>
             </div>
           </div>
 
           {/* Simulated Training Deck Alert Banner */}
-          <div className="mb-4 border border-yellow-500/40 bg-yellow-500/5 p-3 rounded text-[9px] font-mono text-yellow-500 uppercase font-bold tracking-wider animate-pulse flex items-center gap-2">
+          <div className="mb-4 border border-yellow-500/20 bg-yellow-500/5 p-3 rounded-xl text-[9px] font-mono text-yellow-600 dark:text-yellow-500 uppercase font-bold tracking-wider animate-pulse flex items-center gap-2">
             <span>⚠️</span>
             <span>SIMULATED TRAINING DECK: ATOMIC PARLAYS RUN IN MOCK ENVIRONMENT. MULTI-LEG PREDICTIONS DO NOT EXECUTE ON-CHAIN TRANSACTIONS ON MAINNET.</span>
           </div>
 
           {/* Warning badge */}
-          <div className="mb-6 flex gap-2.5 p-3.5 bg-yellow-500/5 border-2 border-dashed border-yellow-500/20 rounded text-trench-gasmask items-center">
+          <div className="mb-6 flex gap-2.5 p-3.5 bg-yellow-500/5 border border-dashed border-yellow-500/20 rounded-xl text-slate-500 dark:text-slate-400 items-center">
             <PepePortrait src={PEPE_ASSETS.jeetSkeleton} size={36} glowColor="jeet" className="rounded-full shrink-0" />
             <div>
-              <span className="font-staatliches text-lg text-moon-gold tracking-wide block uppercase leading-none">HIGH LEVERAGE HAZARD ZONE</span>
-              <p className="font-mono text-[9px] uppercase font-bold mt-1 leading-normal">
+              <span className="font-sans text-sm font-bold text-slate-900 dark:text-amber-500 tracking-wide block uppercase leading-none">HIGH LEVERAGE HAZARD ZONE</span>
+              <p className="font-mono text-[9px] uppercase font-bold mt-1.5 leading-normal">
                 If a single prediction on your parlay ticket settles against your side, the entire ammunition stake is forfeit to the prediction pool.
               </p>
             </div>
           </div>
 
           {/* Selector to add new legs */}
-          <div className="bg-trench-black/40 p-4 border border-trench-sandbag/80 rounded-lg mb-6 flex flex-col md:flex-row items-center gap-3">
+          <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800 rounded-xl mb-6 flex flex-col md:flex-row items-center gap-3">
             <div className="flex-1 w-full">
-              <span className="font-mono text-[9px] text-trench-gasmask block uppercase font-bold mb-1">CHOOSE TARGET POSITION:</span>
+              <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 block uppercase font-bold mb-1.5">CHOOSE TARGET POSITION:</span>
               <select
                 value={selectedRoomId}
                 onChange={(e) => setSelectedRoomId(e.target.value)}
-                className="w-full bg-trench-black text-white border border-trench-sandbag rounded px-3 py-2 font-mono text-xs uppercase font-bold outline-none cursor-pointer"
+                className="w-full bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 font-mono text-xs uppercase font-bold outline-none cursor-pointer"
               >
                 <option value="">-- SELECT ACTIVE ARENA ROOM --</option>
                 {activeRooms
@@ -214,8 +209,8 @@ export default function ParlaysPage() {
             </div>
             
             <div className="w-full md:w-auto shrink-0 flex flex-col items-center">
-              <span className="font-mono text-[9px] text-trench-gasmask block uppercase font-bold mb-1 align-self-start">SIDE:</span>
-              <div className="flex border border-trench-sandbag rounded overflow-hidden w-full md:w-auto">
+              <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 block uppercase font-bold mb-1.5 align-self-start">SIDE:</span>
+              <div className="flex border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden w-full md:w-auto">
                 <button
                   type="button"
                   onClick={() => { setSelectedSide('moon'); synthSound('bet'); }}
@@ -323,35 +318,35 @@ export default function ParlaysPage() {
         </div>
 
         {/* Right Column: Dynamic Aggregation Console (5 cols) */}
-        <div className="lg:col-span-4 bg-trench-mud border-4 border-trench-sandbag rounded-lg p-6 relative shadow-lg scanlines flex flex-col justify-between min-h-[340px] lg:h-[430px]">
+        <div className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 relative shadow-sm flex flex-col justify-between min-h-[340px] lg:h-[430px]">
           <div>
-            <h3 className="font-staatliches text-2xl text-white tracking-wider mb-6 flex items-center gap-2 uppercase border-b border-trench-sandbag/40 pb-2">
+            <h3 className="font-sans text-xl text-slate-950 dark:text-white tracking-tight font-extrabold mb-6 flex items-center gap-2 uppercase border-b border-slate-200 dark:border-slate-800 pb-2">
               <PepePortrait src={PEPE_ASSETS.apeGeneral} size={24} className="rounded-full" />
               SLIP SLATE
             </h3>
 
             {/* Aggregated details */}
-            <div className="space-y-4 font-mono text-xs font-bold uppercase text-trench-gasmask">
+            <div className="space-y-4 font-mono text-xs font-bold uppercase text-slate-500 dark:text-slate-400">
               <div className="flex justify-between items-center">
                 <span>COMBINED WEIGHTS</span>
-                <span className="text-white font-bold">{legs.length} SECTOR LEGS</span>
+                <span className="text-slate-900 dark:text-white font-bold">{legs.length} SECTOR LEGS</span>
               </div>
               <div className="flex justify-between items-center">
                 <span>AMMO STAKE DEPLOYED</span>
-                <span className="text-white font-bold">{stakeAmount} SOL</span>
+                <span className="text-slate-900 dark:text-white font-bold">{stakeAmount} SOL</span>
               </div>
-              <div className="flex justify-between items-center border-t border-trench-sandbag/40 pt-3">
+              <div className="flex justify-between items-center border-t border-slate-200 dark:border-slate-800 pt-3">
                 <span>POTENTIATE ODDS</span>
-                <span className="text-moon-gold font-staatliches text-2xl tracking-wider">x{calculateMultiplier().toFixed(2)}</span>
+                <span className="text-amber-500 font-mono text-lg font-bold">x{calculateMultiplier().toFixed(2)}</span>
               </div>
             </div>
           </div>
 
           <div>
             {/* Massive Payout Banner */}
-            <div className="bg-trench-black p-4 border border-trench-sandbag rounded text-center my-6 shadow-inner">
-              <span className="font-mono text-[9px] text-trench-gasmask block uppercase font-bold">POTENTIAL PREDICTION PAYOUT (SOL)</span>
-              <span className="font-staatliches text-4xl text-neon-moon tracking-widest glow-moon block mt-1 font-bold">
+            <div className="bg-slate-50 dark:bg-slate-950 p-4 border border-slate-200 dark:border-slate-800 rounded-xl text-center my-6">
+              <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 block uppercase font-bold">POTENTIAL PAYOUT (SOL)</span>
+              <span className="font-mono text-2xl text-emerald-500 block mt-1 font-extrabold">
                 {calculatePayout().toFixed(3)} SOL
               </span>
             </div>
@@ -359,10 +354,10 @@ export default function ParlaysPage() {
             <button
               onClick={handleDispatchTicket}
               disabled={legs.length === 0}
-              className={`w-full py-3.5 font-staatliches text-xl rounded uppercase border-b-4 transition-all ${
+              className={`w-full py-3.5 font-mono text-xs uppercase tracking-wider rounded-xl font-extrabold transition-all duration-200 ${
                 legs.length > 0
-                  ? 'bg-neon-moon text-black border-trench-black cursor-pointer hover:scale-[1.02] active:scale-[0.98]'
-                  : 'bg-trench-sandbag text-trench-gasmask border-trench-black cursor-not-allowed opacity-50'
+                  ? 'bg-emerald-500 text-white cursor-pointer hover:bg-emerald-600 shadow-md shadow-emerald-500/10'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed'
               }`}
             >
               <span>DISPATCH CONQUER TICKET ⚔️</span>

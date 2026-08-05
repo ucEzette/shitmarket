@@ -666,34 +666,32 @@ export default function CreateRoomPage() {
 
   return (
     <div className="mx-auto max-w-5xl w-full px-4 py-8 flex-1 flex flex-col items-center select-none">
-      
-      {/* Main Wizard Container */}
-      <div className="w-full bg-white dark:bg-[#080B11] border border-cyan-200 dark:border-gray-800 rounded-2xl shadow-xl dark:shadow-2xl overflow-hidden relative text-slate-800 dark:text-white transition-colors duration-200">
+          {/* Main Wizard Container */}
+      <div className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[24px] shadow-xl overflow-hidden relative text-slate-800 dark:text-white transition-colors duration-200">
         
         {/* Top Gradient Banner & Header */}
-        <div className="bg-gradient-to-r from-cyan-100 via-sky-50 to-cyan-100 dark:from-gray-900 dark:via-[#0E1525] dark:to-gray-900 border-b border-cyan-200 dark:border-gray-800 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h1 className="font-staatliches text-4xl text-[#0A1A2A] dark:text-white tracking-wider uppercase font-bold flex items-center gap-2">
+            <h1 className="font-sans text-3xl text-slate-900 dark:text-white tracking-tight uppercase font-extrabold flex items-center gap-2">
               CREATE PREDICTION ARENA
             </h1>
-            <p className="font-sans text-xs text-slate-600 dark:text-gray-400 mt-1 max-w-xl">
+            <p className="font-sans text-xs text-slate-600 dark:text-slate-400 mt-1 max-w-xl">
               Create instant prediction markets on live price action or custom qualitative events. Resolved on-chain by automated price feeds or AI oracle nodes.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 bg-white/80 dark:bg-[#05080E] p-3 rounded-xl border border-cyan-200 dark:border-gray-800/80 shadow-xs">
+          <div className="flex items-center gap-3 bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
             <PepePortrait src={PEPE_ASSETS.fewUnderstand} size={42} glowColor="moon" className="rounded-lg" />
             <div>
-              <span className="font-mono text-[10px] text-slate-500 dark:text-gray-400 block uppercase font-bold">CREATOR WALLET</span>
+              <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 block uppercase font-bold">CREATOR WALLET</span>
               <span className="font-mono text-xs text-slate-900 dark:text-white font-bold select-all">
                 {wallet?.address ? `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}` : 'WALLET NOT CONNECTED'}
               </span>
             </div>
           </div>
         </div>
-
         {/* Step Indicator */}
-        <div className="bg-cyan-50/80 dark:bg-[#0b101a] border-b border-cyan-200 dark:border-gray-800/80 px-6 py-4">
+        <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 px-6 py-4">
           <div className="max-w-3xl mx-auto flex items-center justify-between">
             
             {/* Step 1 Button */}
@@ -701,66 +699,65 @@ export default function CreateRoomPage() {
               onClick={() => { if (step > 1) setStep(1); }}
               className={`flex items-center gap-3 transition-all ${step === 1 ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
             >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-staatliches text-lg font-bold border transition-all ${
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-mono text-xs font-bold border transition-all ${
                 step === 1
-                  ? 'bg-[#00796B] dark:bg-neon-moon text-white dark:text-black border-[#00796B] dark:border-neon-moon shadow-sm dark:shadow-[0_0_12px_rgba(57,255,20,0.3)]'
+                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
                   : step > 1
-                  ? 'bg-teal-100 dark:bg-emerald-950 text-[#00796B] dark:text-neon-moon border-[#00796B]/60 dark:border-neon-moon/60'
-                  : 'bg-white dark:bg-gray-900 text-slate-400 dark:text-gray-500 border-cyan-200 dark:border-gray-800'
+                  ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                  : 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800'
               }`}>
                 {step > 1 ? <Check size={18} className="stroke-[3]" /> : '1'}
               </div>
               <div className="text-left hidden sm:block">
-                <span className="font-mono text-[9px] text-slate-500 dark:text-gray-400 uppercase font-bold block">STEP 1</span>
-                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 1 ? 'text-[#0A1A2A] dark:text-white font-bold' : 'text-slate-400 dark:text-gray-400'}`}>
+                <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold block">STEP 1</span>
+                <span className={`font-mono text-xs uppercase block ${step === 1 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400 dark:text-slate-500'}`}>
                   TARGET MARKET
                 </span>
               </div>
             </button>
 
-            <div className={`h-0.5 flex-1 mx-4 transition-colors ${step >= 2 ? 'bg-[#00796B] dark:bg-neon-moon/60' : 'bg-cyan-200 dark:bg-gray-800'}`} />
+            <div className={`h-0.5 flex-1 mx-4 transition-colors ${step >= 2 ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-850'}`} />
 
             {/* Step 2 Button */}
             <button
               onClick={() => { if (step > 2) setStep(2); }}
               className={`flex items-center gap-3 transition-all ${step === 2 ? 'opacity-100' : 'opacity-70 hover:opacity-100'}`}
             >
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-staatliches text-lg font-bold border transition-all ${
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-mono text-xs font-bold border transition-all ${
                 step === 2
-                  ? 'bg-[#00796B] dark:bg-neon-moon text-white dark:text-black border-[#00796B] dark:border-neon-moon shadow-sm dark:shadow-[0_0_12px_rgba(57,255,20,0.3)]'
+                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
                   : step > 2
-                  ? 'bg-teal-100 dark:bg-emerald-950 text-[#00796B] dark:text-neon-moon border-[#00796B]/60 dark:border-neon-moon/60'
-                  : 'bg-white dark:bg-gray-900 text-slate-400 dark:text-gray-500 border-cyan-200 dark:border-gray-800'
+                  ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/30'
+                  : 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800'
               }`}>
                 {step > 2 ? <Check size={18} className="stroke-[3]" /> : '2'}
               </div>
               <div className="text-left hidden sm:block">
-                <span className="font-mono text-[9px] text-slate-500 dark:text-gray-400 uppercase font-bold block">STEP 2</span>
-                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 2 ? 'text-[#0A1A2A] dark:text-white font-bold' : 'text-slate-400 dark:text-gray-400'}`}>
+                <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold block">STEP 2</span>
+                <span className={`font-mono text-xs uppercase block ${step === 2 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400 dark:text-slate-500'}`}>
                   ORACLE PROTOCOL
                 </span>
               </div>
             </button>
 
-            <div className={`h-0.5 flex-1 mx-4 transition-colors ${step >= 3 ? 'bg-[#00796B] dark:bg-neon-moon/60' : 'bg-cyan-200 dark:bg-gray-800'}`} />
+            <div className={`h-0.5 flex-1 mx-4 transition-colors ${step >= 3 ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-850'}`} />
 
             {/* Step 3 Button */}
             <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-staatliches text-lg font-bold border transition-all ${
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-mono text-xs font-bold border transition-all ${
                 step === 3
-                  ? 'bg-[#00796B] dark:bg-neon-moon text-white dark:text-black border-[#00796B] dark:border-neon-moon shadow-sm dark:shadow-[0_0_12px_rgba(57,255,20,0.3)]'
-                  : 'bg-white dark:bg-gray-900 text-slate-400 dark:text-gray-500 border-cyan-200 dark:border-gray-800'
+                  ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                  : 'bg-white dark:bg-slate-900 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-800'
               }`}>
                 3
               </div>
               <div className="text-left hidden sm:block">
-                <span className="font-mono text-[9px] text-slate-500 dark:text-gray-400 uppercase font-bold block">STEP 3</span>
-                <span className={`font-staatliches text-base tracking-wider uppercase block ${step === 3 ? 'text-[#0A1A2A] dark:text-white font-bold' : 'text-slate-400 dark:text-gray-400'}`}>
+                <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 uppercase font-bold block">STEP 3</span>
+                <span className={`font-mono text-xs uppercase block ${step === 3 ? 'text-slate-900 dark:text-white font-bold' : 'text-slate-400 dark:text-slate-500'}`}>
                   LIQUIDITY & LAUNCH
                 </span>
               </div>
             </div>
-
           </div>
         </div>
 
@@ -770,14 +767,13 @@ export default function CreateRoomPage() {
           {/* STEP 1: TARGET MARKET DEFINITION */}
           {step === 1 && (
             <div className="space-y-8 animate-fadeIn">
-              
-              {/* Type Selection Header */}
+                          {/* Type Selection Header */}
               <div>
-                <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase flex items-center gap-2">
-                  <Layers size={22} className="text-neon-moon" />
+                <h3 className="font-sans text-xl text-slate-900 dark:text-white tracking-tight uppercase flex items-center gap-2 font-extrabold">
+                  <Layers size={22} className="text-emerald-500" />
                   <span>SELECT PREDICTION MARKET STRUCTURE</span>
                 </h3>
-                <p className="font-sans text-xs text-gray-400 mt-1">
+                <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Choose between automated token price battles or custom qualitative event markets.
                 </p>
               </div>
@@ -790,30 +786,19 @@ export default function CreateRoomPage() {
                   onClick={() => handleSelectArenaType('token')}
                   className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 relative overflow-hidden ${
                     arenaType === 'token'
-                      ? 'border-neon-moon bg-gradient-to-b from-emerald-950/30 to-[#0A140B] shadow-[0_0_20px_rgba(57,255,20,0.12)]'
-                      : 'border-gray-800 bg-[#0A0E17] hover:border-gray-700 hover:bg-[#0E1420]'
+                      ? 'border-emerald-500 bg-emerald-500/5'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                   }`}
                 >
                   {arenaType === 'token' && (
-                    <div className="absolute top-3 right-3 text-neon-moon">
-                      <CheckCircle2 size={20} className="fill-neon-moon text-black" />
+                    <div className="absolute top-3 right-3 text-emerald-500">
+                      <CheckCircle2 size={20} className="fill-emerald-500 text-white" />
                     </div>
                   )}
-                  <div className="w-12 h-12 rounded-xl bg-emerald-950/60 border border-neon-moon/40 flex items-center justify-center mb-3">
-                    <TrendingUp size={26} className="text-neon-moon" />
-                  </div>
-                  <h4 className="font-staatliches text-2xl text-white tracking-wider uppercase">PRICE CHART BATTLE</h4>
-                  <p className="font-sans text-xs text-gray-400 mt-1 leading-relaxed">
-                    Bet on live USD price movements of any token on Solana or Avalanche. Uses Pyth & Chainlink feeds to resolve automatically.
+                  <h4 className="font-sans text-lg text-slate-900 dark:text-white font-extrabold uppercase">PRICE CHART BATTLE</h4>
+                  <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                    Bet on live USD price movements of any token. Uses Pyth & Chainlink feeds to resolve automatically.
                   </p>
-                  <div className="mt-4 flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 font-mono text-[9px] text-neon-moon uppercase font-bold">
-                      Trustless TWAP
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 font-mono text-[9px] text-gray-300 uppercase font-bold">
-                      0 USDC Fee
-                    </span>
-                  </div>
                 </div>
 
                 {/* Custom Prediction / Debate Card */}
@@ -821,30 +806,19 @@ export default function CreateRoomPage() {
                   onClick={() => handleSelectArenaType('debate')}
                   className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 relative overflow-hidden ${
                     arenaType === 'debate'
-                      ? 'border-yellow-400 bg-gradient-to-b from-amber-950/30 to-[#141007] shadow-[0_0_20px_rgba(255,215,0,0.12)]'
-                      : 'border-gray-800 bg-[#0A0E17] hover:border-gray-700 hover:bg-[#0E1420]'
+                      ? 'border-emerald-500 bg-emerald-500/5'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/50 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                   }`}
                 >
                   {arenaType === 'debate' && (
-                    <div className="absolute top-3 right-3 text-yellow-400">
-                      <CheckCircle2 size={20} className="fill-yellow-400 text-black" />
+                    <div className="absolute top-3 right-3 text-emerald-500">
+                      <CheckCircle2 size={20} className="fill-emerald-500 text-white" />
                     </div>
                   )}
-                  <div className="w-12 h-12 rounded-xl bg-amber-950/60 border border-yellow-400/40 flex items-center justify-center mb-3">
-                    <Scale size={26} className="text-yellow-400" />
-                  </div>
-                  <h4 className="font-staatliches text-2xl text-white tracking-wider uppercase">CUSTOM PREDICTION / DEBATE</h4>
-                  <p className="font-sans text-xs text-gray-400 mt-1 leading-relaxed">
+                  <h4 className="font-sans text-lg text-slate-900 dark:text-white font-extrabold uppercase">CUSTOM PREDICTION / DEBATE</h4>
+                  <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                     Create plain-language prediction statements regarding politics, crypto milestones, tech releases, or custom events.
                   </p>
-                  <div className="mt-4 flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 font-mono text-[9px] text-yellow-400 uppercase font-bold">
-                      AI & DAO Oracles
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-gray-900 border border-gray-800 font-mono text-[9px] text-gray-300 uppercase font-bold">
-                      Custom Uploads
-                    </span>
-                  </div>
                 </div>
 
               </div>
@@ -860,28 +834,28 @@ export default function CreateRoomPage() {
                     <div className="flex flex-col sm:flex-row gap-2">
                       <input
                         type="text"
-                        placeholder="PASTE TOKEN CONTRACT ADDRESS (e.g., 0x420fca... or 4k3Dyw...)"
+                        placeholder="PASTE TOKEN CONTRACT ADDRESS"
                         value={contractAddress}
                         onChange={(e) => {
                           setContractAddress(e.target.value);
                           setTokenInfo(null);
                         }}
-                        className="flex-1 px-4 py-3 bg-[#05080E] border border-gray-800 text-white font-mono text-xs placeholder-gray-600 rounded-xl focus:border-neon-moon focus:outline-none tracking-widest font-bold"
+                        className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none tracking-widest font-bold"
                       />
                       <button
                         type="button"
                         onClick={(e) => handleScan(e)}
                         disabled={scanning || !contractAddress.trim()}
-                        className="px-6 bg-neon-moon hover:bg-green-400 text-black font-staatliches text-xl rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
+                        className="px-6 bg-emerald-500 hover:bg-emerald-600 text-white font-mono text-xs uppercase rounded-xl transition-all flex items-center justify-center gap-2 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed font-bold"
                       >
                         {scanning ? (
                           <>
-                            <Loader2 size={18} className="animate-spin text-black" />
+                            <Loader2 size={14} className="animate-spin text-white" />
                             <span>SCANNING...</span>
                           </>
                         ) : (
                           <>
-                            <Zap size={18} />
+                            <Zap size={14} />
                             <span>SCAN TOKEN</span>
                           </>
                         )}
@@ -1111,14 +1085,14 @@ export default function CreateRoomPage() {
               )}
 
               {/* Wizard Nav buttons */}
-              <div className="flex justify-end pt-4 border-t border-gray-800">
+              <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={nextStep}
-                  className="px-8 py-3 bg-neon-moon hover:bg-green-400 font-staatliches text-xl text-black rounded-xl tracking-wider flex items-center gap-2 font-bold transition-all uppercase"
+                  className="px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 font-mono text-xs text-white rounded-xl tracking-wider flex items-center gap-2 font-bold transition-all uppercase"
                 >
                   <span>NEXT: ORACLE PROTOCOL</span>
-                  <ArrowRight size={20} />
+                  <ArrowRight size={14} />
                 </button>
               </div>
             </div>

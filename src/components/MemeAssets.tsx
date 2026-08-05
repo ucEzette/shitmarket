@@ -228,44 +228,6 @@ export const MemePopup: React.FC<{ triggerInterval?: number }> = ({ triggerInter
   );
 };
 
-/** War propaganda poster / meme art tile with caption */
-export const WarPropaganda: React.FC<{
-  src: string;
-  caption: string;
-  subcaption?: string;
-  glowColor?: 'moon' | 'jeet' | 'gold';
-  className?: string;
-}> = ({ src, caption, subcaption, glowColor = 'moon', className = '' }) => {
-  const borderColors = {
-    moon: 'border-neon-moon/40 hover:border-neon-moon hover:shadow-glow-moon',
-    jeet: 'border-jeet-red/40 hover:border-jeet-red hover:shadow-glow-jeet',
-    gold: 'border-moon-gold/40 hover:border-moon-gold hover:shadow-glow-gold',
-  };
-
-  return (
-    <div className={`glass-panel border-t border-white/10 rounded-2xl overflow-hidden transition-all duration-300 group shadow-lg hover:shadow-2xl ${className}`}>
-      <div className="relative overflow-hidden">
-        <img
-          src={src}
-          alt={caption}
-          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-700"
-          draggable={false}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0F1016] via-transparent to-transparent" />
-      </div>
-      <div className="p-4 relative z-10 bg-[#0F1016]/80 backdrop-blur-sm">
-        <p className={`font-staatliches text-xl text-white tracking-wider uppercase leading-tight ${
-          glowColor === 'moon' ? 'group-hover:text-neon-moon group-hover:shadow-glow-moon' : 
-          glowColor === 'jeet' ? 'group-hover:text-jeet-red group-hover:shadow-glow-jeet' : 
-          'group-hover:text-moon-gold group-hover:shadow-glow-gold'
-        } transition-all duration-300`}>{caption}</p>
-        {subcaption && (
-          <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold mt-1.5">{subcaption}</p>
-        )}
-      </div>
-    </div>
-  );
-};
 
 /** Meme mascot row — a lineup of character portraits */
 export const MascotRow: React.FC<{ className?: string }> = ({ className = '' }) => {

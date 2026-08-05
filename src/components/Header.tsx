@@ -349,38 +349,38 @@ export const Header: React.FC<{
   }, [disconnect]);
 
   return (
-    <header className="sticky top-0 z-[100] w-full border-b border-cyan-200 dark:border-trench-sandbag bg-white dark:bg-black px-2 h-10 sm:h-11 flex items-center retro-panel !overflow-visible rounded-none border-t-0 border-l-0 border-r-0 shadow-sm dark:shadow-none" style={{ overflow: 'visible' }}>
-      <div className="w-full mx-auto px-2 sm:px-4 flex flex-row items-center justify-between gap-2 relative animate-fadeIn" style={{ overflow: 'visible' }}>
+    <header className="sticky top-0 z-[100] w-full border-b border-[var(--border-color)] bg-[var(--card-bg)] px-4 h-14 flex items-center shadow-sm" style={{ overflow: 'visible' }}>
+      <div className="w-full mx-auto flex flex-row items-center justify-between gap-2 relative animate-fadeIn" style={{ overflow: 'visible' }}>
         {/* Left Aligned branding and navigation section */}
-        <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+        <div className="flex items-center gap-4 sm:gap-6 shrink-0">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-1 group shrink-0">
+          <Link href="/" className="flex items-center gap-2 group shrink-0">
             <img
               src="/pepes/logo-main.png"
               alt="ShitMarket"
-              className="h-[22px] sm:h-[26px] w-auto object-contain group-hover:scale-105 transition-all duration-300"
+              className="h-8 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
               loading="eager"
               decoding="sync"
             />
-            <span className="font-staatliches text-[13px] sm:text-base tracking-wider font-extrabold flex items-center select-none ml-1">
-              <span className="text-[#0A1A2A] dark:text-white">SHIT</span>
-              <span className="text-[#00796B] dark:text-[#39ff14]">MARKET</span>
-              <span className="text-[#C62828] dark:text-[#ff073a]">.</span>
+            <span className="font-sans text-base tracking-wider font-extrabold flex items-center select-none">
+              <span className="text-[var(--text-primary)]">SHIT</span>
+              <span className="text-[#10b981]">MARKET</span>
+              <span className="text-[#ef4444]">.</span>
             </span>
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-2 ml-1">
+          <nav className="hidden lg:flex items-center gap-3 ml-2">
             {navItems.map((item) => {
               const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`font-mono text-[10px] tracking-wider uppercase transition-all px-2 py-0.5 rounded-md border-b-2 font-bold ${
+                  className={`font-mono text-[11px] tracking-wider uppercase transition-all px-3 py-1.5 rounded-lg border font-bold ${
                     isActive
-                      ? 'bg-cyan-50 dark:bg-trench-black text-[#00796B] dark:text-neon-moon border-[#00796B] dark:border-neon-moon font-extrabold shadow-sm dark:shadow-[0_1px_4px_rgba(57,255,20,0.08)]'
-                      : 'text-[#2C3E50] dark:text-trench-gasmask border-transparent hover:text-[#0A1A2A] dark:hover:text-white hover:bg-cyan-50/60 dark:hover:bg-trench-black/40'
+                      ? 'bg-[var(--card-secondary)] text-[#10b981] border-[var(--border-color)] font-extrabold shadow-sm'
+                      : 'text-[var(--text-secondary)] border-transparent hover:text-[var(--text-primary)] hover:bg-[var(--card-secondary)]'
                   }`}
                 >
                   {item.label}

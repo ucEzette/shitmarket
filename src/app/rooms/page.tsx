@@ -517,8 +517,8 @@ export default function RoomsPage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-50">
         <div className="flex items-center gap-6">
-          <h2 className="font-staatliches text-4xl text-[#0A1A2A] dark:text-white tracking-wider font-bold">
-            War Room
+          <h2 className="font-sans text-3xl text-slate-900 dark:text-white tracking-tight font-extrabold">
+            Markets
           </h2>
           {/* Network Selection Icons */}
           <div className="flex items-center gap-3">
@@ -831,16 +831,15 @@ export default function RoomsPage() {
           </div>
           {/* Rocket Deploy Button */}
           <Link href="/create-room" className="w-full md:w-auto">
-            <button className="w-full py-2 px-4 font-staatliches text-lg tracking-wider text-white dark:text-black bg-[#00796B] dark:bg-neon-moon hover:bg-[#004D40] dark:hover:bg-green-500 rounded-lg shadow-md dark:shadow-glow-moon active:translate-y-0.5 transition-all flex items-center justify-center gap-2 uppercase font-bold h-11 text-center">
-              <Rocket size={18} className="animate-bounce text-white dark:text-black" />
+            <button className="w-full py-2 px-5 font-mono text-xs uppercase tracking-wider text-white dark:text-black bg-[#10b981] hover:bg-[#059669] rounded-xl shadow-md transition-all flex items-center justify-center gap-2 font-extrabold h-11 text-center">
+              <Rocket size={16} className="animate-bounce text-white dark:text-black" />
               <span>DEPLOY ROOM</span>
             </button>
           </Link>
         </div>
       </div>
 
-      {/* Category Selector Bar */}
-      <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-3 mb-6 scrollbar-none border-b border-cyan-200 dark:border-trench-sandbag/40 shrink-0">
+      <div className="flex items-center gap-2 overflow-x-auto pt-2 pb-3 mb-6 scrollbar-none border-b border-slate-200 dark:border-slate-800 shrink-0">
         {CATEGORIES.map((cat) => {
           const isActive = selectedCategory === cat.id;
           return (
@@ -850,10 +849,10 @@ export default function RoomsPage() {
                 setSelectedCategory(cat.id);
                 synthSound('bet');
               }}
-              className={`px-3 py-1.5 rounded-lg border font-staatliches text-xs tracking-wider uppercase transition-all duration-150 flex items-center gap-1.5 shrink-0 select-none ${
+              className={`px-3 py-1.5 rounded-lg border font-mono text-[10px] tracking-wider uppercase transition-all duration-150 flex items-center gap-1.5 shrink-0 select-none ${
                 isActive
-                  ? 'bg-[#00796B]/15 dark:bg-neon-moon/20 border-[#00796B] dark:border-neon-moon text-[#00796B] dark:text-neon-moon shadow-sm dark:shadow-glow-moon scale-105 font-bold'
-                  : 'bg-white dark:bg-trench-black/60 border-cyan-200 dark:border-trench-sandbag/40 text-slate-700 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-sm font-bold scale-105'
+                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               <span className="text-sm">{cat.icon}</span>
@@ -864,12 +863,12 @@ export default function RoomsPage() {
       </div>
 
       {/* Unified Search & Filters Toolbar */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag rounded-2xl p-3.5 mb-6 shadow-sm dark:shadow-none">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 mb-6 shadow-sm">
         <div className="flex items-center gap-2">
-          <span className="font-staatliches text-xl text-slate-900 dark:text-white tracking-wider font-bold uppercase">
+          <span className="font-sans text-lg text-slate-900 dark:text-white font-extrabold uppercase">
             All Markets
           </span>
-          <span className="font-mono text-xs text-slate-600 dark:text-trench-gasmask bg-cyan-100 dark:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/80 px-2 py-0.5 rounded-full font-bold">
+          <span className="font-mono text-xs text-slate-500 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-2.5 py-0.5 rounded-full font-bold">
             {filteredRooms.length}
           </span>
         </div>
@@ -968,23 +967,23 @@ export default function RoomsPage() {
 
       {/* Wallet Connection Helper Prompter */}
       {!user && (
-        <div className="bg-white dark:bg-trench-mud/50 border border-cyan-200 dark:border-2 dark:border-trench-sandbag rounded-xl p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-md mb-6 text-slate-800 dark:text-white">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col md:flex-row justify-between items-center gap-4 shadow-sm mb-6 text-slate-800 dark:text-white">
           <div className="flex items-center gap-3">
             <PepePortrait src={PEPE_ASSETS.neonWojak} size={56} glowColor="jeet" animated className="rounded-lg" />
             <div>
-              <h4 className="font-staatliches text-lg text-slate-900 dark:text-white tracking-wide uppercase">
+              <h4 className="font-sans text-base text-slate-900 dark:text-white font-bold uppercase">
                 FIGHT IN COLD BLOOD? CONNECT YOUR AMMO WALLET!
               </h4>
-              <p className="font-mono text-xs text-trench-gasmask font-bold uppercase mt-0.5">
+              <p className="font-mono text-xs text-slate-500 dark:text-slate-400 font-bold uppercase mt-0.5">
                 Connect your wallet to stack ammo on Moon or Jeet across live prediction rooms.
               </p>
             </div>
           </div>
           <button
             onClick={connectWallet}
-            className="w-full md:w-auto px-6 py-2 bg-jeet-red hover:bg-red-700 text-white font-staatliches text-base tracking-wider rounded uppercase flex items-center justify-center gap-1.5 border-b-4 border-red-950 font-bold"
+            className="w-full md:w-auto px-6 py-3.5 bg-red-500 hover:bg-red-600 text-white font-mono text-xs uppercase tracking-wider rounded-xl font-extrabold shadow-md transition-colors duration-200 shrink-0"
           >
-            <UserPlus size={16} />
+            <UserPlus size={14} className="inline mr-1" />
             <span>INSTANT DEPLOY WALLET</span>
           </button>
         </div>

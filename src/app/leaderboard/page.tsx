@@ -68,40 +68,40 @@ export default function LeaderboardPage() {
     <div className="mx-auto max-w-5xl w-full px-4 py-8 flex-1 flex flex-col select-none text-slate-800 dark:text-white transition-colors duration-200">
       
       {/* 1. SEASON TIMELINE HEADER BANNER */}
-      <div className="bg-white dark:bg-trench-black border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-xl p-5 mb-8 flex flex-col md:flex-row justify-between items-center gap-4 relative shadow-md dark:shadow-lg dark:scanlines text-slate-800 dark:text-white">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 mb-8 flex flex-col md:flex-row justify-between items-center gap-4 relative shadow-sm text-slate-800 dark:text-white">
         <div className="flex items-center gap-3">
           <PepePortrait src={PEPE_ASSETS.apeGeneral} size={48} glowColor="gold" animated className="rounded-lg shrink-0" />
           <div>
-            <h2 className="font-staatliches text-2xl text-[#0A1A2A] dark:text-white tracking-wider uppercase leading-none">
+            <h2 className="font-sans text-xl text-slate-950 dark:text-white tracking-tight font-extrabold leading-none">
               SEASON 1 SECTOR CONQUEST
             </h2>
-            <p className="font-mono text-[10px] text-slate-500 dark:text-trench-gasmask uppercase mt-1 font-bold">
-              The supreme degen commanders on the front lines. Rewards distributed every Sunday.
+            <p className="font-mono text-[10px] text-slate-500 dark:text-slate-400 uppercase mt-1.5 font-bold">
+              The supreme commanders on the front lines. Rewards distributed every Sunday.
             </p>
           </div>
         </div>
 
         {/* Flashing Season Countdown */}
-        <div className="bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/80 rounded-lg px-4 py-1.5 text-center min-w-[200px]">
-          <span className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask block uppercase font-bold">
+        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-center min-w-[200px]">
+          <span className="font-mono text-[9px] text-slate-500 dark:text-slate-400 block uppercase font-bold">
             TIME TO ARBITRAGE RESET:
           </span>
-          <span className="font-staatliches text-xl text-[#C62828] dark:text-jeet-red tracking-wider dark:glow-jeet animate-pulse font-bold block">
+          <span className="font-mono text-base text-red-500 font-extrabold animate-pulse block mt-0.5">
             {seasonTimeLeft}
           </span>
         </div>
       </div>
 
       {/* 2. THE TACTICAL PODIUM */}
-      <div className="bg-white/90 dark:bg-trench-mud/40 border-2 border-cyan-200 dark:border-4 dark:border-trench-sandbag rounded-xl p-6 mb-8 relative shadow-md dark:shadow-lg overflow-hidden dark:scanlines flex flex-col items-center text-slate-800 dark:text-white">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 mb-8 relative shadow-sm flex flex-col items-center text-slate-800 dark:text-white">
         
         {/* Glowing visual indicators */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-100/30 dark:from-trench-mud/30 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-100 dark:from-slate-800/10 via-transparent to-transparent pointer-events-none" />
 
-        <h3 className="font-staatliches text-3xl text-[#0A1A2A] dark:text-white tracking-widest uppercase mb-10 text-center flex items-center justify-center gap-2">
-          <Trophy className="text-amber-600 dark:text-moon-gold animate-spin" size={24} />
+        <h3 className="font-sans text-2xl text-slate-950 dark:text-white font-extrabold tracking-tight mb-8 text-center flex items-center justify-center gap-2">
+          <Trophy className="text-amber-500 animate-pulse" size={24} />
           TOP TRADERS
-          <Trophy className="text-amber-600 dark:text-moon-gold animate-spin" size={24} />
+          <Trophy className="text-amber-500 animate-pulse" size={24} />
         </h3>
 
         {/* 3 Steps Podium Construction */}

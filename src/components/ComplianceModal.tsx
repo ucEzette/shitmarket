@@ -35,13 +35,13 @@ export const ComplianceModal: React.FC = () => {
   if (!mounted || !isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/95 backdrop-blur-md flex items-center justify-center z-[10000] p-4 select-none dark:scanlines">
-      <div className="bg-white dark:bg-[#0c1809] border-2 border-teal-600 dark:border-4 dark:border-neon-moon max-w-lg w-full rounded-xl p-6 relative shadow-2xl dark:shadow-[0_0_30px_rgba(57,255,20,0.15)] overflow-hidden text-slate-800 dark:text-white transition-colors duration-200">
+    <div className="fixed inset-0 bg-trench-black/95 backdrop-blur-md flex items-center justify-center z-[10000] p-4 select-none scanlines">
+      <div className="sm-panel-raised max-w-lg w-full rounded-md p-6 relative overflow-hidden text-foreground">
         {/* Glow scanline lines */}
         <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(to_bottom,rgba(255,255,255,0),rgba(255,255,255,0)_50%,rgba(0,0,0,1)_50%,rgba(0,0,0,1))] bg-[size:100%_4px]"></div>
 
         {/* Header */}
-        <div className="flex items-center gap-3 border-b-2 border-teal-600 dark:border-neon-moon pb-3 mb-4">
+        <div className="flex items-center gap-3 border-b border-neon-moon pb-3 mb-4">
           <PepePortrait src={PEPE_ASSETS.apeGeneral} size={48} glowColor="moon" className="rounded-lg shrink-0" />
           <div>
             <h2 className="font-staatliches text-2xl text-teal-700 dark:text-neon-moon tracking-widest uppercase leading-none">

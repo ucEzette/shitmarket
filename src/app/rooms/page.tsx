@@ -512,7 +512,7 @@ export default function RoomsPage() {
   const filteredRooms = getFilteredAndSortedRooms();
 
   return (
-    <div className="w-full px-4 md:px-8 py-6 flex-1 flex flex-col select-none max-w-full">
+    <main className="sm-shell w-full px-4 md:px-8 py-6 flex-1 flex flex-col select-none max-w-full">
       
       {/* Page Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-50">
@@ -995,6 +995,6 @@ export default function RoomsPage() {
         <DegenQuoteBanner />
       </div>
 
-    </div>
+    </main>
   );
 }

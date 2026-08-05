@@ -23,7 +23,6 @@ export const HeaderPanel: React.FC<HeaderPanelProps> = ({
   <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4 w-full">
     <div className="flex items-center gap-2 w-full sm:w-auto">
       <NavButton href={backHref} className="flex-1 sm:flex-initial">← {title}</NavButton>
-      <NavButton href={missionHref} className="flex-1 sm:flex-initial">📜 BRIEFING</NavButton>
       {onToggleBookmark && (
         <button
           onClick={onToggleBookmark}

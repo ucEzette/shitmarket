@@ -145,7 +145,8 @@ export default function RoomDetailPage() {
     fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile, fetchBalance,
     showAlert, addToast,
     listings, fetchRoomListings, listPosition, cancelListing, buyPosition, wallet,
-    disputeRoom, resolveDispute
+    disputeRoom, resolveDispute,
+    parlayCart, addLegToParlay, removeLegFromParlay
   } = useAppState();
 
   const room = rooms.find((r) => r.id === roomId);
@@ -1311,7 +1312,7 @@ export default function RoomDetailPage() {
                       : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                   }`}
                 >
-                  <span className="font-mono text-xs text-emerald-500 font-bold uppercase tracking-wider block">YES</span>
+                  <span className="font-mono text-xs text-emerald-500 font-bold uppercase tracking-wider block">{room.moonLabel || 'YES'}</span>
                   <span className="font-sans text-4xl font-extrabold text-emerald-500 mt-2 block">
                     {moonPercentageSafe.toFixed(1)}%
                   </span>
@@ -1325,7 +1326,7 @@ export default function RoomDetailPage() {
                       : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
                   }`}
                 >
-                  <span className="font-mono text-xs text-rose-500 font-bold uppercase tracking-wider block">NO</span>
+                  <span className="font-mono text-xs text-rose-500 font-bold uppercase tracking-wider block">{room.jeetLabel || 'NO'}</span>
                   <span className="font-sans text-4xl font-extrabold text-rose-500 mt-2 block">
                     {jeetPercentageSafe.toFixed(1)}%
                   </span>
@@ -1404,7 +1405,7 @@ export default function RoomDetailPage() {
                               : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
-                          <span>YES</span>
+                          <span>{room.moonLabel || 'YES'}</span>
                           <span className="text-[10px] opacity-75">{moonPercentageSafe.toFixed(0)}%</span>
                         </button>
                         <button
@@ -1416,7 +1417,7 @@ export default function RoomDetailPage() {
                               : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
-                          <span>NO</span>
+                          <span>{room.jeetLabel || 'NO'}</span>
                           <span className="text-[10px] opacity-75">{jeetPercentageSafe.toFixed(0)}%</span>
                         </button>
                       </div>
@@ -1441,7 +1442,7 @@ export default function RoomDetailPage() {
                             <span>
                               {orderType === 'buy'
                                 ? `Balance: ${user?.balance !== undefined ? user.balance.toFixed(2) : '0.00'} USDC`
-                                : `Balance: ${selectedSharesOwned.toFixed(2)} ${selectedSide === 'moon' ? 'YES' : 'NO'} Shares`
+                                : `Balance: ${selectedSharesOwned.toFixed(2)} ${selectedSide === 'moon' ? (room.moonLabel || 'YES') : (room.jeetLabel || 'NO')} Shares`
                               }
                             </span>
                           </label>
@@ -1527,6 +1528,36 @@ export default function RoomDetailPage() {
                         <span>EXECUTE TRANSACTION</span>
                       )}
                     </button>
+
+                    {/* Parlay bookmark action */}
+                    {room.status === 'active' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const isInParlay = parlayCart.some((l) => l.roomId === room.id);
+                          if (isInParlay) {
+                            removeLegFromParlay(room.id);
+                            addToast('Removed from Parlay Ticket', 'info');
+                          } else {
+                            addLegToParlay(room.id, selectedSide);
+                            addToast(`Added $${room.token.symbol} (${selectedSide === 'moon' ? (room.moonLabel || 'YES') : (room.jeetLabel || 'NO')}) to Parlay Ticket`, 'success');
+                          }
+                          synthSound('bet');
+                        }}
+                        className={`w-full py-3.5 rounded-xl border font-mono text-xs uppercase font-extrabold tracking-wide transition-all flex items-center justify-center gap-2 ${
+                          parlayCart.some((l) => l.roomId === room.id)
+                            ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 hover:bg-emerald-500/15'
+                            : 'border-slate-200 dark:border-slate-800 text-slate-650 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-slate-50 dark:bg-slate-950/40 hover:border-slate-350 hover:dark:border-slate-700'
+                        }`}
+                      >
+                        <Bookmark size={14} className="shrink-0" />
+                        <span>
+                          {parlayCart.some((l) => l.roomId === room.id)
+                            ? 'Added to Parlay Ticket ✓'
+                            : 'Add Bet to Parlay Slip'}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 )}
 

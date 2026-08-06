@@ -142,7 +142,7 @@ export default function RoomDetailPage() {
   const { 
     rooms, user, chatMessages, placeBet, placeLimitOrder, executeEvmMarketTrade, claimWinnings, 
     addMessage, connectWallet, isTransactionLoading, 
-    fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile,
+    fetchSingleRoom, fetchRoomChats, sendRoomChat, refreshProfile, fetchBalance,
     showAlert, addToast,
     listings, fetchRoomListings, listPosition, cancelListing, buyPosition, wallet,
     disputeRoom, resolveDispute
@@ -151,27 +151,38 @@ export default function RoomDetailPage() {
   const room = rooms.find((r) => r.id === roomId);
 
   const getEvmBuyCost = (shares: number, side: 'moon' | 'jeet', moonRes: number, jeetRes: number): number => {
-    const rTarget = side === 'moon' ? moonRes : jeetRes;
-    const rOpposite = side === 'moon' ? jeetRes : moonRes;
+    const rTarget = side === 'moon' ? jeetRes : moonRes;
+    const rOpposite = side === 'moon' ? moonRes : jeetRes;
     if (rTarget <= 0 || rOpposite <= 0) return shares * 0.5;
-    if (shares >= rTarget) return Infinity;
+    if (shares >= rTarget + rOpposite) return shares * 0.99;
+    
+    const B = rTarget + rOpposite - shares;
+    const C = -shares * rOpposite;
+    const desc = B * B - 4 * C;
+    if (desc < 0) return shares * 0.99;
+    const dx = (-B + Math.sqrt(desc)) / 2;
+    return (dx * 10000) / 9970;
+  };
+
+  const getEvmSharesReceived = (usdcAmount: number, side: 'moon' | 'jeet', moonRes: number, jeetRes: number): number => {
+    const rTarget = side === 'moon' ? jeetRes : moonRes;
+    const rOpposite = side === 'moon' ? moonRes : jeetRes;
+    if (rTarget <= 0 || rOpposite <= 0) return usdcAmount / 0.5;
+    const netUsdc = (usdcAmount * 9970) / 10000;
     const k = rTarget * rOpposite;
-    const newTargetReserve = rTarget - shares;
-    const newOppositeReserve = k / newTargetReserve;
-    const netUsdc = newOppositeReserve - rOpposite;
-    return (netUsdc * 10000) / 9970;
+    const newOppositeReserve = rOpposite + netUsdc;
+    const newTargetReserve = k / newOppositeReserve;
+    return netUsdc + rTarget - newTargetReserve;
   };
 
   const getEvmSellReceived = (shares: number, side: 'moon' | 'jeet', moonRes: number, jeetRes: number): number => {
-    const rTarget = side === 'moon' ? moonRes : jeetRes;
-    const rOpposite = side === 'moon' ? jeetRes : moonRes;
+    const rTarget = side === 'moon' ? jeetRes : moonRes;
+    const rOpposite = side === 'moon' ? moonRes : jeetRes;
     if (rTarget <= 0 || rOpposite <= 0) return shares * 0.5;
     const k = rTarget * rOpposite;
-    const newTargetReserve = rTarget + shares;
-    const newOppositeReserve = k / newTargetReserve;
-    const netUsdc = rOpposite - newOppositeReserve;
-    const fee = (netUsdc * 30) / 10000;
-    return netUsdc - fee;
+    const newOppositeReserve = k / (rTarget + shares);
+    const dx = rOpposite - newOppositeReserve;
+    return (dx * 9970) / 10000;
   };
 
   const isDebateMarket = room ? (
@@ -234,7 +245,7 @@ export default function RoomDetailPage() {
   const [sharesInput, setSharesInput] = useState<number>(10);
   const [selectedProfileAddress, setSelectedProfileAddress] = useState<string | null>(null);
   const [activeRulesTab, setActiveRulesTab] = useState<'rules' | 'context'>('rules');
-  const [activeMainTab, setActiveMainTab] = useState<'comments' | 'holders' | 'positions' | 'activity'>('positions');
+  const [activeMainTab, setActiveMainTab] = useState<'trade' | 'chart' | 'holdings' | 'activity' | 'discussion'>('trade');
   const [localShake, setLocalShake] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [livePrice, setLivePrice] = useState<number | null>(null);
@@ -360,12 +371,14 @@ export default function RoomDetailPage() {
     // Hydrate secondary components (chats, profile stats, bet transactions) concurrently in background
     fetchRoomChats(roomId);
     refreshProfile();
+    fetchBalance();
     fetchRoomBets();
 
     const interval = setInterval(() => {
       fetchSingleRoom(roomId);
       fetchRoomChats(roomId);
       refreshProfile();
+      fetchBalance();
       fetchRoomBets();
     }, 5000);
 
@@ -373,7 +386,7 @@ export default function RoomDetailPage() {
       active = false;
       clearInterval(interval);
     };
-  }, [roomId, fetchSingleRoom, refreshProfile, fetchRoomBets]);
+  }, [roomId, fetchSingleRoom, refreshProfile, fetchBalance, fetchRoomBets]);
 
   // Poll live token price aggregator (DexScreener, Birdeye, Jupiter, Chainlink, Pyth) every 5 seconds
   useEffect(() => {
@@ -717,7 +730,7 @@ export default function RoomDetailPage() {
   const hasBetOnMoon = userSidesChosen.includes('moon');
   const hasBetOnJeet = userSidesChosen.includes('jeet');
 
-  const handlePlaceOrder = async (e?: React.MouseEvent<HTMLButtonElement>) => {
+  const handlePlaceOrder = async (mode: 'market' | 'limit', e?: React.MouseEvent<HTMLButtonElement>) => {
     if (!user || !user.wallet) {
       connectWallet();
       synthSound('bet');
@@ -729,11 +742,16 @@ export default function RoomDetailPage() {
     const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
 
     let totalCost = 0;
+    let sharesToTrade = sharesInput;
     if (isEvm) {
       if (orderType === 'buy') {
-        totalCost = getEvmBuyCost(sharesInput, selectedSide, moonPool, jeetPool);
+        const usdcAmount = sharesInput;
+        sharesToTrade = getEvmSharesReceived(usdcAmount, selectedSide, moonPool, jeetPool);
+        totalCost = usdcAmount;
       } else {
-        totalCost = getEvmSellReceived(sharesInput, selectedSide, moonPool, jeetPool);
+        const sharesToSell = sharesInput;
+        totalCost = getEvmSellReceived(sharesToSell, selectedSide, moonPool, jeetPool);
+        sharesToTrade = sharesToSell;
       }
     } else {
       const poolTotal = moonPool + jeetPool;
@@ -778,7 +796,7 @@ export default function RoomDetailPage() {
     setLocalShake(true);
 
     const labelText = orderType === 'buy' ? 'DEPLOYED' : 'LIQUIDATED';
-    const newLog = `[ARTILLERY SHELL] Fired ${sharesInput} ${selectedSide.toUpperCase()} shares ${labelText.toLowerCase()} order payload!`;
+    const newLog = `[ARTILLERY SHELL] Fired ${sharesToTrade.toFixed(2)} ${selectedSide.toUpperCase()} shares ${labelText.toLowerCase()} order payload!`;
     setBattleLogs((prev) => [...prev, newLog]);
 
     // After flight finishes (800ms)
@@ -808,13 +826,24 @@ export default function RoomDetailPage() {
     }, 800);
 
     try {
-      if (tradeMode === 'limit') {
-        await placeLimitOrder(room.id, orderType, selectedSide === 'moon' ? 0 : 1, limitPrice, sharesInput);
+      if (mode === 'limit') {
+        await placeLimitOrder(room.id, orderType, selectedSide === 'moon' ? 0 : 1, limitPrice, sharesToTrade);
       } else {
         const slippageMultiplier = orderType === 'buy' ? 1.05 : 0.95;
         const limitUsdc = totalCost * slippageMultiplier;
-        await executeEvmMarketTrade(room.id, selectedSide, sharesInput, orderType, limitUsdc);
+        await executeEvmMarketTrade(room.id, selectedSide, sharesToTrade, orderType, limitUsdc);
       }
+      
+      // Optimistic update for Activity tab
+      const optimisticBet = {
+        id: 'opt-' + Date.now(),
+        user: user.wallet,
+        side: selectedSide,
+        amount: totalCost,
+        timestamp: Date.now()
+      };
+      setRoomBets((prev) => [optimisticBet, ...prev]);
+      
       fetchRoomBets();
     } catch (err) {
       console.error('Failed to execute bet:', err);
@@ -1015,1925 +1044,764 @@ export default function RoomDetailPage() {
         }
       ` }} />
 
-      {/* 1. AUTO-SCROLLING HORIZONTAL TREND SLIDER */}
-      <div className="w-full bg-white/80 dark:bg-[#050803] border-b border-cyan-200 dark:border-[#193012] py-2.5 overflow-hidden font-mono relative z-20 shadow-xs dark:shadow-inner text-[#0A1A2A] dark:text-white">
-        <div className="flex animate-marquee whitespace-nowrap gap-8 min-w-full">
-          {Array.from({ length: 2 }).map((_, loopIdx) => (
-            <div key={loopIdx} className="flex gap-8 items-center shrink-0">
-              {top10Tokens.map((tok, idx) => {
-                const isPositive = tok.change.startsWith('+');
-                const badgeColor = isPositive ? 'text-[#00796B] dark:text-[#16a34a]' : 'text-[#C62828] dark:text-[#ff535a]';
-                const arrow = isPositive ? '↗' : '↘';
-                return (
-                  <div key={`${loopIdx}-${idx}`} className="flex items-center gap-2.5 bg-cyan-50/80 dark:bg-black/50 border border-cyan-200 dark:border-[#172c12] px-3.5 py-1.5 rounded-md text-xs select-none">
-                    <span className="font-staatliches tracking-wider text-[#0A1A2A] dark:text-white uppercase">{tok.name}</span>
-                    <span className="text-[10px] text-slate-500 dark:text-trench-gasmask font-bold">({formatCashtag(tok.symbol)})</span>
-                    <span className="text-amber-700 dark:text-yellow-500 font-bold ml-1">{tok.price}</span>
-                    <span className={`font-extrabold ml-1.5 ${badgeColor}`}>{arrow} {tok.change}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+      {/* 1. CYAN TOP NAVIGATION BAR */}
+      <div className="w-full bg-[#A8EEFF] px-4 py-3 flex items-center justify-between z-20 relative select-none border-b border-cyan-300">
+        <div className="flex items-center gap-2">
+          <Link href="/rooms">
+            <button
+              onClick={() => synthSound('bet')}
+              className="bg-black hover:bg-slate-900 text-white font-mono text-xs uppercase px-4 py-2 rounded font-bold shadow-md transition-all active:scale-95 border-b-2 border-slate-950"
+            >
+              ← WAR ROOM
+            </button>
+          </Link>
+          <button
+            onClick={() => {
+              if (room) toggleBookmark(room.id);
+              synthSound('bet');
+            }}
+            className="bg-black hover:bg-slate-900 text-white font-mono text-xs uppercase px-4 py-2 rounded font-bold shadow-md transition-all active:scale-95 border-b-2 border-slate-950 flex items-center gap-1.5"
+          >
+            <span>{room && watchlistedIds.includes(room.id) ? '☒' : '☐'}</span>
+            <span>BOOKMARK</span>
+          </button>
         </div>
-      </div>
 
-      {/* Top Navigation Bar */}
-      <div className="w-full px-2 sm:px-4 md:px-6 pt-4 pb-2 z-20 relative bg-[#A8EEFF] dark:bg-[#020501]">
-        <HeaderPanel 
-          backHref="/rooms" 
-          missionHref="/?play_intro=true" 
-          title="WAR ROOM" 
-          countdown={countdownText} 
-          isBookmarked={room ? watchlistedIds.includes(room.id) : false}
-          onToggleBookmark={room ? () => toggleBookmark(room.id) : undefined}
-        />
+        {room && (
+          <div className="bg-[#B8001F] text-white px-3 py-1.5 rounded font-mono text-xs uppercase font-bold flex items-center gap-2 border border-red-800 shadow-sm shrink-0">
+            <span className="opacity-75 text-[10px]">ARENA CLOSING</span>
+            <span className="font-extrabold">{countdownText}</span>
+          </div>
+        )}
       </div>
 
       {/* 2. THE SPLIT-SCREEN TRENCH HEADER (Full-Bleed Across Screen) */}
-      <section className="relative w-full min-h-[220px] sm:min-h-[280px] h-[30vh] sm:h-[35vh] md:h-[38vh] overflow-hidden border-b-4 border-trench-sandbag flex z-10 scanlines bg-[#020501]" id="battlefield">
-        
-        {/* Real-time Mortar Container Overlay */}
-        <div className="mortar-container" id="mortar-container">
-          {mortars.map((m) => (
-            <div
-              key={m.id}
-              className={`mortar ${m.side === 'moon' ? 'mortar-moon' : 'mortar-jeet'}`}
-              style={{
-                left: '50%',
-                bottom: '0px',
-                '--tx': `${m.tx}px`,
-                '--ty': `${m.ty}px`,
-                '--tx-half': `${m.txHalf}px`,
-                '--ty-peak': `${m.tyPeak}px`,
-              } as React.CSSProperties}
-            />
-          ))}
-          {explosions.map((e) => (
-            <div
-              key={e.id}
-              className={`explosion ${e.side === 'moon' ? 'explosion-moon' : 'explosion-jeet'}`}
-              style={{
-                left: `calc(50% + ${e.x}px)`,
-                bottom: `calc(10px + ${Math.abs(e.y)}px)`,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Left Side: Moon Army (Charging Pepes) */}
-        <div className="w-1/2 h-full bg-trench-black relative group overflow-hidden border-r-2 border-dashed border-trench-sandbag/40">
-          <div className="absolute inset-0">
-            <img 
-              alt="Moon Army Charging" 
-              className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 filter sepia saturate-[350%] hue-rotate-[85deg] contrast-[1.2]" 
-              src={PEPE_ASSETS.moonJuice}
-            />
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-r from-trench-black via-neon-moon/30 to-transparent mix-blend-color opacity-90 pointer-events-none"></div>
-          <div className="absolute inset-0 bg-gradient-to-r from-trench-black/80 via-transparent to-transparent pointer-events-none"></div>
-          
-          {/* Moon Army Commander Portrait */}
-          <div className="absolute top-2 left-2 md:top-4 md:left-4 border-2 border-dashed border-neon-moon bg-trench-black/85 px-1.5 py-0.5 md:px-3 md:py-1 rotate-[-4deg] shadow-lg flex items-center gap-1.5 z-10">
-            <PepePortrait src={PEPE_ASSETS.chadBull} size={20} loading="eager" className="rounded-full sm:size-[28px]" />
-            <span className="font-staatliches text-neon-moon text-[8px] sm:text-[10px] md:text-base tracking-widest block glow-moon">BULLISH TRENCH</span>
-          </div>
-
-          <div className="absolute bottom-2 left-2 md:bottom-4 md:left-4 bg-trench-black/90 border border-neon-moon/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] z-10">
-            <span className="font-mono text-[7px] sm:text-[9px] text-neon-moon block font-bold uppercase tracking-wider">MOON POT</span>
-            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{moonPoolSafe.toFixed(2)} {room?.token?.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
-          </div>
-        </div>
-
-        {/* Right Side: Jeet Army (Charging Wojak Skeletons) */}
-        <div className="w-1/2 h-full bg-trench-black relative group overflow-hidden">
-          <div className="absolute inset-0">
-            <img 
-              alt="Jeet Skeleton Forces" 
-              className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 filter sepia saturate-[400%] hue-rotate-[320deg] contrast-[1.2]" 
-              src={PEPE_ASSETS.jeetSkeleton}
-            />
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-l from-trench-black via-jeet-red/30 to-transparent mix-blend-color opacity-90 pointer-events-none"></div>
-          <div className="absolute inset-0 bg-gradient-to-l from-trench-black/80 via-transparent to-transparent pointer-events-none"></div>
-
-          {/* Jeet Commander Portrait */}
-          <div className="absolute bottom-2 right-2 md:bottom-4 md:right-4 border-2 border-dashed border-jeet-red bg-trench-black/85 px-1.5 py-0.5 md:px-3 md:py-1 rotate-[4deg] shadow-lg flex items-center gap-1.5 z-10">
-            <span className="font-staatliches text-jeet-red text-[8px] sm:text-[10px] md:text-base tracking-widest block glow-jeet">BEARISH WASTELAND</span>
-            <PepePortrait src={PEPE_ASSETS.neonWojak} size={20} loading="eager" className="rounded-full sm:size-[28px]" />
-          </div>
-
-          <div className="absolute top-2 right-2 md:top-4 md:right-4 bg-trench-black/90 border border-jeet-red/30 p-1.5 md:p-2.5 rounded shadow-lg min-w-[80px] sm:min-w-[120px] text-right z-10">
-            <span className="font-mono text-[7px] sm:text-[9px] text-jeet-red block font-bold uppercase tracking-wider">JEET POT</span>
-            <span className="font-staatliches text-xs sm:text-lg md:text-2xl text-white block mt-0.5">{jeetPoolSafe.toFixed(2)} {room?.token?.chainId === 'avalanche' || process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' ? 'USDC' : 'SOL'}</span>
-          </div>
-        </div>
-
-        {/* Absolute Center Swords Emblem & Active Target Status */}
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center pointer-events-none text-center">
-          <div className="bg-trench-mud border-2 sm:border-4 border-trench-sandbag rounded-full w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 flex items-center justify-center shadow-[0_0_30px_rgba(0,0,0,0.9)] relative animate-pulse">
-            <div className="absolute inset-1 rounded-full border border-dashed border-trench-gasmask/60 opacity-60"></div>
-            <Swords size={18} className="text-white sm:size-[24px] md:size-[30px]" />
-          </div>
-          <div className="mt-2 md:mt-4 bg-trench-black border-2 border-trench-sandbag px-2 py-0.5 md:px-3.5 md:py-1.5 shadow-2xl rounded">
-            <p className="font-mono text-[6px] sm:text-[8px] text-trench-gasmask uppercase font-bold tracking-widest">YOU ARE FIGHTING FOR:</p>
-            {userTotalBet > 0 ? (
-              <span className={`font-staatliches text-[10px] sm:text-sm md:text-lg block tracking-wider ${
-                hasBetOnMoon && hasBetOnJeet
-                  ? 'text-moon-gold font-bold glow-gold animate-pulse'
-                  : hasBetOnMoon
-                  ? 'text-neon-moon font-bold glow-moon'
-                  : 'text-jeet-red font-bold glow-jeet'
-              }`}>
-                {hasBetOnMoon && hasBetOnJeet
-                  ? 'HEDGE LORD 👑'
-                  : hasBetOnMoon
-                  ? 'MOON ARMY 🚀'
-                  : 'JEET SQUAD 💀'}
-              </span>
-            ) : (
-              <span className="font-staatliches text-[10px] sm:text-sm md:text-lg text-trench-gasmask font-bold block uppercase tracking-wider">
-                OBSERVER 🕵️
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Sounds Toggle Button */}
-        <button
-          type="button"
-          onClick={() => {
-            setIsMuted(!isMuted);
-            if (isMuted) {
-              synthSound('bet');
-            }
-          }}
-          className="absolute top-2 left-1/2 -translate-x-1/2 z-40 bg-trench-black/85 hover:bg-trench-sandbag border border-trench-sandbag text-[8px] sm:text-[10px] uppercase px-2 py-0.5 sm:px-2.5 sm:py-1 rounded font-mono font-bold tracking-widest transition-colors flex items-center gap-1 text-white shadow-lg pointer-events-auto whitespace-nowrap"
+      {room && (
+        <section 
+          className="relative w-full min-h-[220px] sm:min-h-[280px] h-[30vh] sm:h-[35vh] md:h-[38vh] overflow-hidden border-b-4 border-slate-800 flex z-10 scanlines bg-[#020501] select-none" 
+          id="battlefield"
         >
-          <span>{isMuted ? '🔇 SOUNDS MUTED' : '🔊 SOUNDS PLAYING'}</span>
-        </button>
+          {/* Real-time Mortar Container Overlay */}
+          <div className="mortar-container" id="mortar-container">
+            {mortars.map((m) => (
+              <div
+                key={m.id}
+                className={`mortar ${m.side === 'moon' ? 'mortar-moon' : 'mortar-jeet'}`}
+                style={{
+                  left: '50%',
+                  bottom: '0px',
+                  '--tx': `${m.tx}px`,
+                  '--ty': `${m.ty}px`,
+                  '--tx-half': `${m.txHalf}px`,
+                  '--ty-peak': `${m.tyPeak}px`,
+                } as React.CSSProperties}
+              />
+            ))}
+            {explosions.map((e) => (
+              <div
+                key={e.id}
+                className={`explosion ${e.side === 'moon' ? 'explosion-moon' : 'explosion-jeet'}`}
+                style={{
+                  left: `calc(50% + ${e.x}px)`,
+                  bottom: `calc(10px + ${Math.abs(e.y)}px)`,
+                }}
+              />
+            ))}
+          </div>
 
-        {/* Dynamic Double-Bar VS Progress Indicator Overlay */}
-        <div className="absolute bottom-0 left-0 w-full h-3 flex">
-          <div style={{ width: `${moonPercentageSafe}%` }} className="bg-neon-moon h-full shadow-[inset_0_-2px_10px_#16a34a]" />
-          <div style={{ width: `${jeetPercentageSafe}%` }} className="bg-jeet-red h-full shadow-[inset_0_-2px_10px_#ff535a]" />
-        </div>
-      </section>
+          {/* Left Side: Moon Army (Charging Pepes) */}
+          <div className="w-1/2 h-full bg-slate-950 relative group overflow-hidden border-r-2 border-dashed border-slate-800/40">
+            <div className="absolute inset-0">
+              <img 
+                alt="Moon Army Charging" 
+                className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 filter sepia saturate-[350%] hue-rotate-[85deg] contrast-[1.2]" 
+                src={PEPE_ASSETS.moonJuice}
+              />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-emerald-500/10 to-transparent mix-blend-color opacity-90 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
+            
+            {/* Moon Army Commander Portrait */}
+            <div className="absolute top-4 left-4 border-2 border-dashed border-emerald-500 bg-slate-950/90 px-3 py-1 rotate-[-4deg] shadow-lg flex items-center gap-1.5 z-10">
+              <PepePortrait src={PEPE_ASSETS.chadBull} size={24} loading="eager" className="rounded-full shrink-0" />
+              <span className="font-mono text-emerald-500 text-xs font-bold uppercase tracking-wider block">BULLISH TRENCH</span>
+            </div>
+            
+            {/* Moon Stats Counter Card */}
+            <div className="absolute bottom-4 left-4 bg-slate-950/85 border border-emerald-500/50 p-3 rounded-xl backdrop-blur-sm z-10 select-none text-left">
+              <span className="font-mono text-[9px] text-emerald-500 uppercase tracking-widest block font-bold">MOON POT</span>
+              <span className="font-mono text-white text-lg font-bold block mt-0.5">
+                {moonPoolSafe.toFixed(2)} USDC
+              </span>
+              <span className="font-mono text-[9px] text-slate-400 mt-0.5 block font-bold">
+                Implied Odds: <span className="text-white">{moonPercentageSafe.toFixed(0)}%</span>
+              </span>
+            </div>
+          </div>
 
-      {/* 2. MAIN GRID WRAPPER (2-column layout - Active Combat lg:col-span-9, Stance Configurator lg:col-span-3) */}
-      <main className="max-w-none w-full px-2 sm:px-4 md:px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start relative z-10 flex-1">
-        
-        {/* COLUMN 1: ACTIVE COIN COMBAT (lg:col-span-9) */}
-        <section className="lg:col-span-9 flex flex-col gap-6 min-w-0 w-full overflow-hidden">
+          {/* Right Side: Jeet Army (Charging Skeletons) */}
+          <div className="w-1/2 h-full bg-slate-950 relative group overflow-hidden">
+            <div className="absolute inset-0">
+              <img 
+                alt="Jeet Army Fleeing" 
+                className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 filter sepia saturate-[250%] hue-rotate-[320deg] contrast-[1.1]" 
+                src={PEPE_ASSETS.jeetSkeleton}
+              />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-l from-slate-950 via-rose-500/10 to-transparent mix-blend-color opacity-90 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-gradient-to-l from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
+            
+            {/* Jeet Army Commander Portrait */}
+            <div className="absolute top-4 right-4 border-2 border-dashed border-rose-500 bg-slate-950/90 px-3 py-1 rotate-[4deg] shadow-lg flex items-center gap-1.5 z-10">
+              <PepePortrait src={PEPE_ASSETS.jeetSkeleton} size={24} loading="eager" className="rounded-full shrink-0" />
+              <span className="font-mono text-rose-500 text-xs font-bold uppercase tracking-wider block">BEARISH WASTELAND</span>
+            </div>
 
-          {/* Determine Market Category Structure */}
-          {(() => {
-            if (isDebateMarket && room) {
-              let refUrl = '';
-              let criteriaText = room.resolutionCriteria || '';
-              if (criteriaText.includes('| Ref: ')) {
-                const parts = criteriaText.split('| Ref: ');
-                criteriaText = parts[0].trim();
-                refUrl = parts[1].trim();
-              } else if (criteriaText.includes('Ref: ')) {
-                const parts = criteriaText.split('Ref: ');
-                criteriaText = parts[0].trim();
-                refUrl = parts[1].trim();
-              }
+            {/* Jeet Stats Counter Card */}
+            <div className="absolute bottom-4 right-4 bg-slate-950/85 border border-rose-500/50 p-3 rounded-xl backdrop-blur-sm z-10 text-right select-none">
+              <span className="font-mono text-[9px] text-rose-500 uppercase tracking-widest block font-bold">JEET POT</span>
+              <span className="font-mono text-white text-lg font-bold block mt-0.5">
+                {jeetPoolSafe.toFixed(2)} USDC
+              </span>
+              <span className="font-mono text-[9px] text-slate-400 mt-0.5 block font-bold">
+                Implied Odds: <span className="text-white">{jeetPercentageSafe.toFixed(0)}%</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Interactive Center Command Deck */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-3">
+            {/* Mute/Sound Toggle Badge */}
+            <button
+              onClick={() => {
+                setIsMuted(!isMuted);
+                synthSound('bet');
+              }}
+              className="bg-black/90 hover:bg-slate-900 border border-slate-700/60 px-3 py-1.5 rounded-full font-mono text-[9px] text-white uppercase tracking-wider font-extrabold shadow-lg transition-all active:scale-95 flex items-center gap-1"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span>{isMuted ? 'SOUND MUTED' : 'SOUNDS PLAYING'}</span>
+            </button>
+
+            {/* Interactive Battle Swords - fires test artillery shell when clicked! */}
+            <button
+              onClick={() => {
+                synthSound('whistle');
+                const targetSide = (Math.random() > 0.5 ? 'moon' : 'jeet') as 'moon' | 'jeet';
+                const tx = targetSide === 'moon' ? -100 - Math.random() * 200 : 100 + Math.random() * 200;
+                const ty = -60 - Math.random() * 120;
+                const newMortar = { id: Date.now(), side: targetSide, tx, ty, txHalf: tx / 2, tyPeak: ty - 100 };
+                setMortars((prev) => [...prev, newMortar]);
+                setTimeout(() => {
+                  synthSound('explosion');
+                  setExplosions((prev) => [...prev, { id: Date.now(), side: targetSide, x: tx, y: ty }]);
+                  setMortars((prev) => prev.filter((m) => m.id !== newMortar.id));
+                  setTimeout(() => {
+                    setExplosions((prev) => prev.filter((e) => e.id !== newMortar.id));
+                  }, 500);
+                }, 800);
+              }}
+              className="w-16 h-16 rounded-full bg-black/90 hover:bg-slate-950 border-4 border-slate-800 text-white flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all group relative cursor-pointer"
+              title="Click to Deploy Test Artillery Payload"
+            >
+              <Swords className="text-white group-hover:rotate-12 transition-transform" size={24} />
+            </button>
+
+            {/* User Fighter Role Stance Badge */}
+            {(() => {
+              const userBetsInRoom = user ? user.bets.filter(b => b.roomId === room.id) : [];
+              const hasMoon = userBetsInRoom.some(b => b.side === 'moon');
+              const hasJeet = userBetsInRoom.some(b => b.side === 'jeet');
+              
+              let fighterText = 'OBSERVER 🕵️‍♂️';
+              if (hasMoon && hasJeet) fighterText = 'DOUBLE AGENT 🎭';
+              else if (hasMoon) fighterText = 'YES SOLDIER 🚀';
+              else if (hasJeet) fighterText = 'NO SOLDIER 💀';
 
               return (
-                <div className="space-y-6 animate-fadeIn">
-                  {/* 1. Prediction Question & Statement Card */}
-                  <div className="bg-[#080B11] border-2 border-yellow-500/40 p-6 rounded-2xl shadow-2xl relative overflow-hidden">
-                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-                      <div className="flex items-start gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-black border-2 border-yellow-400 overflow-hidden shrink-0 flex items-center justify-center text-3xl shadow-lg">
-                          {room.token.icon && (room.token.icon.startsWith('http') || room.token.icon.startsWith('data:') || room.token.icon.startsWith('blob:')) ? (
-                            <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover" />
-                          ) : (
-                            <span>{room.token.icon || '🗣️'}</span>
-                          )}
-                        </div>
-
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="px-2.5 py-0.5 rounded-full bg-yellow-400/10 border border-yellow-400/50 font-mono text-[10px] text-yellow-400 font-extrabold uppercase tracking-wider">
-                              DEBATE / PREDICTION MARKET
-                            </span>
-                            <span className="px-2.5 py-0.5 rounded-full bg-gray-800 border border-gray-700 font-mono text-[10px] text-white font-extrabold uppercase">
-                              ${room.token.symbol}
-                            </span>
-                          </div>
-                          <h1 className="font-staatliches text-3xl sm:text-4xl text-white tracking-wide uppercase leading-tight mt-1">
-                            {criteriaText || room.token.name}
-                          </h1>
-                          <p className="font-mono text-xs text-gray-400 mt-1">
-                            CREATED BY <span className="text-white font-bold">{cleanEvmAddress(room.creator)}</span> • EXPIRATION: <span className="text-neon-moon font-bold">{new Date(room.expiry).toLocaleString()}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="bg-[#05080E] border border-gray-800 p-4 rounded-xl shrink-0 text-center min-w-[140px]">
-                        <span className="font-mono text-[9px] text-gray-400 uppercase font-bold block">STATUS</span>
-                        <span className={`font-staatliches text-2xl block mt-0.5 ${
-                          room.status === 'settled' ? 'text-moon-gold' : room.status === 'disputed' ? 'text-jeet-red' : 'text-neon-moon animate-pulse'
-                        }`}>
-                          {room.status.toUpperCase()}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
+                <div className="bg-black/90 border border-slate-800 px-4 py-1.5 rounded font-mono text-[9px] text-slate-400 uppercase tracking-widest font-extrabold">
+                  YOU ARE FIGHTING FOR: <span className="text-white">{fighterText}</span>
                 </div>
               );
-            }
+            })()}
+          </div>
+        </section>
+      )}
 
-            return (
-              <div className="space-y-6">
-                {/* High-impact prediction question */}
-                <div className="bg-trench-black border-2 border-trench-sandbag p-4 md:p-5 rounded-xl shadow-2xl relative scanlines overflow-hidden">
-                  {/* corner rivets */}
-                  <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                  <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                  <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                  <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                  
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pl-4 pr-4">
-                    <div className="space-y-1.5 flex-1">
-                      <span className="font-mono text-[9px] text-neon-moon font-extrabold uppercase tracking-widest block animate-pulse">
-                        ACTIVE TARGET PREDICTION QUESTION
-                      </span>
-                      <h2 className="font-staatliches text-2xl sm:text-3xl text-white tracking-wide uppercase leading-tight">
-                        Will {room ? room.token.name : 'Token'} ({room ? formatCashtag(room.token.symbol) : 'TKN'}) end above ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} on {new Date(expirySafe).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}?
-                      </h2>
+      {/* 3. odds color split bar indicator separating visual header from content */}
+      {room && (
+        <div className="w-full h-2 flex z-10 relative">
+          <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${moonPercentageSafe}%` }} />
+          <div className="bg-rose-500 h-full transition-all duration-500" style={{ width: `${jeetPercentageSafe}%` }} />
+        </div>
+      )}
+
+      {/* Main Container */}
+      <div className="max-w-7xl mx-auto w-full px-4 py-8 flex-1 flex flex-col gap-6 text-slate-800 dark:text-white">
+        
+        {/* Sleek Polymarket-style Header Card */}
+        {room && (
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 md:p-8 space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-855 font-mono text-[10px] text-slate-600 dark:text-slate-400 font-bold uppercase tracking-wider">
+                {room.category || 'Crypto'}
+              </span>
+              <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 font-mono text-[10px] text-emerald-500 font-bold uppercase">
+                Active
+              </span>
+            </div>
+
+            <h1 className="font-sans text-2xl md:text-3xl text-slate-900 dark:text-white tracking-tight font-extrabold leading-tight">
+              {room.resolutionCriteria 
+                ? room.resolutionCriteria.split('| Ref:')[0].trim() 
+                : `Will ${room.token.name} end above $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}?`
+              }
+            </h1>
+
+            <p className="font-sans text-sm text-slate-500 dark:text-slate-400 max-w-4xl leading-relaxed">
+              {room.resolutionCriteria 
+                ? `This market resolves according to the following condition: "${room.resolutionCriteria.split('| Ref:')[0].trim()}"` 
+                : `This market resolves YES if the price of ${room.token.symbol} closes above $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} on resolution target time ${new Date(expirySafe).toLocaleString()}, as reported by oracle price feeds.`
+              }
+            </p>
+
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 border-t border-slate-100 dark:border-slate-850 font-mono text-xs text-slate-400 dark:text-slate-500">
+              <div className="flex items-center gap-1">
+                <span>Ends:</span>
+                <span className="text-slate-800 dark:text-slate-350 font-bold">{countdownText}</span>
+              </div>
+              <div className="flex items-center gap-1.5 select-all cursor-pointer hover:text-emerald-500 transition-colors" title="Copy Address">
+                <span>Address:</span>
+                <span className="text-slate-800 dark:text-slate-350 font-bold">{room.id.slice(0, 6)}...{room.id.slice(-4)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span>Volume:</span>
+                <span className="text-slate-800 dark:text-slate-350 font-bold">{totalPotSafe.toFixed(2)} USDC</span>
+              </div>
+              {room.resolutionCriteria && room.resolutionCriteria.includes('Ref:') && (
+                <a 
+                  href={room.resolutionCriteria.split('Ref:')[1]?.trim() || '#'} 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="flex items-center gap-1 text-emerald-500 hover:text-emerald-400 transition-colors"
+                >
+                  <span>Resolution Source</span>
+                  <ExternalLink size={12} />
+                </a>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Dual Column Layout Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* COLUMN 1: TRADING TERMINAL & MEDIA CONTENT (lg:col-span-8) */}
+          <div className="lg:col-span-8 space-y-6">
+            
+            {/* Big YES / NO percentage card */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                {/* YES box */}
+                <div 
+                  onClick={() => { setSelectedSide('moon'); setOrderType('buy'); synthSound('bet'); }}
+                  className={`border rounded-xl p-5 text-center cursor-pointer transition-all duration-200 ${
+                    selectedSide === 'moon' && orderType === 'buy'
+                      ? 'bg-emerald-500/5 border-emerald-500 shadow-md shadow-emerald-500/10'
+                      : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                  }`}
+                >
+                  <span className="font-mono text-xs text-emerald-500 font-bold uppercase tracking-wider block">YES</span>
+                  <span className="font-sans text-4xl font-extrabold text-emerald-500 mt-2 block">
+                    {moonPercentageSafe.toFixed(1)}%
+                  </span>
+                </div>
+                {/* NO box */}
+                <div 
+                  onClick={() => { setSelectedSide('jeet'); setOrderType('buy'); synthSound('bet'); }}
+                  className={`border rounded-xl p-5 text-center cursor-pointer transition-all duration-200 ${
+                    selectedSide === 'jeet' && orderType === 'buy'
+                      ? 'bg-rose-500/5 border-rose-500 shadow-md shadow-rose-500/10'
+                      : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                  }`}
+                >
+                  <span className="font-mono text-xs text-rose-500 font-bold uppercase tracking-wider block">NO</span>
+                  <span className="font-sans text-4xl font-extrabold text-rose-500 mt-2 block">
+                    {jeetPercentageSafe.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Bar split */}
+              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
+                <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${moonPercentageSafe}%` }} />
+                <div className="bg-rose-500 h-full transition-all duration-500" style={{ width: `${jeetPercentageSafe}%` }} />
+              </div>
+            </div>
+
+            {/* Tab Deck Card */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+              
+              {/* Tab Bar Header */}
+              <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 overflow-x-auto scrollbar">
+                {(['trade', 'chart', 'holdings', 'activity', 'discussion'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => { setActiveMainTab(tab); synthSound('bet'); }}
+                    className={`px-6 py-4 font-mono text-xs uppercase tracking-wider font-bold transition-all relative whitespace-nowrap ${
+                      activeMainTab === tab
+                        ? 'text-slate-900 dark:text-white'
+                        : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-355'
+                    }`}
+                  >
+                    {tab}
+                    {activeMainTab === tab && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-rose-500" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content Panels */}
+              <div className="p-6">
+                
+                {/* 1. TRADE PANEL */}
+                {activeMainTab === 'trade' && room && (
+                  <div className="space-y-6">
+                    {/* Buy / Sell swap toggles */}
+                    <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-950 p-1 border border-slate-200 dark:border-slate-855 rounded-xl">
+                      <button
+                        onClick={() => { setOrderType('buy'); synthSound('bet'); }}
+                        className={`py-3 text-center font-mono text-xs uppercase rounded-lg transition-all font-bold ${
+                          orderType === 'buy' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        BUY
+                      </button>
+                      <button
+                        onClick={() => { setOrderType('sell'); synthSound('bet'); }}
+                        className={`py-3 text-center font-mono text-xs uppercase rounded-lg transition-all font-bold ${
+                          orderType === 'sell' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        SELL
+                      </button>
                     </div>
-                    
-                    <div className="shrink-0 flex flex-col gap-1 bg-[#0d140a] border border-[#2c3d25] px-4 py-2 rounded">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
-                        <span className="font-mono text-xs text-white uppercase font-bold tracking-widest">
-                          {isRoomSettling || (room && room.status === 'settled') ? 'RESOLVED' : 'ACTIVE'}
+
+                    {/* Stance selectors */}
+                    <div className="space-y-2">
+                      <label className="block font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                        CHOOSE OUTCOME:
+                      </label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedSide('moon'); synthSound('bet'); }}
+                          className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex items-center justify-center gap-2 ${
+                            selectedSide === 'moon'
+                              ? 'border-emerald-500 bg-emerald-500/5 text-emerald-500'
+                              : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <span>YES</span>
+                          <span className="text-[10px] opacity-75">{moonPercentageSafe.toFixed(0)}%</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setSelectedSide('jeet'); synthSound('bet'); }}
+                          className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex items-center justify-center gap-2 ${
+                            selectedSide === 'jeet'
+                              ? 'border-rose-500 bg-rose-500/5 text-rose-500'
+                              : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <span>NO</span>
+                          <span className="text-[10px] opacity-75">{jeetPercentageSafe.toFixed(0)}%</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quantity Input */}
+                    <div className="space-y-2">
+                      <label className="block font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex justify-between">
+                        <span>{orderType === 'buy' ? 'USDC AMOUNT:' : 'SHARES AMOUNT:'}</span>
+                        <span>Balance: {user?.balance !== undefined ? `${user.balance.toFixed(2)} USDC` : '0.00 USDC'}</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          min="1"
+                          placeholder={orderType === 'buy' ? 'ENTER USDC SWAP QUANTITY...' : 'ENTER SHARES TO SELL...'}
+                          value={sharesInput}
+                          onChange={(e) => setSharesInput(parseFloat(e.target.value) || 10)}
+                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-emerald-500 focus:outline-none font-bold"
+                        />
+                        <span className="absolute right-4 font-mono text-xs text-slate-400 dark:text-slate-500 font-extrabold uppercase">
+                          {orderType === 'buy' ? 'USDC' : 'Shares'}
                         </span>
                       </div>
-                      <span className="font-mono text-[9px] text-trench-gasmask uppercase tracking-wider">
-                        Last synced {lastSyncedLabel}
-                      </span>
                     </div>
+
+                    {/* Execution details */}
+                    {(() => {
+                      const moonPool = room.moonPool || 0;
+                      const jeetPool = room.jeetPool || 0;
+                      const totalPool = moonPool + jeetPool;
+                      const priceMoon = (moonPool + 10) / (totalPool + 20);
+                      const priceJeet = (jeetPool + 10) / (totalPool + 20);
+                      const currentPrice = selectedSide === 'moon' ? priceMoon : priceJeet;
+
+                      let cost = 0;
+                      let estShares = 0;
+                      let estReturn = 0;
+                      let avgPrice = currentPrice;
+
+                      if (orderType === 'buy') {
+                        cost = sharesInput;
+                        estShares = getEvmSharesReceived(sharesInput, selectedSide, moonPool, jeetPool);
+                        avgPrice = estShares > 0 ? cost / estShares : currentPrice;
+                      } else {
+                        estShares = sharesInput;
+                        estReturn = getEvmSellReceived(sharesInput, selectedSide, moonPool, jeetPool);
+                        avgPrice = estShares > 0 ? estReturn / estShares : currentPrice;
+                      }
+
+                      const maxPayout = orderType === 'buy' ? estShares : estReturn;
+                      const profit = maxPayout - cost;
+                      const roiPercent = cost > 0 ? (profit / cost) * 100 : 0;
+
+                      return (
+                        <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-4 rounded-xl space-y-2.5 font-mono text-xs">
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400 uppercase font-bold">
+                            <span>AVG EXECUTION PRICE</span>
+                            <span className="text-slate-900 dark:text-white font-bold">{(avgPrice * 100).toFixed(0)}¢ / share</span>
+                          </div>
+                          <div className="flex justify-between text-slate-500 dark:text-slate-400 uppercase font-bold">
+                            <span>{orderType === 'buy' ? 'ESTIMATED SHARES' : 'ESTIMATED RETURN'}</span>
+                            <span className="text-slate-900 dark:text-white font-bold">
+                              {orderType === 'buy' ? `${estShares.toFixed(2)} Shares` : `${estReturn.toFixed(2)} USDC`}
+                            </span>
+                          </div>
+                          {orderType === 'buy' && (
+                            <div className="flex justify-between text-slate-500 dark:text-slate-400 uppercase font-bold">
+                              <span>POTENTIAL RETURN</span>
+                              <span className="text-emerald-500 font-bold">+{maxPayout.toFixed(2)} USDC (+{roiPercent.toFixed(0)}%)</span>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Submit Action Button */}
+                    <button
+                      onClick={(e) => { setTradeMode('market'); handlePlaceOrder('market', e); }}
+                      disabled={isTransactionLoading}
+                      className="w-full py-4 text-center bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 disabled:cursor-not-allowed font-mono text-xs uppercase text-white rounded-xl shadow-md transition-all flex items-center justify-center gap-2 font-bold"
+                    >
+                      {isTransactionLoading ? (
+                        <>
+                          <Loader2 className="animate-spin text-white shrink-0" size={14} />
+                          <span>EXECUTING SWAP...</span>
+                        </>
+                      ) : (
+                        <span>EXECUTE TRANSACTION</span>
+                      )}
+                    </button>
                   </div>
-                </div>
+                )}
 
-                {/* Toggle buttons for Chart view */}
-                <div className="flex justify-end gap-2 font-mono text-[10px]">
-                  <button className="px-3.5 py-1 bg-neon-moon text-black font-bold rounded uppercase tracking-wider border border-neon-moon">
-                    Line
-                  </button>
-                  <button className="px-3.5 py-1 bg-transparent text-trench-gasmask border border-trench-sandbag rounded uppercase tracking-wider hover:text-white transition-colors">
-                    Crates
-                  </button>
-                </div>
-
-                {/* Stable and Static DexScreener Chart Terminal with Militarized Console Shell Frame (Permanently Flicker-Free) */}
-                <div className="bg-[#050803] border-4 border-trench-sandbag rounded-xl shadow-2xl relative overflow-hidden h-[320px] sm:h-[410px] flex flex-col justify-between z-10 scanlines">
-                  
-                  {/* Steel Console Top Header Bar */}
-                  <div className="w-full bg-[#0d140a] border-b border-[#2c3d25] px-3.5 py-2 flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] text-trench-gasmask uppercase font-bold relative select-none">
-                    {/* corner rivets */}
-                    <div className="absolute top-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                    <div className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                    
-                    <div className="flex items-center gap-2 pl-4">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] shadow-[0_0_8px_#16a34a]" />
-                      <span className="text-white tracking-widest font-staatliches text-xs">CRT RADAR CONSOLE</span>
-                    </div>
-                    
-                    {/* System status LEDs */}
-                    <div className="flex items-center gap-3 pr-4">
-                      <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-[#16a34a] shadow-[0_0_6px_#16a34a]" />
-                        <span>SYS ON</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-yellow-500 shadow-[0_0_6px_#f59e0b] animate-ping" />
-                        <span>DEX SYNC</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Interactive Iframe CRT Panel Overlay Container */}
-                  <div className="w-full flex-1 relative bg-black overflow-hidden group">
-                    
-                    {/* 1. Vertical Sweep Radar Overlay */}
-                    <div className="radar-sweep-line absolute left-0 right-0 h-[2px] bg-neon-moon/20 shadow-[0_0_10px_#16a34a] z-10 pointer-events-none" />
-
-                    {/* 2. Glass Reflection Glare Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent pointer-events-none z-10" />
-
-                    {/* 3. CRT Scanline Grid Overlay */}
-                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.15)_50%)] bg-[size:100%_4px] opacity-25 z-10" />
-
-                    {/* 4. Steel Overlay Inner Shadows */}
-                    <div className="absolute inset-0 border border-white/5 pointer-events-none z-10 shadow-[inset_0_0_15px_rgba(0,0,0,0.95)]" />
-
+                {/* 2. CHART PANEL */}
+                {activeMainTab === 'chart' && room && (
+                  <div className="h-[380px] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden relative">
                     {room.token.chainId && room.token.pairAddress ? (
                       <LazyDexChart
                         chainId={room.token.chainId}
                         pairAddress={room.token.pairAddress}
                       />
                     ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center bg-[#070c04] pt-12 z-10 animate-pulse">
-                        <Loader2 size={32} className="animate-spin text-neon-moon mb-4" />
-                        <span className="font-mono text-xs text-trench-gasmask font-bold uppercase tracking-widest">
-                          WAITING FOR MARKET TELEMETRY...
+                      <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-slate-50 dark:bg-slate-950 text-slate-400 dark:text-slate-500">
+                        <Loader2 size={32} className="animate-spin text-emerald-500 mb-4" />
+                        <span className="font-mono text-xs uppercase tracking-widest font-bold">
+                          No integrated chart available for this custom debate.
                         </span>
                       </div>
                     )}
                   </div>
+                )}
 
-                  {/* Steel Console Bottom Panel */}
-                  <div className="w-full bg-[#0d140a] border-t border-[#2c3d25] px-3.5 py-1.5 flex flex-wrap items-center justify-between gap-1 font-mono text-[8px] text-trench-gasmask uppercase font-bold relative select-none">
-                    <div className="absolute bottom-1.5 left-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                    <div className="absolute bottom-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-                    
-                    <span className="pl-4">INDEXER ADDR: {room.token.pairAddress ? room.token.pairAddress.substring(0, 16) : 'WAITING'}...</span>
-                    <span className="pr-4 text-neon-moon">CHANNEL SECURE</span>
-                  </div>
-                </div>
+                {/* 3. HOLDINGS PANEL */}
+                {activeMainTab === 'holdings' && room && (
+                  <div className="space-y-4 font-mono text-xs text-left">
+                    {(() => {
+                      const userBetsInRoom = user ? user.bets.filter(b => isSameRoom(b.roomId, room.id)) : [];
+                      const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || 0), 0);
+                      const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || 0), 0);
+                      const totalSpentMoon = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + b.amount, 0);
+                      const avgMoonPrice = moonSharesOwned > 0 ? totalSpentMoon / moonSharesOwned : 0;
+                      const totalSpentJeet = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + b.amount, 0);
+                      const avgJeetPrice = jeetSharesOwned > 0 ? totalSpentJeet / jeetSharesOwned : 0;
 
-                {/* 🛡️ TARGET AREA TELEMETRY & COIN INTEL BRIEFING */}
-                <div className="bg-trench-black border-2 border-trench-sandbag p-4 rounded-lg font-mono text-xs shadow-2xl relative space-y-4">
-                  <div className="flex items-center gap-1.5 text-yellow-500 font-staatliches text-sm font-bold uppercase border-b border-trench-sandbag pb-2">
-                    <Terminal className="w-4 h-4 text-yellow-500 animate-pulse" />
-                    <span>{isDebateMarket ? 'DEBATE SPECIFICATION & ORACLE DATA' : 'MARKET INTEL & PRICE SPECIFICATION'}</span>
-                  </div>
+                      if (moonSharesOwned === 0 && jeetSharesOwned === 0) {
+                        return (
+                          <div className="text-center py-10 text-slate-400 dark:text-slate-500">
+                            NO ACTIVE POSITIONS FOUND IN THIS ARENA
+                          </div>
+                        );
+                      }
 
-                  {isDebateMarket ? (
-                    <>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3">
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden col-span-1 sm:col-span-2">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">DEBATE QUESTION / TOPIC</span>
-                          <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.resolutionCriteria || room.token.name}>
-                            {room.resolutionCriteria || room.token.name || 'UNKNOWN'}
-                          </span>
-                        </div>
-
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">RESOLUTION ID</span>
-                          <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.symbol}>
-                            {formatCashtag(room.token.symbol || 'UNKNWN')}
-                          </span>
-                        </div>
-
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ORACLE FEE</span>
-                          <span className="text-yellow-400 font-staatliches text-base block mt-0.5">
-                            {room.oracleFeeLamports ? `${(Number(room.oracleFeeLamports) / 1e6).toFixed(2)} USDC` : '0.00 USDC'}
-                          </span>
-                        </div>
-
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROUND DURATION</span>
-                          <span className="text-white font-staatliches text-base block mt-0.5">
-                            {durationSafe ? `${durationSafe} MINS` : '60 MINS'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Debate Briefing Text */}
-                      <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed border-l-4 border-l-neon-moon">
-                        <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
-                          <span className="text-neon-moon font-bold uppercase">ORACLE RESOLUTION INTEL:</span>
-                          <span className="text-trench-gasmask uppercase">VALIDATOR ADDR:</span>
-                          <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full min-w-0">
-                            <span className="truncate min-w-0">{cleanEvmAddress(room.oracleAddress || room.creator)}</span>
-                          </span>
-                        </div>
-                        <div className="uppercase">
-                          <span>This is a community prediction debate market. Wagers are placed in USDC on whether the question resolves to YES (MOON) or NO (JEET). Autonomous keepers monitor the criteria, and settlement is completed permissionlessly based on verified rules.</span>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NAME</span>
-                          <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.name}>
-                            {room.token.name || 'UNKNOWN'}
-                          </span>
-                        </div>
-
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TICKER / SYMBOL</span>
-                          <span className="text-white font-staatliches text-base block mt-0.5 uppercase tracking-wide truncate" title={room.token.symbol}>
-                            {formatCashtag(room.token.symbol || 'UNKNWN')}
-                          </span>
-                        </div>
-
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded overflow-hidden flex flex-col justify-between">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">TOKEN NETWORK</span>
-                          {room.token.chainId && (
-                            <div className="mt-1 bg-trench-black/60 p-0.5 rounded border border-[#1d3515] flex items-center justify-center h-7 w-7 shrink-0">
-                              <img
-                                src={`https://dd.dexscreener.com/ds-data/chains/${room.token.chainId.toLowerCase()}.png`}
-                                alt={room.token.chainId}
-                                className="w-5 h-5 object-contain rounded-full"
-                                onError={(e) => {
-                                  e.currentTarget.src = 'https://dd.dexscreener.com/ds-data/chains/solana.png';
-                                }}
-                              />
+                      return (
+                        <div className="space-y-3">
+                          {moonSharesOwned > 0 && (
+                            <div className="flex justify-between items-center bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20">
+                              <div>
+                                <div className="font-bold text-emerald-500 uppercase text-[10px]">YES shares</div>
+                                <div className="text-xs text-slate-600 dark:text-slate-400 font-bold mt-1">
+                                  Shares Owned: {moonSharesOwned.toFixed(1)} | Avg Cost: {avgMoonPrice.toFixed(2)} USDC
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          {jeetSharesOwned > 0 && (
+                            <div className="flex justify-between items-center bg-rose-500/5 p-4 rounded-xl border border-rose-500/20">
+                              <div>
+                                <div className="font-bold text-rose-500 uppercase text-[10px]">NO shares</div>
+                                <div className="text-xs text-slate-600 dark:text-slate-400 font-bold mt-1">
+                                  Shares Owned: {jeetSharesOwned.toFixed(1)} | Avg Cost: {avgJeetPrice.toFixed(2)} USDC
+                                </div>
+                              </div>
                             </div>
                           )}
                         </div>
-
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ENTRY PRICE (POOL)</span>
-                          <span className="text-yellow-500 font-staatliches text-base block mt-0.5">
-                            {room.status === 'pending' 
-                              ? 'PENDING TRIGGER' 
-                              : openingPriceSafe !== undefined 
-                                ? `$${formatPrice(openingPriceSafe)}` 
-                                : 'N/A'}
-                          </span>
-                        </div>
-
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">LAST PRICE (REALTIME)</span>
-                          <span className="text-neon-moon font-staatliches text-base block mt-0.5 glow-moon animate-pulse">
-                            {livePrice !== null 
-                              ? `$${formatPrice(livePrice)}` 
-                              : openingPriceSafe !== undefined 
-                                ? `$${formatPrice(openingPriceSafe)}`
-                                : 'N/A'}
-                          </span>
-                        </div>
-
-                        <div className="bg-trench-mud border border-[#1d3515] p-2.5 rounded">
-                          <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROOM DURATION</span>
-                          <span className="text-white font-staatliches text-base block mt-0.5">
-                            {durationSafe 
-                              ? (durationSafe >= 60 
-                                  ? `${durationSafe.toLocaleString()} MINS (${formatDuration(durationSafe)})` 
-                                  : `${durationSafe} MINS`) 
-                              : '60 MINS'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Coin Briefing Text */}
-                      <div className="bg-[#050803] border border-trench-sandbag/40 p-3 rounded font-mono text-[10px] text-gray-300 leading-relaxed border-l-4 border-l-neon-moon">
-                        <div className="flex flex-wrap items-center gap-2 mb-2 pb-2 border-b border-trench-sandbag/35">
-                          <span className="text-neon-moon font-bold uppercase">COIN INTEL BRIEF:</span>
-                          <span className="text-trench-gasmask uppercase">MINT ADDR:</span>
-                          <span className="text-white bg-trench-mud px-1.5 py-0.5 rounded font-mono text-[9px] border border-trench-sandbag/30 flex items-center gap-1 select-all break-all max-w-full min-w-0">
-                            <span className="truncate min-w-0">{cleanEvmAddress(room.token.address)}</span>
-                            <button 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigator.clipboard.writeText(cleanEvmAddress(room.token.address));
-                                addToast("CONTRACT ADDRESS COPIED TO CLIPBOARD!", 'success');
-                              }}
-                              className="text-neon-moon hover:text-white ml-1 font-bold font-staatliches text-[10px] tracking-wider uppercase bg-trench-black border border-neon-moon/40 px-1 rounded active:scale-95 transition-transform"
-                            >
-                              [COPY]
-                            </button>
-                          </span>
-                        </div>
-                        <div className="uppercase">
-                        {room.token.symbol === 'PEPE' ? (
-                          <span>🐸 Pepe the frog, standard infantry memecoin. Plunged into the bearish mud after local high listings, currently fighting for bullish recovery inside the SOL arena. Highly volatile.</span>
-                        ) : room.token.symbol === 'WIF' ? (
-                          <span>🐕 Soldier Dogwifhat, holding the line with a standard-issue wool cap. Defending the bullish support trench with high-morale community reinforcement.</span>
-                        ) : room.token.symbol === 'JEET' ? (
-                          <span>📉 The ultimate paperhands avatar. A mascot for those who take profit at the first sign of green. Usually found dumping on early believers.</span>
-                        ) : (
-                          <span>📊 Operation targeting {room.token.symbol} ({room.token.name}). Active token index synced in real time via DexScreener. Factions are competing to influence the TWAP before deployment countdown expires.</span>
-                        )}
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* EXIT TRENCH MARKETPLACE PANEL */}
-          <div className="bg-trench-black border-2 border-trench-sandbag p-4 md:p-5 rounded-xl shadow-2xl relative overflow-hidden scanlines">
-            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/40 shadow-inner" />
-            
-            <div className="flex items-center justify-between border-b border-trench-sandbag pb-3 mb-4">
-              <div className="flex items-center gap-2 text-neon-moon font-staatliches text-lg sm:text-xl font-bold uppercase tracking-wider">
-                <span className="w-2.5 h-2.5 rounded-full bg-neon-moon animate-pulse shrink-0 shadow-glow-moon" />
-                <span>EXIT TRENCH POSITION MARKETPLACE</span>
-              </div>
-              <span className="font-mono text-[9px] font-bold text-trench-gasmask bg-trench-mud border border-[#1d3515] px-2 py-0.5 rounded uppercase">
-                TRADE FEE: 0.5%
-              </span>
-            </div>
-
-            <div className="font-mono text-[10px] text-trench-gasmask uppercase leading-relaxed mb-4 font-bold">
-              Secure discounted moon/jeet positions or liquidate wagers early before this battlefield sector resolves.
-            </div>
-
-            <div className="overflow-x-auto w-full">
-              {listings.length > 0 ? (
-                <table className="w-full text-left font-mono text-[10px] uppercase border-collapse">
-                  <thead>
-                    <tr className="border-b border-trench-sandbag/45 text-trench-gasmask text-[9px] font-bold">
-                      <th className="py-2 px-2">SIDE</th>
-                      <th className="py-2 px-2">POSITION SIZE</th>
-                      <th className="py-2 px-2">ASK PRICE</th>
-                      <th className="py-2 px-2">DISCOUNT</th>
-                      <th className="py-2 px-2">SELLER</th>
-                      <th className="py-2 px-2 text-right">ACTION</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {listings.map((listing) => {
-                      const size = listing.amount || 0;
-                      const price = listing.price || 0;
-                      const diff = size - price;
-                      const pct = size > 0 ? (diff / size) * 100 : 0;
-                      const isDiscount = pct > 0;
-                      
-                      const isUserListing = wallet?.publicKey && listing.seller === wallet.publicKey.toBase58();
-
-                      return (
-                        <tr key={listing.pubkey} className="border-b border-trench-sandbag/10 hover:bg-trench-mud/10 transition-colors">
-                          <td className="py-2.5 px-2 font-bold">
-                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-staatliches ${
-                              listing.side === 'moon' 
-                                ? 'bg-neon-moon/10 text-[#16A34A] border border-neon-moon/20 shadow-glow-moon' 
-                                : 'bg-jeet-red/10 text-jeet-red border border-jeet-red/20 shadow-glow-jeet'
-                            }`}>
-                              {listing.side === 'moon' ? 'MOON 🚀' : 'JEET 💀'}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-2 text-white font-bold">{size.toFixed(2)} SOL</td>
-                          <td className="py-2.5 px-2 text-white font-bold">{price.toFixed(2)} SOL</td>
-                          <td className="py-2.5 px-2 font-bold">
-                            {pct === 0 ? (
-                              <span className="text-gray-400">0.0% (PAR)</span>
-                            ) : isDiscount ? (
-                              <span className="text-[#16A34A] font-bold shadow-glow-moon bg-[#16A34A]/10 border border-[#16A34A]/20 px-1 py-0.5 rounded text-[8px]">
-                                {pct.toFixed(1)}% OFF 🎁
-                              </span>
-                            ) : (
-                              <span className="text-yellow-500 font-bold bg-yellow-500/10 border border-yellow-500/20 px-1 py-0.5 rounded text-[8px]">
-                                +{Math.abs(pct).toFixed(1)}% PREM
-                              </span>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-2 text-gray-300 font-mono">
-                            {listing.seller.slice(0, 4)}...{listing.seller.slice(-4)}
-                          </td>
-                          <td className="py-2.5 px-2 text-right">
-                            {isUserListing ? (
-                              <button
-                                disabled={isTransactionLoading}
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  synthSound('bet');
-                                  await cancelListing(listing.pubkey, listing.bet);
-                                }}
-                                className="px-3 py-1 bg-red-950/40 text-jeet-red hover:bg-jeet-red hover:text-white border border-jeet-red/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all"
-                              >
-                                CANCEL ASK
-                              </button>
-                            ) : (
-                              <button
-                                disabled={isTransactionLoading}
-                                onClick={async (e) => {
-                                  e.stopPropagation();
-                                  synthSound('bet');
-                                  if (!wallet?.publicKey) {
-                                    connectWallet();
-                                    return;
-                                  }
-                                  await buyPosition(room.id, listing.pubkey, listing.bet, listing.seller, listing.seller);
-                                }}
-                                className="px-3 py-1 bg-neon-moon text-black hover:bg-[#15803d] hover:text-white border border-neon-moon/40 rounded text-[9px] font-staatliches uppercase font-bold tracking-wider transition-all shadow-glow-moon active:scale-95"
-                              >
-                                ACQUIRE TICKET
-                              </button>
-                            )}
-                          </td>
-                        </tr>
                       );
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-8 text-center text-trench-gasmask/60 font-mono text-[9px] font-bold uppercase leading-relaxed bg-[#050803] border border-trench-sandbag/20 rounded-lg p-4">
-                  📢 NO POSITION TICKET LISTINGS REPORTED IN THE EXIT TRENCH.
-                  <span className="text-gray-500 text-[8px] mt-1 normal-case font-medium">PLACED A BET? LIST IT FROM YOUR LOCKED POSITIONS PANEL TO SELL IT EARLY.</span>
-                </div>
-              )}
-            </div>
-          </div>
+                    })()}
+                  </div>
+                )}
 
-          {/* 📋 RULES & MARKET CONTEXT TABS */}
-          <div className="bg-trench-black border-2 border-trench-sandbag rounded-xl shadow-2xl overflow-hidden font-mono text-xs text-left relative z-10 scanlines">
-            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/45" />
-            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/45" />
-            
-            {/* Tab Bar */}
-            <div className="flex border-b border-trench-sandbag bg-trench-mud">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveRulesTab('rules');
-                  synthSound('bet');
-                }}
-                className={`px-6 py-3 font-staatliches text-lg tracking-wider uppercase transition-all ${
-                  activeRulesTab === 'rules'
-                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
-                    : 'text-trench-gasmask hover:text-white'
-                }`}
-              >
-                Rules
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveRulesTab('context');
-                  synthSound('bet');
-                }}
-                className={`px-6 py-3 font-staatliches text-lg tracking-wider uppercase transition-all ${
-                  activeRulesTab === 'context'
-                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
-                    : 'text-trench-gasmask hover:text-white'
-                }`}
-              >
-                Market Context
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            <div className="p-5 space-y-4">
-              {activeRulesTab === 'rules' ? (
-                <div className="space-y-4">
-                  <p className="text-white text-xs font-bold leading-relaxed uppercase">
-                    {isDebateMarket 
-                      ? (room.resolutionCriteria || room.token.name)
-                      : `This market will resolve to YES (MOON) if the spot price of ${room.token.symbol} is higher than the entry price ($${formatPrice(openingPriceSafe || 0)}) upon final countdown settlement. Otherwise, this market will resolve to NO (JEET).`}
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                    <div className="bg-[#050A06] border border-emerald-950 p-4 rounded-xl space-y-1.5">
-                      <span className="font-staatliches text-sm text-neon-moon uppercase tracking-wider block">
-                        YES (MOON) CONDITION
-                      </span>
-                      <p className="text-[10px] text-gray-300 leading-normal">
-                        {isDebateMarket
-                          ? "Resolves YES if statement is confirmed TRUE before market expiry timestamp."
-                          : `Resolves YES if the price of ${room.token.symbol} ends higher than $${formatPrice(openingPriceSafe || 0)}.`}
-                      </p>
-                    </div>
-
-                    <div className="bg-[#0F0506] border border-red-950 p-4 rounded-xl space-y-1.5">
-                      <span className="font-staatliches text-sm text-jeet-red uppercase tracking-wider block">
-                        NO (JEET) CONDITION
-                      </span>
-                      <p className="text-[10px] text-gray-300 leading-normal">
-                        {isDebateMarket
-                          ? "Resolves NO if statement is confirmed FALSE or condition remains unfulfilled."
-                          : `Resolves NO if the price of ${room.token.symbol} ends equal to or lower than $${formatPrice(openingPriceSafe || 0)}.`}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
-                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">CREATOR</span>
-                    <span className="text-white font-bold block mt-0.5 truncate select-all">{cleanEvmAddress(room.creator)}</span>
-                  </div>
-                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
-                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">EXPIRATION</span>
-                    <span className="text-white font-bold block mt-0.5">{new Date(room.expiry).toLocaleString()}</span>
-                  </div>
-                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
-                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">RESOLUTION ID</span>
-                    <span className="text-white font-bold block mt-0.5 truncate">{formatCashtag(room.token.symbol || 'UNKNWN')}</span>
-                  </div>
-                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
-                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ROUND DURATION</span>
-                    <span className="text-white font-bold block mt-0.5">{durationSafe ? `${durationSafe} MINS` : '60 MINS'}</span>
-                  </div>
-                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded">
-                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">ORACLE VAL ADDR</span>
-                    <span className="text-white font-bold block mt-0.5 truncate select-all">{cleanEvmAddress(room.oracleAddress || room.creator)}</span>
-                  </div>
-                  <div className="bg-trench-mud border border-[#1d3515] p-3 rounded flex flex-col justify-between">
-                    <span className="text-trench-gasmask uppercase text-[9px] font-bold block">CONTRACT ADDRESS</span>
-                    <div className="flex items-center justify-between gap-1.5 mt-0.5">
-                      <span className="text-white font-bold truncate min-w-0">{cleanEvmAddress(room.token.address)}</span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(cleanEvmAddress(room.token.address));
-                          addToast("CONTRACT ADDRESS COPIED TO CLIPBOARD!", 'success');
-                        }}
-                        className="text-neon-moon hover:text-white font-bold font-staatliches text-[10px] tracking-wider uppercase bg-trench-black border border-neon-moon/40 px-1.5 py-0.5 rounded active:scale-95 transition-transform shrink-0"
-                      >
-                        [COPY]
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 💬 DISCUSSION, HOLDERS, POSITIONS & ACTIVITY TAB GROUP */}
-          <div className="bg-trench-black border-2 border-trench-sandbag rounded-xl shadow-2xl overflow-hidden font-mono text-xs text-left relative z-10 scanlines">
-            <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/45" />
-            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag/45" />
-            
-            {/* Tab Bar */}
-            <div className="flex border-b border-trench-sandbag bg-trench-mud overflow-x-auto scrollbar">
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMainTab('comments');
-                  synthSound('bet');
-                }}
-                className={`px-5 py-3 font-staatliches text-lg tracking-wider uppercase transition-all whitespace-nowrap ${
-                  activeMainTab === 'comments'
-                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
-                    : 'text-trench-gasmask hover:text-white'
-                }`}
-              >
-                Comments ({activeRoomChats.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMainTab('holders');
-                  synthSound('bet');
-                }}
-                className={`px-5 py-3 font-staatliches text-lg tracking-wider uppercase transition-all whitespace-nowrap ${
-                  activeMainTab === 'holders'
-                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
-                    : 'text-trench-gasmask hover:text-white'
-                }`}
-              >
-                Top Holders
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMainTab('positions');
-                  synthSound('bet');
-                }}
-                className={`px-5 py-3 font-staatliches text-lg tracking-wider uppercase transition-all whitespace-nowrap ${
-                  activeMainTab === 'positions'
-                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
-                    : 'text-trench-gasmask hover:text-white'
-                }`}
-              >
-                Positions
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveMainTab('activity');
-                  synthSound('bet');
-                }}
-                className={`px-5 py-3 font-staatliches text-lg tracking-wider uppercase transition-all whitespace-nowrap ${
-                  activeMainTab === 'activity'
-                    ? 'bg-trench-black text-neon-moon border-b-2 border-b-neon-moon font-bold'
-                    : 'text-trench-gasmask hover:text-white'
-                }`}
-              >
-                Activity
-              </button>
-            </div>
-
-            {/* Tab Content */}
-            <div className="p-5">
-              {/* 1. COMMENTS (Chat Comms Radar) */}
-              {activeMainTab === 'comments' && (
-                <div className="h-80 flex flex-col justify-between relative">
-                  {/* Faction chat squad selectors */}
-                  <div className="flex gap-2 mb-3 pb-2 border-b border-trench-sandbag/35">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveChatTab('moon');
-                        synthSound('bet');
-                      }}
-                      className={`px-3 py-1 font-staatliches text-xs tracking-wider uppercase border rounded transition-all ${
-                        activeChatTab === 'moon'
-                          ? 'bg-neon-moon/10 text-neon-moon border-neon-moon/50 shadow-glow-moon'
-                          : 'text-trench-gasmask border-trench-sandbag/45 hover:text-white'
-                      }`}
-                    >
-                      🚀 Moon Squad Chat
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setActiveChatTab('jeet');
-                        synthSound('bet');
-                      }}
-                      className={`px-3 py-1 font-staatliches text-xs tracking-wider uppercase border rounded transition-all ${
-                        activeChatTab === 'jeet'
-                          ? 'bg-jeet-red/10 text-jeet-red border-jeet-red/50 shadow-glow-jeet'
-                          : 'text-trench-gasmask border-trench-sandbag/45 hover:text-white'
-                      }`}
-                    >
-                      💀 Jeet Squad Chat
-                    </button>
-                  </div>
-
-                  <div
-                    ref={chatScrollRef}
-                    className="flex-1 overflow-y-auto space-y-2 pr-1 font-mono text-[10px] select-text scrollbar"
-                  >
-                    <div className="flex gap-1.5 items-start text-neon-moon font-bold uppercase">
-                      <span>📡</span>
-                      <span>[COMMS LOG] Scanning squad dialogue...</span>
-                    </div>
-                    {activeRoomChats.length > 0 ? (
-                      activeRoomChats.map((msg, index) => {
-                        const isHQ = msg.user.includes('HQ') || msg.user.includes('COMMAND') || msg.user.includes('SYSTEM');
-                        const bubbleColor = isHQ
-                          ? 'text-yellow-500'
-                          : msg.side === 'moon'
-                          ? 'text-[#16A34A]'
-                          : 'text-[#ff535a]';
-
-                        const displayUser = msg.user.startsWith('0x') && msg.user.length > 15
-                          ? `${msg.user.substring(0, 6)}...${msg.user.substring(msg.user.length - 4)}`
-                          : msg.user;
+                {/* 4. ACTIVITY PANEL */}
+                {activeMainTab === 'activity' && (
+                  <div className="h-72 overflow-y-auto space-y-2.5 pr-1 font-mono text-xs scrollbar">
+                    {roomBets.length > 0 ? (
+                      roomBets.map((bet) => {
+                        const formattedUser = bet.user ? (bet.user.length > 8 ? bet.user.slice(0, 4) + '...' + bet.user.slice(-4) : bet.user) : 'DEGEN';
+                        const isMoon = bet.side === 'moon';
+                        const colorClass = isMoon ? 'text-emerald-500' : 'text-rose-500';
+                        const timeString = new Date(bet.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
                         return (
-                          <div key={index} className="flex gap-1.5 items-start font-bold uppercase leading-tight">
-                            <span>📡</span>
-                            <span>
-                              <span
-                                onClick={() => {
-                                  if (!isHQ && msg.user.startsWith('0x')) {
-                                    setSelectedProfileAddress(msg.user);
-                                    synthSound('bet');
-                                  }
-                                }}
-                                className={`${bubbleColor} font-bold mr-1.5 cursor-pointer hover:underline`}
-                              >
-                                [{displayUser}]
+                          <div key={bet.id} className="flex items-center justify-between font-bold uppercase hover:bg-slate-50 dark:hover:bg-slate-900/40 p-2 rounded-lg transition-colors border border-slate-100 dark:border-slate-855">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span>{isMoon ? '🚀' : '💀'}</span>
+                              <span className="text-slate-500 dark:text-slate-400">[{formattedUser}]</span>
+                              <span className={`${colorClass} font-extrabold tracking-wide`}>
+                                {isMoon ? 'YES' : 'NO'}
                               </span>
-                              <span className="text-gray-300">{msg.message}</span>
-                            </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-slate-900 dark:text-white font-bold">{bet.amount.toFixed(2)} USDC</span>
+                              <span className="text-slate-400 dark:text-slate-500 text-[10px]">{timeString}</span>
+                            </div>
                           </div>
                         );
                       })
                     ) : (
-                      <div className="flex gap-1.5 items-start text-gray-500 font-bold uppercase">
-                        <span>📡</span>
-                        <span>[RADAR LOG] Waiting for user chat broadcasts...</span>
+                      <div className="flex items-center justify-center h-full text-slate-400 dark:text-slate-500 font-bold uppercase animate-pulse">
+                        AWAITING TRANSACTION LOGS...
                       </div>
                     )}
                   </div>
+                )}
 
-                  <form onSubmit={handleSendChat} className="mt-4 pt-2 border-t border-trench-sandbag flex gap-2">
-                    <input
-                      type="text"
-                      placeholder={`SEND BROADCAST MESSAGE TO ${activeChatTab.toUpperCase()} SQUAD...`}
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      className="flex-1 min-w-0 px-3 py-1.5 bg-trench-black border border-trench-sandbag text-white text-[10px] font-mono rounded focus:border-neon-moon focus:outline-none uppercase placeholder-trench-gasmask/50 font-bold"
-                    />
-                    <button
-                      type="submit"
-                      className="px-4 py-1.5 bg-trench-sandbag hover:bg-trench-gasmask text-white rounded transition-colors flex items-center justify-center"
+                {/* 5. DISCUSSION PANEL */}
+                {activeMainTab === 'discussion' && (
+                  <div className="h-80 flex flex-col justify-between relative">
+                    <div className="flex gap-2 mb-3 pb-2 border-b border-slate-200 dark:border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => { setActiveChatTab('moon'); synthSound('bet'); }}
+                        className={`px-3 py-1 font-mono text-[10px] uppercase font-bold rounded-lg transition-all ${
+                          activeChatTab === 'moon' ? 'bg-emerald-500 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        YES SQUAD ({chatMessages.filter((m) => m.side === 'moon').length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setActiveChatTab('jeet'); synthSound('bet'); }}
+                        className={`px-3 py-1 font-mono text-[10px] uppercase font-bold rounded-lg transition-all ${
+                          activeChatTab === 'jeet' ? 'bg-rose-500 text-white' : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                        }`}
+                      >
+                        NO SQUAD ({chatMessages.filter((m) => m.side === 'jeet').length})
+                      </button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar mb-3 max-h-[220px]">
+                      {chatMessages
+                        .filter((msg) => msg.side === activeChatTab)
+                        .map((msg, idx) => (
+                          <div key={idx} className="text-left bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 font-mono">
+                              <span className="font-bold cursor-pointer hover:underline" onClick={() => setSelectedProfileAddress(msg.user)}>
+                                {msg.user.slice(0, 6)}...{msg.user.slice(-4)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-855 dark:text-slate-205 mt-1 font-sans break-words font-medium">
+                              {msg.message}
+                            </p>
+                          </div>
+                        ))}
+                    </div>
+
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!chatInput.trim() || !user || !user.wallet) return;
+                        sendRoomChat(room.id, activeChatTab, user.wallet, chatInput.trim());
+                        setChatInput('');
+                      }}
+                      className="flex gap-2"
                     >
-                      <Send size={12} />
-                    </button>
-                  </form>
-                </div>
-              )}
-
-              {/* 2. TOP HOLDERS */}
-              {activeMainTab === 'holders' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* YES/MOON side */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center border-b border-trench-sandbag/45 pb-1 font-staatliches text-base text-neon-moon uppercase font-bold">
-                      <span>YES HOLDERS</span>
-                      <span className="text-[10px] font-mono text-trench-gasmask">SHARES</span>
-                    </div>
-                    <div className="space-y-2 max-h-72 overflow-y-auto scrollbar pr-1">
-                      {topHolders.yesList.length > 0 ? (
-                        topHolders.yesList.map((holder, idx) => (
-                          <div key={idx} className="flex justify-between items-center py-1 hover:bg-trench-mud/10 px-1 rounded transition-colors">
-                            <span className="text-gray-300 font-bold uppercase truncate max-w-[150px]">
-                              {holder.user.startsWith('0x') ? `${holder.user.slice(0, 6)}...${holder.user.slice(-4)}` : holder.user}
-                            </span>
-                            <span className="text-white font-bold">{holder.shares.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-trench-gasmask/60 uppercase text-[10px] py-4 text-center">No holders recorded</div>
-                      )}
-                    </div>
+                      <input
+                        type="text"
+                        value={chatInput}
+                        onChange={(e) => setChatInput(e.target.value)}
+                        placeholder="ENTER COMMENTS..."
+                        className="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs rounded-xl focus:border-emerald-500 focus:outline-none"
+                      />
+                      <button
+                        type="submit"
+                        className="px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl transition-all"
+                      >
+                        <Send size={14} />
+                      </button>
+                    </form>
                   </div>
+                )}
 
-                  {/* NO/JEET side */}
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center border-b border-trench-sandbag/45 pb-1 font-staatliches text-base text-jeet-red uppercase font-bold">
-                      <span>NO HOLDERS</span>
-                      <span className="text-[10px] font-mono text-trench-gasmask">SHARES</span>
-                    </div>
-                    <div className="space-y-2 max-h-72 overflow-y-auto scrollbar pr-1">
-                      {topHolders.noList.length > 0 ? (
-                        topHolders.noList.map((holder, idx) => (
-                          <div key={idx} className="flex justify-between items-center py-1 hover:bg-trench-mud/10 px-1 rounded transition-colors">
-                            <span className="text-gray-300 font-bold uppercase truncate max-w-[150px]">
-                              {holder.user.startsWith('0x') ? `${holder.user.slice(0, 6)}...${holder.user.slice(-4)}` : holder.user}
-                            </span>
-                            <span className="text-white font-bold">{holder.shares.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-trench-gasmask/60 uppercase text-[10px] py-4 text-center">No holders recorded</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 3. POSITIONS */}
-              {activeMainTab === 'positions' && (() => {
-                const isCurrentUser = (userAddress: string) => {
-                  if (!userAddress) return false;
-                  const cleanAddr = userAddress.toLowerCase();
-                  return (
-                    wallet?.publicKey?.toBase58().toLowerCase() === cleanAddr ||
-                    user?.wallet?.toLowerCase() === cleanAddr
-                  );
-                };
-                return (
-                  <div className="space-y-4">
-                    {/* Header bar controls as shown in the screenshot */}
-                    <div className="flex justify-between items-center pb-2 border-b border-gray-900">
-                      {/* Left selector */}
-                      <div className="flex items-center bg-[#0C121F] border border-gray-800 rounded px-2.5 py-1 cursor-pointer hover:bg-[#121b2f] transition-all">
-                        <span className="text-white font-bold text-[10px] uppercase">July 31</span>
-                        <ChevronDown size={12} className="text-gray-400 ml-1.5" />
-                      </div>
-                      {/* Right filters */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center bg-[#0C121F] border border-gray-800 rounded px-2.5 py-1 cursor-pointer hover:bg-[#121b2f] transition-all">
-                          <span className="text-gray-300 font-bold text-[10px] uppercase">All</span>
-                          <ChevronDown size={12} className="text-gray-400 ml-1.5" />
-                        </div>
-                        <div className="flex items-center bg-[#0C121F] border border-gray-800 rounded px-2.5 py-1 cursor-pointer hover:bg-[#121b2f] transition-all">
-                          <span className="text-gray-300 font-bold text-[10px] uppercase">Desc</span>
-                          <ChevronDown size={12} className="text-gray-400 ml-1.5" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* YES and NO side lists */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* YES/MOON Positions list */}
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center font-staatliches text-base text-neon-moon uppercase font-bold">
-                          <span>YES</span>
-                          <span className="text-[10px] font-mono text-trench-gasmask">PNL</span>
-                        </div>
-                        <div className="space-y-2 max-h-72 overflow-y-auto scrollbar pr-1">
-                          {topHolders.yesList.length > 0 ? (
-                            topHolders.yesList.map((pos, idx) => {
-                              const isUser = isCurrentUser(pos.user);
-                              return (
-                                <div key={idx} className={`flex justify-between items-center p-2 rounded transition-colors ${
-                                  isUser ? 'bg-[#1b3515]/30 border border-[#16A34A]/50' : 'hover:bg-trench-mud/10'
-                                }`}>
-                                  <div className="flex flex-col">
-                                    <span className="text-gray-300 font-bold uppercase truncate max-w-[150px]">
-                                      {pos.user.startsWith('0x') ? `${pos.user.slice(0, 6)}...${pos.user.slice(-4)}` : pos.user}
-                                    </span>
-                                    <span className="text-trench-gasmask text-[9px] font-bold">
-                                      avg {(pos.shares > 0 ? (pos.totalSpent / pos.shares) * 100 : 0).toFixed(1)}¢
-                                    </span>
-                                  </div>
-                                  <span className="text-[#16A34A] font-staatliches text-sm font-bold">
-                                    ${pos.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-trench-gasmask/60 uppercase text-[10px] py-4 text-center">No YES positions active</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* NO/JEET Positions list */}
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center font-staatliches text-base text-jeet-red uppercase font-bold">
-                          <span>NO</span>
-                          <span className="text-[10px] font-mono text-trench-gasmask">PNL</span>
-                        </div>
-                        <div className="space-y-2 max-h-72 overflow-y-auto scrollbar pr-1">
-                          {topHolders.noList.length > 0 ? (
-                            topHolders.noList.map((pos, idx) => {
-                              const isUser = isCurrentUser(pos.user);
-                              return (
-                                <div key={idx} className={`flex justify-between items-center p-2 rounded transition-colors ${
-                                  isUser ? 'bg-[#3b1213]/30 border border-jeet-red/50' : 'hover:bg-trench-mud/10'
-                                }`}>
-                                  <div className="flex flex-col">
-                                    <span className="text-gray-300 font-bold uppercase truncate max-w-[150px]">
-                                      {pos.user.startsWith('0x') ? `${pos.user.slice(0, 6)}...${pos.user.slice(-4)}` : pos.user}
-                                    </span>
-                                    <span className="text-trench-gasmask text-[9px] font-bold">
-                                      avg {(pos.shares > 0 ? (pos.totalSpent / pos.shares) * 100 : 0).toFixed(1)}¢
-                                    </span>
-                                  </div>
-                                  <span className="text-jeet-red font-staatliches text-sm font-bold">
-                                    ${pos.totalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <div className="text-trench-gasmask/60 uppercase text-[10px] py-4 text-center">No NO positions active</div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* 4. ACTIVITY (Bet History) */}
-              {activeMainTab === 'activity' && (
-                <div className="h-72 overflow-y-auto space-y-1.5 pr-1 font-mono text-[10px] select-text scrollbar">
-                  {allSectorBets.length > 0 ? (
-                    allSectorBets.map((bet) => {
-                      const formattedUser = bet.user ? (bet.user.length > 8 ? bet.user.slice(0, 4) + '...' + bet.user.slice(-4) : bet.user) : 'RECRUIT';
-                      const isMoon = bet.side === 'moon';
-                      const colorClass = isMoon ? 'text-[#16A34A] glow-moon' : 'text-jeet-red glow-jeet';
-                      const timeString = new Date(bet.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                      const currencySymbol = (room.token.chainId === 'solana' || !room.id.startsWith('0x')) ? 'SOL' : 'USDC';
-
-                      return (
-                        <div key={bet.id} className="flex items-center justify-between font-bold uppercase hover:bg-trench-mud/20 px-1 py-0.5 rounded transition-colors">
-                          <div className="flex items-center gap-1.5 truncate">
-                            <span className={isMoon ? 'animate-pulse' : ''}>
-                              {isMoon ? '🚀' : '💀'}
-                            </span>
-                            <span
-                              onClick={() => {
-                                if (bet.user && bet.user.startsWith('0x')) {
-                                  setSelectedProfileAddress(bet.user);
-                                  synthSound('bet');
-                                }
-                              }}
-                              className="text-trench-gasmask cursor-pointer hover:underline"
-                            >
-                              [{formattedUser}]
-                            </span>
-                            <span className={`${colorClass} font-extrabold tracking-wide`}>
-                              {isMoon ? 'MOON' : 'JEET'}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-white font-bold">{bet.amount.toFixed(2)} {currencySymbol}</span>
-                            <span className="text-trench-gasmask/70 text-[8px] sm:text-[9px]">{timeString}</span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="flex gap-1.5 items-center justify-center h-full text-trench-gasmask/50 font-bold uppercase animate-pulse">
-                      <span>AWAITING TRANSACTION LOGS...</span>
-                    </div>
-                  )}
-                </div>
-              )}
+              </div>
             </div>
           </div>
 
-        </section>
-
-        {/* COLUMN 2: STANCE CONFIGURATOR (lg:col-span-3) */}
-        <section className="lg:col-span-3 retro-panel p-5 shadow-2xl relative scanlines rounded-xl min-w-0 w-full overflow-hidden" id="bet-panel">
-          {/* Decorative Corner Screws */}
-          <div className="absolute top-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-          <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-          <div className="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-          <div className="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-trench-black border border-trench-sandbag"></div>
-          
-          <div className="text-center border-b-2 border-trench-sandbag pb-4 mb-4">
-            <span className="font-staatliches text-sm text-yellow-500 block uppercase tracking-wider text-left mb-2 flex items-center gap-1.5">
-              <Swords size={16} className="text-yellow-500" />
-              <span>STANCE CONFIGURATOR</span>
-            </span>
-
-            {/* Prominent Bidding Resolution Condition Card */}
+          {/* COLUMN 2: MARKET INFO & RESOLUTION (lg:col-span-4) */}
+          <div className="lg:col-span-4 space-y-6">
+            
+            {/* Market Info Card */}
             {room && (
-              <div className="bg-[#04070D] border border-yellow-500/50 p-3.5 rounded-xl mb-3 text-left font-mono shadow-md">
-                <div className="flex items-center gap-1.5 text-yellow-400 text-[10px] font-bold uppercase tracking-wider mb-1 pb-1 border-b border-gray-800/80">
-                  <Scale size={13} className="shrink-0 text-yellow-400" />
-                  <span>BIDDING RESOLUTION CONDITION</span>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-5">
+                <h3 className="font-sans text-sm text-slate-900 dark:text-white font-extrabold uppercase tracking-tight">
+                  Market Info
+                </h3>
+                
+                <div className="space-y-3 font-mono text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 dark:text-slate-500">Liquidity Pool</span>
+                    <span className="text-slate-800 dark:text-slate-350 font-bold">{totalPotSafe.toFixed(2)} USDC</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 dark:text-slate-500">YES Shares</span>
+                    <span className="text-emerald-500 font-bold">{moonPercentageSafe.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 dark:text-slate-500">NO Shares</span>
+                    <span className="text-rose-500 font-bold">{jeetPercentageSafe.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 dark:text-slate-500">Total Volume</span>
+                    <span className="text-slate-800 dark:text-slate-350 font-bold">{totalPotSafe.toFixed(2)} USDC</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-855 pt-3">
+                    <span className="text-slate-400 dark:text-slate-500">Created</span>
+                    <span className="text-slate-800 dark:text-slate-350 font-bold">Aug 5, 2026</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-400 dark:text-slate-500">Resolves</span>
+                    <span className="text-slate-800 dark:text-slate-350 font-bold" suppressHydrationWarning>{new Date(room.expiry).toLocaleDateString()}</span>
+                  </div>
                 </div>
-                <p className="text-white text-xs font-bold leading-snug">
-                  {(room.category as string) === 'debate' || (room.category as string) === 'prediction' || (!!room.resolutionCriteria && room.resolutionCriteria.length > 0)
-                    ? (room.resolutionCriteria || room.token.name)
-                    : `Will ${room.token.symbol} end above $${formatPrice(openingPriceSafe || 1)} on ${new Date(expirySafe).toLocaleString()}?`}
-                </p>
               </div>
             )}
-            
-            {/* Displaying requested images (moonJuice for moon and jeetSkeleton for jeet) */}
-            <PepePortrait 
-              src={selectedSide === 'moon' ? PEPE_ASSETS.moonJuice : PEPE_ASSETS.jeetSkeleton} 
-              size={56} 
-              glowColor={selectedSide === 'moon' ? 'moon' : 'jeet'} 
-              animated 
-              className="rounded-full mx-auto mb-3" 
-            />
-            
-            <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wide uppercase">Deploy Capital</h3>
-            <p className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask font-bold mt-0.5 uppercase tracking-widest">SELECT AMMUNITION YIELD</p>
-          </div>
 
-          {/* Win Streak Indicator inside the Stance Configurator sidebar (Wallet Balance removed) */}
-          <div className="mb-5 text-[9px] font-mono uppercase font-bold text-center">
-            <div className="bg-black/60 border border-[#1d3515] p-2.5 rounded">
-              <div className="text-yellow-500 flex items-center justify-center gap-1">
-                <Flame className="w-3.5 h-3.5 text-red-500 animate-pulse" /> Win Streak
-              </div>
-              <div className="text-red-500 font-staatliches text-sm sm:text-base mt-0.5">
-                {user?.stats?.winStreak !== undefined ? `${user.stats.winStreak} wins` : '0 wins'}
-              </div>
-            </div>
-          </div>
-
-          {room.status === 'disputed' ? (
-            // Disputed State card
-            <div className="space-y-4 text-center py-4">
-              <div className="bg-red-950/40 border-2 border-jeet-red p-4 rounded text-center relative overflow-hidden">
-                <div className="absolute inset-0 bg-jeet-red/5 animate-pulse" />
-                <AlertTriangle className="text-jeet-red mx-auto mb-2 animate-bounce" size={36} />
-                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">ARENA LOCK ACTIVE</span>
-                <span className="font-staatliches text-2xl block mt-1 tracking-wider text-jeet-red uppercase">
-                  ⚠️ VERDICT DISPUTED
-                </span>
-                <p className="font-mono text-[10px] text-gray-300 mt-2 normal-case leading-relaxed">
-                  Bettor challenged the verdict by posting a 0.1 SOL bond. Funds are frozen pending arbitrator arbitration.
-                </p>
-                <div className="mt-3 text-[8px] text-trench-gasmask uppercase border-t border-trench-sandbag/40 pt-2 text-left space-y-1">
-                  <div>Challenger: <span className="text-white font-bold">{room.disputeChallenger?.slice(0, 6)}...{room.disputeChallenger?.slice(-4)}</span></div>
-                  <div>Bond Escrowed: <span className="text-white font-bold">0.1 SOL</span></div>
-                </div>
-              </div>
-
-              {/* Arbitrator Resolution Console */}
-              {room.oracleAddress && (
-                (wallet?.publicKey && wallet.publicKey.toBase58().toLowerCase() === room.oracleAddress.toLowerCase()) ||
-                (wallet?.address && wallet.address.toLowerCase() === room.oracleAddress.toLowerCase())
-              ) && (
-                <div className="bg-trench-black border-2 border-moon-gold p-4 rounded text-left space-y-3">
-                  <h4 className="font-staatliches text-lg text-moon-gold tracking-wider uppercase border-b border-trench-sandbag pb-1">
-                    ARBITRATION PANEL
-                  </h4>
-                  <p className="font-mono text-[9px] text-trench-gasmask uppercase leading-tight font-bold">
-                    As the designated oracle arbitrator, you must review the dispute and submit the final verdict.
-                  </p>
-                  
-                  {/* Select Winner */}
-                  <div className="space-y-1.5">
-                    <span className="font-mono text-[8px] text-trench-gasmask font-bold uppercase">SELECT FACTUAL WINNER:</span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['moon', 'jeet', 'draw'] as const).map((side) => (
-                        <button
-                          key={side}
-                          type="button"
-                          onClick={() => { setArbitrationWinner(side); synthSound('bet'); }}
-                          className={`py-1.5 font-staatliches text-xs tracking-wider uppercase rounded border transition-all ${
-                            arbitrationWinner === side
-                              ? 'bg-moon-gold border-moon-gold text-black font-bold'
-                              : 'border-trench-sandbag bg-trench-mud text-trench-gasmask'
-                          }`}
-                        >
-                          {side}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Overturn Verdict Toggle */}
-                  <label className="flex items-center gap-2 cursor-pointer pt-1">
-                    <input
-                      type="checkbox"
-                      checked={arbitrationOverturned}
-                      onChange={(e) => { setArbitrationOverturned(e.target.checked); synthSound('bet'); }}
-                      className="accent-moon-gold"
-                    />
-                    <span className="font-mono text-[8px] text-white uppercase font-bold">
-                      OVERTURN ORIGINAL VERDICT (REFUND CHALLENGER)
-                    </span>
-                  </label>
-
-                  <button
-                    disabled={isTransactionLoading}
-                    onClick={async () => {
-                      synthSound('bet');
-                      try {
-                        const winnerArg = arbitrationWinner === 'draw' ? null : arbitrationWinner;
-                        await resolveDispute(room.id, winnerArg, arbitrationOverturned);
-                        fetchSingleRoom(room.id);
-                      } catch (err) {
-                        console.error("Arbitration failed", err);
-                      }
-                    }}
-                    className="w-full mt-2 py-2.5 bg-moon-gold hover:bg-yellow-400 disabled:bg-trench-sandbag font-staatliches text-xl text-black border-b-4 border-yellow-800 shadow-glow-gold rounded uppercase flex items-center justify-center gap-1.5 font-bold"
-                  >
-                    {isTransactionLoading ? (
-                      <>
-                        <Loader2 className="animate-spin text-black shrink-0" size={16} />
-                        <span>SUBMITTING RESOLUTION...</span>
-                      </>
-                    ) : (
-                      <span>PUBLISH VERDICT 🎯</span>
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {/* AI Arbitrator Telemetry */}
-              {room.resolutionCriteria && (
-                <div className="bg-black/80 border border-trench-sandbag/40 p-3 rounded text-left font-mono text-[9px]">
-                  <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-xs font-bold border-b border-trench-sandbag/40 pb-1 mb-2">
-                    <Brain size={14} className="animate-pulse" />
-                    <span>AI ARBITRATOR TELEMETRY</span>
-                  </div>
-                  <div className="text-[10px] text-white font-bold mb-2">
-                    Criteria: "{room.resolutionCriteria}"
-                  </div>
-                  {room.oracleLogs ? (
-                    <div className="bg-[#050803] p-2 border border-trench-sandbag/45 text-trench-gasmask max-h-48 overflow-y-auto whitespace-pre-wrap font-mono leading-normal scrollbar text-[9px]">
-                      {room.oracleLogs}
-                    </div>
-                  ) : (
-                    <div className="text-trench-gasmask animate-pulse">
-                      📡 SCANNING SIGNALS... AI NODE SCRAPER DETECTED DISPUTED ROOM. Awaiting execution sweep signature.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ) : isSettled ? (
-            // Concluded / Settled State card
-            <div className="space-y-4 text-center py-4">
-              <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
-                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME</span>
-                <span className={`font-staatliches text-3xl block mt-1 tracking-wider ${
-                  room.winner === 'moon' ? 'text-neon-moon glow-moon' : room.winner === 'jeet' ? 'text-jeet-red glow-jeet' : 'text-yellow-500 glow-gold'
-                }`}>
-                  {room.winner === 'moon' ? 'MOON ARMY WON' : room.winner === 'jeet' ? 'JEET SQUADRON WON' : 'BATTLE DRAW / VOIDED'}
-                </span>
-                {!isDebateMarket && finalPriceSafe !== undefined && openingPriceSafe !== undefined ? (
-                  <p className="font-mono text-[10px] text-gray-300 mt-2 normal-case leading-relaxed">
-                    Exit price of <span className="text-white font-bold">${formatPrice(finalPriceSafe)}</span> was{' '}
-                    <span className={finalPriceSafe > openingPriceSafe ? 'text-neon-moon font-bold' : finalPriceSafe < openingPriceSafe ? 'text-jeet-red font-bold' : 'text-yellow-500 font-bold'}>
-                      {finalPriceSafe > openingPriceSafe ? 'HIGHER' : finalPriceSafe < openingPriceSafe ? 'LOWER' : 'EQUAL'}
-                    </span>{' '}
-                    than the entry price of <span className="text-white font-bold">${formatPrice(openingPriceSafe)}</span>.
-                  </p>
-                ) : isDebateMarket ? (
-                  <p className="font-mono text-[10px] text-gray-300 mt-2 normal-case leading-relaxed">
-                    This debate market resolved to <span className={`font-bold ${room.winner === 'moon' ? 'text-neon-moon' : room.winner === 'jeet' ? 'text-jeet-red' : 'text-yellow-500'}`}>{room.winner?.toUpperCase()}</span> by the oracle.
-                  </p>
-                ) : null}
-              </div>
-
-              {/* Challenge Period Countdown / Dispute button */}
-              {disputeCountdown ? (
-                <div className="bg-trench-black border-2 border-yellow-500/40 p-4 rounded text-left space-y-2.5">
-                  <div className="flex justify-between items-center border-b border-trench-sandbag/35 pb-1">
-                    <span className="font-mono text-[9px] text-yellow-500 font-bold uppercase">CHALLENGE PERIOD OPEN</span>
-                    <span className="font-mono text-xs text-yellow-500 font-extrabold animate-pulse">{disputeCountdown}</span>
-                  </div>
-                  <p className="font-mono text-[8px] text-trench-gasmask uppercase font-bold leading-tight">
-                    Disagree with this verdict? Lock 0.1 SOL dispute bond to challenge results and pause winnings claims.
-                  </p>
-                  <button
-                    disabled={isTransactionLoading}
-                    onClick={async () => {
-                      synthSound('bet');
-                      try {
-                        await disputeRoom(room.id);
-                        fetchSingleRoom(room.id);
-                      } catch (err) {
-                        console.error("Dispute trigger failed", err);
-                      }
-                    }}
-                    className="w-full py-2 bg-yellow-500 hover:bg-yellow-400 disabled:bg-trench-sandbag text-black font-staatliches text-lg uppercase rounded border-b-2 border-yellow-800 shadow-glow-yellow font-bold flex items-center justify-center gap-1.5"
-                  >
-                    {isTransactionLoading ? (
-                      <>
-                        <Loader2 className="animate-spin text-black shrink-0" size={14} />
-                        <span>ESCROWING BOND...</span>
-                      </>
-                    ) : (
-                      <span>FILE DISPUTE ⚠️</span>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-trench-mud border border-trench-sandbag p-2.5 rounded font-mono text-[9px] text-trench-gasmask uppercase font-bold flex items-center justify-center gap-1.5">
-                  <span>🔒 dispute challenge window closed</span>
-                </div>
-              )}
-
-              {/* Tactical Skirmish Receipt / Evidence Card */}
-              <div className="bg-trench-black border border-dashed border-trench-sandbag p-4 rounded text-left font-mono text-[10px] text-trench-gasmask uppercase space-y-2 relative">
-                <div className="absolute top-3 right-3 flex items-center gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-neon-moon animate-pulse" />
-                  <span className="text-[7px] text-neon-moon font-bold tracking-wider">VERIFIED ON-CHAIN</span>
-                </div>
-                <h4 className="font-staatliches text-xs text-white tracking-widest border-b border-trench-sandbag pb-1.5 mb-2 flex items-center gap-1 font-bold">
-                  {isDebateMarket ? 'ORACLE DECISION RECEIPT' : 'EVIDENCE RECEIPT'}
-                </h4>
-                {isDebateMarket ? (
-                  <>
-                    <div className="flex justify-between items-center mt-1">
-                      <span>RESOLUTION ID:</span>
-                      <span className="text-white font-bold">{formatCashtag(room.token.symbol)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>VERDICT DECISION:</span>
-                      <span className={`font-bold ${room.winner === 'moon' ? 'text-neon-moon' : room.winner === 'jeet' ? 'text-jeet-red' : 'text-yellow-500'}`}>
-                        {room.winner?.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>ORACLE ADDRESS:</span>
-                      <span className="text-white font-bold">
-                        {room.oracleAddress ? `${room.oracleAddress.slice(0, 6)}...${room.oracleAddress.slice(-4)}` : 'DEFAULT KEEPER'}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-between items-center mt-1">
-                      <span>TARGET Symbol:</span>
-                      <span className="text-white font-bold">{formatCashtag(room.token.symbol)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>ENTRY PRICE:</span>
-                      <span className="text-white font-bold">
-                        ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>EXIT PRICE (SPOT):</span>
-                      <span className="text-white font-bold">
-                        ${finalPriceSafe !== undefined ? formatPrice(finalPriceSafe) : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span>TWAP EXIT (EMA):</span>
-                      <span className="text-moon-gold font-bold">
-                        ${twapFinalPriceSafe !== undefined ? formatPrice(twapFinalPriceSafe) : 'N/A'}
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* AI Arbitrator Telemetry */}
-              {room.resolutionCriteria && (
-                <div className="bg-black/80 border border-trench-sandbag/40 p-3 rounded text-left font-mono text-[9px]">
-                  <div className="flex items-center gap-1.5 text-neon-moon font-staatliches text-xs font-bold border-b border-trench-sandbag/40 pb-1 mb-2">
-                    <Brain size={14} className="animate-pulse" />
-                    <span>AI ARBITRATOR TELEMETRY</span>
-                  </div>
-                  <div className="text-[10px] text-white font-bold mb-2">
-                    Criteria: "{room.resolutionCriteria}"
-                  </div>
-                  {room.oracleLogs ? (
-                    <div className="bg-[#050803] p-2 border border-trench-sandbag/45 text-trench-gasmask max-h-48 overflow-y-auto whitespace-pre-wrap font-mono leading-normal scrollbar text-[9px]">
-                      {room.oracleLogs}
-                    </div>
-                  ) : (
-                    <div className="text-trench-gasmask animate-pulse">
-                      📡 SCANNING SIGNALS... AI NODE SCRAPER DETECTED Expired ROOM. Awaiting execution sweep signature.
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {userWon && (
-                <div className="p-4 bg-trench-black border-2 border-moon-gold rounded text-center relative overflow-hidden">
-                  <Award size={36} className="text-moon-gold mx-auto mb-2 animate-bounce" />
-                  <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed">
-                    YOUR FORCES DECREED VICTORY. WAR BONDS SECURED!
-                  </p>
-                  {hasUnclaimed ? (
-                    <button
-                      onClick={handleClaim}
-                      disabled={isTransactionLoading}
-                      className="w-full mt-4 py-3 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold flex items-center justify-center gap-2"
-                    >
-                      {isTransactionLoading ? (
-                        <>
-                          <Loader2 className="animate-spin text-black shrink-0" size={20} />
-                          <span>CLAIMING BOOTY...</span>
-                        </>
-                      ) : (
-                        <span>CLAIM WAR WINNINGS</span>
-                      )}
-                    </button>
-                  ) : (
-                    <div className="mt-4 p-2 bg-trench-mud border border-trench-sandbag rounded font-mono text-[9px] text-moon-gold uppercase font-bold">
-                      🎉 Winnings Dispatched to Ammo Wallet!
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {userLost && (
-                <div className="p-4 bg-red-950/40 border border-jeet-red rounded text-center">
-                  <p className="font-mono text-[10px] text-jeet-red font-bold uppercase leading-relaxed animate-pulse">
-                    YOU GOT EXIT LIQUIDITY STAMPED!
-                  </p>
-                  <button
-                    onClick={() => router.push('/rooms')}
-                    className="w-full mt-4 py-2 bg-trench-black hover:bg-trench-sandbag text-white border border-trench-sandbag font-staatliches text-base uppercase rounded font-bold"
-                  >
-                    RETREAT TO FRONTLINES
-                  </button>
-                </div>
-              )}
-
-              {isDrawOrVoid && userBetsInRoom.length > 0 && (
-                <div className="p-4 bg-trench-black border-2 border-yellow-500 rounded text-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-yellow-500/5 animate-pulse" />
-                  <ShieldAlert size={36} className="text-yellow-500 mx-auto mb-2 animate-bounce" />
-                  <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed relative z-10">
-                    {room.moonPool === 0 || room.jeetPool === 0
-                      ? "ONE-SIDED SKIRMISH: NO OPPOSING FORCES ENGAGED. SECURING FULL STAKE REFUND!"
-                      : "BATTLE CONCLUDED IN A DRAW! RECOVERING WAR FUNDS!"}
-                  </p>
-                  {hasUnclaimed ? (
-                    <button
-                      onClick={handleClaim}
-                      disabled={isTransactionLoading}
-                      className="w-full mt-4 py-3 bg-yellow-500 hover:bg-yellow-400 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-yellow-800 shadow-glow-yellow font-bold flex items-center justify-center gap-2 relative z-10"
-                    >
-                      {isTransactionLoading ? (
-                        <>
-                          <Loader2 className="animate-spin text-black shrink-0" size={20} />
-                          <span>RETRIEVING SOL...</span>
-                        </>
-                      ) : (
-                        <span>CLAIM FULL REFUND</span>
-                      )}
-                    </button>
-                  ) : (
-                    <div className="mt-4 p-2 bg-trench-mud border border-trench-sandbag rounded font-mono text-[9px] text-yellow-500 uppercase font-bold relative z-10">
-                      🎉 Funds Safely Recovered to Ammo Wallet!
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {!userWon && !userLost && (!isDrawOrVoid || userBetsInRoom.length === 0) && (
-                <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
-                  <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold">
-                    Sector closed. You did not participate in this skirmish.
-                  </p>
-                  <button
-                    onClick={() => router.push('/rooms')}
-                    className="w-full mt-4 py-2 bg-trench-sandbag hover:bg-trench-gasmask text-white font-staatliches text-base uppercase rounded font-bold"
-                  >
-                    CHOOSE NEXT TARGET
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : room.expiry <= Date.now() ? (
-            // Expired but not settled yet (Pending telemetry resolving)
-            <div className="space-y-4 text-center py-4">
-              <div className="bg-trench-black border border-trench-sandbag p-4 rounded text-center">
-                <span className="font-mono text-[9px] text-trench-gasmask block font-bold uppercase">BATTLE OUTCOME PENDING</span>
-                <span className="font-staatliches text-2xl block mt-1 tracking-wider text-moon-gold glow-moon uppercase animate-pulse">
-                  TELEMETRY RESOLVING
-                </span>
-                {livePrice !== null && openingPriceSafe !== undefined && (
-                  <div className="mt-3 font-mono text-[10px] text-gray-300 border-t border-trench-sandbag/35 pt-2 leading-relaxed">
-                    Last Price: <span className="text-white font-bold">${formatPrice(livePrice)}</span> vs Entry: <span className="text-white font-bold">${formatPrice(openingPriceSafe)}</span>
-                    <div className="mt-1 text-[9px]">
-                      Potential Winner:{' '}
-                      <span className={livePrice > openingPriceSafe ? 'text-neon-moon font-bold glow-moon' : livePrice < openingPriceSafe ? 'text-jeet-red font-bold glow-jeet' : 'text-yellow-500 font-bold'}>
-                        {livePrice > openingPriceSafe ? 'MOON ARMY 🚀' : livePrice < openingPriceSafe ? 'JEET SQUADRON 💀' : 'DRAW / VOIDED 🤝'}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {userBetsInRoom.length > 0 ? (
-                <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
-                  <p className="font-mono text-[10px] text-white font-bold uppercase leading-relaxed mb-4">
-                    YOU HAVE ACTIVE FORCES IN THIS SECTOR! CHOOSE TO RESOLVE TRENCH VIA DEXSCREENER DATA TO REVEAL THE OUTCOME AND CLAIM BOOTY.
-                  </p>
-                  <button
-                    onClick={handleClaim}
-                    disabled={isTransactionLoading}
-                    className="w-full py-3 bg-neon-moon hover:bg-green-500 disabled:bg-trench-sandbag disabled:text-trench-gasmask disabled:border-trench-sandbag font-staatliches text-xl text-black rounded border-b-4 border-green-800 shadow-glow-moon font-bold flex items-center justify-center gap-2 uppercase tracking-wider transition-all"
-                  >
-                    {isTransactionLoading ? (
-                      <>
-                        <Loader2 className="animate-spin text-black shrink-0" size={20} />
-                        <span>RESOLVING DEXSCREENER & SETTLING...</span>
-                      </>
-                    ) : (
-                      <span>RESOLVE & CLAIM</span>
-                    )}
-                  </button>
-                </div>
-              ) : (
-                <div className="p-4 bg-trench-black border border-trench-sandbag rounded text-center">
-                  <p className="font-mono text-[10px] text-trench-gasmask uppercase font-bold leading-relaxed mb-4">
-                    Sector concluded. Settle now to process telemetry resolution.
-                  </p>
-                  <button
-                    onClick={handleClaim}
-                    disabled={isTransactionLoading}
-                    className="w-full py-3 bg-trench-sandbag hover:bg-trench-gasmask disabled:bg-trench-black disabled:text-trench-gasmask text-white font-staatliches text-base uppercase rounded font-bold flex items-center justify-center gap-2"
-                  >
-                    {isTransactionLoading ? (
-                      <>
-                        <Loader2 className="animate-spin text-white shrink-0" size={16} />
-                        <span>RESOLVING DEXSCREENER DATA...</span>
-                      </>
-                    ) : (
-                      <span>RESOLVE TRENCH FOR KEEPER</span>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            // Active Faction Selector + Slider controls
-            <>
-              {/* AMM Pool Ratio Meter */}
-              <div className="mb-4">
-                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-2">AMM TRENCH POOL DEPTH</span>
-                {(() => {
-                  const moonPool = room.moonPool || 0;
-                  const jeetPool = room.jeetPool || 0;
-                  const totalPool = moonPool + jeetPool;
-                  
-                  const moonPct = totalPool > 0 ? (moonPool / totalPool) * 100 : 50;
-                  const jeetPct = totalPool > 0 ? (jeetPool / totalPool) * 100 : 50;
-                  
-                  const priceMoon = (moonPool + 10) / (totalPool + 20);
-                  const priceJeet = (jeetPool + 10) / (totalPool + 20);
-
-                  return (
-                    <div className="bg-[#050804] border border-trench-sandbag/45 p-3 rounded-lg font-mono text-[10px]">
-                      {/* Faction Pools details */}
-                      <div className="flex justify-between mb-1.5 font-bold uppercase text-[9px]">
-                        <span className="text-neon-moon">MOON POOL: {moonPool.toFixed(2)} USDC</span>
-                        <span className="text-jeet-red">JEET POOL: {jeetPool.toFixed(2)} USDC</span>
-                      </div>
-
-                      {/* Visual Ratio Bar */}
-                      <div className="w-full h-3 bg-trench-black border border-trench-sandbag/35 rounded-sm overflow-hidden flex mb-2">
-                        <div 
-                          style={{ width: `${moonPct}%` }}
-                          className="h-full bg-neon-moon transition-all duration-300"
-                        />
-                        <div 
-                          style={{ width: `${jeetPct}%` }}
-                          className="h-full bg-jeet-red transition-all duration-300"
-                        />
-                      </div>
-
-                      {/* Implied Prices */}
-                      <div className="grid grid-cols-2 gap-2 text-center text-[10px] font-bold mt-2 pt-2 border-t border-trench-sandbag/20">
-                        <div className="bg-neon-moon/5 p-1 rounded border border-neon-moon/25">
-                          <div className="text-neon-moon uppercase text-[8px]">MOON PRICE</div>
-                          <div className="text-white text-xs mt-0.5">{(priceMoon * 100).toFixed(0)}¢ / share</div>
-                        </div>
-                        <div className="bg-jeet-red/5 p-1 rounded border border-jeet-red/25">
-                          <div className="text-jeet-red uppercase text-[8px]">JEET PRICE</div>
-                          <div className="text-white text-xs mt-0.5">{(priceJeet * 100).toFixed(0)}¢ / share</div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Stance Selector */}
-              <div className="mb-4">
-                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-2">1. PICK YOUR STANCE</span>
-                <div className="flex gap-3 h-14">
-                  <button
-                    onClick={() => {
-                      setSelectedSide('moon');
-                      synthSound('bet');
-                    }}
-                    className={`flex-1 uiverse-btn uiverse-btn-moon font-staatliches text-xl uppercase tracking-wider transition-all ${
-                      selectedSide === 'moon'
-                        ? 'shadow-glow-moon border-neon-moon animate-pulse'
-                        : 'opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <img src="/pepes/pepe-few-understand.png" className="btn-icon object-contain" alt="Pepe" />
-                    <span className="now">MOON</span>
-                    <span className="play">BUY MOON (BULL)</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setSelectedSide('jeet');
-                      synthSound('bet');
-                    }}
-                    className={`flex-1 uiverse-btn uiverse-btn-jeet font-staatliches text-xl uppercase tracking-wider transition-all ${
-                      selectedSide === 'jeet'
-                        ? 'shadow-glow-jeet border-jeet-red animate-pulse'
-                        : 'opacity-70 hover:opacity-100'
-                    }`}
-                  >
-                    <img src="/pepes/jeet-skeleton.png" className="btn-icon object-contain" alt="Pepe" />
-                    <span className="now">JEET</span>
-                    <span className="play">BUY JEET (BEAR)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* OrderBook (CLOB) */}
-              <div className="mb-4">
-                <OrderBook roomId={room.id} outcomeIndex={selectedSide === 'moon' ? 0 : 1} />
-              </div>
-
-              {/* Action Tabs */}
-              <div className="mb-4">
-                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-1">CHOOSE ACTION</span>
-                <div className="grid grid-cols-2 gap-1.5 bg-trench-mud p-1 border border-trench-sandbag rounded">
-                  <button
-                    onClick={() => { setOrderType('buy'); synthSound('bet'); }}
-                    className={`py-1.5 text-center font-staatliches text-sm tracking-wider uppercase rounded transition-all font-bold ${
-                      orderType === 'buy' ? 'bg-neon-moon text-black' : 'text-trench-gasmask hover:text-white'
-                    }`}
-                  >
-                    BUY SHARES
-                  </button>
-                  <button
-                    onClick={() => { setOrderType('sell'); synthSound('bet'); }}
-                    className={`py-1.5 text-center font-staatliches text-sm tracking-wider uppercase rounded transition-all font-bold ${
-                      orderType === 'sell' ? 'bg-jeet-red text-white' : 'text-trench-gasmask hover:text-white'
-                    }`}
-                  >
-                    SELL SHARES
-                  </button>
-                </div>
-              </div>
-
-              {/* Trade Mode Tabs */}
-              <div className="mb-4">
-                <span className="font-mono text-[9px] text-trench-gasmask font-bold uppercase block mb-1">ORDER TYPE</span>
-                <div className="grid grid-cols-2 gap-1.5 bg-trench-mud p-1 border border-trench-sandbag rounded">
-                  <button
-                    onClick={() => { setTradeMode('market'); synthSound('bet'); }}
-                    className={`py-1.5 text-center font-staatliches text-sm tracking-wider uppercase rounded transition-all font-bold ${
-                      tradeMode === 'market' ? 'bg-yellow-400 text-black' : 'text-trench-gasmask hover:text-white'
-                    }`}
-                  >
-                    MARKET
-                  </button>
-                  <button
-                    onClick={() => { setTradeMode('limit'); synthSound('bet'); }}
-                    className={`py-1.5 text-center font-staatliches text-sm tracking-wider uppercase rounded transition-all font-bold ${
-                      tradeMode === 'limit' ? 'bg-yellow-400 text-black' : 'text-trench-gasmask hover:text-white'
-                    }`}
-                  >
-                    LIMIT
-                  </button>
-                </div>
-              </div>
-
-              {/* Limit Price Input */}
-              {tradeMode === 'limit' && (
-                <div className="mb-4 bg-trench-black p-3.5 border border-trench-sandbag rounded">
-                  <div className="flex justify-between items-center mb-1 font-mono text-[9px] text-trench-gasmask uppercase font-bold">
-                    <span>LIMIT PRICE (USDC)</span>
-                    <span className="text-yellow-400">${limitPrice.toFixed(2)}</span>
-                  </div>
-                  <input
-                    type="number"
-                    min="0.01"
-                    max="0.99"
-                    step="0.01"
-                    value={limitPrice}
-                    onChange={(e) => setLimitPrice(parseFloat(e.target.value) || 0.5)}
-                    className="w-full bg-[#050804] border border-trench-sandbag text-white font-mono text-sm px-2.5 py-1.5 rounded focus:outline-none focus:border-yellow-400 font-bold"
-                  />
-                </div>
-              )}
-
-              {/* Order Entry Fields */}
-              <div className="mb-4 bg-trench-black p-3.5 border border-trench-sandbag rounded">
-                <div className="flex justify-between items-center mb-1 font-mono text-[9px] text-trench-gasmask uppercase font-bold">
-                  <span>{orderType === 'buy' ? 'BUY QTY (SHARES)' : 'SELL QTY (SHARES)'}</span>
-                  <span className="text-yellow-400">{sharesInput.toFixed(0)} shares</span>
-                </div>
-                <input
-                  type="number"
-                  min="1"
-                  step="any"
-                  value={sharesInput}
-                  onChange={(e) => setSharesInput(parseFloat(e.target.value) || 10)}
-                  className="w-full bg-[#050804] border border-trench-sandbag text-white font-mono text-sm px-2.5 py-1.5 rounded focus:outline-none focus:border-yellow-400 font-bold"
-                />
-              </div>
-
-              {/* Instant Swap Statistics */}
-              {(() => {
-                const moonPool = room.moonPool || 0;
-                const jeetPool = room.jeetPool || 0;
-                const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
-
-                let cost = 0;
-                let price = 0;
-
-                if (isEvm) {
-                  if (orderType === 'buy') {
-                    cost = getEvmBuyCost(sharesInput, selectedSide, moonPool, jeetPool);
-                  } else {
-                    cost = getEvmSellReceived(sharesInput, selectedSide, moonPool, jeetPool);
+            {/* Resolution Criteria Card */}
+            {room && (
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4 text-left">
+                <h3 className="font-sans text-sm text-slate-900 dark:text-white font-extrabold uppercase tracking-tight">
+                  Resolution Criteria
+                </h3>
+                
+                <p className="font-sans text-xs text-slate-700 dark:text-slate-300 leading-relaxed text-[11px]">
+                  {room.resolutionCriteria 
+                    ? room.resolutionCriteria.split('| Ref:')[0].trim()
+                    : `Will the price of ${room.token.symbol} end above $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}?`
                   }
-                  price = sharesInput > 0 ? (cost === Infinity ? Infinity : cost / sharesInput) : 0.50;
-                } else {
-                  const totalPool = moonPool + jeetPool;
-                  const priceMoon = (moonPool + 10) / (totalPool + 20);
-                  const priceJeet = (jeetPool + 10) / (totalPool + 20);
-                  price = selectedSide === 'moon' ? priceMoon : priceJeet;
-                  cost = price * sharesInput;
-                }
-
-                const maxPayout = sharesInput;
-                const profit = cost === Infinity ? -Infinity : maxPayout - cost;
-                const roiPercent = cost > 0 && cost !== Infinity ? (profit / cost) * 100 : 0;
-
-                return (
-                  <div className="space-y-2 mb-4 font-mono text-xs border-b border-trench-sandbag/40 pb-3">
-                    <div className="flex justify-between text-slate-500 dark:text-trench-gasmask uppercase font-bold">
-                      <span>EXECUTION PRICE</span>
-                      <span className="text-slate-900 dark:text-white font-bold">
-                        {price === Infinity ? 'N/A' : `${price.toFixed(2)} USDC / share`}
-                      </span>
-                    </div>
-                    {orderType === 'buy' ? (
-                      <>
-                        <div className="flex justify-between text-slate-500 dark:text-trench-gasmask uppercase font-bold">
-                          <span>TOTAL SWAP COST</span>
-                          <span className="text-slate-900 dark:text-white font-bold">
-                            {cost === Infinity ? 'EXCEEDS RESERVES' : `${cost.toFixed(2)} USDC`}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-slate-500 dark:text-trench-gasmask uppercase font-bold">
-                          <span>MAX PAYOUT (WIN)</span>
-                          <span className="text-[#00796B] dark:text-neon-moon font-bold">+{maxPayout.toFixed(2)} USDC</span>
-                        </div>
-                        <div className="flex justify-between text-slate-500/80 dark:text-trench-gasmask/80 uppercase font-bold text-[11px]">
-                          <span>NET PROFIT</span>
-                          <span className="text-amber-700 dark:text-yellow-400 font-bold">
-                            {cost === Infinity ? 'N/A' : `+${profit.toFixed(2)} USDC (+${roiPercent.toFixed(0)}%)`}
-                          </span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex justify-between text-slate-500 dark:text-trench-gasmask uppercase font-bold">
-                          <span>IMMEDIATE PAYOUT</span>
-                          <span className="text-[#00796B] dark:text-neon-moon font-bold">
-                            {cost === Infinity ? '0.00 USDC' : `+${cost.toFixed(2)} USDC`}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                    <div className="flex justify-between text-slate-500/60 dark:text-trench-gasmask/60 text-[9px] uppercase font-bold">
-                      <span>FEE & SLIPPAGE</span>
-                      <span>0.00% (AMM SWAP)</span>
-                    </div>
-                  </div>
-                );
-              })()}
-
-              <button
-                onClick={() => handlePlaceOrder()}
-                disabled={isTransactionLoading}
-                className="w-full py-3.5 text-center font-staatliches text-2xl uppercase tracking-widest text-black rounded border-2 border-yellow-700 border-b-4 bg-yellow-400 hover:bg-yellow-500 active:translate-y-0.5 transition-all relative overflow-hidden group font-bold flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(251,191,36,0.3)] disabled:bg-trench-sandbag disabled:border-trench-sandbag disabled:text-trench-gasmask hatch-pattern"
-              >
-                {isTransactionLoading ? (
-                  <Loader2 className="animate-spin text-black shrink-0" size={20} />
-                ) : (
-                  <span className="relative z-10 flex items-center gap-1.5 justify-center font-bold">
-                    <Coins size={20} className="text-black shrink-0 animate-pulse" />
-                    EXECUTE IMMEDIATE SWAP
-                  </span>
-                )}
-                <div className="absolute top-0 -left-[100%] w-1/2 h-full bg-white/20 skew-x-[-20deg] group-hover:animate-[shimmer_1s_ease-in-out_infinite]"></div>
-              </button>
-
-              {/* Active Positions Info */}
-              {(() => {
-                const userBetsInRoom = user ? user.bets.filter(b => b.roomId === room.id) : [];
-                const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || 0), 0);
-                const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || 0), 0);
-                const totalSpentMoon = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + b.amount, 0);
-                const avgMoonPrice = moonSharesOwned > 0 ? totalSpentMoon / moonSharesOwned : 0;
-                const totalSpentJeet = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + b.amount, 0);
-                const avgJeetPrice = jeetSharesOwned > 0 ? totalSpentJeet / jeetSharesOwned : 0;
-
-                if (moonSharesOwned === 0 && jeetSharesOwned === 0) return null;
-
-                return (
-                  <div className="mt-4 bg-[#050804] border border-trench-sandbag/45 p-3 rounded-lg font-mono text-[10px] space-y-2 text-left">
-                    <div className="font-bold text-yellow-500 uppercase border-b border-trench-sandbag/30 pb-1 flex justify-between">
-                      <span>YOUR ACTIVE TRENCH POSITIONS</span>
-                    </div>
-                    {moonSharesOwned > 0 && (
-                      <div className="flex justify-between items-center bg-neon-moon/5 p-1.5 rounded border border-neon-moon/20">
-                        <div>
-                          <div className="font-bold text-neon-moon uppercase text-[9px]">Moon (YES) Positions</div>
-                          <div className="text-[9px] text-trench-gasmask font-bold mt-0.5">QTY: {moonSharesOwned.toFixed(0)} | AVG PRICE: {avgMoonPrice.toFixed(2)} USDC</div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setSelectedSide('moon');
-                            setOrderType('sell');
-                            setSharesInput(moonSharesOwned);
-                            synthSound('bet');
-                          }}
-                          className="px-1.5 py-0.5 bg-jeet-red hover:bg-red-600 text-white text-[9px] uppercase font-bold rounded"
-                        >
-                          EXIT
-                        </button>
-                      </div>
-                    )}
-                    {jeetSharesOwned > 0 && (
-                      <div className="flex justify-between items-center bg-jeet-red/5 p-1.5 rounded border border-jeet-red/20">
-                        <div>
-                          <div className="font-bold text-jeet-red uppercase text-[9px]">Jeet (NO) Positions</div>
-                          <div className="text-[9px] text-gray-400 font-bold mt-0.5">QTY: {jeetSharesOwned.toFixed(0)} | AVG PRICE: {avgJeetPrice.toFixed(2)} USDC</div>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setSelectedSide('jeet');
-                            setOrderType('sell');
-                            setSharesInput(jeetSharesOwned);
-                            synthSound('bet');
-                          }}
-                          className="px-1.5 py-0.5 bg-jeet-red hover:bg-red-600 text-white text-[9px] uppercase font-bold rounded"
-                        >
-                          EXIT
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              <div className="mt-4 flex gap-2.5 items-start text-trench-gasmask leading-tight font-mono text-[9px] uppercase font-bold text-left">
-                <ShieldAlert size={16} className="text-jeet-red shrink-0 mt-0.5" />
-                <p>
-                  'Pure prediction execution. Order limits lock USDC collateral. Exit positions early by placing opposing sell orders.'
                 </p>
+
+                {room.resolutionCriteria && room.resolutionCriteria.includes('Ref:') && (
+                  <a 
+                    href={room.resolutionCriteria.split('Ref:')[1]?.trim() || '#'} 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-flex items-center gap-1 text-xs text-emerald-500 hover:text-emerald-400 transition-colors font-mono font-bold"
+                  >
+                    <span>View source</span>
+                    <ExternalLink size={12} />
+                  </a>
+                )}
               </div>
-            </>
-          )}
+            )}
 
-          {/* 4. RUBBER STAMP OVERLAYS ON SETTLEMENT */}
-          {isSettled && (
-            <div 
-              className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 font-staatliches text-3xl sm:text-5xl font-black tracking-widest border-2 sm:border-4 uppercase p-2 sm:p-3 rotate-[-15deg] backdrop-blur-sm z-40 bg-black/90 pointer-events-none transition-all duration-300 animate-pulse whitespace-nowrap ${
-                userWon
-                  ? 'border-neon-moon text-neon-moon shadow-glow-moon'
-                  : userLost
-                  ? 'border-jeet-red text-jeet-red shadow-glow-jeet'
-                  : 'border-trench-sandbag text-white'
-              }`}
-            >
-              {userWon ? 'VICTORY' : userLost ? 'GET REKT' : 'SETTLED'}
-            </div>
-          )}
+            {/* Expired / Dispute Settlement Cards (Only shown if pool has ended) */}
+            {room && (room.status === 'settled' || room.status === 'disputed' || room.expiry <= Date.now()) && (
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm space-y-4">
+                <h4 className="font-sans text-xs text-slate-900 dark:text-white font-extrabold uppercase">
+                  Arena Verdict Console
+                </h4>
+                
+                {room.status === 'disputed' ? (
+                  <div className="text-xs space-y-2">
+                    <div className="text-rose-500 font-bold uppercase">⚠️ Verdict Disputed</div>
+                    <p className="text-slate-500 dark:text-slate-400 leading-relaxed text-[11px]">
+                      Bettor challenged the verdict. Funds are frozen pending arbitrator verification.
+                    </p>
+                  </div>
+                ) : room.status === 'settled' ? (
+                  <div className="text-xs space-y-3">
+                    <span className={`font-bold block tracking-wider ${
+                      room.winner === 'moon' ? 'text-emerald-500' : room.winner === 'jeet' ? 'text-rose-500' : 'text-amber-500'
+                    }`}>
+                      {room.winner === 'moon' ? 'Resolved YES / MOON' : room.winner === 'jeet' ? 'Resolved NO / JEET' : 'DRAW / VOIDED'}
+                    </span>
 
-        </section>
+                    {userWon && hasUnclaimed && (
+                      <button
+                        onClick={handleClaim}
+                        disabled={isTransactionLoading}
+                        className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-200 text-white font-mono text-xs uppercase rounded-xl font-bold transition-all"
+                      >
+                        {isTransactionLoading ? 'CLAIMING...' : 'CLAIM WINNINGS'}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs space-y-3">
+                    <span className="text-amber-500 font-bold block animate-pulse">TELEMETRY RESOLVING</span>
+                    <button
+                      onClick={handleClaim}
+                      disabled={isTransactionLoading}
+                      className="w-full py-3 bg-slate-200 dark:bg-slate-800 hover:bg-slate-355 dark:hover:bg-slate-700 disabled:opacity-50 text-slate-800 dark:text-white font-mono text-xs uppercase rounded-xl font-bold transition-all"
+                    >
+                      {isTransactionLoading ? 'RESOLVING...' : 'RESOLVE TRENCH'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
-      </main>
+          </div>
+
+        </div>
+
+      </div>
 
       {selectedProfileAddress && (
         <PublicProfileModal
@@ -2941,7 +1809,6 @@ export default function RoomDetailPage() {
           onClose={() => setSelectedProfileAddress(null)}
         />
       )}
-
     </div>
   );
 }

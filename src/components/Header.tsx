@@ -417,7 +417,7 @@ export const Header: React.FC<{
                 {process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche' && (
                   <button
                     onClick={() => useAppState.getState().mintTestnetUsdc(1000)}
-                    className="hidden sm:inline-block px-1.5 py-0.5 bg-teal-600/20 hover:bg-teal-600 dark:bg-neon-moon/20 dark:hover:bg-neon-moon text-teal-700 hover:text-white dark:text-neon-moon dark:hover:text-black border border-teal-600/50 dark:border-neon-moon/50 font-mono text-[8px] font-bold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+                    className="hidden sm:inline-block uiverse-cyber-btn uiverse-cyber-btn-sm uiverse-cyber-btn-teal font-mono font-bold uppercase rounded-none cursor-pointer transition-all"
                     title="Get 1,000 Free Testnet USDC"
                   >
                     +1K USDC
@@ -425,7 +425,7 @@ export const Header: React.FC<{
                 )}
                 <button
                   onClick={() => useAppState.getState().openRelayDepositModal()}
-                  className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-[#00796B]/15 dark:bg-neon-moon/20 hover:bg-[#00796B] dark:hover:bg-neon-moon text-[#00796B] hover:text-white dark:text-neon-moon dark:hover:text-black border border-[#00796B]/50 dark:border-neon-moon/50 font-mono text-[8px] font-extrabold uppercase rounded-sm cursor-pointer transition-all active:translate-y-0.5"
+                  className="hidden md:inline-flex items-center gap-0.5 uiverse-cyber-btn uiverse-cyber-btn-sm uiverse-cyber-btn-amber font-mono font-extrabold uppercase rounded-none cursor-pointer transition-all"
                   title="Deposit from Base, Arbitrum, Mainnet, etc. via Relay Protocol"
                 >
                   <span>+ DEPOSIT</span>

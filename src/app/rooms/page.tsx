@@ -371,8 +371,8 @@ export default function RoomsPage() {
               : 'bg-cyan-50/50 dark:bg-trench-black/40 border-cyan-200/60 dark:border-trench-sandbag/40 hover:border-cyan-300 dark:hover:border-trench-sandbag'
           }`}>
             <div className="flex items-center gap-2">
-              <span className="text-sm">🚀</span>
-              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">MOON</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+              <span className="font-bold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-wider">{room.moonLabel || 'MOON'}</span>
               {isSettled && room.winner === 'moon' && <span className="text-[10px] text-teal-700 dark:text-green-500 bg-teal-100 dark:bg-green-500/10 px-1.5 py-0.5 rounded font-mono font-bold">WINNER</span>}
             </div>
             <div className="flex items-center gap-3">
@@ -380,12 +380,12 @@ export default function RoomsPage() {
               {!isSettled && !isDisputed ? (
                 <button
                   onClick={(e) => handleQuickBet(e, room.id, 'moon', quickAmount)}
-                  className="px-3.5 py-1 bg-[#00796B] dark:bg-green-600/10 text-white dark:text-green-500 hover:bg-[#004D40] dark:hover:bg-green-600 dark:hover:text-white border border-[#00796B] dark:border-green-600/30 transition-all rounded-lg font-bold text-xs min-w-[70px] text-center"
+                  className="px-3.5 py-1 bg-[#00796B] dark:bg-green-600/10 text-white dark:text-green-500 hover:bg-[#004D40] dark:hover:bg-green-600 dark:hover:text-white border border-[#00796B] dark:border-green-600/30 transition-all rounded-lg font-bold text-xs min-w-[80px] text-center uppercase truncate"
                 >
-                  MOON
+                  {room.moonLabel || 'MOON'}
                 </button>
               ) : (
-                <div className="w-[70px]" />
+                <div className="w-[80px]" />
               )}
             </div>
           </div>
@@ -399,8 +399,8 @@ export default function RoomsPage() {
               : 'bg-cyan-50/50 dark:bg-trench-black/40 border-cyan-200/60 dark:border-trench-sandbag/40 hover:border-cyan-300 dark:hover:border-trench-sandbag'
           }`}>
             <div className="flex items-center gap-2">
-              <span className="text-sm">💀</span>
-              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">JEET</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+              <span className="font-bold text-xs text-slate-800 dark:text-slate-200 uppercase tracking-wider">{room.jeetLabel || 'JEET'}</span>
               {isSettled && room.winner === 'jeet' && <span className="text-[10px] text-red-700 dark:text-red-500 bg-red-100 dark:bg-red-500/10 px-1.5 py-0.5 rounded font-mono font-bold">WINNER</span>}
             </div>
             <div className="flex items-center gap-3">
@@ -408,12 +408,12 @@ export default function RoomsPage() {
               {!isSettled && !isDisputed ? (
                 <button
                   onClick={(e) => handleQuickBet(e, room.id, 'jeet', quickAmount)}
-                  className="px-3.5 py-1 bg-[#C62828] dark:bg-red-600/10 text-white dark:text-red-500 hover:bg-[#B71C1C] dark:hover:bg-red-600 dark:hover:text-white border border-[#C62828] dark:border-red-600/30 transition-all rounded-lg font-bold text-xs min-w-[70px] text-center"
+                  className="px-3.5 py-1 bg-[#C62828] dark:bg-red-600/10 text-white dark:text-red-500 hover:bg-[#B71C1C] dark:hover:bg-red-600 dark:hover:text-white border border-[#C62828] dark:border-red-600/30 transition-all rounded-lg font-bold text-xs min-w-[80px] text-center uppercase truncate"
                 >
-                  JEET
+                  {room.jeetLabel || 'JEET'}
                 </button>
               ) : (
-                <div className="w-[70px]" />
+                <div className="w-[80px]" />
               )}
             </div>
           </div>
@@ -829,10 +829,9 @@ export default function RoomsPage() {
               </>
             )}
           </div>
-          {/* Rocket Deploy Button */}
+          {/* Deploy Button */}
           <Link href="/create-room" className="w-full md:w-auto">
             <button className="w-full py-2 px-5 font-mono text-xs uppercase tracking-wider text-white dark:text-black bg-[#10b981] hover:bg-[#059669] rounded-xl shadow-md transition-all flex items-center justify-center gap-2 font-extrabold h-11 text-center">
-              <Rocket size={16} className="animate-bounce text-white dark:text-black" />
               <span>DEPLOY ROOM</span>
             </button>
           </Link>
@@ -851,7 +850,7 @@ export default function RoomsPage() {
               }}
               className={`px-3 py-1.5 rounded-lg border font-mono text-[10px] tracking-wider uppercase transition-all duration-150 flex items-center gap-1.5 shrink-0 select-none ${
                 isActive
-                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-sm font-bold scale-105'
+                  ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 shadow-sm font-bold'
                   : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               }`}
             >

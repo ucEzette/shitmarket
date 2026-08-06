@@ -612,9 +612,9 @@ export default function PortfolioWallets() {
               </div>
             </div>
             
-            <div className="bg-trench-black border border-trench-sandbag rounded-lg overflow-x-auto">
+            <div className="bg-white dark:bg-trench-black border border-slate-200 dark:border-trench-sandbag rounded-lg overflow-x-auto">
               <table className="w-full text-left font-mono text-[10px] min-w-[320px]">
-                <thead className="bg-trench-mud/50 text-trench-gasmask border-b border-trench-sandbag">
+                <thead className="bg-slate-50 dark:bg-trench-mud/50 text-slate-500 dark:text-trench-gasmask border-b border-slate-200 dark:border-trench-sandbag">
                   <tr>
                     <th className="py-2 px-3 font-normal uppercase">Wallet</th>
                     <th className="py-2 px-3 font-normal uppercase text-right">USDC</th>
@@ -622,7 +622,7 @@ export default function PortfolioWallets() {
                     <th className="py-2 px-3 font-normal uppercase text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-trench-sandbag/40 text-slate-900 dark:text-white">
+                <tbody className="divide-y divide-slate-100 dark:divide-trench-sandbag/40 text-slate-900 dark:text-white">
                   {tradingWallets.map((wallet, idx) => {
                     const usdcBal = usdcBalances[wallet.address] || 0;
                     const avaxBal = avaxBalances[wallet.address] || 0;
@@ -630,10 +630,10 @@ export default function PortfolioWallets() {
                     const isEmbedded = embeddedWallets.some(w => w.address?.toLowerCase() === wallet.address?.toLowerCase());
                     
                     return (
-                      <tr key={idx} className={`hover:bg-trench-mud/30 transition-colors ${isActive ? 'bg-neon-moon/5' : ''}`}>
+                      <tr key={idx} className={`hover:bg-slate-50 dark:hover:bg-trench-mud/30 transition-colors ${isActive ? 'bg-emerald-500/10 dark:bg-neon-moon/5' : ''}`}>
                         <td className="py-3 px-3 w-1/3">
                           <div className="flex items-center gap-2 group">
-                            <Folder size={12} className={isActive ? "text-neon-moon" : "text-trench-gasmask"} />
+                            <Folder size={12} className={isActive ? "text-emerald-500 dark:text-neon-moon" : "text-slate-400 dark:text-trench-gasmask"} />
                             <div className="w-full">
                               {editingWallet === wallet.address ? (
                                 <div className="flex items-center gap-1">
@@ -655,7 +655,7 @@ export default function PortfolioWallets() {
                                   </span>
                                 </span>
                               )}
-                              <span className="block text-[9px] text-trench-gasmask cursor-pointer hover:text-slate-900 dark:text-white flex items-center gap-1 mt-0.5" onClick={() => handleCopy(wallet.address)}>
+                              <span className="block text-[9px] text-slate-400 dark:text-trench-gasmask cursor-pointer hover:text-slate-900 dark:hover:text-white flex items-center gap-1 mt-0.5" onClick={() => handleCopy(wallet.address)}>
                                 {wallet.address.slice(0, 6)}...{wallet.address.slice(-6)} <Copy size={8} />
                               </span>
                             </div>
@@ -669,6 +669,25 @@ export default function PortfolioWallets() {
                         </td>
                         <td className="py-3 px-3 text-right w-1/4">
                           <div className="flex items-center justify-end gap-2 text-trench-gasmask">
+                            {!isActive ? (
+                              <button
+                                onClick={() => {
+                                  if (isEmbedded) {
+                                    walletContext.setWalletType('embedded');
+                                    walletContext.setActiveEmbeddedWalletAddress(wallet.address);
+                                  } else {
+                                    walletContext.setWalletType('external');
+                                    walletContext.setActiveExternalWalletAddress(wallet.address);
+                                  }
+                                  synthSound('bet');
+                                }}
+                                className="px-2 py-0.5 bg-teal-600/20 hover:bg-teal-600 dark:bg-neon-moon/20 dark:hover:bg-neon-moon text-teal-700 hover:text-white dark:text-neon-moon dark:hover:text-black font-mono text-[8px] font-bold uppercase rounded border border-teal-600/40 dark:border-neon-moon/40 transition-colors"
+                              >
+                                Activate
+                              </button>
+                            ) : (
+                              <span className="text-[8px] text-teal-700 dark:text-neon-moon font-mono uppercase font-bold px-2 py-0.5 bg-teal-600/10 dark:bg-neon-moon/10 rounded">Active</span>
+                            )}
                             <button onClick={() => { setSourceAddress(wallet.address); synthSound('bet'); }} title="Set as Source" className="hover:text-neon-moon transition-colors"><Upload size={12} /></button>
                             <button onClick={() => { setEditingWallet(wallet.address); setEditName(walletNames[wallet.address] || ''); }} title="Rename" className="hover:text-slate-900 dark:text-white transition-colors"><Edit2 size={12} /></button>
                             {!isActive && (

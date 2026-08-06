@@ -240,7 +240,7 @@ const PNLChart: React.FC<{
                         {formatVal(hoveredPoint.y)}
                       </span>
                     </div>
-                    <div className="text-[6px] text-trench-gasmask/70 mt-0.5">
+                    <div className="text-[6px] text-trench-gasmask/70 mt-0.5" suppressHydrationWarning>
                       {new Date(hoveredPoint.timestamp).toLocaleDateString()} // {new Date(hoveredPoint.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
@@ -552,7 +552,7 @@ export default function PortfolioPage() {
       {/* Portfolio Title Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-10">
         <div>
-          <h2 className="font-staatliches text-4xl text-white tracking-wider font-bold">
+          <h2 className="font-staatliches text-4xl text-slate-900 dark:text-white tracking-wider font-bold">
             PORTFOLIO WALLETS
           </h2>
           <div className="flex items-center gap-2 mt-1">
@@ -677,7 +677,7 @@ export default function PortfolioPage() {
               className={`pb-2 px-4 font-staatliches text-sm sm:text-base tracking-wider uppercase border-b-2 font-bold transition-all ${
                 isActive 
                   ? 'border-neon-moon text-neon-moon glow-moon font-extrabold scale-105' 
-                  : 'border-transparent text-trench-gasmask hover:text-white'
+                  : 'border-transparent text-slate-400 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               {label}
@@ -890,7 +890,7 @@ export default function PortfolioPage() {
                         <div key={idx} className="p-2 bg-trench-black/60 border border-trench-sandbag/40 rounded flex justify-between items-center text-[10px] font-mono font-bold">
                           <div>
                             <span className="text-white uppercase">{bet.amount.toFixed(1)} SOL on {formatCashtag(symbol)}</span>
-                            <span className="text-trench-gasmask/70 text-[8px] block uppercase">Side: {bet.side} // {new Date(bet.timestamp).toLocaleDateString()}</span>
+                            <span className="text-trench-gasmask/70 text-[8px] block uppercase" suppressHydrationWarning>Side: {bet.side} // {new Date(bet.timestamp).toLocaleDateString()}</span>
                           </div>
                           <div>
                             {!isSettled ? (

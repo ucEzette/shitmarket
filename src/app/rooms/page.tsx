@@ -429,7 +429,7 @@ export default function RoomsPage() {
                 (room.category as string) === 'prediction' || 
                 (!!room.resolutionCriteria && room.resolutionCriteria.length > 0 && (!room.token.pairAddress || room.token.pairAddress === '')) ||
                 room.token.address === room.creator;
-              const isMeme = room.category === 'meme' || room.category === 'pop_culture' || (room.token.liquidity && room.token.liquidity < 100000);
+              const isMeme = (room.category as string) === 'meme' || (room.category as string) === 'pop_culture' || (room.token.liquidity && room.token.liquidity < 100000);
 
               if (isDebate) {
                 return (

@@ -36,12 +36,7 @@ export const Footer: React.FC = () => {
           </p>
         </div>
 
-        {/* Dynamic Status Badges / Settlement Engine */}
-        <div className="flex items-center gap-2 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/60 rounded px-3 py-1 shadow-sm dark:shadow-md">
-          <div className="w-1.5 h-1.5 rounded-full bg-red-600 dark:bg-jeet-red animate-pulse" />
-          <span className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask font-bold uppercase">SETTLEMENT ENGINE:</span>
-          <span className="font-staatliches text-sm text-red-600 dark:text-jeet-red tracking-wider">SECURE PREDICTIONS</span>
-        </div>
+
 
         {/* Warning Banner */}
         <div className="flex items-center gap-1.5 bg-cyan-50/60 dark:bg-trench-mud/40 border border-cyan-200 dark:border-trench-sandbag/30 rounded px-2.5 py-1 max-w-xs sm:max-w-md">
@@ -51,20 +46,8 @@ export const Footer: React.FC = () => {
           </span>
         </div>
 
-        {/* Social / Recruit Links */}
         <div className="flex items-center gap-3">
-          <span className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask font-bold tracking-wider uppercase hidden xl:inline">
-            RECRUIT CHANNELS:
-          </span>
           <div className="flex items-center gap-2">
-            {/* Mobile App Coming Soon Status */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag/60 rounded font-mono text-[9.5px] font-bold text-slate-600 dark:text-trench-gasmask shadow-inner select-none">
-              <span>MOBILE CLIENT:</span>
-              <span className="text-[#00796B] dark:text-neon-moon flex items-center gap-1">
-                COMING SOON
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00796B] dark:bg-neon-moon animate-pulse" />
-              </span>
-            </div>
 
             <a
               href="https://x.com/shitmarketlol"

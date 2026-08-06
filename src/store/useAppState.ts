@@ -508,6 +508,8 @@ export interface Room {
   disputeChallenger?: string;
   disputeBond?: number;
   oracleLogs?: string;
+  moonLabel?: string;
+  jeetLabel?: string;
 }
 
 export interface UserProfile {
@@ -597,6 +599,11 @@ export interface AppState {
     openingPrice?: number;
   } | null;
   setShareCardData: (data: any) => void;
+
+  parlayCart: { roomId: string; side: 'moon' | 'jeet' }[];
+  addLegToParlay: (roomId: string, side: 'moon' | 'jeet') => void;
+  removeLegFromParlay: (roomId: string) => void;
+  clearParlayCart: () => void;
   
   // Transactional & Web3 states
   wallet: any | null;
@@ -999,6 +1006,26 @@ export const useAppState = create<AppState>()(
   fullDegenMode: false,
   shareCardData: null,
   setShareCardData: (data) => set({ shareCardData: data }),
+
+  parlayCart: [],
+  addLegToParlay: (roomId, side) => {
+    set((state) => {
+      const exists = state.parlayCart.some((l) => l.roomId === roomId);
+      let newCart;
+      if (exists) {
+        newCart = state.parlayCart.map((l) => (l.roomId === roomId ? { ...l, side } : l));
+      } else {
+        newCart = [...state.parlayCart, { roomId, side }];
+      }
+      return { parlayCart: newCart };
+    });
+  },
+  removeLegFromParlay: (roomId) => {
+    set((state) => ({
+      parlayCart: state.parlayCart.filter((l) => l.roomId !== roomId),
+    }));
+  },
+  clearParlayCart: () => set({ parlayCart: [] }),
 
   isRelayDepositOpen: false,
   relayInitialOriginChainId: undefined,
@@ -1960,7 +1987,9 @@ export const useAppState = create<AppState>()(
             creator: wallet.address,
             chainId: room.token.chainId,
             duration: room.duration,
-            status: 'active'
+            status: 'active',
+            moonLabel: room.moonLabel || 'MOON',
+            jeetLabel: room.jeetLabel || 'JEET'
           })
         }).catch(err => console.warn("Failed to post EVM room to indexer:", err));
         
@@ -2239,7 +2268,9 @@ export const useAppState = create<AppState>()(
           creator: wallet.publicKey.toBase58(),
           chainId: room.token.chainId,
           duration: room.duration,
-          status: 'active'
+          status: 'active',
+          moonLabel: room.moonLabel || 'MOON',
+          jeetLabel: room.jeetLabel || 'JEET'
         })
       }).catch(err => console.warn("Failed to post Solana room to indexer:", err));
       

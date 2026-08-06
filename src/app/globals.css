@@ -726,3 +726,160 @@ body {
   transform: translateX(12px) !important;
 }
 
+/* Cyberpunk Button Styles from Uiverse.io */
+.uiverse-cyber-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.2s ease-in-out;
+  text-align: center;
+}
+
+.uiverse-cyber-btn:active {
+  transform: scale(0.98);
+}
+
+.uiverse-cyber-btn:before {
+  content: "";
+  width: 4px;
+  height: 28px;
+  background: #f8fafc; /* matches light theme bg */
+  transform: rotate(-45deg);
+  position: absolute;
+  border-top: 0;
+  border-left: 0;
+  border-bottom: 0;
+  bottom: -7px;
+  left: 4px;
+  border-bottom-left-radius: 10px;
+  border-top-left-radius: 10px;
+}
+
+.dark .uiverse-cyber-btn:before {
+  background: #020617; /* matches dark theme bg */
+}
+
+.uiverse-cyber-btn:after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  bottom: -2px;
+  border-top: 15px solid transparent;
+  border-left: 15px solid #fffcf7;
+}
+
+/* Green (Enter Arena) Variant */
+.uiverse-cyber-btn-green {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.6) -12.74%, rgba(5, 150, 105, 0.3) 56.76%);
+  border: 2px solid #34d399;
+  color: #ffffff !important;
+}
+.uiverse-cyber-btn-green:before {
+  border-right: 2px solid #34d399;
+}
+.uiverse-cyber-btn-green:after {
+  border-left-color: #34d399;
+}
+.uiverse-cyber-btn-green:hover {
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.8) -12.74%, rgba(5, 150, 105, 0.5) 56.76%);
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.3);
+}
+
+/* Neutral/Gray (Create Market) Variant */
+.uiverse-cyber-btn-gray {
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.15) -12.74%, rgba(203, 213, 225, 0.08) 56.76%);
+  border: 2px solid #cbd5e1;
+  color: #0f172a;
+}
+.dark .uiverse-cyber-btn-gray {
+  border: 2px solid #475569;
+  color: #ffffff;
+}
+.uiverse-cyber-btn-gray:before {
+  border-right: 2px solid #cbd5e1;
+}
+.dark .uiverse-cyber-btn-gray:before {
+  border-right: 2px solid #475569;
+}
+.uiverse-cyber-btn-gray:after {
+  border-left-color: #cbd5e1;
+}
+.dark .uiverse-cyber-btn-gray:after {
+  border-left-color: #475569;
+}
+.uiverse-cyber-btn-gray:hover {
+  background: linear-gradient(90deg, rgba(148, 163, 184, 0.3) -12.74%, rgba(203, 213, 225, 0.15) 56.76%);
+  box-shadow: 0 0 15px rgba(148, 163, 184, 0.15);
+}
+
+/* Header Small Variant modifications */
+.uiverse-cyber-btn-sm {
+  padding: 4px 10px !important;
+  font-size: 9px !important;
+  font-weight: 700;
+}
+.uiverse-cyber-btn-sm:before {
+  height: 16px;
+  width: 2px;
+  bottom: -4px;
+  left: 2px;
+}
+.uiverse-cyber-btn-sm:after {
+  border-top-width: 8px;
+  border-left-width: 8px;
+}
+
+/* Header Green/Teal (claim) Variant */
+.uiverse-cyber-btn-teal {
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.25) -12.74%, rgba(13, 148, 136, 0.12) 56.76%);
+  border: 1.5px solid #2dd4bf;
+  color: #115e59;
+}
+.dark .uiverse-cyber-btn-teal {
+  color: #2dd4bf;
+}
+.uiverse-cyber-btn-teal:before {
+  border-right: 1.5px solid #2dd4bf;
+}
+.uiverse-cyber-btn-teal:after {
+  border-left-color: #2dd4bf;
+}
+.uiverse-cyber-btn-teal:hover {
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.45) -12.74%, rgba(13, 148, 136, 0.25) 56.76%);
+  box-shadow: 0 0 10px rgba(20, 184, 166, 0.25);
+  color: #0f172a;
+}
+.dark .uiverse-cyber-btn-teal:hover {
+  color: #000000;
+}
+
+/* Header Deposit (base/relayer) Variant */
+.uiverse-cyber-btn-amber {
+  background: linear-gradient(90deg, rgba(217, 119, 6, 0.25) -12.74%, rgba(180, 83, 9, 0.12) 56.76%);
+  border: 1.5px solid #fbbf24;
+  color: #92400e;
+}
+.dark .uiverse-cyber-btn-amber {
+  color: #fbbf24;
+}
+.uiverse-cyber-btn-amber:before {
+  border-right: 1.5px solid #fbbf24;
+}
+.uiverse-cyber-btn-amber:after {
+  border-left-color: #fbbf24;
+}
+.uiverse-cyber-btn-amber:hover {
+  background: linear-gradient(90deg, rgba(217, 119, 6, 0.45) -12.74%, rgba(180, 83, 9, 0.25) 56.76%);
+  box-shadow: 0 0 10px rgba(217, 119, 6, 0.25);
+  color: #0f172a;
+}
+.dark .uiverse-cyber-btn-amber:hover {
+  color: #000000;
+}
+

@@ -2453,7 +2453,7 @@ export const useAppState = create<AppState>()(
         name: 'CTFExchange',
         version: '1',
         chainId: avalancheFuji.id,
-        verifyingContract: (process.env.NEXT_PUBLIC_EXCHANGE_CONTRACT || '0x0') as `0x${string}`
+        verifyingContract: (process.env.NEXT_PUBLIC_EXCHANGE_CONTRACT || '0x0000000000000000000000000000000000000000') as `0x${string}`
       };
       const types = {
         Order: [
@@ -2620,8 +2620,15 @@ export const useAppState = create<AppState>()(
       }
 
       // Fetch matching limit orders from indexer API
-      const response = await fetch(`${INDEXER_URL}/api/orders/book/${roomId}`);
-      const data = await response.json();
+      let data: any = { success: false, book: { asks: [], bids: [] } };
+      try {
+        const response = await fetch(`${INDEXER_URL}/api/orders/book/${roomId}`);
+        if (response.ok) {
+          data = await response.json();
+        }
+      } catch (fetchErr) {
+        console.warn("Failed to fetch order book from indexer, falling back to pure AMM:", fetchErr);
+      }
       
       const makerOrders: any[] = [];
       const signatures: string[] = [];
@@ -3039,6 +3046,15 @@ export const useAppState = create<AppState>()(
       }).catch(err => console.warn("Failed to log bet to indexer:", err));
 
       get().updateToast(toastId, { type: 'success', message: 'MARKET ORDER COMPLETED', description: 'Transaction successfully settled on Avalanche Fuji.', txSig: tradeTxHash });
+      
+      // Dispatch notification activity entry locally
+      get().addActivity({
+        type: 'win',
+        title: orderType === 'buy' ? 'WAGER DEPLOYED' : 'POSITION LIQUIDATED',
+        message: `${orderType === 'buy' ? 'Deployed' : 'Liquidated'} ${amountShares.toFixed(2)} shares of ${side === 'moon' ? 'YES' : 'NO'} outcome.`,
+        link: `/room/${roomId}`
+      });
+
       await get().fetchBalance();
       await get().fetchSingleRoom(roomId);
     } catch (err: any) {

@@ -423,6 +423,8 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
           disputeChallenger: true,
           disputeBond: true,
           oracleLogs: true,
+          moonLabel: true,
+          jeetLabel: true,
         },
       });
 
@@ -482,7 +484,9 @@ roomsRouter.post('/', async (req, res) => {
       creator,
       chainId,
       duration,
-      status
+      status,
+      moonLabel,
+      jeetLabel
     } = req.body;
 
     if (!roomPubkey) {
@@ -521,6 +525,8 @@ roomsRouter.post('/', async (req, res) => {
         oracleFeeLamports: oracleFeeLamports ? BigInt(oracleFeeLamports) : BigInt(0),
         resolutionCriteria: resolutionCriteria || '',
         totalPool: totalPoolScaled,
+        moonLabel: moonLabel || 'MOON',
+        jeetLabel: jeetLabel || 'JEET',
       },
       update: {
         status: status || 'active',
@@ -537,6 +543,8 @@ roomsRouter.post('/', async (req, res) => {
         oracleAddress: normOracle || undefined,
         oracleFeeLamports: oracleFeeLamports ? BigInt(oracleFeeLamports) : undefined,
         creator: normCreator || undefined,
+        moonLabel: moonLabel || undefined,
+        jeetLabel: jeetLabel || undefined,
       }
     });
 

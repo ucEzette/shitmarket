@@ -45,6 +45,8 @@ model Room {
   disputeChallenger   String?   @map("dispute_challenger") @db.VarChar(255)
   disputeBond         BigInt?   @map("dispute_bond")
   oracleLogs          String?   @map("oracle_logs") @db.Text
+  moonLabel           String    @default("MOON") @map("moon_label") @db.VarChar(50)
+  jeetLabel           String    @default("JEET") @map("jeet_label") @db.VarChar(50)
 
   bets            Bet[]
   payouts         Payout[]

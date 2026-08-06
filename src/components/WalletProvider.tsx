@@ -341,34 +341,24 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const savedType = localStorage.getItem('shitmarket_wallet_type');
 
     if (privy.authenticated) {
-      if (savedType === 'embedded') {
+      if (!savedType || savedType === 'external') {
+        if (walletType !== 'embedded') {
+          setWalletType('embedded');
+          localStorage.setItem('shitmarket_wallet_type', 'embedded');
+        }
+      } else if (savedType === 'embedded') {
         if (walletType !== 'embedded') {
           setWalletType('embedded');
         }
-      } else if (savedType === 'external') {
-        if (walletType !== 'external') {
-          setWalletType('external');
-        }
-      } else if (!walletType && savedType !== 'imported') {
-        // Auto-detect if type not explicitly set
-        const hasEmbedded = privySolanaWallets.some((w) => {
-          const linked = privy.user?.linkedAccounts.find(
-            (uw: any) => uw.type === 'wallet' && uw.address?.toLowerCase() === w.address.toLowerCase()
-          ) as any;
-          return linked?.connectorType === 'embedded' || linked?.walletClientType === 'privy';
-        });
-        if (hasEmbedded) {
-          setWalletType('embedded');
-          localStorage.setItem('shitmarket_wallet_type', 'embedded');
-        } else if (privySolanaWallets.length > 0) {
-          setWalletType('external');
-          localStorage.setItem('shitmarket_wallet_type', 'external');
+      } else if (savedType === 'imported') {
+        if (walletType !== 'imported') {
+          setWalletType('imported');
         }
       }
     } else if (walletType !== 'imported' && walletType !== null) {
       setWalletType(null);
     }
-  }, [privy.ready, privy.authenticated, privySolanaWallets, privy.user?.linkedAccounts, walletType]);
+  }, [privy.ready, privy.authenticated, walletType]);
 
   // Trigger wallet creation for authenticated users without an embedded wallet who selected 'embedded'
   useEffect(() => {
@@ -468,7 +458,11 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
-    const effectivePrivyWallet = activeEvmWallet || activeEmbeddedWallet || activeExternalWallet;
+    const effectivePrivyWallet = walletType === 'embedded' 
+      ? activeEmbeddedWallet 
+      : walletType === 'external' 
+      ? activeExternalWallet 
+      : null;
     const customWalletAdaptor = {
       publicKey: activeWalletPublicKey,
       address: activeWalletAddress,
@@ -476,9 +470,6 @@ const WalletContextProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       privyWallet: effectivePrivyWallet ? {
         ...effectivePrivyWallet,
         getEthereumProvider: async () => {
-          if (activeEvmWallet?.getEthereumProvider) {
-            return await activeEvmWallet.getEthereumProvider();
-          }
           if ((effectivePrivyWallet as any)?.getEthereumProvider) {
             return await (effectivePrivyWallet as any).getEthereumProvider();
           }
@@ -855,10 +846,10 @@ export const SolanaWalletProvider: React.FC<{ children: React.ReactNode }> = ({ 
         },
         embeddedWallets: {
           solana: {
-            createOnLogin: 'users-without-wallets',
+            createOnLogin: 'all-users',
           },
           ethereum: {
-            createOnLogin: 'users-without-wallets',
+            createOnLogin: 'all-users',
           },
           showWalletUIs: false, // Disables confirmation modal for promptless transactions
         },

@@ -11,7 +11,7 @@ import { config } from '../config';
 import { logger } from '../logger';
 import { prisma } from '../db';
 import { redis, cacheRoom, publishRoomUpdate, updateLeaderboard } from '../redis';
-import { createPublicClient, http, decodeEventLog } from 'viem';
+import { createPublicClient, http, decodeEventLog, decodeFunctionData } from 'viem';
 import { avalancheFuji } from 'viem/chains';
 import {
   roomsCreatedTotal,
@@ -503,8 +503,22 @@ async function handleSwap(log: EvmLog) {
 
   if (conditionId) {
     const roomId = conditionId;
-    const amount = BigInt(usdcSpent);
-    const side = outcomeIndex === 0 ? 'moon' : 'jeet';
+    
+    let isSell = false;
+    try {
+      const tx = await publicClient.getTransaction({ hash: log.transactionHash as `0x${string}` });
+      const selector = tx.input.slice(0, 10).toLowerCase();
+      if (selector === '0xf2ccb397' || selector === '0xbc0b831c') {
+        isSell = true;
+      }
+    } catch (txErr) {
+      logger.warn({ msg: 'Failed to inspect tx input for buy vs sell detection', hash: log.transactionHash, err: txErr });
+    }
+
+    const amount = isSell ? -BigInt(usdcSpent) : BigInt(usdcSpent);
+    const side = isSell 
+      ? (outcomeIndex === 0 ? 'jeet' : 'moon')
+      : (outcomeIndex === 0 ? 'moon' : 'jeet');
 
     // Log the Bet in Prisma
     await prisma.bet.create({
@@ -538,7 +552,7 @@ async function handleSwap(log: EvmLog) {
       jeetPool: reserveNO.toString(),
     });
 
-    logger.info({ msg: 'EVM AMM Swap indexed', pool: log.address, swapper, side, amount: amount.toString() });
+    logger.info({ msg: isSell ? 'EVM AMM Sell indexed' : 'EVM AMM Buy indexed', pool: log.address, swapper, side, amount: amount.toString() });
   }
 }
 

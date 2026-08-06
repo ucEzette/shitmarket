@@ -2583,9 +2583,11 @@ export const useAppState = create<AppState>()(
           args: [tokensAddress, roomId as `0x${string}`, usdcAddress],
           account: wallet.address as `0x${string}`
         });
+        const deployPoolNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
         const deployPoolHash = await evmWalletClient.writeContract({
           ...deployPoolReq,
-          gas: BigInt(2500000)
+          gas: BigInt(2500000),
+          nonce: deployPoolNonce
         });
         const deployReceipt = await publicClient.waitForTransactionReceipt({ hash: deployPoolHash });
 
@@ -2790,9 +2792,11 @@ export const useAppState = create<AppState>()(
               args: [poolAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
               account: wallet.address as `0x${string}`
             });
+            const approveNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
             const approveHash = await evmWalletClient.writeContract({
               ...approveReq,
-              gas: BigInt(150000)
+              gas: BigInt(150000),
+              nonce: approveNonce
             });
             await publicClient.waitForTransactionReceipt({ hash: approveHash });
           }
@@ -2806,9 +2810,11 @@ export const useAppState = create<AppState>()(
             account: wallet.address as `0x${string}`
           });
 
+          const buyNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
           tradeTxHash = await evmWalletClient.writeContract({
             ...request,
-            gas: BigInt(600000)
+            gas: BigInt(600000),
+            nonce: buyNonce
           });
           await publicClient.waitForTransactionReceipt({ hash: tradeTxHash });
 
@@ -2831,9 +2837,11 @@ export const useAppState = create<AppState>()(
               args: [poolAddress, true],
               account: wallet.address as `0x${string}`
             });
+            const approveTokensNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
             const approveHash = await evmWalletClient.writeContract({
               ...approveReq,
-              gas: BigInt(150000)
+              gas: BigInt(150000),
+              nonce: approveTokensNonce
             });
             await publicClient.waitForTransactionReceipt({ hash: approveHash });
           }
@@ -2846,9 +2854,11 @@ export const useAppState = create<AppState>()(
             account: wallet.address as `0x${string}`
           });
 
+          const sellNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
           tradeTxHash = await evmWalletClient.writeContract({
             ...request,
-            gas: BigInt(600000)
+            gas: BigInt(600000),
+            nonce: sellNonce
           });
           await publicClient.waitForTransactionReceipt({ hash: tradeTxHash });
         }
@@ -2884,9 +2894,11 @@ export const useAppState = create<AppState>()(
               args: [routerAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
               account: wallet.address as `0x${string}`
             });
+            const approveUsdcNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
             const approveHash = await evmWalletClient.writeContract({
               ...approveReq,
-              gas: BigInt(150000)
+              gas: BigInt(150000),
+              nonce: approveUsdcNonce
             });
             await publicClient.waitForTransactionReceipt({ hash: approveHash });
           }
@@ -2899,9 +2911,11 @@ export const useAppState = create<AppState>()(
             account: wallet.address as `0x${string}`
           });
 
+          const routeBuyNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
           tradeTxHash = await evmWalletClient.writeContract({
             ...request,
-            gas: BigInt(600000)
+            gas: BigInt(600000),
+            nonce: routeBuyNonce
           });
           await publicClient.waitForTransactionReceipt({ hash: tradeTxHash });
 
@@ -2926,9 +2940,11 @@ export const useAppState = create<AppState>()(
               args: [routerAddress, true],
               account: wallet.address as `0x${string}`
             });
+            const approveTokensMarketNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
             const approveHash = await evmWalletClient.writeContract({
               ...approveReq,
-              gas: BigInt(150000)
+              gas: BigInt(150000),
+              nonce: approveTokensMarketNonce
             });
             await publicClient.waitForTransactionReceipt({ hash: approveHash });
           }
@@ -2941,9 +2957,11 @@ export const useAppState = create<AppState>()(
             account: wallet.address as `0x${string}`
           });
 
+          const routeSellNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
           tradeTxHash = await evmWalletClient.writeContract({
             ...request,
-            gas: BigInt(600000)
+            gas: BigInt(600000),
+            nonce: routeSellNonce
           });
           await publicClient.waitForTransactionReceipt({ hash: tradeTxHash });
         }

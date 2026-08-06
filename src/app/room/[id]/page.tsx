@@ -1423,25 +1423,44 @@ export default function RoomDetailPage() {
                     </div>
 
                     {/* Quantity Input */}
-                    <div className="space-y-2">
-                      <label className="block font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex justify-between">
-                        <span>{orderType === 'buy' ? 'USDC AMOUNT:' : 'SHARES AMOUNT:'}</span>
-                        <span>Balance: {user?.balance !== undefined ? `${user.balance.toFixed(2)} USDC` : '0.00 USDC'}</span>
-                      </label>
-                      <div className="relative flex items-center">
-                        <input
-                          type="number"
-                          min="1"
-                          placeholder={orderType === 'buy' ? 'ENTER USDC SWAP QUANTITY...' : 'ENTER SHARES TO SELL...'}
-                          value={sharesInput}
-                          onChange={(e) => setSharesInput(parseFloat(e.target.value) || 10)}
-                          className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-emerald-500 focus:outline-none font-bold"
-                        />
-                        <span className="absolute right-4 font-mono text-xs text-slate-400 dark:text-slate-500 font-extrabold uppercase">
-                          {orderType === 'buy' ? 'USDC' : 'Shares'}
-                        </span>
-                      </div>
-                    </div>
+                    {(() => {
+                      const userBetsInRoom = user ? user.bets.filter(b => isSameRoom(b.roomId, room.id)) : [];
+                      const moonPool = room.moonPool || 0;
+                      const jeetPool = room.jeetPool || 0;
+                      const totalPool = moonPool + jeetPool;
+                      const priceMoon = totalPool > 0 ? (moonPool + 10) / (totalPool + 20) : 0.5;
+                      const priceJeet = totalPool > 0 ? (jeetPool + 10) / (totalPool + 20) : 0.5;
+                      const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || (b.amount / priceMoon)), 0);
+                      const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || (b.amount / priceJeet)), 0);
+                      const selectedSharesOwned = selectedSide === 'moon' ? moonSharesOwned : jeetSharesOwned;
+
+                      return (
+                        <div className="space-y-2">
+                          <label className="block font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex justify-between">
+                            <span>{orderType === 'buy' ? 'USDC AMOUNT:' : 'SHARES AMOUNT:'}</span>
+                            <span>
+                              {orderType === 'buy'
+                                ? `Balance: ${user?.balance !== undefined ? user.balance.toFixed(2) : '0.00'} USDC`
+                                : `Balance: ${selectedSharesOwned.toFixed(2)} ${selectedSide === 'moon' ? 'YES' : 'NO'} Shares`
+                              }
+                            </span>
+                          </label>
+                          <div className="relative flex items-center">
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder={orderType === 'buy' ? 'ENTER USDC SWAP QUANTITY...' : 'ENTER SHARES TO SELL...'}
+                              value={sharesInput}
+                              onChange={(e) => setSharesInput(parseFloat(e.target.value) || 10)}
+                              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-emerald-500 focus:outline-none font-bold"
+                            />
+                            <span className="absolute right-4 font-mono text-xs text-slate-400 dark:text-slate-500 font-extrabold uppercase">
+                              {orderType === 'buy' ? 'USDC' : 'Shares'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* Execution details */}
                     {(() => {
@@ -1535,8 +1554,14 @@ export default function RoomDetailPage() {
                   <div className="space-y-4 font-mono text-xs text-left">
                     {(() => {
                       const userBetsInRoom = user ? user.bets.filter(b => isSameRoom(b.roomId, room.id)) : [];
-                      const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || 0), 0);
-                      const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || 0), 0);
+                      const moonPool = room.moonPool || 0;
+                      const jeetPool = room.jeetPool || 0;
+                      const totalPool = moonPool + jeetPool;
+                      const priceMoon = totalPool > 0 ? (moonPool + 10) / (totalPool + 20) : 0.5;
+                      const priceJeet = totalPool > 0 ? (jeetPool + 10) / (totalPool + 20) : 0.5;
+
+                      const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || (b.amount / priceMoon)), 0);
+                      const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || (b.amount / priceJeet)), 0);
                       const totalSpentMoon = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + b.amount, 0);
                       const avgMoonPrice = moonSharesOwned > 0 ? totalSpentMoon / moonSharesOwned : 0;
                       const totalSpentJeet = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + b.amount, 0);

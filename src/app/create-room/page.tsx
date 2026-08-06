@@ -1397,57 +1397,69 @@ export default function CreateRoomPage() {
                     }}
                     min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 60 * 60000).toISOString().slice(0, 16)}
                     max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 365 * 24 * 60 * 60000).toISOString().slice(0, 16)}
-                    className="w-full bg-[#0A0E17] border border-gray-800 text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-neon-moon focus:outline-none font-bold cursor-pointer"
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-emerald-500 focus:outline-none font-bold cursor-pointer"
                   />
                 </div>
               </div>
 
               {/* Initial Ammo Seeding Box */}
-              <div className="bg-[#05080E] border border-gray-800 rounded-2xl p-6 space-y-5">
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6">
                 
-                <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+                <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
                   <div>
-                    <h4 className="font-staatliches text-xl text-white tracking-wider uppercase">
-                      INITIAL LIQUIDITY AMMO (*REQUIRED)
+                    <h4 className="font-sans text-lg text-slate-900 dark:text-white font-extrabold uppercase">
+                      INITIAL LIQUIDITY SEEDING
                     </h4>
-                    <p className="font-sans text-xs text-gray-400 mt-0.5">
-                      Seed initial USDC into the pot to activate this arena on the explore page.
+                    <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Deploy initial USDC to fund the prediction pool and activate this market.
                     </p>
                   </div>
-                  <span className="font-mono text-lg text-yellow-400 font-extrabold">
+                  <span className="font-mono text-lg text-emerald-500 font-extrabold">
                     {seedAmount} USDC
                   </span>
                 </div>
 
                 {/* Seed Side Selector */}
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => { setSeedSide('moon'); synthSound('bet'); }}
-                    className={`py-3.5 rounded-xl font-staatliches text-lg tracking-wider uppercase transition-all border-2 font-bold ${
-                      seedSide === 'moon'
-                        ? 'bg-neon-moon text-black border-neon-moon shadow-[0_0_16px_rgba(57,255,20,0.3)]'
-                        : 'bg-[#0A0E17] border-gray-800 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    SEED MOON (YES)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSeedSide('jeet'); synthSound('bet'); }}
-                    className={`py-3.5 rounded-xl font-staatliches text-lg tracking-wider uppercase transition-all border-2 font-bold ${
-                      seedSide === 'jeet'
-                        ? 'bg-jeet-red text-white border-jeet-red shadow-[0_0_16px_rgba(255,7,58,0.3)]'
-                        : 'bg-[#0A0E17] border-gray-800 text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    SEED JEET (NO)
-                  </button>
+                <div className="space-y-3">
+                  <span className="block font-mono text-xs font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider">
+                    CHOOSE YOUR INITIAL STANCE:
+                  </span>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => { setSeedSide('moon'); synthSound('bet'); }}
+                      className={`py-4 rounded-xl font-mono text-xs uppercase tracking-wider transition-all border-2 font-bold flex flex-col items-center justify-center gap-1 ${
+                        seedSide === 'moon'
+                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <span className="text-base">🚀</span>
+                      <span>YES / MOON</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setSeedSide('jeet'); synthSound('bet'); }}
+                      className={`py-4 rounded-xl font-mono text-xs uppercase tracking-wider transition-all border-2 font-bold flex flex-col items-center justify-center gap-1 ${
+                        seedSide === 'jeet'
+                          ? 'bg-red-500 text-white border-red-500 shadow-md shadow-red-500/20'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <span className="text-base">💀</span>
+                      <span>NO / JEET</span>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-slate-400 font-mono italic">
+                    {seedSide === 'moon' 
+                      ? "You are betting that the target condition WILL be met (BULLISH)." 
+                      : "You are betting that the target condition WILL NOT be met (BEARISH)."}
+                  </p>
                 </div>
 
                 {/* Seeding Amount Input */}
                 <div className="space-y-2">
-                  <label className="block font-mono text-xs font-bold text-gray-300 uppercase tracking-wider">
+                  <label className="block font-mono text-xs font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider">
                     USDC Seeding Amount:
                   </label>
                   <div className="relative flex items-center">
@@ -1461,38 +1473,38 @@ export default function CreateRoomPage() {
                         const val = parseFloat(e.target.value);
                         setSeedAmount(isNaN(val) ? 0 : val);
                       }}
-                      className="w-full bg-[#0A0E17] border border-gray-800 text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-neon-moon focus:outline-none font-bold"
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-emerald-500 focus:outline-none font-bold"
                     />
-                    <span className="absolute right-4 font-mono text-xs text-neon-moon font-extrabold uppercase">
-                      USDC AMMO
+                    <span className="absolute right-4 font-mono text-xs text-slate-500 dark:text-slate-400 font-extrabold uppercase">
+                      USDC
                     </span>
                   </div>
                 </div>
               </div>
 
               {/* Complete Deployment Order Summary */}
-              <div className="bg-[#05080E] border border-emerald-900/60 rounded-2xl p-6 space-y-4">
-                <h4 className="font-staatliches text-xl text-neon-moon tracking-wider uppercase flex items-center gap-2">
-                  <CheckCircle2 size={18} />
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4">
+                <h4 className="font-sans text-sm text-slate-900 dark:text-white font-extrabold uppercase flex items-center gap-2">
+                  <CheckCircle2 size={18} className="text-emerald-500" />
                   <span>PRE-DEPLOYMENT ORDER SUMMARY</span>
                 </h4>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
-                  <div className="bg-[#0A0F1A] border border-gray-800 p-3 rounded-xl">
-                    <span className="text-gray-500 uppercase block font-bold text-[9px]">TARGET MARKET</span>
-                    <span className="text-white font-bold block truncate mt-0.5">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">TARGET MARKET</span>
+                    <span className="text-slate-900 dark:text-white font-bold block truncate mt-0.5">
                       {arenaType === 'token' ? (tokenInfo?.name || 'Chart Battle') : (debateName || 'Custom Event')}
                     </span>
                   </div>
-                  <div className="bg-[#0A0F1A] border border-gray-800 p-3 rounded-xl">
-                    <span className="text-gray-500 uppercase block font-bold text-[9px]">ORACLE RESOLVER</span>
-                    <span className="text-neon-moon font-bold block truncate mt-0.5">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">ORACLE RESOLVER</span>
+                    <span className="text-emerald-500 font-bold block truncate mt-0.5">
                       {selectedOracleId.toUpperCase()}
                     </span>
                   </div>
-                  <div className="bg-[#0A0F1A] border border-gray-800 p-3 rounded-xl">
-                    <span className="text-gray-500 uppercase block font-bold text-[9px]">EXPIRY TIME</span>
-                    <span className="text-white font-bold block mt-0.5">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">EXPIRY TIME</span>
+                    <span className="text-slate-900 dark:text-white font-bold block mt-0.5">
                       {(() => {
                         const diffMs = new Date(expiryDate).getTime() - Date.now();
                         const diffMins = Math.max(0, Math.floor(diffMs / 60000));
@@ -1502,9 +1514,9 @@ export default function CreateRoomPage() {
                       })()}
                     </span>
                   </div>
-                  <div className="bg-[#0A0F1A] border border-gray-800 p-3 rounded-xl">
-                    <span className="text-gray-500 uppercase block font-bold text-[9px]">INITIAL POT</span>
-                    <span className="text-yellow-400 font-bold block mt-0.5">
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">INITIAL POT</span>
+                    <span className="text-amber-500 font-bold block mt-0.5">
                       {seedAmount} USDC ({seedSide.toUpperCase()})
                     </span>
                   </div>
@@ -1512,30 +1524,30 @@ export default function CreateRoomPage() {
               </div>
 
               {/* Wizard Nav & Submit Buttons */}
-              <div className="flex justify-between items-center pt-4 border-t border-gray-800">
+              <div className="flex justify-between items-center pt-4 border-t border-slate-200 dark:border-slate-800">
                 <button
                   type="button"
                   onClick={prevStep}
-                  className="px-6 py-3 bg-gray-900 hover:bg-gray-800 text-white font-staatliches text-xl rounded-xl tracking-wider flex items-center gap-2 transition-all uppercase"
+                  className="px-6 py-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-900 dark:text-white font-mono text-xs rounded-xl tracking-wider flex items-center gap-2 transition-all uppercase font-bold"
                 >
-                  <ArrowLeft size={18} />
+                  <ArrowLeft size={14} />
                   <span>BACK</span>
                 </button>
 
                 <button
                   type="submit"
                   disabled={isTransactionLoading}
-                  className="px-10 py-4 bg-neon-moon hover:bg-green-400 disabled:bg-gray-800 disabled:text-gray-600 disabled:shadow-none disabled:cursor-not-allowed font-staatliches text-2xl text-black rounded-xl shadow-[0_0_25px_rgba(57,255,20,0.4)] active:scale-95 transition-all uppercase flex items-center justify-center gap-3 font-extrabold"
+                  className="px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 disabled:cursor-not-allowed font-mono text-xs text-white rounded-xl shadow-md transition-all uppercase flex items-center justify-center gap-3 font-extrabold"
                 >
                   {isTransactionLoading ? (
                     <>
-                      <Loader2 className="animate-spin text-black shrink-0" size={26} />
-                      <span>LAUNCHING ARENA ON-CHAIN...</span>
+                      <Loader2 className="animate-spin text-white shrink-0" size={14} />
+                      <span>LAUNCHING ON-CHAIN...</span>
                     </>
                   ) : (
                     <>
-                      <PepePortrait src={PEPE_ASSETS.diamondHands} size={30} className="rounded-full" />
-                      <span>LAUNCH PREDICTION ARENA</span>
+                      <PepePortrait src={PEPE_ASSETS.diamondHands} size={20} className="rounded-full" />
+                      <span>LAUNCH ARENA</span>
                     </>
                   )}
                 </button>

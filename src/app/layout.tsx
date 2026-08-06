@@ -63,13 +63,13 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Staatliches&family=JetBrains+Mono:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet" />
-        <style>{`
+        <style dangerouslySetInnerHTML={{ __html: `
           :root {
             --font-staatliches: 'Staatliches', sans-serif;
             --font-jetbrains-mono: 'JetBrains Mono', monospace;
             --font-permanent-marker: 'Permanent Marker', cursive;
           }
-        `}</style>
+        ` }} />
       </head>
       <body className="antialiased selection:bg-neon-moon selection:text-black bg-background text-foreground transition-colors duration-200">
         <ErrorBoundary>

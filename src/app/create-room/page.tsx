@@ -65,7 +65,7 @@ export default function CreateRoomPage() {
   const [contractAddress, setContractAddress] = useState('');
   const [debateName, setDebateName] = useState('');
   const [debateSymbol, setDebateSymbol] = useState('');
-  const [customIcon, setCustomIcon] = useState<string>('/pepes/pepe-general.png');
+  const [customIcon, setCustomIcon] = useState<string>('');
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,6 +80,10 @@ export default function CreateRoomPage() {
   // Platform Keeper address cached
   const [keeperAddress, setKeeperAddress] = useState('');
 
+  // Form State - Outcome labels (moon/jeet or yes/no)
+  const [moonLabel, setMoonLabel] = useState('MOON');
+  const [jeetLabel, setJeetLabel] = useState('JEET');
+
   // Form State - Config & Seeding
   const [expiryDate, setExpiryDate] = useState<string>(() => {
     const defaultDate = new Date(Date.now() + 60 * 60 * 1000);
@@ -90,6 +94,16 @@ export default function CreateRoomPage() {
   const [seedAmount, setSeedAmount] = useState<number>(10);
   const [openingPriceType, setOpeningPriceType] = useState<'market' | 'set'>('market');
   const [customSetPrice, setCustomSetPrice] = useState<string>('');
+
+  useEffect(() => {
+    if (arenaType === 'token') {
+      setMoonLabel('MOON');
+      setJeetLabel('JEET');
+    } else {
+      setMoonLabel('YES');
+      setJeetLabel('NO');
+    }
+  }, [arenaType]);
 
   // Available Oracles Specification Grid
   const AVAILABLE_ORACLES = [
@@ -600,65 +614,42 @@ export default function CreateRoomPage() {
 
   const renderOracleCard = (oracle: typeof AVAILABLE_ORACLES[number]) => {
     const isSelected = selectedOracleId === oracle.id;
-    const Icon = oracle.icon;
     return (
       <div
         key={oracle.id}
         onClick={() => handleSelectOracle(oracle)}
-        className={`p-5 rounded-2xl border-2 cursor-pointer transition-all duration-200 relative ${
+        className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${
           isSelected
-            ? 'border-neon-moon bg-gradient-to-r from-emerald-950/30 via-[#0A140B] to-[#0A0E17] shadow-[0_0_20px_rgba(57,255,20,0.12)]'
-            : 'border-gray-800 bg-[#0A0E17] hover:border-gray-700 hover:bg-[#0E1420]'
+            ? 'border-emerald-500 bg-emerald-500/[0.04] dark:bg-emerald-950/10'
+            : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 hover:border-slate-300 dark:hover:border-slate-700'
         }`}
       >
-        <div className="flex items-start gap-4">
-          <div className="mt-1">
-            <input
-              type="radio"
-              name="oracleOption"
-              value={oracle.id}
-              checked={isSelected}
-              onChange={() => {}}
-              className="accent-neon-moon h-5 w-5 pointer-events-none"
-            />
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Icon size={20} className={isSelected ? 'text-neon-moon' : 'text-gray-400'} />
-                <h4 className="font-staatliches text-xl text-white tracking-wider uppercase">
-                  {oracle.name}
-                </h4>
-              </div>
-              <span className={`px-2.5 py-0.5 rounded-full border font-mono text-[9px] font-bold uppercase tracking-wider ${oracle.badgeColor}`}>
-                {oracle.badge}
-              </span>
-            </div>
-
-            <p className="font-sans text-xs text-gray-400 mt-1.5 leading-relaxed">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <input
+            type="radio"
+            name="oracleOption"
+            value={oracle.id}
+            checked={isSelected}
+            onChange={() => {}}
+            className="accent-emerald-500 h-4.5 w-4.5 shrink-0 pointer-events-none"
+          />
+          <div className="min-w-0">
+            <h4 className="font-sans text-sm text-slate-800 dark:text-white font-extrabold tracking-tight uppercase leading-tight">
+              {oracle.name}
+            </h4>
+            <p className="font-sans text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-normal truncate">
               {oracle.description}
             </p>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 pt-3 border-t border-gray-800/80 font-mono text-[9px]">
-              <div>
-                <span className="text-gray-500 uppercase block font-bold">SUITABLE FOR</span>
-                <span className="text-white font-bold block truncate">{oracle.suitability}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 uppercase block font-bold">RESOLUTION SPEED</span>
-                <span className="text-neon-moon font-bold block">{oracle.resolutionSpeed}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 uppercase block font-bold">TRUST MODEL</span>
-                <span className="text-gray-300 font-bold block">{oracle.trustModel}</span>
-              </div>
-              <div>
-                <span className="text-gray-500 uppercase block font-bold">ORACLE FEE</span>
-                <span className="text-yellow-400 font-bold block">{oracle.feeSol > 0 ? `${oracle.feeSol} USDC` : '0 USDC'}</span>
-              </div>
-            </div>
           </div>
+        </div>
+
+        <div className="text-right shrink-0 ml-4">
+          <span className="font-mono text-xs font-bold text-slate-950 dark:text-white block">
+            {oracle.feeSol > 0 ? `${oracle.feeSol} USDC` : 'FREE'}
+          </span>
+          <span className="font-mono text-[9px] text-slate-400 block uppercase">
+            ORACLE FEE
+          </span>
         </div>
       </div>
     );
@@ -926,7 +917,7 @@ export default function CreateRoomPage() {
                       placeholder="e.g., WILL BITCOIN REACH $100,000 BEFORE DECEMBER 2026?"
                       value={debateName}
                       onChange={(e) => setDebateName(e.target.value)}
-                      className="w-full px-4 py-3 bg-[#05080E] border border-gray-800 text-white font-mono text-xs placeholder-gray-600 rounded-xl focus:border-yellow-400 focus:outline-none uppercase tracking-wide font-bold"
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none uppercase tracking-wide font-bold transition-all"
                     />
                   </div>
 
@@ -941,7 +932,7 @@ export default function CreateRoomPage() {
                         placeholder="e.g., BTC100K"
                         value={debateSymbol}
                         onChange={(e) => setDebateSymbol(e.target.value.replace(/[^a-zA-Z0-9]/g, ''))}
-                        className="w-full px-4 py-3 bg-[#05080E] border border-gray-800 text-white font-mono text-xs placeholder-gray-600 rounded-xl focus:border-yellow-400 focus:outline-none uppercase tracking-widest font-bold"
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none uppercase tracking-widest font-bold transition-all"
                       />
                     </div>
 
@@ -950,21 +941,26 @@ export default function CreateRoomPage() {
                         Market Image / Avatar:
                       </label>
                       <div className="flex items-center gap-2">
-                        {customIcon && (
-                          <div className="w-10 h-10 bg-black rounded-lg border border-yellow-400 overflow-hidden shrink-0 flex items-center justify-center text-xl shadow-lg">
-                            {customIcon.startsWith('http') || customIcon.startsWith('data:') || customIcon.startsWith('/') ? (
-                              <img src={customIcon} alt="Preview" className="w-full h-full object-cover" />
-                            ) : (
-                              <span>{customIcon}</span>
-                            )}
-                          </div>
-                        )}
+                        <div className="w-10 h-10 bg-slate-100 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shrink-0 flex items-center justify-center text-xl shadow-md">
+                          {customIcon ? (
+                            <img 
+                              src={customIcon} 
+                              alt="Preview" 
+                              className="w-full h-full object-cover animate-fadeIn" 
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <ImageIcon size={18} className="text-slate-400 dark:text-slate-500" />
+                          )}
+                        </div>
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="flex-1 px-4 py-3 bg-[#05080E] border border-dashed border-gray-700 hover:border-yellow-400 text-gray-300 font-mono text-xs rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer font-bold"
+                          className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-dashed border-slate-200 dark:border-slate-800 hover:border-emerald-500 hover:dark:border-emerald-500 text-slate-700 dark:text-slate-300 font-mono text-xs rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer font-bold"
                         >
-                          <Upload size={16} className="text-yellow-400" />
+                          <Upload size={16} className="text-emerald-500" />
                           <span>UPLOAD CUSTOM IMAGE</span>
                         </button>
                         <input
@@ -982,10 +978,8 @@ export default function CreateRoomPage() {
                     </div>
                   </div>
 
-                  {/* Drag and Drop Zone & Presets */}
-                  <div className="bg-[#05080E] border border-gray-800 rounded-2xl p-5 space-y-4">
-                    
-                    {/* Drag and Drop Box */}
+                  {/* Drag and Drop Zone */}
+                  <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 space-y-4">
                     <div
                       onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
                       onDragLeave={() => setIsDragOver(false)}
@@ -997,92 +991,119 @@ export default function CreateRoomPage() {
                         }
                       }}
                       onClick={() => fileInputRef.current?.click()}
-                      className={`p-6 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+                      className={`p-8 border-2 border-dashed rounded-xl flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
                         isDragOver
-                          ? 'border-yellow-400 bg-yellow-400/10'
-                          : 'border-gray-800 bg-[#0A0E17] hover:border-gray-700'
+                          ? 'border-emerald-500 bg-emerald-500/10'
+                          : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-emerald-500'
                       }`}
                     >
-                      <ImageIcon size={32} className="text-yellow-400 mb-2" />
-                      <span className="font-staatliches text-lg text-white tracking-wider uppercase">
+                      <ImageIcon size={32} className="text-emerald-500 mb-2" />
+                      <span className="font-sans text-sm font-extrabold text-slate-800 dark:text-white tracking-wider uppercase">
                         DRAG & DROP CUSTOM MARKET IMAGE HERE
                       </span>
-                      <span className="font-mono text-[10px] text-gray-400 uppercase mt-0.5">
+                      <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 uppercase mt-0.5">
                         SUPPORTS PNG, JPG, WEBP, SVG (AUTO-COMPRESSED TO INSTANT HIGH-SPEED DATA URL)
                       </span>
-                    </div>
-
-                    {/* Presets Grid */}
-                    <div>
-                      <span className="font-mono text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-2">
-                        OR CHOOSE A CURATED DEGEN AVATAR:
-                      </span>
-                      <div className="grid grid-cols-6 sm:grid-cols-12 gap-2">
-                        {PRESET_AVATARS.map((avatar) => (
-                          <button
-                            key={avatar.id}
-                            type="button"
-                            onClick={() => {
-                              setCustomIcon(avatar.url);
-                              synthSound('bet');
-                            }}
-                            className={`h-10 w-10 rounded-xl border flex items-center justify-center transition-all ${
-                              customIcon === avatar.url
-                                ? 'border-yellow-400 bg-yellow-400/20 scale-110 shadow-[0_0_10px_rgba(255,215,0,0.4)]'
-                                : 'border-gray-800 bg-black hover:border-gray-600'
-                            }`}
-                            title={avatar.name}
-                          >
-                            <img src={avatar.url} alt={avatar.name} className="w-full h-full object-cover rounded-xl" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Live Room Card Replica Preview */}
-                  <div className="bg-[#05080E] border border-gray-800/80 rounded-2xl p-5">
-                    <span className="font-mono text-[10px] text-gray-400 font-bold uppercase tracking-wider block mb-3 flex items-center gap-1.5">
-                      <Sparkles size={14} className="text-yellow-400" />
-                      <span>LIVE ARENA CARD PREVIEW ON EXPLORE PAGE:</span>
-                    </span>
-
-                    <div className="max-w-md mx-auto p-4 rounded-xl border border-yellow-400/50 bg-[#05050A] shadow-xl">
-                      <div className="flex items-center gap-3 border-b border-gray-800 pb-3 mb-3">
-                        <div className="w-10 h-10 bg-black rounded-lg border border-yellow-400 overflow-hidden shrink-0 flex items-center justify-center">
-                          {customIcon.startsWith('http') || customIcon.startsWith('data:') || customIcon.startsWith('/') ? (
-                            <img src={customIcon} alt="Market" className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-2xl">{customIcon}</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-staatliches text-base text-white truncate leading-tight uppercase">
-                            {debateName.trim() || 'WILL BITCOIN HIT $100K BEFORE DECEMBER?'}
-                          </h4>
-                          <span className="font-mono text-[10px] text-yellow-400 font-bold">
-                            ${debateSymbol.trim() || 'BTC100K'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="bg-[#0A0E17] border border-gray-800 p-2 rounded-lg text-center font-mono text-[10px] text-gray-300 font-bold uppercase mb-3">
-                        WILL {debateSymbol.trim() || 'BTC100K'} RESOLVE TO MOON BEFORE EXPIRY?
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 font-staatliches text-xs">
-                        <div className="py-2 bg-emerald-950/80 text-neon-moon border border-neon-moon/40 text-center rounded-lg font-bold">
-                          MOON (YES) 50%
-                        </div>
-                        <div className="py-2 bg-red-950/80 text-jeet-red border border-jeet-red/40 text-center rounded-lg font-bold">
-                          JEET (NO) 50%
-                        </div>
-                      </div>
                     </div>
                   </div>
 
                 </div>
               )}
+
+              {/* Custom Outcome Labels Editor */}
+              <div className="space-y-4 pt-6 border-t border-slate-200 dark:border-slate-800">
+                <h4 className="font-sans text-sm text-slate-800 dark:text-white font-extrabold uppercase tracking-wide flex items-center gap-2">
+                  <Sparkles size={16} className="text-emerald-500" />
+                  <span>CUSTOM OUTCOME LABELS</span>
+                </h4>
+                <p className="font-sans text-xs text-slate-500 dark:text-slate-400">
+                  Customize outcome names for Side 0 (Bullish/Yes) and Side 1 (Bearish/No).
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="block font-mono text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
+                      Side 0 Label (Default: {arenaType === 'token' ? 'MOON' : 'YES'})
+                    </label>
+                    <input
+                      type="text"
+                      value={moonLabel}
+                      onChange={(e) => setMoonLabel(e.target.value.toUpperCase().slice(0, 15))}
+                      placeholder={arenaType === 'token' ? 'MOON' : 'YES'}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs rounded-xl focus:border-emerald-500 focus:outline-none uppercase font-bold"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block font-mono text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
+                      Side 1 Label (Default: {arenaType === 'token' ? 'JEET' : 'NO'})
+                    </label>
+                    <input
+                      type="text"
+                      value={jeetLabel}
+                      onChange={(e) => setJeetLabel(e.target.value.toUpperCase().slice(0, 15))}
+                      placeholder={arenaType === 'token' ? 'JEET' : 'NO'}
+                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs rounded-xl focus:border-emerald-500 focus:outline-none uppercase font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Beautified Live Room Card Replica Preview */}
+              <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 space-y-4">
+                <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-emerald-500" />
+                  <span>LIVE PREVIEW CARD:</span>
+                </span>
+
+                <div className="max-w-md mx-auto p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 shadow-xl">
+                  <div className="flex items-center gap-3 border-b border-slate-100 dark:border-slate-800/60 pb-3.5 mb-3.5">
+                    <div className="w-11 h-11 bg-slate-100 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shrink-0 flex items-center justify-center">
+                      {arenaType === 'token' && tokenInfo ? (
+                        tokenInfo.icon.startsWith('http') ? (
+                          <img src={tokenInfo.icon} alt={tokenInfo.symbol} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">{tokenInfo.icon}</span>
+                        )
+                      ) : customIcon ? (
+                        <img
+                          src={customIcon}
+                          alt="Market"
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <ImageIcon size={22} className="text-slate-400 dark:text-slate-500" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-sans text-sm font-extrabold text-slate-900 dark:text-white truncate leading-tight uppercase">
+                        {arenaType === 'token' 
+                          ? (tokenInfo?.name || 'PASTE TOKEN ADDRESS')
+                          : (debateName.trim() || 'ENTER PREDICTION STATEMENT TITLE')}
+                      </h4>
+                      <span className="font-mono text-[10px] text-emerald-500 font-extrabold">
+                        ${arenaType === 'token' ? (tokenInfo?.symbol || 'TKN') : (debateSymbol.trim() || 'EVENT')}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200/60 dark:border-slate-800 p-2.5 rounded-xl text-center font-mono text-[10px] text-slate-600 dark:text-slate-300 font-bold uppercase mb-3.5">
+                    {arenaType === 'token'
+                      ? `Will $${tokenInfo?.symbol || 'TKN'} close above $${tokenInfo?.priceUsd || '0.00'}?`
+                      : `Will this event resolve to ${moonLabel || 'YES'}?`}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 font-sans text-xs">
+                    <div className="py-2.5 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 text-center rounded-xl font-extrabold uppercase tracking-wide">
+                      {moonLabel || 'YES'} 50%
+                    </div>
+                    <div className="py-2.5 bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-500/20 text-center rounded-xl font-extrabold uppercase tracking-wide">
+                      {jeetLabel || 'NO'} 50%
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Wizard Nav buttons */}
               <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-800">
@@ -1100,94 +1121,59 @@ export default function CreateRoomPage() {
 
           {/* STEP 2: CLEAR & EXPLICIT ORACLE SELECTION GRID */}
           {step === 2 && (
-            <div className="space-y-8 animate-fadeIn">
+            <div className="space-y-6 animate-fadeIn">
               
               <div>
-                <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase flex items-center gap-2">
-                  <Brain size={22} className="text-neon-moon" />
-                  <span>SELECT RESOLUTION ORACLE PROTOCOL</span>
+                <h3 className="font-sans text-lg font-extrabold text-slate-900 dark:text-white uppercase tracking-tight">
+                  SELECT RESOLUTION ORACLE PROTOCOL
                 </h3>
-                <p className="font-sans text-xs text-gray-400 mt-1">
+                <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Choose the oracle mechanism responsible for settling outcomes on-chain. Every oracle runs transparently.
                 </p>
               </div>
 
-              {/* Oracle Selection Grid */}
-              <div className="space-y-6">
+              {/* Oracle Selection List */}
+              <div className="space-y-2">
                 {arenaType === 'token' ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-neon-moon font-mono text-[10px] font-bold uppercase tracking-wider mb-1">
-                      <TrendingUp size={14} />
-                      <span>AUTOMATED PRICE FEED (TRUSTLESS ON-CHAIN INDEXING)</span>
-                    </div>
-                    {AVAILABLE_ORACLES
-                      .filter(o => o.id === 'price')
-                      .map((oracle) => renderOracleCard(oracle))}
-                  </div>
+                  AVAILABLE_ORACLES
+                    .filter(o => o.id === 'price')
+                    .map((oracle) => renderOracleCard(oracle))
                 ) : (
-                  <>
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-cyan-400 font-mono text-[10px] font-bold uppercase tracking-wider mb-1">
-                        <Brain size={14} />
-                        <span>AUTONOMOUS AI AGENTS (FAST RESOLUTION)</span>
-                      </div>
-                      {AVAILABLE_ORACLES
-                        .filter(o => o.id === 'ai-sonnet' || o.id === 'ai-consensus')
-                        .map((oracle) => renderOracleCard(oracle))}
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-yellow-400 font-mono text-[10px] font-bold uppercase tracking-wider mb-1">
-                        <Globe size={14} />
-                        <span>COMMUNITY DECISION MAKING (DEMOCRATIC VERDICT)</span>
-                      </div>
-                      {AVAILABLE_ORACLES
-                        .filter(o => o.id === 'dao-jury')
-                        .map((oracle) => renderOracleCard(oracle))}
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-emerald-400 font-mono text-[10px] font-bold uppercase tracking-wider mb-1">
-                        <UserCheck size={14} />
-                        <span>ESCROW SIGNER (DESIGNATED WALLET KEY)</span>
-                      </div>
-                      {AVAILABLE_ORACLES
-                        .filter(o => o.id === 'custom')
-                        .map((oracle) => renderOracleCard(oracle))}
-                    </div>
-                  </>
+                  AVAILABLE_ORACLES
+                    .filter(o => o.id !== 'price')
+                    .map((oracle) => renderOracleCard(oracle))
                 )}
               </div>
 
               {/* AI & Custom Resolution Rules Builder */}
               {(selectedOracleId === 'ai-sonnet' || selectedOracleId === 'ai-consensus' || selectedOracleId === 'dao-jury' || selectedOracleId === 'custom') && (
-                <div className="bg-[#05080E] border border-gray-800 rounded-2xl p-6 space-y-5 animate-fadeIn">
+                <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5 animate-fadeIn">
                   
                   <div className="flex items-center justify-between">
                     <div>
-                      <h4 className="font-staatliches text-xl text-white tracking-wider uppercase flex items-center gap-2">
-                        <FileText size={18} className="text-neon-moon" />
+                      <h4 className="font-sans text-sm font-extrabold text-slate-800 dark:text-white tracking-tight uppercase flex items-center gap-2">
+                        <FileText size={18} className="text-emerald-500" />
                         <span>ORACLE RESOLUTION RULES & PROMPTS</span>
                       </h4>
-                      <p className="font-sans text-xs text-gray-400 mt-0.5">
+                      <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         Specify precise evaluation conditions for the oracle node.
                       </p>
                     </div>
 
                     {/* Pre-filled Templates */}
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="font-mono text-[9px] text-gray-500 font-bold uppercase">TEMPLATES:</span>
+                      <span className="font-mono text-[9px] text-slate-400 dark:text-slate-500 font-bold uppercase">TEMPLATES:</span>
                       <button
                         type="button"
                         onClick={() => applyTemplate('target')}
-                        className="px-2 py-1 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-neon-moon font-mono text-[9px] rounded uppercase font-bold"
+                        className="px-2.5 py-1 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-750 text-emerald-600 dark:text-emerald-400 font-mono text-[9px] rounded uppercase font-bold transition-all shadow-sm"
                       >
                         Price Target
                       </button>
                       <button
                         type="button"
                         onClick={() => applyTemplate('web')}
-                        className="px-2 py-1 bg-gray-900 hover:bg-gray-800 border border-gray-800 text-yellow-400 font-mono text-[9px] rounded uppercase font-bold"
+                        className="px-2.5 py-1 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-750 text-amber-600 dark:text-yellow-400 font-mono text-[9px] rounded uppercase font-bold transition-all shadow-sm"
                       >
                         Web Event
                       </button>
@@ -1201,15 +1187,15 @@ export default function CreateRoomPage() {
                       placeholder="ENTER PRECISE RESOLUTION CRITERIA... e.g., RESOLVES MOON IF BITCOIN TRADES ABOVE $100K USD BEFORE DEC 2026. RESOLVES JEET OTHERWISE."
                       value={resolutionCriteria}
                       onChange={(e) => setResolutionCriteria(e.target.value)}
-                      className="w-full px-4 py-3 bg-[#0A0E17] border border-gray-800 text-white font-mono text-xs placeholder-gray-600 rounded-xl focus:border-neon-moon focus:outline-none uppercase tracking-wide font-bold"
+                      className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none uppercase tracking-wide font-bold transition-all"
                     />
                   </div>
 
                   {/* Reference URL */}
                   {(selectedOracleId === 'ai-sonnet' || selectedOracleId === 'ai-consensus') && (
                     <div className="space-y-2">
-                      <label className="block font-mono text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <Globe size={14} className="text-cyan-400" />
+                      <label className="block font-mono text-xs font-bold text-slate-700 dark:text-slate-350 uppercase tracking-wider flex items-center gap-1.5">
+                        <Globe size={14} className="text-emerald-500" />
                         <span>Reference URL / Scraper Source (Optional):</span>
                       </label>
                       <input
@@ -1217,16 +1203,16 @@ export default function CreateRoomPage() {
                         placeholder="https://x.com/realDonaldTrump or official news announcement URL"
                         value={referenceUrl}
                         onChange={(e) => setReferenceUrl(e.target.value)}
-                        className="w-full px-4 py-2.5 bg-[#0A0E17] border border-gray-800 text-white font-mono text-xs placeholder-gray-600 rounded-xl focus:border-cyan-400 focus:outline-none font-bold"
+                        className="w-full px-4 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none font-bold transition-all"
                       />
                     </div>
                   )}
 
                   {/* Custom Arbitrator Key input */}
                   {selectedOracleId === 'custom' && (
-                    <div className="space-y-4 pt-2 border-t border-gray-800">
+                    <div className="space-y-4 pt-2 border-t border-slate-200 dark:border-slate-800">
                       <div className="space-y-2">
-                        <label className="block font-mono text-xs font-bold text-gray-300 uppercase tracking-wider">
+                        <label className="block font-mono text-xs font-bold text-slate-700 dark:text-slate-350 uppercase tracking-wider">
                           Arbitrator Wallet Public Key:
                         </label>
                         <input
@@ -1235,17 +1221,17 @@ export default function CreateRoomPage() {
                           placeholder="PASTE THE ARBITRATOR'S WALLET PUBLIC KEY OR EVM ADDRESS..."
                           value={customOracleAddress}
                           onChange={(e) => setCustomOracleAddress(e.target.value)}
-                          className="w-full px-4 py-3 bg-[#0A0E17] border border-gray-800 text-white font-mono text-xs placeholder-gray-600 rounded-xl focus:border-emerald-400 focus:outline-none uppercase font-bold"
+                          className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none uppercase font-bold transition-all"
                         />
                       </div>
 
                       {/* Oracle Fee Slider */}
-                      <div className="space-y-2 bg-[#0A0E17] p-4 border border-gray-800 rounded-xl">
+                      <div className="space-y-2 bg-white dark:bg-slate-900 p-4 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm">
                         <div className="flex justify-between items-center">
-                          <label className="font-staatliches text-base text-white tracking-wider uppercase">
+                          <label className="font-sans text-sm font-extrabold text-slate-800 dark:text-white tracking-tight uppercase">
                             Custom Oracle Resolution Fee:
                           </label>
-                          <span className="font-mono text-sm text-yellow-400 font-extrabold">
+                          <span className="font-mono text-sm text-amber-600 dark:text-yellow-400 font-extrabold">
                             {oracleFeeSol} USDC
                           </span>
                         </div>
@@ -1256,9 +1242,9 @@ export default function CreateRoomPage() {
                           step="1"
                           value={oracleFeeSol || 1}
                           onChange={(e) => setOracleFeeSol(parseFloat(e.target.value) || 1)}
-                          className="w-full accent-neon-moon cursor-pointer"
+                          className="w-full accent-emerald-500 cursor-pointer"
                         />
-                        <p className="font-mono text-[9px] text-gray-400 uppercase font-bold">
+                        <p className="font-mono text-[9px] text-slate-400 dark:text-slate-500 uppercase font-bold">
                           *Paid directly to the resolver wallet when they invoke settlement. Deducted from winning pool pot.
                         </p>
                       </div>

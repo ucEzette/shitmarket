@@ -1,4 +1,4 @@
-import { INDEXER_URL } from "../utils/config";
+import { INDEXER_URL, CONTRACT_ADDRESSES } from "../utils/config";
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { PublicKey, SystemProgram, ComputeBudgetProgram } from '@solana/web3.js';
@@ -137,6 +137,40 @@ export const MARKET_FACTORY_ABI = [
     outputs: [{ name: '', type: 'address' }]
   },
   {
+    name: 'resolveMarket',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'marketId', type: 'uint256' }
+    ],
+    outputs: []
+  },
+  {
+    name: 'conditionToMarketId',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'conditionId', type: 'bytes32' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'markets',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'uint256' }],
+    outputs: [
+      { name: 'marketId', type: 'uint256' },
+      { name: 'conditionId', type: 'bytes32' },
+      { name: 'ipfsHash', type: 'string' },
+      { name: 'outcomeCount', type: 'uint256' },
+      { name: 'oracle', type: 'address' },
+      { name: 'resolutionTime', type: 'uint256' },
+      { name: 'resolved', type: 'bool' },
+      { name: 'resolvedOutcomeIndex', type: 'uint256' }
+    ]
+  },
+  {
     name: 'MarketCreated',
     type: 'event',
     inputs: [
@@ -220,6 +254,24 @@ export const CONDITIONAL_TOKENS_ABI = [
       { name: 'amount', type: 'uint256' }
     ],
     outputs: []
+  },
+  {
+    name: 'isResolved',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'conditionId', type: 'bytes32' }
+    ],
+    outputs: [{ name: '', type: 'bool' }]
+  },
+  {
+    name: 'outcomeCounts',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'conditionId', type: 'bytes32' }
+    ],
+    outputs: [{ name: '', type: 'uint256' }]
   },
   {
     name: 'balanceOf',
@@ -637,6 +689,8 @@ export interface AppState {
   placeEvmBet: (roomId: string, side: 'moon' | 'jeet', amount: number) => Promise<any>;
   claimWinnings: (roomId: string) => Promise<any>;
   claimEvmWinnings: (roomId: string) => Promise<any>;
+  addAmmLiquidity: (roomId: string, amountUsdc: number) => Promise<any>;
+  removeAmmLiquidity: (roomId: string, amountLp: number) => Promise<any>;
   mintTestnetUsdc: (amount?: number) => Promise<any>;
   disputeRoom: (roomId: string) => Promise<any>;
   resolveDispute: (roomId: string, winner: 'moon' | 'jeet' | 'draw' | null, overturned: boolean) => Promise<any>;
@@ -1707,9 +1761,9 @@ export const useAppState = create<AppState>()(
           transport: custom(provider)
         });
         
-        const marketFactoryAddress = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS || '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0') as `0x${string}`;
-        const oracleRegistryAddress = (process.env.NEXT_PUBLIC_ORACLE_REGISTRY_ADDRESS || '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512') as `0x${string}`;
-        const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
+        const marketFactoryAddress = CONTRACT_ADDRESSES.MARKET_FACTORY;
+        const oracleRegistryAddress = CONTRACT_ADDRESSES.ORACLE_REGISTRY;
+        const usdcAddress = CONTRACT_ADDRESSES.USDC;
         const resolutionTime = BigInt(Math.floor(room.expiry / 1000));
         
         // Check allowance for MarketFactory creation fee (5 USDC)
@@ -1798,9 +1852,9 @@ export const useAppState = create<AppState>()(
 
         if (seedAmountScaled > BigInt(0)) {
           try {
-            const poolFactoryAddress = (process.env.NEXT_PUBLIC_AM_POOL_FACTORY_ADDRESS || '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9') as `0x${string}`;
+            const poolFactoryAddress = CONTRACT_ADDRESSES.AM_POOL_FACTORY;
             
-            let tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A') as `0x${string}`;
+            let tokensAddress = CONTRACT_ADDRESSES.CONDITIONAL_TOKENS;
             try {
               const factoryCt = await publicClient.readContract({
                 address: marketFactoryAddress,
@@ -2572,11 +2626,11 @@ export const useAppState = create<AppState>()(
         transport: custom(provider)
       });
 
-      const routerAddress = (process.env.NEXT_PUBLIC_PREDICTION_ROUTER_ADDRESS || '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9') as `0x${string}`;
-      const poolFactoryAddress = (process.env.NEXT_PUBLIC_AM_POOL_FACTORY_ADDRESS || '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9') as `0x${string}`;
-      const marketFactoryAddress = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS || '0x139E2Bd8A802f6fb37C8f1eE1ff798271f623167') as `0x${string}`;
+      const routerAddress = CONTRACT_ADDRESSES.PREDICTION_ROUTER;
+      const poolFactoryAddress = CONTRACT_ADDRESSES.AM_POOL_FACTORY;
+      const marketFactoryAddress = CONTRACT_ADDRESSES.MARKET_FACTORY;
       
-      let tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A') as `0x${string}`;
+      let tokensAddress = CONTRACT_ADDRESSES.CONDITIONAL_TOKENS;
       try {
         const factoryCt = await publicClient.readContract({
           address: marketFactoryAddress,
@@ -2590,7 +2644,7 @@ export const useAppState = create<AppState>()(
         console.warn("Could not read conditionalTokens in market trade:", ctErr);
       }
       
-      const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
+      const usdcAddress = CONTRACT_ADDRESSES.USDC;
       
       let poolAddress: `0x${string}` = '0x0000000000000000000000000000000000000000';
       try {
@@ -3362,8 +3416,8 @@ export const useAppState = create<AppState>()(
       
       const isEvmRoom = roomId.startsWith('0x');
       if (isEvmRoom) {
-        const marketFactoryAddress = (process.env.NEXT_PUBLIC_MARKET_FACTORY_ADDRESS || '0x139E2Bd8A802f6fb37C8f1eE1ff798271f623167') as `0x${string}`;
-        let tokensAddress = (process.env.NEXT_PUBLIC_CONDITIONAL_TOKENS_ADDRESS || '0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A') as `0x${string}`;
+        const marketFactoryAddress = CONTRACT_ADDRESSES.MARKET_FACTORY;
+        let tokensAddress = CONTRACT_ADDRESSES.CONDITIONAL_TOKENS;
         try {
           const factoryCt = await publicClient.readContract({
             address: marketFactoryAddress,
@@ -3377,99 +3431,190 @@ export const useAppState = create<AppState>()(
           console.warn("Could not read conditionalTokens in claimWinnings:", ctErr);
         }
 
-        const tokenId0 = await publicClient.readContract({
-          address: tokensAddress,
-          abi: CONDITIONAL_TOKENS_ABI,
-          functionName: 'getTokenId',
-          args: [roomId as `0x${string}`, BigInt(0)]
-        }) as bigint;
-
-        const tokenId1 = await publicClient.readContract({
-          address: tokensAddress,
-          abi: CONDITIONAL_TOKENS_ABI,
-          functionName: 'getTokenId',
-          args: [roomId as `0x${string}`, BigInt(1)]
-        }) as bigint;
-
-        const balance0 = await publicClient.readContract({
-          address: tokensAddress,
-          abi: CONDITIONAL_TOKENS_ABI,
-          functionName: 'balanceOf',
-          args: [wallet.address as `0x${string}`, tokenId0]
-        }) as bigint;
-
-        const balance1 = await publicClient.readContract({
-          address: tokensAddress,
-          abi: CONDITIONAL_TOKENS_ABI,
-          functionName: 'balanceOf',
-          args: [wallet.address as `0x${string}`, tokenId1]
-        }) as bigint;
-
-        const redeemAmount = balance0 > balance1 ? balance0 : balance1;
-        if (redeemAmount === BigInt(0)) {
-          throw new Error("No winning position outcome shares found to redeem in this market.");
+        // 1. Detect if it is a Conditional Tokens market or standard ShitMarketCore room
+        let isConditionalTokenMarket = false;
+        try {
+          const outcomeCount = await publicClient.readContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'outcomeCounts',
+            args: [roomId as `0x${string}`]
+          }) as bigint;
+          isConditionalTokenMarket = outcomeCount > BigInt(0);
+        } catch (err) {
+          console.log("Not a ConditionalTokens contract market, defaulting to ShitMarketCore.");
         }
 
-        const { request } = await publicClient.simulateContract({
-          address: tokensAddress,
-          abi: CONDITIONAL_TOKENS_ABI,
-          functionName: 'redeemPositions',
-          args: [roomId as `0x${string}`, redeemAmount],
-          account: wallet.address as `0x${string}`
-        });
+        if (isConditionalTokenMarket) {
+          // 2. Check if the condition is resolved first on-chain
+          const isResolved = await publicClient.readContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'isResolved',
+            args: [roomId as `0x${string}`]
+          }) as boolean;
 
-        const txHash = await evmWalletClient.writeContract({
-          ...request,
-          gas: BigInt(500000)
-        });
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
-        console.log("EVM Conditional Token redemption submitted! Tx:", txHash);
+          if (!isResolved) {
+            console.log("Condition not resolved yet. Resolving market first on MarketFactory...");
+            const marketId = await publicClient.readContract({
+              address: marketFactoryAddress,
+              abi: MARKET_FACTORY_ABI,
+              functionName: 'conditionToMarketId',
+              args: [roomId as `0x${string}`]
+            }) as bigint;
 
-        get().updateToast(toastId, {
-          type: 'success',
-          message: 'SPOILS SECURED',
-          description: `Successfully claimed on-chain outcome USDC payouts.`,
-          txSig: txHash
-        });
+            // Fetch oracle registry details to verify if report is ready
+            const marketData = await publicClient.readContract({
+              address: marketFactoryAddress,
+              abi: MARKET_FACTORY_ABI,
+              functionName: 'markets',
+              args: [marketId]
+            }) as any;
 
-        await get().fetchBalance();
-        await get().fetchSingleRoom(roomId);
-        return txHash;
+            const oracleAddress = marketData[4]; // struct index 4 is address oracle
+
+            let isOracleReady = false;
+            try {
+              const ORACLE_ABI = [
+                {
+                  name: 'getOutcome',
+                  type: 'function',
+                  stateMutability: 'view',
+                  inputs: [{ name: 'marketId', type: 'uint256' }],
+                  outputs: [
+                    { name: 'ready', type: 'bool' },
+                    { name: 'outcomeIndex', type: 'uint256' }
+                  ]
+                }
+              ] as const;
+
+              const [ready] = await publicClient.readContract({
+                address: oracleAddress,
+                abi: ORACLE_ABI,
+                functionName: 'getOutcome',
+                args: [marketId]
+              }) as [boolean, bigint];
+              
+              isOracleReady = ready;
+            } catch (oracleErr) {
+              console.warn("Could not query oracle getOutcome status:", oracleErr);
+            }
+
+            if (!isOracleReady) {
+              throw new Error("The Oracle report is not ready or finalized yet. If it was recently reported, it is currently in the dispute challenge period (~1 day). Please check back later!");
+            }
+
+            const { request: resolveRequest } = await publicClient.simulateContract({
+              address: marketFactoryAddress,
+              abi: MARKET_FACTORY_ABI,
+              functionName: 'resolveMarket',
+              args: [marketId],
+              account: wallet.address as `0x${string}`
+            });
+
+            const resolveTxHash = await evmWalletClient.writeContract({
+              ...resolveRequest,
+              gas: BigInt(500000)
+            });
+            await publicClient.waitForTransactionReceipt({ hash: resolveTxHash });
+            console.log("Market resolved on-chain! Tx:", resolveTxHash);
+          }
+
+          const tokenId0 = await publicClient.readContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'getTokenId',
+            args: [roomId as `0x${string}`, BigInt(0)]
+          }) as bigint;
+
+          const tokenId1 = await publicClient.readContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'getTokenId',
+            args: [roomId as `0x${string}`, BigInt(1)]
+          }) as bigint;
+
+          const balance0 = await publicClient.readContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'balanceOf',
+            args: [wallet.address as `0x${string}`, tokenId0]
+          }) as bigint;
+
+          const balance1 = await publicClient.readContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'balanceOf',
+            args: [wallet.address as `0x${string}`, tokenId1]
+          }) as bigint;
+
+          const redeemAmount = balance0 > balance1 ? balance0 : balance1;
+          if (redeemAmount === BigInt(0)) {
+            throw new Error("No winning position outcome shares found to redeem in this market.");
+          }
+
+          const { request } = await publicClient.simulateContract({
+            address: tokensAddress,
+            abi: CONDITIONAL_TOKENS_ABI,
+            functionName: 'redeemPositions',
+            args: [roomId as `0x${string}`, redeemAmount],
+            account: wallet.address as `0x${string}`
+          });
+
+          const txHash = await evmWalletClient.writeContract({
+            ...request,
+            gas: BigInt(500000)
+          });
+          await publicClient.waitForTransactionReceipt({ hash: txHash });
+          console.log("EVM Conditional Token redemption submitted! Tx:", txHash);
+
+          get().updateToast(toastId, {
+            type: 'success',
+            message: 'SPOILS SECURED',
+            description: `Successfully claimed on-chain outcome USDC payouts.`,
+            txSig: txHash
+          });
+
+          await get().fetchBalance();
+          await get().fetchSingleRoom(roomId);
+          return txHash;
+        } else {
+          // 3. ShitMarketCore path
+          const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
+          
+          try {
+            await fetch(`${INDEXER_URL}/api/rooms/${roomId}/settle`, { method: 'POST' });
+          } catch (e) {
+            console.warn("Settlement trigger failed, proceeding with direct claim:", e);
+          }
+          
+          const userBet = get().user?.bets.find((b) => b.roomId === roomId && !b.claimed);
+          const sideVal = userBet?.side === 'moon' ? 0 : 1;
+          
+          const { request } = await publicClient.simulateContract({
+            address: contractAddress,
+            abi: SHITMARKET_CORE_ABI,
+            functionName: 'claimWinnings',
+            args: [roomId as `0x${string}`, sideVal],
+            account: wallet.address as `0x${string}`
+          });
+          
+          const txHash = await evmWalletClient.writeContract({
+            ...request,
+            gas: BigInt(500000)
+          });
+          console.log("EVM Claim submitted! Tx:", txHash);
+          
+          get().updateToast(toastId, {
+            type: 'success',
+            message: 'SPOILS SECURED',
+            description: `Spoils recovered to your EVM wallet.`,
+            txSig: txHash
+          });
+          
+          return txHash;
+        }
       }
-
-      const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
-      
-      try {
-        await fetch(`${INDEXER_URL}/api/rooms/${roomId}/settle`, { method: 'POST' });
-      } catch (e) {
-        console.warn("Settlement trigger failed, proceeding with direct claim:", e);
-      }
-      
-      const userBet = get().user?.bets.find((b) => b.roomId === roomId && !b.claimed);
-      const sideVal = userBet?.side === 'moon' ? 0 : 1;
-      
-      const { request } = await publicClient.simulateContract({
-        address: contractAddress,
-        abi: SHITMARKET_CORE_ABI,
-        functionName: 'claimWinnings',
-        args: [roomId as `0x${string}`, sideVal],
-        account: wallet.address as `0x${string}`
-      });
-      
-      const txHash = await evmWalletClient.writeContract({
-        ...request,
-        gas: BigInt(500000)
-      });
-      console.log("EVM Claim submitted! Tx:", txHash);
-      
-      get().updateToast(toastId, {
-        type: 'success',
-        message: 'SPOILS SECURED',
-        description: `Spoils recovered to your EVM wallet.`,
-        txSig: txHash
-      });
-      
-      return txHash;
     } catch (err: any) {
       console.error("Failed to claim EVM winnings:", err);
       setTransactionError(err.message || String(err));
@@ -3477,6 +3622,211 @@ export const useAppState = create<AppState>()(
         type: 'error',
         message: 'CLAIM MISSION FLUNKED',
         description: err.message
+      });
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  addAmmLiquidity: async (roomId: string, amountUsdc: number) => {
+    const { wallet, setTransactionLoading, setTransactionError } = get();
+    if (!wallet || !wallet.address) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet first!");
+      return;
+    }
+    setTransactionLoading(true);
+    setTransactionError(null);
+    const toastId = get().addToast('ADDING LP LIQUIDITY', 'loading', `Seeding ${amountUsdc} USDC into AMM Pool...`);
+
+    try {
+      let provider: any = null;
+      if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+        provider = await wallet.privyWallet.getEthereumProvider();
+      } else if (typeof (window as any).ethereum !== 'undefined') {
+        provider = (window as any).ethereum;
+      }
+      if (!provider) throw new Error("No EVM provider found.");
+      await ensureAvalancheFujiChain(provider);
+
+      const evmWalletClient = createWalletClient({
+        account: wallet.address as `0x${string}`,
+        chain: avalancheFuji,
+        transport: custom(provider)
+      });
+
+      const marketFactoryAddress = CONTRACT_ADDRESSES.MARKET_FACTORY;
+      const poolFactoryAddress = CONTRACT_ADDRESSES.AM_POOL_FACTORY;
+      
+      const poolAddress = await publicClient.readContract({
+        address: poolFactoryAddress,
+        abi: AM_POOL_FACTORY_ABI,
+        functionName: 'getPool',
+        args: [roomId as `0x${string}`]
+      }) as `0x${string}`;
+
+      if (!poolAddress || poolAddress === '0x0000000000000000000000000000000000000000') {
+        throw new Error("AMM Pool does not exist for this market.");
+      }
+
+      const amountScaled = BigInt(Math.round(amountUsdc * 1e6));
+
+      // Approve USDC spending for the pool
+      const usdcAddress = CONTRACT_ADDRESSES.USDC;
+      
+      const allowance = await publicClient.readContract({
+        address: usdcAddress,
+        abi: [
+          {
+            name: 'allowance',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: 'owner', type: 'address' }, { name: 'spender', type: 'address' }],
+            outputs: [{ name: '', type: 'uint256' }]
+          }
+        ],
+        functionName: 'allowance',
+        args: [wallet.address as `0x${string}`, poolAddress]
+      }) as bigint;
+
+      if (allowance < amountScaled) {
+        get().updateToast(toastId, {
+          type: 'loading',
+          message: 'APPROVING USDC SPEND',
+          description: 'Authorizing AMM pool to split USDC...'
+        });
+        const { request: approveReq } = await publicClient.simulateContract({
+          address: usdcAddress,
+          abi: [
+            {
+              name: 'approve',
+              type: 'function',
+              stateMutability: 'nonpayable',
+              inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
+              outputs: [{ name: '', type: 'bool' }]
+            }
+          ],
+          functionName: 'approve',
+          args: [poolAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
+          account: wallet.address as `0x${string}`
+        });
+        const approveHash = await evmWalletClient.writeContract(approveReq);
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+      }
+
+      get().updateToast(toastId, {
+        type: 'loading',
+        message: 'SEPARATING RESERVES',
+        description: 'Depositing USDC collateral into target outcomes...'
+      });
+
+      const { request } = await publicClient.simulateContract({
+        address: poolAddress,
+        abi: AM_POOL_ABI,
+        functionName: 'addLiquidity',
+        args: [amountScaled],
+        account: wallet.address as `0x${string}`
+      });
+
+      const txHash = await evmWalletClient.writeContract({
+        ...request,
+        gas: BigInt(1000000)
+      });
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'LIQUIDITY INJECTED',
+        description: `Successfully added ${amountUsdc} USDC to pool reserves.`,
+        txSig: txHash
+      });
+
+      await get().fetchBalance();
+      await get().fetchSingleRoom(roomId);
+      return txHash;
+    } catch (err: any) {
+      console.error("Add LP Liquidity failed:", err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'LP ADD MISSION FLUNKED',
+        description: err.message || String(err)
+      });
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  removeAmmLiquidity: async (roomId: string, amountLp: number) => {
+    const { wallet, setTransactionLoading, setTransactionError } = get();
+    if (!wallet || !wallet.address) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet first!");
+      return;
+    }
+    setTransactionLoading(true);
+    setTransactionError(null);
+    const toastId = get().addToast('REMOVING LP LIQUIDITY', 'loading', `Removing ${amountLp} LP tokens...`);
+
+    try {
+      let provider: any = null;
+      if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+        provider = await wallet.privyWallet.getEthereumProvider();
+      } else if (typeof (window as any).ethereum !== 'undefined') {
+        provider = (window as any).ethereum;
+      }
+      if (!provider) throw new Error("No EVM provider found.");
+      await ensureAvalancheFujiChain(provider);
+
+      const evmWalletClient = createWalletClient({
+        account: wallet.address as `0x${string}`,
+        chain: avalancheFuji,
+        transport: custom(provider)
+      });
+
+      const poolFactoryAddress = CONTRACT_ADDRESSES.AM_POOL_FACTORY;
+      const poolAddress = await publicClient.readContract({
+        address: poolFactoryAddress,
+        abi: AM_POOL_FACTORY_ABI,
+        functionName: 'getPool',
+        args: [roomId as `0x${string}`]
+      }) as `0x${string}`;
+
+      if (!poolAddress || poolAddress === '0x0000000000000000000000000000000000000000') {
+        throw new Error("AMM Pool does not exist for this market.");
+      }
+
+      const amountLpScaled = BigInt(Math.round(amountLp * 1e6));
+
+      const { request } = await publicClient.simulateContract({
+        address: poolAddress,
+        abi: AM_POOL_ABI,
+        functionName: 'removeLiquidity',
+        args: [amountLpScaled],
+        account: wallet.address as `0x${string}`
+      });
+
+      const txHash = await evmWalletClient.writeContract({
+        ...request,
+        gas: BigInt(1000000)
+      });
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'LIQUIDITY WITHDRAWN',
+        description: `Successfully removed LP reserves back to USDC.`,
+        txSig: txHash
+      });
+
+      await get().fetchBalance();
+      await get().fetchSingleRoom(roomId);
+      return txHash;
+    } catch (err: any) {
+      console.error("Remove LP Liquidity failed:", err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'LP REMOVE MISSION FLUNKED',
+        description: err.message || String(err)
       });
       throw err;
     } finally {
@@ -4340,7 +4690,7 @@ export const useAppState = create<AppState>()(
       let balance = 0;
       if (address.startsWith('0x')) {
         try {
-          const usdcAddress = (process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS || '0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2') as `0x${string}`;
+          const usdcAddress = CONTRACT_ADDRESSES.USDC;
           const raw = await publicClient.readContract({
             address: usdcAddress,
             abi: [{ name: 'balanceOf', type: 'function', stateMutability: 'view', inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }] }] as const,
@@ -4756,19 +5106,6 @@ export const useAppState = create<AppState>()(
     console.log(`Stats update logged: result ${betResult}, amount ${amount}`);
   },
 
-  tickTimers: () => {
-    // Rooms are settled on-chain by the Keeper. 
-    // Timer ticks are purely visual for local client count-downs.
-  },
-
-  setFullDegenMode: (val: boolean) => {
-    set({ fullDegenMode: val });
-  },
-
-  getUserBetForRoom: (roomId: string) => {
-    return get().user?.bets.find((b) => b.roomId === roomId);
-  },
-
   updateLeaderboard: () => {
     get().fetchLeaderboard();
   },
@@ -4781,8 +5118,125 @@ export const useAppState = create<AppState>()(
     console.log("Parlay bet processed:", legs, amount);
   },
 
+  tickTimers: () => {
+    // Rooms are settled on-chain by the Keeper. 
+    // Timer ticks are purely visual for local client count-downs.
+  },
+  setFullDegenMode: (val: boolean) => {
+    set({ fullDegenMode: val });
+  },
+
+  getUserBetForRoom: (roomId: string) => {
+    return get().user?.bets.find((b) => b.roomId === roomId);
+  },
+
   disputeRoom: async (roomId: string) => {
     const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
+    
+    const isEvmRoom = roomId.startsWith('0x');
+    if (isEvmRoom) {
+      if (!wallet || !wallet.address || !wallet.privyWallet) {
+        get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet command helmet first!");
+        return;
+      }
+      
+      setTransactionLoading(true);
+      setTransactionError(null);
+      
+      const toastId = get().addToast(
+        'INITIATING DISPUTE',
+        'loading',
+        'Locking 10 USDC dispute bond to challenge results...'
+      );
+      
+      try {
+        let provider: any = null;
+        if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+          provider = await wallet.privyWallet.getEthereumProvider();
+        } else if (typeof (window as any).ethereum !== 'undefined') {
+          provider = (window as any).ethereum;
+        }
+        
+        if (!provider) {
+          throw new Error("No EVM provider found on wallet or browser window.");
+        }
+        
+        await ensureAvalancheFujiChain(provider);
+        
+        const evmWalletClient = createWalletClient({
+          account: wallet.address as `0x${string}`,
+          chain: avalancheFuji,
+          transport: custom(provider)
+        });
+        
+        const usdcAddress = CONTRACT_ADDRESSES.USDC;
+        const contractAddress = CONTRACT_ADDRESSES.CORE_CONTRACT;
+        
+        const bondAmount = BigInt(10 * 10**6);
+        const { request: approveReq } = await publicClient.simulateContract({
+          address: usdcAddress,
+          abi: [{
+            name: 'approve',
+            type: 'function',
+            stateMutability: 'nonpayable',
+            inputs: [{ name: 'spender', type: 'address' }, { name: 'value', type: 'uint256' }],
+            outputs: [{ name: '', type: 'bool' }]
+          }] as const,
+          functionName: 'approve',
+          args: [contractAddress, bondAmount],
+          account: wallet.address as `0x${string}`
+        });
+        
+        const approveHash = await evmWalletClient.writeContract({
+          ...approveReq,
+          gas: BigInt(100000)
+        });
+        
+        await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        
+        const { request } = await publicClient.simulateContract({
+          address: contractAddress,
+          abi: [{
+            name: 'disputeRoom',
+            type: 'function',
+            stateMutability: 'nonpayable',
+            inputs: [{ name: '_roomId', type: 'bytes32' }],
+            outputs: []
+          }] as const,
+          functionName: 'disputeRoom',
+          args: [roomId as `0x${string}`],
+          account: wallet.address as `0x${string}`
+        });
+        
+        const txHash = await evmWalletClient.writeContract({
+          ...request,
+          gas: BigInt(300000)
+        });
+        
+        get().updateToast(toastId, {
+          type: 'success',
+          message: 'DISPUTE DECLARED',
+          description: 'Dispute bond secured. Room status set to DISPUTED.',
+          txSig: txHash
+        });
+        
+        get().fetchRooms();
+        return txHash;
+      } catch (err: any) {
+        console.error("Failed to dispute EVM room:", err);
+        setTransactionError(err.message || String(err));
+        
+        get().updateToast(toastId, {
+          type: 'error',
+          message: 'DISPUTE LOCK FAILED',
+          description: err.message
+        });
+        throw err;
+      } finally {
+        setTransactionLoading(false);
+      }
+    }
+
     if (!wallet || !wallet.publicKey) {
       get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
       return;
@@ -4833,7 +5287,6 @@ export const useAppState = create<AppState>()(
         txSig: tx
       });
 
-      // Force refreshing the rooms list in the background
       get().fetchRooms();
 
       return tx;
@@ -4856,6 +5309,96 @@ export const useAppState = create<AppState>()(
 
   resolveDispute: async (roomId: string, winner: 'moon' | 'jeet' | 'draw' | null, overturned: boolean) => {
     const { wallet, setTransactionLoading, setTransactionError, sendTransaction } = get();
+    
+    const isEvmRoom = roomId.startsWith('0x');
+    if (isEvmRoom) {
+      if (!wallet || !wallet.address || !wallet.privyWallet) {
+        get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet command helmet first!");
+        return;
+      }
+      
+      setTransactionLoading(true);
+      setTransactionError(null);
+      
+      const toastId = get().addToast(
+        'RESOLVING DISPUTE',
+        'loading',
+        'Publishing final arbitration verdict to C-Chain...'
+      );
+      
+      try {
+        let provider: any = null;
+        if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+          provider = await wallet.privyWallet.getEthereumProvider();
+        } else if (typeof (window as any).ethereum !== 'undefined') {
+          provider = (window as any).ethereum;
+        }
+        
+        if (!provider) {
+          throw new Error("No EVM provider found on wallet or browser window.");
+        }
+        
+        await ensureAvalancheFujiChain(provider);
+        
+        const evmWalletClient = createWalletClient({
+          account: wallet.address as `0x${string}`,
+          chain: avalancheFuji,
+          transport: custom(provider)
+        });
+        
+        const contractAddress = process.env.NEXT_PUBLIC_CORE_CONTRACT_ADDRESS as `0x${string}`;
+        
+        let winnerVal = 2;
+        if (winner === 'moon') winnerVal = 0;
+        if (winner === 'jeet') winnerVal = 1;
+        
+        const { request } = await publicClient.simulateContract({
+          address: contractAddress,
+          abi: [{
+            name: 'resolveDispute',
+            type: 'function',
+            stateMutability: 'nonpayable',
+            inputs: [
+              { name: '_roomId', type: 'bytes32' },
+              { name: '_winner', type: 'uint8' },
+              { name: '_overturned', type: 'bool' }
+            ],
+            outputs: []
+          }] as const,
+          functionName: 'resolveDispute',
+          args: [roomId as `0x${string}`, winnerVal, overturned],
+          account: wallet.address as `0x${string}`
+        });
+        
+        const txHash = await evmWalletClient.writeContract({
+          ...request,
+          gas: BigInt(300000)
+        });
+        
+        get().updateToast(toastId, {
+          type: 'success',
+          message: 'DISPUTE RESOLVED',
+          description: `Arbitration verdict published on C-Chain.`,
+          txSig: txHash
+        });
+        
+        get().fetchRooms();
+        return txHash;
+      } catch (err: any) {
+        console.error("Failed to resolve EVM dispute:", err);
+        setTransactionError(err.message || String(err));
+        
+        get().updateToast(toastId, {
+          type: 'error',
+          message: 'RESOLVE FAILED',
+          description: err.message
+        });
+        throw err;
+      } finally {
+        setTransactionLoading(false);
+      }
+    }
+
     if (!wallet || !wallet.publicKey) {
       get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your wallet command helmet first!");
       return;
@@ -4877,11 +5420,9 @@ export const useAppState = create<AppState>()(
       const escrowPda = getEscrowPda(roomPda);
       const configPda = getPlatformConfigPda();
       
-      // Fetch room state to extract challenger
       const roomOnChain: any = await (program.account as any).room.fetch(roomPda);
-      let challengerAddress = roomOnChain.creator; // default/fallback
+      let challengerAddress = roomOnChain.creator;
       
-      // Fetch room details from indexer DB to get the correct disputeChallenger address
       try {
         const res = await fetch(`${INDEXER_URL}/api/rooms/${roomId}`);
         if (res.ok) {
@@ -4930,7 +5471,6 @@ export const useAppState = create<AppState>()(
         txSig: tx
       });
 
-      // Force refreshing the rooms list in the background
       get().fetchRooms();
 
       return tx;
@@ -4941,7 +5481,7 @@ export const useAppState = create<AppState>()(
       const cleanErr = extractErrorMessage(err);
       get().updateToast(toastId, {
         type: 'error',
-        message: 'RESOLUTION FLUNKED',
+        message: 'RESOLVE FAILED',
         description: cleanErr
       });
       

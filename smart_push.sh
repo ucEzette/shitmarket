@@ -3,121 +3,144 @@
 set -e
 
 echo "=== ShitMarket Smart Push Script ==="
-echo "Pushing up to 3 files per commit, with 3-4 min delays between batches."
+echo "Pushing up to 3 files per commit, 3–4 min delays between batches."
 echo ""
 
 cd "$(git rev-parse --show-toplevel)"
 
 git fetch origin
 
-# --- BATCH 1: State management & order book resilience ---
+# ─────────────────────────────────────────────────────────────────────────────
+# BATCH 1: Contract addresses config + contract dual-copy ERC-1155 upgrade
+# ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 1: State management & order book resilience ---"
-git add src/store/useAppState.ts
-git commit -m "fix(state): harden order book fetch with try/catch fallback and dispatch activity on trade
+echo "--- BATCH 1: Config utility + ERC-1155 upgrade in both contract copies ---"
+git add src/utils/config.ts contracts/ShitMarketCore.sol evm/contracts/ShitMarketCore.sol
+git commit -m "feat(contracts): upgrade ShitMarketCore to ERC-1155 outcome tokens; centralise contract addresses
 
-- Wrap indexer order book fetch in try/catch; fall back to pure AMM on network error
-- Fix verifyingContract fallback from '0x0' to zero-padded address
-- Dispatch 'win' activity notification locally after successful market order"
+- Inherit ERC1155 in ShitMarketCore; pass empty URI to constructor
+- Add getOutcomeTokenId(roomId, side) pure helper to derive deterministic token IDs
+- Mint ERC-1155 outcome tokens to bettor on placeBet; amount = USDC wagered
+- Refactor claimWinnings to use balanceOf() instead of Bet.claimed flag; burn tokens on claim
+- Handle Draw path (return 100% of token balance) and conditional bet.claimed backfill
+- Add CONTRACT_ADDRESSES const map to src/utils/config.ts (USDC, ORACLE_REGISTRY, MARKET_FACTORY, CONDITIONAL_TOKENS, AM_POOL_FACTORY, PREDICTION_ROUTER, CORE_CONTRACT)
+- Sync changes across both contracts/ and evm/contracts/ copies"
 
 echo "Pushing batch 1..."
 git push origin main
 
-# --- Wait 3-4 minutes ---
 SLEEP_1=$(( 180 + RANDOM % 61 ))
 echo "Waiting ${SLEEP_1}s before next batch..."
 sleep $SLEEP_1
 
-# --- BATCH 2: Wallet provider overhaul ---
+# ─────────────────────────────────────────────────────────────────────────────
+# BATCH 2: App state — ABI extensions + replace inline address fallbacks
+# ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 2: Wallet provider & embedded wallet detection ---"
-git add src/components/WalletProvider.tsx
-git commit -m "fix(wallet): simplify wallet type detection logic and always create embedded wallets on login
+echo "--- BATCH 2: useAppState — ABI additions + CONTRACT_ADDRESSES refactor ---"
+git add src/store/useAppState.ts
+git commit -m "refactor(state): centralise contract address resolution and extend ABIs
 
-- Rework savedType priority: prefer embedded over external on login
-- Remove auto-detect heuristic; rely on explicit localStorage wallet type
-- Set createOnLogin to 'all-users' for both Solana and Ethereum embedded wallets
-- Fix effectivePrivyWallet selection to respect walletType (embedded vs external)
-- Remove redundant activeEvmWallet fallback in getEthereumProvider"
+- Replace all inline process.env fallback address strings with CONTRACT_ADDRESSES from config.ts
+- Add resolveMarket, conditionToMarketId, and markets ABI entries to MARKET_FACTORY_ABI
+- Add isResolved and outcomeCounts view ABI entries to CONDITIONAL_TOKENS_ABI
+- Declare addAmmLiquidity and removeAmmLiquidity method signatures on AppState interface"
 
 echo "Pushing batch 2..."
 git push origin main
 
-# --- Wait 3-4 minutes ---
 SLEEP_2=$(( 180 + RANDOM % 61 ))
 echo "Waiting ${SLEEP_2}s before next batch..."
 sleep $SLEEP_2
 
-# --- BATCH 3: Footer cleanup ---
+# ─────────────────────────────────────────────────────────────────────────────
+# BATCH 3: Room detail page — Liquidity tab panel
+# ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 3: Footer UI cleanup ---"
-git add src/components/Footer.tsx
-git commit -m "chore(ui): remove deprecated status badges and recruit channel labels from Footer
+echo "--- BATCH 3: Room detail — LiquidityTabPanel component ---"
+git add "src/app/room/[id]/page.tsx"
+git commit -m "feat(room): add LiquidityTabPanel for AMM liquidity add/remove on EVM rooms
 
-- Remove Settlement Engine status badge (animated pulse indicator)
-- Remove 'RECRUIT CHANNELS' label and 'MOBILE CLIENT: COMING SOON' badge
-- Simplify footer layout to core social links only"
+- Import publicClient, AM_POOL_ABI, AM_POOL_FACTORY_ABI from state store and CONTRACT_ADDRESSES from config
+- Add LiquidityTabPanel component: fetches user SM-LP balance every 10s from pool contract
+- Expose ADD USDC LIQUIDITY input (calls addAmmLiquidity) and REMOVE LP RESERVES input (calls removeAmmLiquidity)
+- Disabled states and loading flag prevent double-submits; balance gate prevents over-removal"
 
 echo "Pushing batch 3..."
 git push origin main
 
-# --- Wait 3-4 minutes ---
 SLEEP_3=$(( 180 + RANDOM % 61 ))
 echo "Waiting ${SLEEP_3}s before next batch..."
 sleep $SLEEP_3
 
-# --- BATCH 4: Portfolio wallets & page theming ---
+# ─────────────────────────────────────────────────────────────────────────────
+# BATCH 4: UMA Oracle integration contracts
+# ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 4: Portfolio wallet management & light mode theming ---"
-git add src/app/portfolio/PortfolioWallets.tsx src/app/portfolio/page.tsx src/app/rooms/page.tsx
-git commit -m "feat(portfolio): add per-wallet Activate button and apply dual light/dark theming
+echo "--- BATCH 4: New UMA oracle adapter and mock OOv3 contracts ---"
+git add evm/contracts/UmaOracleAdapter.sol evm/contracts/MockOptimisticOracleV3.sol
+git commit -m "feat(contracts): add UmaOracleAdapter and MockOptimisticOracleV3 for dispute resolution
 
-- Add 'Activate' button per wallet row to switch active wallet without page reload
-- Apply light-mode-safe color tokens (slate-*) across PortfolioWallets table
-- Add suppressHydrationWarning to date/time nodes in PNL chart tooltip and bet list
-- Fix portfolio tab inactive state text color for light mode
-- Fix rooms page: cast room.category to string before equality check to prevent TS mismatch"
+- UmaOracleAdapter: implements IOracle; wraps UMA Optimistic Oracle v3 assertTruthWithDefaults
+  - assertOutcome() submits ANCILLARY_DATA claim to OOv3 and maps assertionId => marketId
+  - assertionResolvedCallback() receives settled truth state; records finalOutcomes and resolvedMarkets
+  - resolveMarket() callable after resolution to propagate winner to MarketFactory
+- MockOptimisticOracleV3: test-only OOv3 shim; stores assertions and allows manual settlement via resolveAssertion()"
 
 echo "Pushing batch 4..."
 git push origin main
 
-# --- Wait 3-4 minutes ---
 SLEEP_4=$(( 180 + RANDOM % 61 ))
 echo "Waiting ${SLEEP_4}s before next batch..."
 sleep $SLEEP_4
 
-# --- BATCH 5: Create room + layout ---
+# ─────────────────────────────────────────────────────────────────────────────
+# BATCH 5: EVM test suite additions
+# ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 5: Create room UI refresh & layout update ---"
-git add src/app/create-room/page.tsx src/app/layout.tsx
-git commit -m "refactor(create-room): migrate dark-only styles to dual light/dark theme tokens
+echo "--- BATCH 5: EVM test suites — ERC-1155 minting/burning and AMPool LP ---"
+git add evm/test/ShitMarketCore.test.js evm/test/AMPool.test.js evm/test/UmaOracleAdapter.test.js
+git commit -m "test(evm): add ERC-1155 outcome token tests, AMPool LP tests, and UMA adapter tests
 
-- Replace hardcoded dark bg/border/text values with slate-* light/dark variants
-- Update order summary card, seed amount input, back/submit buttons to use semantic colors
-- Replace neon-moon accent with emerald-500 for broader theme compatibility
-- Add seed side description hint text (bullish/bearish) below YES/NO toggle
-- Minor layout: inherit USDC label styling update"
+- ShitMarketCore.test.js: assert ERC-1155 tokens minted equal to bet amount on placeBet; assert tokens burned and USDC payout received on claimWinnings (Moon wins scenario)
+- AMPool.test.js: full LP lifecycle — deploy MarketFactory + AMPoolFactory, create condition, seed pool, verify LP token minting, swap conditional tokens, redeem via ConditionalTokens after settlement
+- UmaOracleAdapter.test.js: deploy MockOOv3 + UmaOracleAdapter, assert outcome through mock oracle, simulate callback resolution, verify finalOutcomes mapping updated"
 
 echo "Pushing batch 5..."
 git push origin main
 
-# --- BATCH 6: Room page ---
+SLEEP_5=$(( 180 + RANDOM % 61 ))
+echo "Waiting ${SLEEP_5}s before next batch..."
+sleep $SLEEP_5
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BATCH 6: EVM utility scripts + roadmap doc
+# ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 6: Room page changes ---"
+echo "--- BATCH 6: EVM debug scripts and world-class market roadmap ---"
+git add evm/scripts/get_ct_address.js evm/scripts/simulate_add_lp.js world_class_market_roadmap.md
+git commit -m "chore(evm): add pool debug scripts and world-class market feature roadmap
 
-# Check if room page has changes
-if git diff HEAD -- src/app/room/[id]/page.tsx | grep -q .; then
-  git add "src/app/room/[id]/page.tsx"
-  git commit -m "refactor(room): apply light/dark theme tokens and UI polish to room detail page
+- evm/scripts/get_ct_address.js: reads conditionalTokens address from MarketFactory deployment
+- evm/scripts/simulate_add_lp.js: reads pool metadata (USDC, CT, conditionId), mints USDC, approves and addLiquidity against deployed AMPool for local testing
+- world_class_market_roadmap.md: documents roadmap gaps and proposed implementations for Gnosis CTF integration, UMA optimistic dispute resolution, and Circle CCTP / Across bridge cross-chain deposits"
 
-- Replace dark-only hardcoded colors with dual light/dark slate-* tokens
-- Align room page styling with the updated design system
-- General cleanup and component consistency improvements"
-  echo "Pushing batch 6..."
-  git push origin main
-else
-  echo "No changes in room page, skipping batch 6."
-fi
+echo "Pushing batch 6..."
+git push origin main
+
+# ─────────────────────────────────────────────────────────────────────────────
+# BATCH 7: Scratch utility + smart_push.sh update
+# ─────────────────────────────────────────────────────────────────────────────
+echo ""
+echo "--- BATCH 7: Scratch debug script + push script update ---"
+git add scratch/get_ct_address.js smart_push.sh
+git commit -m "chore(scripts): add scratch CT address helper and update smart push script
+
+- scratch/get_ct_address.js: standalone conditional tokens address lookup via ethers RPC (mirrors evm/scripts version, used outside Hardhat context)
+- smart_push.sh: updated with current batch plan and accurate commit messages for this release cycle"
+
+echo "Pushing batch 7..."
+git push origin main
 
 echo ""
 echo "=== All batches pushed successfully! ==="

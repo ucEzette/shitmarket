@@ -7,7 +7,7 @@ import { motion } from 'framer-motion';
 import { PixelBarbedWire } from '@/components/PixelArt';
 import { useAppState, Room, formatPrice } from '@/store/useAppState';
 import { PEPE_ASSETS } from '@/components/MemeAssets';
-import { Flame, Zap, Target } from 'lucide-react';
+import { Flame, Zap, Target, Bookmark, Layers } from 'lucide-react';
 
 const RoomCountdown = ({ expiry }: { expiry: number }) => {
   const [timeLeft, setTimeLeft] = React.useState('');
@@ -34,11 +34,28 @@ const RoomCountdown = ({ expiry }: { expiry: number }) => {
   return <span>{timeLeft}</span>;
 };
 
-const HomepageRoomCard = ({ room }: { room: Room }) => {
+const HomepageRoomCard = ({ 
+  room, 
+  watchlistedIds, 
+  toggleBookmark, 
+  parlayCart, 
+  addLegToParlay, 
+  removeLegFromParlay 
+}: { 
+  room: Room;
+  watchlistedIds: string[];
+  toggleBookmark: (roomId: string) => void;
+  parlayCart: { roomId: string; side: 'moon' | 'jeet' }[];
+  addLegToParlay: (roomId: string, side: 'moon' | 'jeet') => void;
+  removeLegFromParlay: (roomId: string) => void;
+}) => {
   const router = useRouter();
   const totalPot = room.moonPool + room.jeetPool;
   const moonPercentage = totalPot > 0 ? (room.moonPool / totalPot) * 100 : 50;
   const jeetPercentage = totalPot > 0 ? (room.jeetPool / totalPot) * 100 : 50;
+
+  const isBookmarked = watchlistedIds.includes(room.id);
+  const isInParlay = parlayCart.some(leg => leg.roomId === room.id);
 
   return (
     <div
@@ -48,33 +65,87 @@ const HomepageRoomCard = ({ room }: { room: Room }) => {
           (window as any).synthSound('bet');
         }
       }}
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 flex flex-col justify-between cursor-pointer hover:border-emerald-500 transition-all select-none w-72 h-48 shrink-0 snap-start"
+      className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col justify-between cursor-pointer hover:-translate-y-1 transition-all duration-300 select-none w-72 h-52 shrink-0 snap-start relative group shadow-sm ${
+        room.moonPool > room.jeetPool
+          ? 'hover:border-emerald-500 dark:hover:shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+          : 'hover:border-rose-500 dark:hover:shadow-[0_0_20px_rgba(244,63,94,0.15)]'
+      }`}
     >
+      {/* Action Buttons Top Right */}
+      <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
+        {/* Bookmark Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            toggleBookmark(room.id);
+            if (typeof window !== 'undefined' && (window as any).synthSound) {
+              (window as any).synthSound('bet');
+            }
+          }}
+          className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
+            isBookmarked
+              ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 fill-emerald-500 dark:fill-emerald-400'
+              : 'bg-white/80 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850'
+          }`}
+          title={isBookmarked ? "Remove Bookmark" : "Bookmark Room"}
+        >
+          <Bookmark size={12} className={isBookmarked ? "fill-current" : ""} />
+        </button>
+
+        {/* Parlay Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            if (isInParlay) {
+              removeLegFromParlay(room.id);
+            } else {
+              addLegToParlay(room.id, room.moonPool > room.jeetPool ? 'moon' : 'jeet');
+            }
+            if (typeof window !== 'undefined' && (window as any).synthSound) {
+              (window as any).synthSound('bet');
+            }
+          }}
+          className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
+            isInParlay
+              ? 'bg-teal-50 dark:bg-emerald-950/30 border-teal-500/40 dark:border-green-600/30 text-teal-600 dark:text-emerald-400'
+              : 'bg-white/80 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850'
+          }`}
+          title={isInParlay ? "Remove from Parlay" : "Add to Parlay"}
+        >
+          <Layers size={12} />
+        </button>
+      </div>
+
       <div>
-        <span className="font-mono text-[9px] text-slate-500 uppercase tracking-wider block">
+        <span className="font-mono text-[9px] text-slate-500 uppercase tracking-wider block pr-16 truncate">
           {room.token.name}
         </span>
-        <h4 className="font-sans font-bold text-sm text-slate-900 dark:text-white line-clamp-2 mt-1 leading-snug">
+        <h4 className="font-sans font-bold text-sm text-slate-900 dark:text-white line-clamp-2 mt-1 leading-snug pr-12">
           Will {room.token.symbol.toUpperCase()} end above {room.openingPrice !== undefined ? `$${formatPrice(room.openingPrice)}` : '$1.00'}?
         </h4>
       </div>
 
+      {/* Progress Bar & Percentages */}
       <div className="space-y-1.5 my-3">
-        <div className="flex justify-between text-[11px] font-mono">
-          <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
-            <span className="inline-block animate-[bounce_1.2s_infinite] text-emerald-500 text-[10px]">▲</span> MOON
-          </span>
-          <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{moonPercentage.toFixed(0)}%</span>
+        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden flex">
+          <div 
+            className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-500" 
+            style={{ width: `${moonPercentage}%` }} 
+          />
+          <div 
+            className="h-full bg-gradient-to-r from-rose-400 to-red-500 transition-all duration-500" 
+            style={{ width: `${jeetPercentage}%` }} 
+          />
         </div>
-        <div className="flex justify-between text-[11px] font-mono">
-          <span className="text-xs font-bold text-rose-500 flex items-center gap-1">
-            <span className="inline-block animate-[bounce_1.2s_infinite] text-rose-500 text-[10px]">▼</span> JEET
-          </span>
-          <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{jeetPercentage.toFixed(0)}%</span>
+        <div className="flex justify-between text-[10px] font-mono font-bold">
+          <span className="text-emerald-500 flex items-center gap-0.5">▲ MOON {moonPercentage.toFixed(0)}%</span>
+          <span className="text-rose-500 flex items-center gap-0.5">▼ JEET {jeetPercentage.toFixed(0)}%</span>
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-200 dark:border-slate-800 pt-3 mt-auto text-[10px] font-mono text-slate-600 dark:text-slate-400">
+      <div className="flex items-center justify-between border-t border-slate-200/60 dark:border-slate-800/60 pt-3 mt-auto text-[10px] font-mono text-slate-600 dark:text-slate-400">
         <span className="font-bold text-emerald-600 dark:text-emerald-500 uppercase">
           POT: {totalPot.toFixed(2)} USDC
         </span>
@@ -87,13 +158,49 @@ const HomepageRoomCard = ({ room }: { room: Room }) => {
 };
 
 function HomeContent() {
-  const { isPaused, rooms } = useAppState();
+  const { isPaused, rooms, parlayCart, addLegToParlay, removeLegFromParlay } = useAppState();
   const [activeTab, setActiveTab] = React.useState<'latest' | 'biggest' | 'expire'>('latest');
   const [mounted, setMounted] = React.useState(false);
+  const [watchlistedIds, setWatchlistedIds] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     setMounted(true);
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('shitmarket-watchlist');
+      if (stored) {
+        try {
+          setWatchlistedIds(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
   }, []);
+
+  React.useEffect(() => {
+    const handleWatchlistChange = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      if (customEvent.detail) {
+        setWatchlistedIds(customEvent.detail);
+      }
+    };
+    window.addEventListener('watchlist-updated', handleWatchlistChange);
+    return () => window.removeEventListener('watchlist-updated', handleWatchlistChange);
+  }, []);
+
+  const toggleBookmark = (roomId: string) => {
+    setWatchlistedIds((prev) => {
+      let next;
+      if (prev.includes(roomId)) {
+        next = prev.filter((id) => id !== roomId);
+      } else {
+        next = [...prev, roomId];
+      }
+      localStorage.setItem('shitmarket-watchlist', JSON.stringify(next));
+      window.dispatchEvent(new CustomEvent('watchlist-updated', { detail: next }));
+      return next;
+    });
+  };
 
   const allRooms = rooms || [];
   
@@ -193,7 +300,17 @@ function HomeContent() {
         </h3>
         <div className="flex overflow-x-auto gap-6 pb-4 scrollbar-none snap-x">
           {mounted ? (
-            trendingRooms.map(room => <HomepageRoomCard key={room.id} room={room} />)
+            trendingRooms.map(room => (
+              <HomepageRoomCard 
+                key={room.id} 
+                room={room} 
+                watchlistedIds={watchlistedIds}
+                toggleBookmark={toggleBookmark}
+                parlayCart={parlayCart}
+                addLegToParlay={addLegToParlay}
+                removeLegFromParlay={removeLegFromParlay}
+              />
+            ))
           ) : (
             <div className="w-72 h-48 bg-slate-100 dark:bg-slate-900/40 animate-pulse rounded-2xl shrink-0" />
           )}
@@ -215,7 +332,17 @@ function HomeContent() {
               const currentList = activeTab === 'latest' ? latestRooms : activeTab === 'biggest' ? biggestPotRooms : soonToExpireRooms;
               return currentList.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {currentList.map((room) => <HomepageRoomCard key={room.id} room={room} />)}
+                  {currentList.map((room) => (
+                    <HomepageRoomCard 
+                      key={room.id} 
+                      room={room} 
+                      watchlistedIds={watchlistedIds}
+                      toggleBookmark={toggleBookmark}
+                      parlayCart={parlayCart}
+                      addLegToParlay={addLegToParlay}
+                      removeLegFromParlay={removeLegFromParlay}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="text-center py-20 font-mono text-xs text-slate-400 uppercase font-bold border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/50">

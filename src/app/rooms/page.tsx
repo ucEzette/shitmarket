@@ -8,7 +8,7 @@ import { useAppState, Room, formatCashtag, formatPrice, MarketCategory, CATEGORI
 import { PixelCrackedHelmet, PixelShovel, PixelGasMask } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS, DegenQuoteBanner, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
 import { synthSound } from '@/components/ClientWrapper';
-import { Search, Flame, Bomb, ArrowRight, UserPlus, Plus, X, Bookmark, Rocket, Clock } from 'lucide-react';
+import { Search, Flame, Bomb, ArrowRight, UserPlus, Plus, X, Bookmark, Rocket, Clock, Layers } from 'lucide-react';
 
 const NetworkLogo = ({ chainId, active, className = "w-7 h-7" }: { chainId: string; active: boolean; className?: string }) => {
   if (chainId === 'all') {
@@ -83,7 +83,7 @@ export default function RoomsPage() {
   };
 
   const router = useRouter();
-  const { rooms, roomsLoaded, fetchRooms, user, placeBet, connectWallet, addToast } = useAppState();
+  const { rooms, roomsLoaded, fetchRooms, user, placeBet, connectWallet, addToast, parlayCart, addLegToParlay, removeLegFromParlay } = useAppState();
   const [selectedNetwork, setSelectedNetwork] = useState<string>('all');
   const [selectedCategory, setSelectedCategory] = useState<MarketCategory>('all');
   const [showOtherNetworksDrawer, setShowOtherNetworksDrawer] = useState(false);
@@ -299,17 +299,61 @@ export default function RoomsPage() {
     const timeText = timeRemainingText[room.id] || '00:00:00';
     const isSettled = room.status === 'settled';
     const isDisputed = room.status === 'disputed';
+    const isInParlay = parlayCart.some(leg => leg.roomId === room.id);
 
     return (
       <div
         key={room.id}
         onClick={() => router.push(`/room/${room.id}`)}
-        className={`bg-white dark:bg-trench-mud border rounded-2xl p-4 flex flex-col justify-between cursor-pointer transition-all duration-200 select-none relative group hover:-translate-y-0.5 shadow-md dark:shadow-none text-slate-800 dark:text-white shrink-0 snap-start w-[280px] sm:w-[320px] md:w-auto ${
+        className={`bg-white/80 dark:bg-trench-mud/85 backdrop-blur-md border rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all duration-350 select-none relative group hover:-translate-y-1 shadow-sm text-slate-800 dark:text-white shrink-0 snap-start w-[280px] sm:w-[320px] md:w-auto ${
           isMoonLeading
-            ? 'border-teal-600/30 dark:border-neon-moon/30 shadow-sm dark:shadow-glow-moon hover:border-teal-600 dark:hover:border-neon-moon/70'
-            : 'border-red-600/30 dark:border-jeet-red/30 shadow-sm dark:shadow-glow-jeet hover:border-red-600 dark:hover:border-jeet-red/70'
+            ? 'border-teal-600/30 dark:border-neon-moon/30 dark:shadow-none hover:border-teal-600 dark:hover:border-neon-moon/70 dark:hover:shadow-[0_0_20px_rgba(16,185,129,0.15)]'
+            : 'border-red-600/30 dark:border-jeet-red/30 dark:shadow-none hover:border-rose-600 dark:hover:border-jeet-red/70 dark:hover:shadow-[0_0_20px_rgba(244,63,94,0.15)]'
         }`}
       >
+        {/* Action Buttons Top Right */}
+        <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
+          {/* Bookmark Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleBookmark(room.id);
+              synthSound('bet');
+            }}
+            className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
+              watchlistedIds.includes(room.id)
+                ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 fill-emerald-500 dark:fill-emerald-400'
+                : 'bg-white/80 dark:bg-trench-black border-slate-200 dark:border-trench-sandbag/40 hover:bg-slate-100 dark:hover:bg-trench-black/85'
+            }`}
+            title={watchlistedIds.includes(room.id) ? "Remove Bookmark" : "Bookmark Room"}
+          >
+            <Bookmark size={12} className={watchlistedIds.includes(room.id) ? "fill-current" : ""} />
+          </button>
+
+          {/* Parlay Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (isInParlay) {
+                removeLegFromParlay(room.id);
+              } else {
+                addLegToParlay(room.id, room.moonPool > room.jeetPool ? 'moon' : 'jeet');
+              }
+              synthSound('bet');
+            }}
+            className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
+              isInParlay
+                ? 'bg-teal-50 dark:bg-emerald-950/30 border-teal-500/40 dark:border-green-600/30 text-teal-600 dark:text-emerald-400'
+                : 'bg-white/80 dark:bg-trench-black border-slate-200 dark:border-trench-sandbag/40 hover:bg-slate-100 dark:hover:bg-trench-black/85'
+            }`}
+            title={isInParlay ? "Remove from Parlay" : "Add to Parlay"}
+          >
+            <Layers size={12} />
+          </button>
+        </div>
+
         {/* Card Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-start gap-3">
@@ -337,7 +381,7 @@ export default function RoomsPage() {
               )}
             </div>
             {/* Question */}
-            <div className="min-w-0">
+            <div className="min-w-0 pr-16">
               <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug tracking-wide group-hover:text-teal-700 dark:group-hover:text-white transition-colors">
                 {isDebateRoom 
                   ? (room.resolutionCriteria ? room.resolutionCriteria.split('| Ref:')[0].split('Ref:')[0].trim() : room.token.name)
@@ -357,6 +401,24 @@ export default function RoomsPage() {
                 </span>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Double-Sided Progress Bar */}
+        <div className="space-y-1 my-3">
+          <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden flex">
+            <div 
+              className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-500" 
+              style={{ width: `${moonPercentage}%` }} 
+            />
+            <div 
+              className="h-full bg-gradient-to-r from-rose-400 to-red-500 transition-all duration-500" 
+              style={{ width: `${jeetPercentage}%` }} 
+            />
+          </div>
+          <div className="flex justify-between text-[9px] font-mono font-bold">
+            <span className="text-emerald-500 flex items-center gap-0.5">▲ MOON {moonPercentage.toFixed(0)}%</span>
+            <span className="text-rose-500 flex items-center gap-0.5">▼ JEET {jeetPercentage.toFixed(0)}%</span>
           </div>
         </div>
 
@@ -472,23 +534,6 @@ export default function RoomsPage() {
               </div>
             )}
           </div>
-
-          {/* Right Bookmark button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              toggleBookmark(room.id);
-              synthSound('bet');
-            }}
-            className="p-1 hover:bg-cyan-100 dark:hover:bg-trench-black border border-cyan-200 dark:border-trench-sandbag/40 text-slate-500 dark:text-trench-gasmask hover:text-slate-900 dark:hover:text-white rounded transition-colors"
-            title={watchlistedIds.includes(room.id) ? "Remove Bookmark" : "Bookmark Room"}
-          >
-            <Bookmark 
-              size={11} 
-              className={watchlistedIds.includes(room.id) ? "fill-[#00796B] text-[#00796B] dark:fill-neon-moon dark:text-neon-moon animate-pulse" : ""} 
-            />
-          </button>
         </div>
       </div>
     );

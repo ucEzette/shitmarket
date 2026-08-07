@@ -71,6 +71,13 @@ export const Footer: React.FC = () => {
               <MessageSquareCode size={13} />
             </a>
             <Link
+              href="/presentation"
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag hover:border-[#00796B] dark:hover:border-neon-moon text-slate-600 dark:text-trench-gasmask hover:text-[#00796B] dark:hover:text-neon-moon transition-all rounded font-mono text-[9.5px] font-bold"
+              title="Protocol Documentation"
+            >
+              <span>DOC</span>
+            </Link>
+            <Link
               href="/rules"
               className="p-1.5 bg-cyan-50 dark:bg-trench-mud border border-cyan-200 dark:border-trench-sandbag hover:border-[#00796B] dark:hover:border-neon-moon text-slate-600 dark:text-trench-gasmask hover:text-[#00796B] dark:hover:text-neon-moon transition-all rounded shadow-inner"
               title="War Manual"

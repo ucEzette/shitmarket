@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppState, Room, ChatMessage, formatCashtag, formatPrice } from '@/store/useAppState';
-import { INDEXER_URL } from '@/utils/config';
+import { useAppState, Room, ChatMessage, formatCashtag, formatPrice, publicClient, AM_POOL_ABI, AM_POOL_FACTORY_ABI } from '@/store/useAppState';
+import { INDEXER_URL, CONTRACT_ADDRESSES } from '@/utils/config';
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
 import { OrderBook } from '@/components/OrderBook';
@@ -94,6 +94,138 @@ const LazyDexChart = ({ chainId, pairAddress }: { chainId: string; pairAddress: 
     </div>
   );
 };
+
+function LiquidityTabPanel({ roomId }: { roomId: string }) {
+  const { addAmmLiquidity, removeAmmLiquidity, wallet } = useAppState();
+  const [usdcAmount, setUsdcAmount] = useState<string>('');
+  const [lpAmount, setLpAmount] = useState<string>('');
+  const [lpBalance, setLpBalance] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
+
+  const fetchLpBalance = async () => {
+    if (!wallet?.address) return;
+    try {
+      const poolFactoryAddress = CONTRACT_ADDRESSES.AM_POOL_FACTORY;
+      const poolAddress = await publicClient.readContract({
+        address: poolFactoryAddress,
+        abi: AM_POOL_FACTORY_ABI,
+        functionName: 'getPool',
+        args: [roomId as `0x${string}`]
+      }) as `0x${string}`;
+
+      if (poolAddress && poolAddress !== '0x0000000000000000000000000000000000000000') {
+        const bal = await publicClient.readContract({
+          address: poolAddress,
+          abi: [
+            {
+              name: 'balanceOf',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [{ name: 'account', type: 'address' }],
+              outputs: [{ name: '', type: 'uint256' }]
+            }
+          ],
+          functionName: 'balanceOf',
+          args: [wallet.address as `0x${string}`]
+        }) as bigint;
+        setLpBalance(Number(bal) / 1e6);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch LP balance:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchLpBalance();
+    const interval = setInterval(fetchLpBalance, 10000);
+    return () => clearInterval(interval);
+  }, [wallet?.address, roomId]);
+
+  const handleAdd = async () => {
+    if (!usdcAmount || isNaN(Number(usdcAmount))) return;
+    setLoading(true);
+    try {
+      await addAmmLiquidity(roomId, Number(usdcAmount));
+      setUsdcAmount('');
+      await fetchLpBalance();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    if (!lpAmount || isNaN(Number(lpAmount))) return;
+    setLoading(true);
+    try {
+      await removeAmmLiquidity(roomId, Number(lpAmount));
+      setLpAmount('');
+      await fetchLpBalance();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6 text-left p-2">
+      <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 font-mono text-xs flex justify-between items-center">
+        <span className="text-slate-500 uppercase font-bold">Your Liquidity Shares:</span>
+        <span className="font-extrabold text-slate-955 dark:text-white">{lpBalance.toFixed(2)} SM-LP</span>
+      </div>
+
+      {/* Add Liquidity section */}
+      <div className="space-y-2">
+        <label className="block font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          ADD USDC LIQUIDITY:
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="number"
+            value={usdcAmount}
+            onChange={(e) => setUsdcAmount(e.target.value)}
+            disabled={loading}
+            placeholder="USDC Amount..."
+            className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={loading || !usdcAmount}
+            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-mono text-xs font-bold transition-all disabled:opacity-50"
+          >
+            ADD
+          </button>
+        </div>
+      </div>
+
+      {/* Remove Liquidity section */}
+      <div className="space-y-2">
+        <label className="block font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          REMOVE LP RESERVES:
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="number"
+            value={lpAmount}
+            onChange={(e) => setLpAmount(e.target.value)}
+            disabled={loading}
+            placeholder="LP tokens to burn..."
+            className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-xs text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600 focus:outline-none focus:border-rose-500"
+          />
+          <button
+            onClick={handleRemove}
+            disabled={loading || !lpAmount || Number(lpAmount) > lpBalance}
+            className="px-6 py-3 bg-rose-500 hover:bg-rose-600 text-white rounded-xl font-mono text-xs font-bold transition-all disabled:opacity-50"
+          >
+            REMOVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface MortarProjectile {
   id: number;
@@ -246,7 +378,7 @@ export default function RoomDetailPage() {
   const [sharesInput, setSharesInput] = useState<number>(10);
   const [selectedProfileAddress, setSelectedProfileAddress] = useState<string | null>(null);
   const [activeRulesTab, setActiveRulesTab] = useState<'rules' | 'context'>('rules');
-  const [activeMainTab, setActiveMainTab] = useState<'trade' | 'chart' | 'holdings' | 'activity' | 'discussion'>('trade');
+  const [activeMainTab, setActiveMainTab] = useState<'trade' | 'chart' | 'liquidity' | 'holdings' | 'activity' | 'discussion'>('trade');
   const [localShake, setLocalShake] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [livePrice, setLivePrice] = useState<number | null>(null);
@@ -1345,11 +1477,14 @@ export default function RoomDetailPage() {
               
               {/* Tab Bar Header */}
               <div className="flex border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 overflow-x-auto scrollbar">
-                {(['trade', 'chart', 'holdings', 'activity', 'discussion'] as const).map((tab) => (
+                {(room.id.startsWith('0x') 
+                  ? ['trade', 'chart', 'liquidity', 'holdings', 'activity', 'discussion'] as const 
+                  : ['trade', 'chart', 'holdings', 'activity', 'discussion'] as const
+                ).map((tab) => (
                   <button
                     key={tab}
                     type="button"
-                    onClick={() => { setActiveMainTab(tab); synthSound('bet'); }}
+                    onClick={() => { setActiveMainTab(tab as any); synthSound('bet'); }}
                     className={`px-6 py-4 font-mono text-xs uppercase tracking-wider font-bold transition-all relative whitespace-nowrap ${
                       activeMainTab === tab
                         ? 'text-slate-900 dark:text-white'
@@ -1559,6 +1694,11 @@ export default function RoomDetailPage() {
                       </button>
                     )}
                   </div>
+                )}
+
+                {/* 1.5 LIQUIDITY PANEL */}
+                {activeMainTab === 'liquidity' && room && (
+                  <LiquidityTabPanel roomId={room.id} />
                 )}
 
                 {/* 2. CHART PANEL */}
@@ -1780,26 +1920,102 @@ export default function RoomDetailPage() {
 
             {/* Resolution Criteria Card */}
             {room && (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-4 text-left">
-                <h3 className="font-sans text-sm text-slate-900 dark:text-white font-extrabold uppercase tracking-tight">
-                  Resolution Criteria
-                </h3>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-sm space-y-5 text-left relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1.5 h-full bg-[#00796B] dark:bg-neon-moon"></div>
                 
-                <p className="font-sans text-xs text-slate-700 dark:text-slate-300 leading-relaxed text-[11px]">
-                  {room.resolutionCriteria 
-                    ? room.resolutionCriteria.split('| Ref:')[0].trim()
-                    : `Will the price of ${room.token.symbol} end above $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}?`
-                  }
-                </p>
+                <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <h3 className="font-sans text-xs text-slate-500 dark:text-slate-400 font-extrabold uppercase tracking-widest">
+                    Detailed Resolution Rules & Oracle
+                  </h3>
+                  <span className="font-mono text-[9px] bg-teal-50 dark:bg-neon-moon/10 text-[#00796B] dark:text-neon-moon px-2 py-0.5 border border-[#00796B]/20 rounded font-bold uppercase">
+                    Verification Protocol
+                  </span>
+                </div>
+                
+                {/* 1. Main Resolve Criteria Statement */}
+                <div className="space-y-1.5">
+                  <span className="block font-mono text-[9px] text-slate-400 dark:text-slate-500 uppercase font-extrabold">Market Criteria Statement</span>
+                  <p className="font-sans text-sm text-slate-800 dark:text-slate-200 font-bold leading-snug">
+                    {room.resolutionCriteria && room.resolutionCriteria.split('| Ref:')[0].trim().length > 10
+                      ? room.resolutionCriteria.split('| Ref:')[0].trim()
+                      : `Will the final TWAP price of ${room.token.name} (${room.token.symbol}) end strictly above the strike price of $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} at the expiry target time?`
+                    }
+                  </p>
+                </div>
+
+                {/* 2. Structured Strike Rules */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 font-mono text-xs">
+                  <div className="space-y-1">
+                    <span className="text-slate-400 text-[9px] font-bold uppercase block">🟢 MOON (YES) WINS IF</span>
+                    <span className="font-bold text-slate-800 dark:text-white">Final Price &gt; $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-slate-400 text-[9px] font-bold uppercase block">🔴 JEET (NO) WINS IF</span>
+                    <span className="font-bold text-slate-800 dark:text-white">Final Price &lt; $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}</span>
+                  </div>
+                </div>
+
+                {/* 3. Oracle and Settlement Feed Details */}
+                <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                  <div className="flex items-start gap-3">
+                    <div className="text-xl">
+                      {(() => {
+                        const addr = (room.oracleAddress || '').toLowerCase();
+                        if (addr === '0x803e97fdffe050bfd781c26ba8a65df069ae9cc6') return '⚖️';
+                        if (addr === '0xc0218f5894591b7b08ea186da3ad2a5e69e40b67' || addr === '0x17c48e0670548b798dcc3e56a18eb2f5b158aab2') return '🤖';
+                        if (addr.includes('adapter')) return '🔮';
+                        return '📡';
+                      })()}
+                    </div>
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <span className="block font-mono text-[9px] text-slate-400 dark:text-slate-500 uppercase font-extrabold">Assigned Resolution Oracle</span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-sans text-xs text-slate-900 dark:text-white font-extrabold">
+                          {(() => {
+                            const addr = (room.oracleAddress || '').toLowerCase();
+                            if (addr === '0x803e97fdffe050bfd781c26ba8a65df069ae9cc6') return 'Jury DAO Optimistic Oracle';
+                            if (addr === '0xc0218f5894591b7b08ea186da3ad2a5e69e40b67' || addr === '0x17c48e0670548b798dcc3e56a18eb2f5b158aab2') return 'Programmatic AI Oracle';
+                            if (addr.includes('adapter')) return 'UMA Optimistic Oracle (OOv3)';
+                            return 'Custom Resolution Oracle Feed';
+                          })()}
+                        </span>
+                        <span className="font-mono text-[9px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded select-all truncate block max-w-[200px]" title={room.oracleAddress || 'No Address'}>
+                          {room.oracleAddress || 'No Address'}
+                        </span>
+                      </div>
+                      <p className="font-sans text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                        {(() => {
+                          const addr = (room.oracleAddress || '').toLowerCase();
+                          if (addr === '0x803e97fdffe050bfd781c26ba8a65df069ae9cc6') {
+                            return 'Resolves optimistically. Disputes are resolved via decentralized voting by Jury DAO token holders on-chain.';
+                          }
+                          if (addr === '0xc0218f5894591b7b08ea186da3ad2a5e69e40b67' || addr === '0x17c48e0670548b798dcc3e56a18eb2f5b158aab2') {
+                            return 'Settles automatically using cryptographically verified Pyth Network feeds, Chainlink, and DexScreener TWAP prices.';
+                          }
+                          return 'Resolves against the custom oracle contract or designated self-sovereign EOA resolver configured during room setup.';
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 4. Dispute Mechanism Guideline */}
+                <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-3 flex items-start gap-2.5 font-sans text-[10px] text-amber-600 dark:text-amber-400 leading-normal">
+                  <span className="text-xs">⚠️</span>
+                  <div>
+                    <span className="font-bold block uppercase tracking-wide">On-Chain Dispute Mechanism</span>
+                    <span>Once the oracle settles the market, a 1-hour challenge window is opened. Any user can challenge the proposed verdict by posting a 10 USDC dispute bond to slash inaccurate reports.</span>
+                  </div>
+                </div>
 
                 {room.resolutionCriteria && room.resolutionCriteria.includes('Ref:') && (
                   <a 
                     href={room.resolutionCriteria.split('Ref:')[1]?.trim() || '#'} 
                     target="_blank" 
                     rel="noreferrer" 
-                    className="inline-flex items-center gap-1 text-xs text-emerald-500 hover:text-emerald-400 transition-colors font-mono font-bold"
+                    className="inline-flex items-center gap-1 text-xs text-emerald-500 hover:text-emerald-400 transition-colors font-mono font-bold pt-1"
                   >
-                    <span>View source</span>
+                    <span>View reference source</span>
                     <ExternalLink size={12} />
                   </a>
                 )}

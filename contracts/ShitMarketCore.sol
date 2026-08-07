@@ -3,6 +3,7 @@ pragma solidity ^0.8.20;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -24,7 +25,7 @@ interface IPyth {
  * @notice Core Prediction Market smart contract migrated from Solana to Avalanche.
  * Wagering is denominated in USDC (6 decimals), matching the Solana USDC scale.
  */
-contract ShitMarketCore is Ownable, ReentrancyGuard {
+contract ShitMarketCore is ERC1155, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ─── Enums & Constants ──────────────────────────────────────────────────
@@ -208,7 +209,7 @@ contract ShitMarketCore is Ownable, ReentrancyGuard {
 
     // ─── Constructor ────────────────────────────────────────────────────────
 
-    constructor(address _usdcToken, address _treasury, uint16 _platformFeeBps) Ownable(msg.sender) {
+    constructor(address _usdcToken, address _treasury, uint16 _platformFeeBps) ERC1155("") Ownable(msg.sender) {
         require(_usdcToken != address(0), "Invalid USDC token");
         require(_treasury != address(0), "Invalid treasury");
         require(_platformFeeBps <= MAX_FEE_BPS, "Fee too high");
@@ -338,6 +339,13 @@ contract ShitMarketCore is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Helper to generate ERC1155 token IDs from roomId and outcome side.
+     */
+    function getOutcomeTokenId(bytes32 _roomId, Side _side) public pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked(_roomId, _side)));
+    }
+
+    /**
      * @notice Place bet on Moon or Jeet
      */
     function placeBet(bytes32 _roomId, Side _side, uint256 _amount) external whenNotPaused nonReentrant {
@@ -352,6 +360,10 @@ contract ShitMarketCore is Ownable, ReentrancyGuard {
         // Transfer USDC from user to contract
         usdcToken.safeTransferFrom(msg.sender, address(this), _amount);
         totalUSDCInEscrow += _amount;
+
+        // Mint outcome tokens (ERC-1155)
+        uint256 tokenId = getOutcomeTokenId(_roomId, _side);
+        _mint(msg.sender, tokenId, _amount, "");
 
         bytes32 betId = keccak256(abi.encodePacked(_roomId, msg.sender, _side));
         Bet storage bet = bets[betId];
@@ -510,17 +522,15 @@ contract ShitMarketCore is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Claim Winnings / Refund from Settled Room
+     * @notice Claim Winnings / Refund from Settled Room by burning outcome tokens
      */
     function claimWinnings(bytes32 _roomId, Side _side) external whenNotPaused nonReentrant {
         Room storage room = rooms[_roomId];
         require(room.status == RoomStatus.Settled, "Room not settled yet");
 
-        bytes32 betId = keccak256(abi.encodePacked(_roomId, msg.sender, _side));
-        Bet storage bet = bets[betId];
-        require(bet.roomId != bytes32(0), "No wager found");
-        require(bet.currentOwner == msg.sender, "Unauthorized claim call");
-        require(!bet.claimed, "Winnings already claimed");
+        uint256 tokenId = getOutcomeTokenId(_roomId, _side);
+        uint256 userTokenBalance = balanceOf(msg.sender, tokenId);
+        require(userTokenBalance > 0, "No outcome tokens owned");
 
         uint256 totalPool = room.moonPool + room.jeetPool;
         uint256 platformFee = (room.winner == Side.Draw) ? 0 : (totalPool * config.platformFeeBps) / BPS_DIVISOR;
@@ -531,15 +541,23 @@ contract ShitMarketCore is Ownable, ReentrancyGuard {
 
         if (room.winner == Side.Draw) {
             // Draw/Void path: return 100% of the player's stake
-            payoutAmount = bet.amount;
+            payoutAmount = userTokenBalance;
         } else {
-            require(bet.side == room.winner, "Only winning side can claim");
+            require(_side == room.winner, "Only winning outcome tokens can claim");
             uint256 winningPool = (room.winner == Side.Moon) ? room.moonPool : room.jeetPool;
-            payoutAmount = (bet.amount * totalPayoutPool) / winningPool;
+            payoutAmount = (userTokenBalance * totalPayoutPool) / winningPool;
         }
 
-        // Reentrancy guard: set claimed flag prior to transfer
-        bet.claimed = true;
+        // Burn the outcome tokens
+        _burn(msg.sender, tokenId, userTokenBalance);
+
+        // Update internal tracking if bet profile exists
+        bytes32 betId = keccak256(abi.encodePacked(_roomId, msg.sender, _side));
+        Bet storage bet = bets[betId];
+        if (bet.roomId != bytes32(0)) {
+            bet.claimed = true;
+        }
+
         totalUSDCInEscrow -= payoutAmount;
 
         // Referral reward distribution (0.1% of payout to referrer)

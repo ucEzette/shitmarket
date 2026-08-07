@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAppState, Room, ChatMessage, formatCashtag, formatPrice, publicClient, AM_POOL_ABI, AM_POOL_FACTORY_ABI } from '@/store/useAppState';
+import { useAppState, Room, ChatMessage, formatCashtag, formatPrice, publicClient, AM_POOL_ABI, AM_POOL_FACTORY_ABI, CONDITIONAL_TOKENS_ABI } from '@/store/useAppState';
 import { INDEXER_URL, CONTRACT_ADDRESSES } from '@/utils/config';
 import { PixelGasMask, PixelBarbedWire } from '@/components/PixelArt';
 import { PepePortrait, PEPE_ASSETS } from '@/components/MemeAssets';
@@ -388,6 +388,8 @@ export default function RoomDetailPage() {
   const [selectedBetToList, setSelectedBetToList] = useState<any | null>(null);
   const [askPriceInput, setAskPriceInput] = useState<string>('');
   const [mounted, setMounted] = useState(false);
+  const [evmYesBalance, setEvmYesBalance] = useState<number>(0);
+  const [evmNoBalance, setEvmNoBalance] = useState<number>(0);
 
   useEffect(() => {
     setMounted(true);
@@ -433,6 +435,71 @@ export default function RoomDetailPage() {
     });
   };
 
+  const fetchEvmBalances = useCallback(async () => {
+    if (!wallet?.address || !roomId.startsWith('0x') || !room) return;
+    try {
+      const tokensAddress = CONTRACT_ADDRESSES.CONDITIONAL_TOKENS;
+      
+      const tokenId0 = await publicClient.readContract({
+        address: tokensAddress,
+        abi: CONDITIONAL_TOKENS_ABI,
+        functionName: 'getTokenId',
+        args: [roomId as `0x${string}`, BigInt(0)]
+      }) as bigint;
+
+      const tokenId1 = await publicClient.readContract({
+        address: tokensAddress,
+        abi: CONDITIONAL_TOKENS_ABI,
+        functionName: 'getTokenId',
+        args: [roomId as `0x${string}`, BigInt(1)]
+      }) as bigint;
+
+      const bal0 = await publicClient.readContract({
+        address: tokensAddress,
+        abi: CONDITIONAL_TOKENS_ABI,
+        functionName: 'balanceOf',
+        args: [wallet.address as `0x${string}`, tokenId0]
+      }) as bigint;
+
+      const bal1 = await publicClient.readContract({
+        address: tokensAddress,
+        abi: CONDITIONAL_TOKENS_ABI,
+        functionName: 'balanceOf',
+        args: [wallet.address as `0x${string}`, tokenId1]
+      }) as bigint;
+
+      setEvmYesBalance(Number(bal0) / 1e6);
+      setEvmNoBalance(Number(bal1) / 1e6);
+    } catch (e) {
+      console.warn("Failed to fetch EVM outcome balances:", e);
+    }
+  }, [wallet?.address, roomId, room]);
+
+  const handleSwitchTabOrSide = useCallback((newOrderType: 'buy' | 'sell', newSide: 'moon' | 'jeet') => {
+    setOrderType(newOrderType);
+    setSelectedSide(newSide);
+    synthSound('bet');
+    
+    if (newOrderType === 'sell' && room) {
+      const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
+      const moonPool = room.moonPool || 0;
+      const jeetPool = room.jeetPool || 0;
+      const totalPool = moonPool + jeetPool;
+      const priceMoon = totalPool > 0 ? (moonPool + 10) / (totalPool + 20) : 0.5;
+      const priceJeet = totalPool > 0 ? (jeetPool + 10) / (totalPool + 20) : 0.5;
+      const userBetsInRoom = user ? user.bets.filter(b => isSameRoom(b.roomId, room.id)) : [];
+      const moonSharesOwned = isEvm 
+        ? evmYesBalance 
+        : userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || (b.amount / priceMoon)), 0);
+      const jeetSharesOwned = isEvm 
+        ? evmNoBalance 
+        : userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || (b.amount / priceJeet)), 0);
+      const selectedSharesOwned = newSide === 'moon' ? moonSharesOwned : jeetSharesOwned;
+      setSharesInput(selectedSharesOwned > 0 ? selectedSharesOwned : 0);
+    } else {
+      setSharesInput(10);
+    }
+  }, [room, user, evmYesBalance, evmNoBalance]);
 
   const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
     if (!isMuted && typeof window !== 'undefined' && (window as any).playDAppSound) {
@@ -483,8 +550,18 @@ export default function RoomDetailPage() {
             side: b.side,
             amount: Number(b.amount) / (isEvm ? 1e6 : 1e9),
             timestamp: new Date(b.createdAt).getTime(),
+            txSig: b.txSig || b.signature || '',
+            action: b.action || 'buy'
           })).sort((a: any, b: any) => b.timestamp - a.timestamp);
-          setRoomBets(mapped);
+
+          const seen = new Set();
+          const clean = mapped.filter((b: any) => {
+            const key = b.txSig ? b.txSig.toLowerCase() : b.id;
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+          setRoomBets(clean);
         }
       }
     } catch (err) {
@@ -506,6 +583,7 @@ export default function RoomDetailPage() {
     refreshProfile();
     fetchBalance();
     fetchRoomBets();
+    fetchEvmBalances();
 
     const interval = setInterval(() => {
       fetchSingleRoom(roomId);
@@ -513,13 +591,14 @@ export default function RoomDetailPage() {
       refreshProfile();
       fetchBalance();
       fetchRoomBets();
+      fetchEvmBalances();
     }, 5000);
 
     return () => {
       active = false;
       clearInterval(interval);
     };
-  }, [roomId, fetchSingleRoom, refreshProfile, fetchBalance, fetchRoomBets]);
+  }, [roomId, fetchSingleRoom, refreshProfile, fetchBalance, fetchRoomBets, fetchEvmBalances]);
 
   // Poll live token price aggregator (DexScreener, Birdeye, Jupiter, Chainlink, Pyth) every 5 seconds
   useEffect(() => {
@@ -962,9 +1041,10 @@ export default function RoomDetailPage() {
       if (mode === 'limit') {
         await placeLimitOrder(room.id, orderType, selectedSide === 'moon' ? 0 : 1, limitPrice, sharesToTrade);
       } else {
-        const slippageMultiplier = orderType === 'buy' ? 1.05 : 0.95;
+        const slippageMultiplier = orderType === 'buy' ? 1.03 : 0.97;
         const limitUsdc = totalCost * slippageMultiplier;
         await executeEvmMarketTrade(room.id, selectedSide, sharesToTrade, orderType, limitUsdc);
+        fetchEvmBalances();
       }
       
       // Optimistic update for Activity tab
@@ -1398,6 +1478,43 @@ export default function RoomDetailPage() {
               }
             </p>
 
+            {/* Crypto Market Live Price Trackers */}
+            {!isDebateMarket && (
+              <div className="flex gap-4 p-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-xl max-w-md">
+                <div className="flex-1 text-center font-mono">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold">STRIKE / ENTRY PRICE</div>
+                  <div className="text-base text-slate-900 dark:text-white font-extrabold mt-1">
+                    ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : '0.00'}
+                  </div>
+                </div>
+                <div className="w-px bg-slate-200 dark:bg-slate-800" />
+                <div className="flex-1 text-center font-mono">
+                  <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold flex items-center justify-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" /> LIVE PRICE
+                  </div>
+                  <div className="text-base text-emerald-500 font-extrabold mt-1">
+                    {livePrice !== null ? `$${formatPrice(livePrice)}` : 'FETCHING...'}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Resolution Rules Details */}
+            <div className="bg-slate-50/50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 p-4 rounded-xl max-w-4xl space-y-2 text-xs font-mono">
+              <div className="text-slate-900 dark:text-white font-bold uppercase">Market Resolution Rules:</div>
+              <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-400 font-bold">
+                <li>
+                  <span className="text-emerald-500">YES Outcome ({room.moonLabel || 'YES'}):</span> The final oracle price at expiry is strictly greater than <span className="text-slate-900 dark:text-white">${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : '0.00'}</span>.
+                </li>
+                <li>
+                  <span className="text-rose-500">NO Outcome ({room.jeetLabel || 'NO'}):</span> The final oracle price at expiry is less than or equal to <span className="text-slate-900 dark:text-white">${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : '0.00'}</span>.
+                </li>
+                <li>
+                  <span className="text-slate-900 dark:text-white">Settlement Oracle:</span> Verified EVM Oracle Registry via assigned resolver address ({room.oracleAddress ? `${room.oracleAddress.slice(0, 8)}...${room.oracleAddress.slice(-6)}` : 'N/A'}).
+                </li>
+              </ul>
+            </div>
+
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 border-t border-slate-100 dark:border-slate-850 font-mono text-xs text-slate-400 dark:text-slate-500">
               <div className="flex items-center gap-1">
                 <span>Ends:</span>
@@ -1507,55 +1624,55 @@ export default function RoomDetailPage() {
                   <div className="space-y-6">
                     {/* Buy / Sell swap toggles */}
                     <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-950 p-1 border border-slate-200 dark:border-slate-855 rounded-xl">
-                      <button
-                        onClick={() => { setOrderType('buy'); synthSound('bet'); }}
-                        className={`py-3 text-center font-mono text-xs uppercase rounded-lg transition-all font-bold ${
-                          orderType === 'buy' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        BUY
-                      </button>
-                      <button
-                        onClick={() => { setOrderType('sell'); synthSound('bet'); }}
-                        className={`py-3 text-center font-mono text-xs uppercase rounded-lg transition-all font-bold ${
-                          orderType === 'sell' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
-                      >
-                        SELL
-                      </button>
-                    </div>
-
-                    {/* Stance selectors */}
-                    <div className="space-y-2">
-                      <label className="block font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                        CHOOSE OUTCOME:
-                      </label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <button
-                          type="button"
-                          onClick={() => { setSelectedSide('moon'); synthSound('bet'); }}
-                          className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex items-center justify-center gap-2 ${
-                            selectedSide === 'moon'
-                              ? 'border-emerald-500 bg-emerald-500/5 text-emerald-500'
-                              : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <span>{room.moonLabel || 'YES'}</span>
-                          <span className="text-[10px] opacity-75">{moonPercentageSafe.toFixed(0)}%</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => { setSelectedSide('jeet'); synthSound('bet'); }}
-                          className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex items-center justify-center gap-2 ${
-                            selectedSide === 'jeet'
-                              ? 'border-rose-500 bg-rose-500/5 text-rose-500'
-                              : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                          }`}
-                        >
-                          <span>{room.jeetLabel || 'NO'}</span>
-                          <span className="text-[10px] opacity-75">{jeetPercentageSafe.toFixed(0)}%</span>
-                        </button>
-                      </div>
+                       <button
+                         onClick={() => handleSwitchTabOrSide('buy', selectedSide)}
+                         className={`py-3 text-center font-mono text-xs uppercase rounded-lg transition-all font-bold ${
+                           orderType === 'buy' ? 'bg-emerald-500 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                         }`}
+                       >
+                         BUY
+                       </button>
+                       <button
+                         onClick={() => handleSwitchTabOrSide('sell', selectedSide)}
+                         className={`py-3 text-center font-mono text-xs uppercase rounded-lg transition-all font-bold ${
+                           orderType === 'sell' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                         }`}
+                       >
+                         SELL
+                       </button>
+                     </div>
+ 
+                     {/* Stance selectors */}
+                     <div className="space-y-2">
+                       <label className="block font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                         CHOOSE OUTCOME:
+                       </label>
+                       <div className="grid grid-cols-2 gap-4">
+                         <button
+                           type="button"
+                           onClick={() => handleSwitchTabOrSide(orderType, 'moon')}
+                           className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex items-center justify-center gap-2 ${
+                             selectedSide === 'moon'
+                               ? 'border-emerald-500 bg-emerald-500/5 text-emerald-500'
+                               : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                           }`}
+                         >
+                           <span>{room.moonLabel || 'YES'}</span>
+                           <span className="text-[10px] opacity-75">{moonPercentageSafe.toFixed(0)}%</span>
+                         </button>
+                         <button
+                           type="button"
+                           onClick={() => handleSwitchTabOrSide(orderType, 'jeet')}
+                           className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex items-center justify-center gap-2 ${
+                             selectedSide === 'jeet'
+                               ? 'border-rose-500 bg-rose-500/5 text-rose-500'
+                               : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                           }`}
+                         >
+                           <span>{room.jeetLabel || 'NO'}</span>
+                           <span className="text-[10px] opacity-75">{jeetPercentageSafe.toFixed(0)}%</span>
+                         </button>
+                       </div>
                     </div>
 
                     {/* Quantity Input */}
@@ -1566,8 +1683,13 @@ export default function RoomDetailPage() {
                       const totalPool = moonPool + jeetPool;
                       const priceMoon = totalPool > 0 ? (moonPool + 10) / (totalPool + 20) : 0.5;
                       const priceJeet = totalPool > 0 ? (jeetPool + 10) / (totalPool + 20) : 0.5;
-                      const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || (b.amount / priceMoon)), 0);
-                      const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || (b.amount / priceJeet)), 0);
+                      const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
+                      const moonSharesOwned = isEvm 
+                        ? evmYesBalance 
+                        : userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || (b.amount / priceMoon)), 0);
+                      const jeetSharesOwned = isEvm 
+                        ? evmNoBalance 
+                        : userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || (b.amount / priceJeet)), 0);
                       const selectedSharesOwned = selectedSide === 'moon' ? moonSharesOwned : jeetSharesOwned;
 
                       return (
@@ -1576,8 +1698,30 @@ export default function RoomDetailPage() {
                             <span>{orderType === 'buy' ? 'USDC AMOUNT:' : 'SHARES AMOUNT:'}</span>
                             <span>
                               {orderType === 'buy'
-                                ? `Balance: ${user?.balance !== undefined ? user.balance.toFixed(2) : '0.00'} USDC`
-                                : `Balance: ${selectedSharesOwned.toFixed(2)} ${selectedSide === 'moon' ? (room.moonLabel || 'YES') : (room.jeetLabel || 'NO')} Shares`
+                                ? <>
+                                    Balance: {user?.balance !== undefined ? user.balance.toFixed(2) : '0.00'} USDC
+                                    {user?.balance !== undefined && user.balance > 0 && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => setSharesInput(Math.floor(user.balance))}
+                                        className="ml-2 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[10px] rounded hover:bg-emerald-500/20 active:scale-95 transition-all font-bold cursor-pointer"
+                                      >
+                                        MAX
+                                      </button>
+                                    )}
+                                  </>
+                                : <>
+                                    Balance: {selectedSharesOwned.toFixed(2)} {selectedSide === 'moon' ? (room.moonLabel || 'YES') : (room.jeetLabel || 'NO')} Shares
+                                    {selectedSharesOwned > 0 && (
+                                      <button 
+                                        type="button"
+                                        onClick={() => setSharesInput(selectedSharesOwned)}
+                                        className="ml-2 px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-[10px] rounded hover:bg-emerald-500/20 active:scale-95 transition-all font-bold cursor-pointer"
+                                      >
+                                        MAX
+                                      </button>
+                                    )}
+                                  </>
                               }
                             </span>
                           </label>
@@ -1622,6 +1766,16 @@ export default function RoomDetailPage() {
                         avgPrice = estShares > 0 ? estReturn / estShares : currentPrice;
                       }
 
+                      let slippagePercent = 0;
+                      if (orderType === 'buy' && cost > 0 && estShares > 0) {
+                        const targetPoolRes = selectedSide === 'moon' ? jeetPool : moonPool; 
+                        const oppositePoolRes = selectedSide === 'moon' ? moonPool : jeetPool;
+                        if (oppositePoolRes > 0 && targetPoolRes > 0) {
+                          const initialPrice = oppositePoolRes / targetPoolRes;
+                          slippagePercent = ((avgPrice - initialPrice) / initialPrice) * 100;
+                        }
+                      }
+
                       const maxPayout = orderType === 'buy' ? estShares : estReturn;
                       const profit = maxPayout - cost;
                       const roiPercent = cost > 0 ? (profit / cost) * 100 : 0;
@@ -1642,6 +1796,11 @@ export default function RoomDetailPage() {
                             <div className="flex justify-between text-slate-500 dark:text-slate-400 uppercase font-bold">
                               <span>POTENTIAL RETURN</span>
                               <span className="text-emerald-500 font-bold">+{maxPayout.toFixed(2)} USDC (+{roiPercent.toFixed(0)}%)</span>
+                            </div>
+                          )}
+                          {orderType === 'buy' && slippagePercent > 10 && (
+                            <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-500 rounded-lg text-[10px] leading-relaxed font-bold uppercase">
+                              ⚠️ HIGH SLIPPAGE WARNING: This order represents a large portion of the pool reserves and will cause significant slippage loss (estimated {slippagePercent.toFixed(1)}% slippage).
                             </div>
                           )}
                         </div>
@@ -1781,21 +1940,38 @@ export default function RoomDetailPage() {
                       roomBets.map((bet) => {
                         const formattedUser = bet.user ? (bet.user.length > 8 ? bet.user.slice(0, 4) + '...' + bet.user.slice(-4) : bet.user) : 'DEGEN';
                         const isMoon = bet.side === 'moon';
+                        const isBuy = bet.action === 'buy';
                         const colorClass = isMoon ? 'text-emerald-500' : 'text-rose-500';
                         const timeString = new Date(bet.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
                         return (
-                          <div key={bet.id} className="flex items-center justify-between font-bold uppercase hover:bg-slate-50 dark:hover:bg-slate-900/40 p-2 rounded-lg transition-colors border border-slate-100 dark:border-slate-855">
-                            <div className="flex items-center gap-1.5 truncate">
-                              <span>{isMoon ? '🚀' : '💀'}</span>
+                          <div key={bet.id} className="flex items-center justify-between font-bold uppercase hover:bg-slate-50 dark:hover:bg-slate-900/40 p-2.5 rounded-xl transition-colors border border-slate-100 dark:border-slate-800">
+                            <div className="flex items-center gap-2 truncate">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold tracking-wider ${
+                                isBuy 
+                                  ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                                  : 'bg-rose-500/10 text-rose-500 border border-rose-500/20'
+                              }`}>
+                                {isBuy ? 'BUY' : 'SELL'}
+                              </span>
                               <span className="text-slate-500 dark:text-slate-400">[{formattedUser}]</span>
                               <span className={`${colorClass} font-extrabold tracking-wide`}>
-                                {isMoon ? 'YES' : 'NO'}
+                                {isMoon ? (room.moonLabel || 'YES') : (room.jeetLabel || 'NO')}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
+                            <div className="flex items-center gap-3 shrink-0">
                               <span className="text-slate-900 dark:text-white font-bold">{bet.amount.toFixed(2)} USDC</span>
                               <span className="text-slate-400 dark:text-slate-500 text-[10px]">{timeString}</span>
+                              {bet.txSig && bet.txSig.startsWith('0x') && (
+                                <a 
+                                  href={`https://testnet.snowtrace.io/tx/${bet.txSig}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="text-slate-400 hover:text-emerald-500 transition-colors"
+                                >
+                                  <ExternalLink size={12} />
+                                </a>
+                              )}
                             </div>
                           </div>
                         );

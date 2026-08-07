@@ -61,11 +61,15 @@ const HomepageRoomCard = ({ room }: { room: Room }) => {
 
       <div className="space-y-1.5 my-3">
         <div className="flex justify-between text-[11px] font-mono">
-          <span className="text-xs font-bold text-emerald-500">🚀 MOON</span>
+          <span className="text-xs font-bold text-emerald-500 flex items-center gap-1">
+            <span className="inline-block animate-[bounce_1.2s_infinite] text-emerald-500 text-[10px]">▲</span> MOON
+          </span>
           <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{moonPercentage.toFixed(0)}%</span>
         </div>
         <div className="flex justify-between text-[11px] font-mono">
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">💀 JEET</span>
+          <span className="text-xs font-bold text-rose-500 flex items-center gap-1">
+            <span className="inline-block animate-[bounce_1.2s_infinite] text-rose-500 text-[10px]">▼</span> JEET
+          </span>
           <span className="font-bold text-xs text-slate-900 dark:text-slate-100">{jeetPercentage.toFixed(0)}%</span>
         </div>
       </div>
@@ -161,7 +165,7 @@ function HomeContent() {
             <Link href="/rooms" className="w-full sm:w-80">
               <button className="uiverse-cyber-btn uiverse-cyber-btn-green w-full h-[53px] font-sans font-bold uppercase tracking-wider text-white shadow-lg">ENTER ARENA</button>
             </Link>
-            {!isPaused && (
+            {mounted && !isPaused && (
               <Link href="/create-room" className="w-full sm:w-80">
                 <button className="uiverse-cyber-btn uiverse-cyber-btn-gray w-full h-[53px] font-sans font-bold uppercase tracking-wider text-slate-900 dark:text-white shadow-md">CREATE MARKET</button>
               </Link>
@@ -188,7 +192,11 @@ function HomeContent() {
           <Flame className="text-emerald-500" /> Trending
         </h3>
         <div className="flex overflow-x-auto gap-6 pb-4 scrollbar-none snap-x">
-          {trendingRooms.map(room => <HomepageRoomCard key={room.id} room={room} />)}
+          {mounted ? (
+            trendingRooms.map(room => <HomepageRoomCard key={room.id} room={room} />)
+          ) : (
+            <div className="w-72 h-48 bg-slate-100 dark:bg-slate-900/40 animate-pulse rounded-2xl shrink-0" />
+          )}
         </div>
       </section>
 
@@ -202,45 +210,55 @@ function HomeContent() {
             ))}
           </div>
 
-          {(() => {
-            const currentList = activeTab === 'latest' ? latestRooms : activeTab === 'biggest' ? biggestPotRooms : soonToExpireRooms;
-            return currentList.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {currentList.map((room) => <HomepageRoomCard key={room.id} room={room} />)}
-              </div>
-            ) : (
-              <div className="text-center py-20 font-mono text-xs text-slate-400 uppercase font-bold border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/50">
-                <p>Awaiting deployment of prediction sectors...</p>
-              </div>
-            );
-          })()}
+          {mounted ? (
+            (() => {
+              const currentList = activeTab === 'latest' ? latestRooms : activeTab === 'biggest' ? biggestPotRooms : soonToExpireRooms;
+              return currentList.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {currentList.map((room) => <HomepageRoomCard key={room.id} room={room} />)}
+                </div>
+              ) : (
+                <div className="text-center py-20 font-mono text-xs text-slate-400 uppercase font-bold border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50/50 dark:bg-slate-950/50">
+                  <p>Awaiting deployment of prediction sectors...</p>
+                </div>
+              );
+            })()
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-48 bg-slate-100 dark:bg-slate-900/40 animate-pulse rounded-2xl" />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl w-full px-4 py-12 text-center relative z-10">
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[24px] p-8 shadow-xl max-w-2xl mx-auto">
-          <h3 className="font-sans text-2xl font-extrabold text-slate-900 dark:text-white uppercase mb-2">DOWNLOAD MOBILE COMPANION</h3>
-          <p className="font-mono text-xs text-slate-500 dark:text-slate-400 uppercase font-bold mb-6">Monitor sectors and claim yields on the go.</p>
-          <span className="font-mono text-xs text-emerald-500 font-extrabold uppercase bg-emerald-500/10 border border-emerald-500/30 px-3.5 py-1 rounded-full inline-block mb-6 animate-pulse">COMING SOON</span>
-          <div className="flex flex-wrap items-center justify-center gap-4 mt-2">
-            <div className="flex items-center gap-3 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 border border-slate-700/80 px-4 py-2.5 rounded-xl cursor-not-allowed opacity-90 select-none transition-all shadow-lg hover:shadow-indigo-500/20">
-              <svg className="w-5 h-5 text-white fill-current drop-shadow-md" viewBox="0 0 24 24">
-                <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.21.67-2.93 1.49-.62.69-1.16 1.84-1.01 2.96 1.12.09 2.27-.58 2.95-1.39z"/>
-              </svg>
-              <div className="text-left">
-                <p className="text-[8px] text-indigo-200 font-mono font-bold leading-none uppercase tracking-wide">Download on the</p>
-                <p className="text-xs text-white font-sans font-extrabold leading-tight mt-0.5">App Store</p>
-              </div>
-            </div>
+      <section className="w-full py-16 bg-black text-center relative z-10 flex flex-col items-center justify-center">
+        <div className="px-8 py-3 rounded-full bg-[#E3FCFE] border-2 border-[#54E6F4] text-[#004B4C] font-mono text-base font-extrabold uppercase tracking-widest shadow-[0_0_15px_rgba(84,230,244,0.3)] inline-block mb-8">
+          COMING SOON
+        </div>
 
-            <div className="flex items-center gap-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 border border-slate-700/80 px-4 py-2.5 rounded-xl cursor-not-allowed opacity-90 select-none transition-all shadow-lg hover:shadow-emerald-500/20">
-              <svg className="w-5 h-5 text-white fill-current drop-shadow-md" viewBox="0 0 24 24">
-                <path d="M5 2c-.3 0-.6.1-.8.4l10.4 10.4 3.7-3.7L5 2.1c0-.1 0-.1-.1-.1M4 3.2v17.6c0 .2.1.4.3.5L13.8 12 4.3 2.7c-.2.1-.3.3-.3.5M14.8 13l3.9 3.9c.1 0 .1-.1.2-.1l3.5-3.5c.3-.3.3-.8 0-1.1L18.8 8.6c-.1 0-.1-.1-.2-.1L14.8 13.1m-.1-1L4.3 21.6c.2.1.4.2.6.2h12.5c.2 0 .4-.1.6-.2l-3.2-3.2"/>
-              </svg>
-              <div className="text-left">
-                <p className="text-[8px] text-emerald-200 font-mono font-bold leading-none uppercase tracking-wide">Get it on</p>
-                <p className="text-xs text-white font-sans font-extrabold leading-tight mt-0.5">Google Play</p>
-              </div>
+        <div className="bg-white rounded-[28px] border-[10px] border-white/20 p-6 md:p-8 max-w-md w-full mx-auto shadow-2xl flex items-center justify-center gap-4">
+          <div className="flex items-center gap-2.5 bg-black text-white px-4 py-2.5 rounded-xl cursor-not-allowed select-none transition-all shadow-md w-1/2 justify-center">
+            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+              <path fill="#EA4335" d="M5.2,2.2c-0.2,0.2-0.3,0.5-0.3,0.9v17.8c0,0.4,0.1,0.7,0.3,0.9l0.1,0.1L15.3,12l-10-10L5.2,2.2z" />
+              <path fill="#FBBC05" d="M18.6,15.3l-3.3-3.3L15.3,12l3.3-3.3L18.6,8.7L22.4,11c1.1,0.6,1.1,1.5,0,2.1L18.6,15.3z" />
+              <path fill="#34A853" d="M15.3,12L5.3,22c0.3,0.3,0.8,0.3,1.3,0l12-6.8L15.3,12z" />
+              <path fill="#4285F4" d="M15.3,12L18.6,8.7L6.6,1.9C6.1,1.6,5.6,1.6,5.3,1.9L15.3,12z" />
+            </svg>
+            <div className="text-left leading-none shrink-0">
+              <p className="text-[7px] text-gray-400 font-sans uppercase font-extrabold tracking-wide">GET IT ON</p>
+              <p className="text-[11px] text-white font-sans font-black tracking-tight mt-0.5">Google Play</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 bg-black text-white px-4 py-2.5 rounded-xl cursor-not-allowed select-none transition-all shadow-md w-1/2 justify-center">
+            <svg className="w-5 h-5 fill-current text-white shrink-0" viewBox="0 0 24 24">
+              <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 4.17c.66-.81 1.11-1.93.99-3.06-1 .04-2.21.67-2.93 1.49-.62.69-1.16 1.84-1.01 2.96 1.12.09 2.27-.58 2.95-1.39z"/>
+            </svg>
+            <div className="text-left leading-none shrink-0">
+              <p className="text-[7px] text-gray-400 font-sans uppercase font-extrabold tracking-wide">Download on the</p>
+              <p className="text-[11px] text-white font-sans font-black tracking-tight mt-0.5">App Store</p>
             </div>
           </div>
         </div>

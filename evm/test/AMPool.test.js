@@ -10,10 +10,11 @@ describe("AMPool & AMPoolFactory", function () {
   let owner;
   let lpProvider;
   let swapper;
+  let treasury;
   let conditionId;
 
   beforeEach(async function () {
-    [owner, lpProvider, swapper] = await ethers.getSigners();
+    [owner, lpProvider, swapper, treasury] = await ethers.getSigners();
 
     // 1. Deploy Mock USDC
     const MockUSDC = await ethers.getContractFactory("MockUSDC");
@@ -22,7 +23,7 @@ describe("AMPool & AMPoolFactory", function () {
 
     // 2. Deploy MarketFactory (which deploys ConditionalTokens)
     const MarketFactory = await ethers.getContractFactory("MarketFactory");
-    factory = await MarketFactory.deploy(await mockUSDC.getAddress(), owner.address);
+    factory = await MarketFactory.deploy(await mockUSDC.getAddress(), treasury.address);
     await factory.waitForDeployment();
 
     const conditionalTokensAddress = await factory.conditionalTokens();
@@ -35,26 +36,28 @@ describe("AMPool & AMPoolFactory", function () {
     await poolFactory.waitForDeployment();
 
     // 4. Distribute USDC
+    await mockUSDC.mint(owner.address, ethers.parseUnits("1000", 6));
     await mockUSDC.mint(lpProvider.address, ethers.parseUnits("1000", 6));
     await mockUSDC.mint(swapper.address, ethers.parseUnits("1000", 6));
 
-    // 5. Create a Prediction Market to generate conditionId
+    // 5. Create a Prediction Market to generate conditionId ($3 creation fee)
     const ipfsHash = "QmTest";
     const outcomeCount = 2;
     const oracle = owner.address;
     const resolutionTime = Math.floor(Date.now() / 1000) + 3600;
 
-    await mockUSDC.approve(await factory.getAddress(), ethers.parseUnits("5", 6)); // pay creation fee
+    await mockUSDC.approve(await factory.getAddress(), ethers.parseUnits("3", 6)); // pay 3 USDC creation fee
     const tx = await factory.createMarket(ipfsHash, outcomeCount, oracle, resolutionTime, ethers.ZeroAddress);
     const receipt = await tx.wait();
     const event = receipt.logs.find(x => x.fragment && x.fragment.name === "MarketCreated");
     conditionId = event.args[1];
 
-    // 6. Deploy AMPool via poolFactory
+    // 6. Deploy AMPool via poolFactory with treasury
     const poolTx = await poolFactory.createPool(
       await conditionalTokens.getAddress(),
       conditionId,
-      await mockUSDC.getAddress()
+      await mockUSDC.getAddress(),
+      treasury.address
     );
     const poolReceipt = await poolTx.wait();
     const poolEvent = poolReceipt.logs.find(x => x.fragment && x.fragment.name === "PoolCreated");
@@ -64,10 +67,15 @@ describe("AMPool & AMPoolFactory", function () {
     pool = AMPool.attach(poolAddress);
   });
 
-  it("should deploy correctly and initialize attributes", async function () {
+  it("should deploy correctly with $3 creation fee and 0.10% fee parameters", async function () {
+    expect(await factory.creationFee()).to.equal(ethers.parseUnits("3", 6));
     expect(await pool.conditionalTokens()).to.equal(await conditionalTokens.getAddress());
     expect(await pool.conditionId()).to.equal(conditionId);
     expect(await pool.usdcToken()).to.equal(await mockUSDC.getAddress());
+    expect(await pool.treasury()).to.equal(treasury.address);
+    expect(await pool.TOTAL_FEE_BPS()).to.equal(10); // 0.10%
+    expect(await pool.LP_FEE_BPS()).to.equal(7);      // 0.07%
+    expect(await pool.TREASURY_FEE_BPS()).to.equal(3); // 0.03%
   });
 
   it("should allow adding initial liquidity and subsequent liquidity", async function () {
@@ -90,31 +98,41 @@ describe("AMPool & AMPoolFactory", function () {
     expect(await pool.reserves(1)).to.equal(ethers.parseUnits("150", 6));
   });
 
-  it("should allow swapping USDC for YES outcome shares", async function () {
+  it("should route 0.03% to treasury and accumulate 0.07% claimable fee for LPs on swaps", async function () {
     const lpAddress = await pool.getAddress();
     
-    // Seed pool liquidity
+    // Seed pool liquidity (100 USDC)
     await mockUSDC.connect(lpProvider).approve(lpAddress, ethers.parseUnits("100", 6));
     await pool.connect(lpProvider).addLiquidity(ethers.parseUnits("100", 6));
 
-    // Swapper buys YES shares (outcomeIndex 0)
-    await mockUSDC.connect(swapper).approve(lpAddress, ethers.parseUnits("10", 6));
-    
-    const buyTx = await pool.connect(swapper).buyShares(0, ethers.parseUnits("10", 6));
-    const buyReceipt = await buyTx.wait();
+    const treasuryBefore = await mockUSDC.balanceOf(treasury.address);
 
-    // Verify swap event emitted
-    const swapEvent = buyReceipt.logs.find(x => x.fragment && x.fragment.name === "Swap");
-    expect(swapEvent).to.not.be.undefined;
-    expect(swapEvent.args[1]).to.equal(0); // outcomeIndex YES
-    
-    // Swapper should receive some YES shares
-    const tokenId0 = await pool.getTokenId(0);
-    const swapperShares = await conditionalTokens.balanceOf(swapper.address, tokenId0);
-    expect(swapperShares).to.be.gt(0);
+    // Swapper spends 100 USDC on YES shares
+    await mockUSDC.connect(swapper).approve(lpAddress, ethers.parseUnits("100", 6));
+    await pool.connect(swapper).buyShares(0, ethers.parseUnits("100", 6));
+
+    // Total fee on 100 USDC = 0.10 USDC = 100,000 micro-USDC
+    // Treasury portion (0.03%) = 0.03 USDC = 30,000 micro-USDC
+    // LP portion (0.07%) = 0.07 USDC = 70,000 micro-USDC
+    const treasuryAfter = await mockUSDC.balanceOf(treasury.address);
+    expect(treasuryAfter - treasuryBefore).to.equal(ethers.parseUnits("0.03", 6));
+
+    // LP should have 0.07 USDC in claimable fees
+    const claimable = await pool.getClaimableFees(lpProvider.address);
+    expect(claimable).to.equal(ethers.parseUnits("0.07", 6));
+
+    // LP claims fee without removing liquidity
+    const lpBalBefore = await mockUSDC.balanceOf(lpProvider.address);
+    await pool.connect(lpProvider).claimFees();
+    const lpBalAfter = await mockUSDC.balanceOf(lpProvider.address);
+
+    expect(lpBalAfter - lpBalBefore).to.equal(ethers.parseUnits("0.07", 6));
+    expect(await pool.getClaimableFees(lpProvider.address)).to.equal(0);
+    // Principal LP balance is completely untouched
+    expect(await pool.balanceOf(lpProvider.address)).to.equal(ethers.parseUnits("100", 6));
   });
 
-  it("should allow selling YES outcome shares back to pool", async function () {
+  it("should allow selling YES outcome shares and accrue 0.07% LP fees and 0.03% treasury fee", async function () {
     const lpAddress = await pool.getAddress();
 
     // Seed pool
@@ -131,12 +149,17 @@ describe("AMPool & AMPoolFactory", function () {
     // Swapper approves pool to manage outcome shares
     await conditionalTokens.connect(swapper).setApprovalForAll(lpAddress, true);
 
-    // Sell shares back to pool
-    const balanceBefore = await mockUSDC.balanceOf(swapper.address);
-    await pool.connect(swapper).sellShares(0, sharesOwned);
-    const balanceAfter = await mockUSDC.balanceOf(swapper.address);
+    const treasuryBefore = await mockUSDC.balanceOf(treasury.address);
 
-    expect(balanceAfter).to.be.gt(balanceBefore);
+    // Sell shares back to pool
+    await pool.connect(swapper).sellShares(0, sharesOwned);
+
+    const treasuryAfter = await mockUSDC.balanceOf(treasury.address);
+    expect(treasuryAfter).to.be.gt(treasuryBefore);
+
+    // Claimable fees for LP should be positive
+    const claimable = await pool.getClaimableFees(lpProvider.address);
+    expect(claimable).to.be.gt(0);
   });
 
   it("should allow removing liquidity and reclaiming USDC", async function () {

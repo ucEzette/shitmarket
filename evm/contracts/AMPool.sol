@@ -13,6 +13,11 @@ import "./ConditionalTokens.sol";
  * @notice Constant Product Market Maker (CPMM) for binary prediction market shares.
  * Users can swap USDC for YES/NO shares, or liquidate shares back to USDC.
  * Acts as the ERC-20 LP token for liquidity providers.
+ * 
+ * Fee Model:
+ * - Total Swap Fee: 0.10% (10 bps)
+ * - Liquidity Provider (LP) Share: 0.07% (7 bps) — claimable on-demand in USDC
+ * - Platform Treasury Share: 0.03% (3 bps) — routed directly to protocol treasury
  */
 contract AMPool is ERC20, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -20,12 +25,21 @@ contract AMPool is ERC20, ReentrancyGuard {
     ConditionalTokens public immutable conditionalTokens;
     bytes32 public immutable conditionId;
     IERC20 public immutable usdcToken;
+    address public immutable treasury;
 
-    uint256 public constant FEE_BPS = 30; // 0.3% swap fee
+    uint256 public constant TOTAL_FEE_BPS = 10; // 0.10% total swap fee
+    uint256 public constant LP_FEE_BPS = 7;     // 0.07% to LPs
+    uint256 public constant TREASURY_FEE_BPS = 3; // 0.03% to Platform Treasury
     uint256 public constant BPS_DIVISOR = 10000;
+    uint256 private constant PRECISION = 1e18;
 
     // Reserves of YES (index 0) and NO (index 1) shares in the pool
     uint256[2] public reserves;
+
+    // --- On-Chain Claimable Fee Accumulator (MasterChef / Staking model) ---
+    uint256 public accFeePerShare; // Accumulated USDC fee per LP unit (scaled by 1e18)
+    mapping(address => uint256) public feeDebt;
+    mapping(address => uint256) public claimableFees;
 
     event LiquidityAdded(address indexed lp, uint256 usdcAmount, uint256 lpSharesMinted);
     event LiquidityRemoved(address indexed lp, uint256 lpSharesBurned, uint256 usdcReturned);
@@ -35,20 +49,93 @@ contract AMPool is ERC20, ReentrancyGuard {
         uint256 usdcSpent,
         uint256 sharesReceived,
         uint256 reserveYES,
-        uint256 reserveNO
+        uint256 reserveNO,
+        uint256 lpFee,
+        uint256 treasuryFee
     );
+    event FeesClaimed(address indexed lp, uint256 amount);
 
     constructor(
         address _conditionalTokens,
         bytes32 _conditionId,
-        address _usdcToken
+        address _usdcToken,
+        address _treasury
     ) ERC20("ShitMarket AMM LP Token", "SM-LP") {
         require(_conditionalTokens != address(0), "Invalid tokens contract");
         require(_usdcToken != address(0), "Invalid USDC");
+        require(_treasury != address(0), "Invalid treasury");
 
         conditionalTokens = ConditionalTokens(_conditionalTokens);
         conditionId = _conditionId;
         usdcToken = IERC20(_usdcToken);
+        treasury = _treasury;
+    }
+
+    /**
+     * @notice Hook triggered by ERC-20 transfers, mints, and burns.
+     * Updates fee accounting per address before balance changes.
+     */
+    function _update(address from, address to, uint256 value) internal override {
+        if (from != address(0)) {
+            _distributeFees(from);
+        }
+        if (to != address(0) && to != from) {
+            _distributeFees(to);
+        }
+
+        super._update(from, to, value);
+
+        if (from != address(0)) {
+            feeDebt[from] = (balanceOf(from) * accFeePerShare) / PRECISION;
+        }
+        if (to != address(0)) {
+            feeDebt[to] = (balanceOf(to) * accFeePerShare) / PRECISION;
+        }
+    }
+
+    /**
+     * @notice Internal fee snapshot calculation for an account.
+     */
+    function _distributeFees(address account) internal {
+        uint256 balance = balanceOf(account);
+        if (balance > 0) {
+            uint256 accumulated = (balance * accFeePerShare) / PRECISION;
+            if (accumulated > feeDebt[account]) {
+                claimableFees[account] += (accumulated - feeDebt[account]);
+            }
+        }
+    }
+
+    /**
+     * @notice View pending claimable USDC fees for a liquidity provider.
+     */
+    function getClaimableFees(address lp) public view returns (uint256) {
+        uint256 pending = claimableFees[lp];
+        uint256 balance = balanceOf(lp);
+        if (balance > 0) {
+            uint256 accumulated = (balance * accFeePerShare) / PRECISION;
+            if (accumulated > feeDebt[lp]) {
+                pending += (accumulated - feeDebt[lp]);
+            }
+        }
+        return pending;
+    }
+
+    /**
+     * @notice Claim accrued USDC swap fees directly without removing liquidity.
+     */
+    function claimFees() external nonReentrant returns (uint256) {
+        _distributeFees(msg.sender);
+        feeDebt[msg.sender] = (balanceOf(msg.sender) * accFeePerShare) / PRECISION;
+
+        uint256 amount = claimableFees[msg.sender];
+        require(amount > 0, "No fees to claim");
+
+        claimableFees[msg.sender] = 0;
+        usdcToken.safeTransfer(msg.sender, amount);
+
+        emit FeesClaimed(msg.sender, amount);
+        return amount;
     }
 
     /**
@@ -82,7 +169,6 @@ contract AMPool is ERC20, ReentrancyGuard {
             lpMintAmount = usdcAmount;
         } else {
             // Subsequential LP: maintain the exact ratio of YES vs NO
-            // LP provides USDC. We transfer and split it, adding to reserves.
             uint256 shareAmount0 = (usdcAmount * reserves[0]) / (reserves[0] + reserves[1]);
             uint256 shareAmount1 = usdcAmount - shareAmount0;
 
@@ -155,7 +241,7 @@ contract AMPool is ERC20, ReentrancyGuard {
 
     /**
      * @notice Swap USDC to acquire YES (0) or NO (1) outcome shares.
-     * Direct instant swap execution.
+     * 0.10% total fee: 0.07% to LPs (claimable), 0.03% to treasury.
      */
     function buyShares(uint8 outcomeIndex, uint256 usdcSpent) external nonReentrant returns (uint256) {
         require(outcomeIndex == 0 || outcomeIndex == 1, "Invalid outcome index");
@@ -165,9 +251,11 @@ contract AMPool is ERC20, ReentrancyGuard {
         uint256 rTarget = reserves[outcomeIndex];
         uint256 rOpposite = reserves[oppositeIndex];
 
-        // Deduct 0.3% fee
-        uint256 fee = (usdcSpent * FEE_BPS) / BPS_DIVISOR;
-        uint256 netUsdc = usdcSpent - fee;
+        // Deduct 0.10% total fee (0.07% LP + 0.03% Treasury)
+        uint256 totalFee = (usdcSpent * TOTAL_FEE_BPS) / BPS_DIVISOR;
+        uint256 treasuryFee = (usdcSpent * TREASURY_FEE_BPS) / BPS_DIVISOR;
+        uint256 lpFee = totalFee - treasuryFee;
+        uint256 netUsdc = usdcSpent - totalFee;
 
         // CPMM Math: (R_target - dy) * (R_opposite + netUsdc) = k
         uint256 k = rTarget * rOpposite;
@@ -177,13 +265,24 @@ contract AMPool is ERC20, ReentrancyGuard {
 
         require(sharesReceived > 0, "Slippage too high: zero shares output");
 
-        // Transfer USDC from user and split it
+        // Transfer full USDC from user and split netUsdc into position tokens
         usdcToken.safeTransferFrom(msg.sender, address(this), usdcSpent);
-        usdcToken.forceApprove(address(conditionalTokens), usdcSpent);
-        conditionalTokens.splitPosition(conditionId, usdcSpent);
+        usdcToken.forceApprove(address(conditionalTokens), netUsdc);
+        conditionalTokens.splitPosition(conditionId, netUsdc);
+
+        // Route treasury fee
+        if (treasuryFee > 0) {
+            usdcToken.safeTransfer(treasury, treasuryFee);
+        }
+
+        // Accrue LP fee
+        uint256 currentSupply = totalSupply();
+        if (lpFee > 0 && currentSupply > 0) {
+            accFeePerShare += (lpFee * PRECISION) / currentSupply;
+        }
 
         // Update reserves
-        reserves[outcomeIndex] = newTargetReserve + fee; // Add fee to reserve
+        reserves[outcomeIndex] = newTargetReserve;
         reserves[oppositeIndex] = newOppositeReserve;
 
         // Transfer output shares to swapper
@@ -195,12 +294,13 @@ contract AMPool is ERC20, ReentrancyGuard {
             ""
         );
 
-        emit Swap(msg.sender, outcomeIndex, usdcSpent, sharesReceived, reserves[0], reserves[1]);
+        emit Swap(msg.sender, outcomeIndex, usdcSpent, sharesReceived, reserves[0], reserves[1], lpFee, treasuryFee);
         return sharesReceived;
     }
 
     /**
      * @notice Swap/Liquidate YES (0) or NO (1) shares back to USDC.
+     * 0.10% total fee: 0.07% to LPs (claimable), 0.03% to treasury.
      */
     function sellShares(uint8 outcomeIndex, uint256 sharesSold) external nonReentrant returns (uint256) {
         require(outcomeIndex == 0 || outcomeIndex == 1, "Invalid outcome index");
@@ -220,28 +320,41 @@ contract AMPool is ERC20, ReentrancyGuard {
         );
 
         // CPMM Math for selling:
-        // We add sharesSold to rTarget. The pool product is maintained.
-        // USDC output (payout) is determined by how much opposite token we release.
         uint256 k = rTarget * rOpposite;
         uint256 newTargetReserve = rTarget + sharesSold;
         uint256 newOppositeReserve = k / newTargetReserve;
         uint256 rawPayout = rOpposite - newOppositeReserve;
 
-        // Deduct 0.3% fee from payout
-        uint256 fee = (rawPayout * FEE_BPS) / BPS_DIVISOR;
-        uint256 netPayout = rawPayout - fee;
+        // Deduct 0.10% total fee (0.07% LP + 0.03% Treasury)
+        uint256 totalFee = (rawPayout * TOTAL_FEE_BPS) / BPS_DIVISOR;
+        uint256 treasuryFee = (rawPayout * TREASURY_FEE_BPS) / BPS_DIVISOR;
+        uint256 lpFee = totalFee - treasuryFee;
+        uint256 netPayout = rawPayout - totalFee;
 
         require(netPayout > 0, "Payout too small");
 
-        // Update reserves
-        reserves[outcomeIndex] = newTargetReserve;
-        reserves[oppositeIndex] = newOppositeReserve + fee;
+        // Merge matching YES/NO to retrieve rawPayout USDC
+        conditionalTokens.mergePositions(conditionId, rawPayout);
 
-        // Merge matching YES/NO to retrieve USDC
-        conditionalTokens.mergePositions(conditionId, netPayout);
+        // Send net payout to seller
         usdcToken.safeTransfer(msg.sender, netPayout);
 
-        emit Swap(msg.sender, oppositeIndex, netPayout, sharesSold, reserves[0], reserves[1]);
+        // Route treasury fee
+        if (treasuryFee > 0) {
+            usdcToken.safeTransfer(treasury, treasuryFee);
+        }
+
+        // Accrue LP fee
+        uint256 currentSupply = totalSupply();
+        if (lpFee > 0 && currentSupply > 0) {
+            accFeePerShare += (lpFee * PRECISION) / currentSupply;
+        }
+
+        // Update reserves
+        reserves[outcomeIndex] = newTargetReserve;
+        reserves[oppositeIndex] = newOppositeReserve;
+
+        emit Swap(msg.sender, oppositeIndex, netPayout, sharesSold, reserves[0], reserves[1], lpFee, treasuryFee);
         return netPayout;
     }
 

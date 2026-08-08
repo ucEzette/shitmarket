@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { PixelBarbedWire } from '@/components/PixelArt';
 import { useAppState, Room, formatPrice } from '@/store/useAppState';
-import { PEPE_ASSETS } from '@/components/MemeAssets';
+import { PEPE_ASSETS, PepePortrait, MOON_PEPES, JEET_PEPES } from '@/components/MemeAssets';
 import { Flame, Zap, Target, Bookmark, Layers } from 'lucide-react';
 
 const RoomCountdown = ({ expiry }: { expiry: number }) => {
@@ -56,6 +56,16 @@ const HomepageRoomCard = ({
 
   const isBookmarked = watchlistedIds.includes(room.id);
   const isInParlay = parlayCart.some(leg => leg.roomId === room.id);
+  const isMoonLeading = room.moonPool > room.jeetPool;
+  const isDebateRoom = 
+    (room.category as string) === 'debate' || 
+    (room.category as string) === 'prediction' || 
+    (!!room.resolutionCriteria && room.resolutionCriteria.length > 0 && (!room.token.pairAddress || room.token.pairAddress === '')) ||
+    room.token.address === room.creator;
+
+  const questionText = isDebateRoom 
+    ? (room.resolutionCriteria ? room.resolutionCriteria.split('| Ref:')[0].split('Ref:')[0].trim() : room.token.name)
+    : `Will ${room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} end above ${room.openingPrice !== undefined && formatPrice(room.openingPrice) !== 'N/A' ? `$${formatPrice(room.openingPrice)}` : '$1.00'}?`;
 
   return (
     <div
@@ -65,70 +75,124 @@ const HomepageRoomCard = ({
           (window as any).synthSound('bet');
         }
       }}
-      className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col justify-between cursor-pointer hover:-translate-y-1 transition-all duration-300 select-none w-72 h-52 shrink-0 snap-start relative group shadow-sm ${
-        room.moonPool > room.jeetPool
+      className={`bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between cursor-pointer hover:-translate-y-1 transition-all duration-300 select-none w-72 h-[230px] shrink-0 snap-start relative group shadow-sm ${
+        isMoonLeading
           ? 'hover:border-emerald-500 dark:hover:shadow-[0_0_20px_rgba(16,185,129,0.15)]'
           : 'hover:border-rose-500 dark:hover:shadow-[0_0_20px_rgba(244,63,94,0.15)]'
       }`}
     >
-      {/* Action Buttons Top Right */}
-      <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
-        {/* Bookmark Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            toggleBookmark(room.id);
-            if (typeof window !== 'undefined' && (window as any).synthSound) {
-              (window as any).synthSound('bet');
-            }
-          }}
-          className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
-            isBookmarked
-              ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 fill-emerald-500 dark:fill-emerald-400'
-              : 'bg-white/80 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850'
-          }`}
-          title={isBookmarked ? "Remove Bookmark" : "Bookmark Room"}
-        >
-          <Bookmark size={12} className={isBookmarked ? "fill-current" : ""} />
-        </button>
+      {/* Top Header Row: Icon + Token Tag + Action Buttons */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="relative bg-slate-100 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shrink-0 w-8 h-8 flex items-center justify-center shadow-xs">
+            {room.token.icon && (room.token.icon.startsWith('http') || room.token.icon.startsWith('data:') || room.token.icon.startsWith('blob:')) ? (
+              <img src={room.token.icon} alt={room.token.name} className="w-full h-full object-cover rounded-lg" />
+            ) : (
+              <PepePortrait
+                src={(() => {
+                  const id = room.id || '';
+                  let hash = 0;
+                  for (let i = 0; i < id.length; i++) {
+                    hash = id.charCodeAt(i) + ((hash << 5) - hash);
+                  }
+                  const index = Math.abs(hash);
+                  return isMoonLeading 
+                    ? MOON_PEPES[index % MOON_PEPES.length] 
+                    : JEET_PEPES[index % JEET_PEPES.length];
+                })()}
+                size={30}
+                glowColor={isMoonLeading ? 'moon' : 'jeet'}
+                className="rounded-lg"
+              />
+            )}
+          </div>
+          <div className="min-w-0">
+            <span className="font-mono font-bold text-[10px] text-slate-700 dark:text-slate-200 uppercase tracking-wider block truncate">
+              {room.token.name}
+            </span>
+            <span className="font-mono text-[9px] text-slate-400 dark:text-slate-400 block -mt-0.5">
+              {room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`}
+            </span>
+          </div>
+        </div>
 
-        {/* Parlay Button */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            if (isInParlay) {
-              removeLegFromParlay(room.id);
-            } else {
-              addLegToParlay(room.id, room.moonPool > room.jeetPool ? 'moon' : 'jeet');
-            }
-            if (typeof window !== 'undefined' && (window as any).synthSound) {
-              (window as any).synthSound('bet');
-            }
-          }}
-          className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
-            isInParlay
-              ? 'bg-teal-50 dark:bg-emerald-950/30 border-teal-500/40 dark:border-green-600/30 text-teal-600 dark:text-emerald-400'
-              : 'bg-white/80 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850'
-          }`}
-          title={isInParlay ? "Remove from Parlay" : "Add to Parlay"}
-        >
-          <Layers size={12} />
-        </button>
+        {/* Action Buttons Top Right */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Bookmark Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              toggleBookmark(room.id);
+              if (typeof window !== 'undefined' && (window as any).synthSound) {
+                (window as any).synthSound('bet');
+              }
+            }}
+            className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
+              isBookmarked
+                ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 fill-emerald-500 dark:fill-emerald-400'
+                : 'bg-white/80 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850'
+            }`}
+            title={isBookmarked ? "Remove Bookmark" : "Bookmark Room"}
+          >
+            <Bookmark size={12} className={isBookmarked ? "fill-current" : ""} />
+          </button>
+
+          {/* Parlay Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              if (isInParlay) {
+                removeLegFromParlay(room.id);
+              } else {
+                addLegToParlay(room.id, room.moonPool > room.jeetPool ? 'moon' : 'jeet');
+              }
+              if (typeof window !== 'undefined' && (window as any).synthSound) {
+                (window as any).synthSound('bet');
+              }
+            }}
+            className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
+              isInParlay
+                ? 'bg-teal-50 dark:bg-emerald-950/30 border-teal-500/40 dark:border-green-600/30 text-teal-600 dark:text-emerald-400'
+                : 'bg-white/80 dark:bg-slate-950/80 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-850'
+            }`}
+            title={isInParlay ? "Remove from Parlay" : "Add to Parlay"}
+          >
+            <Layers size={12} />
+          </button>
+        </div>
       </div>
 
-      <div>
-        <span className="font-mono text-[9px] text-slate-500 uppercase tracking-wider block pr-16 truncate">
-          {room.token.name}
-        </span>
-        <h4 className="font-sans font-bold text-sm text-slate-900 dark:text-white line-clamp-2 mt-1 leading-snug pr-12">
-          Will {room.token.symbol.toUpperCase()} end above {room.openingPrice !== undefined ? `$${formatPrice(room.openingPrice)}` : '$1.00'}?
+      {/* Main Condition Question & Detail Badges */}
+      <div className="my-1">
+        <h4 className="font-sans font-bold text-[13px] text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-emerald-500 transition-colors">
+          {questionText}
         </h4>
+
+        {/* Clear Condition Badges */}
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+          {!isDebateRoom && room.openingPrice !== undefined && (
+            <div className="inline-flex items-center gap-1 font-mono text-[9px] px-2 py-0.5 rounded-md bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-bold">
+              <span>Target:</span>
+              <span className="font-extrabold">&gt; ${formatPrice(room.openingPrice)}</span>
+            </div>
+          )}
+          {isDebateRoom && (
+            <div className="inline-flex items-center gap-1 font-mono text-[9px] px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border border-purple-500/30 font-bold uppercase">
+              <span>Event Market</span>
+            </div>
+          )}
+          {room.token.chainId && (
+            <div className="inline-flex items-center font-mono text-[9px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 font-semibold uppercase">
+              <span>{room.token.chainId}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Progress Bar & Percentages */}
-      <div className="space-y-1.5 my-3">
+      <div className="space-y-1">
         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800/80 rounded-full overflow-hidden flex">
           <div 
             className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-500" 
@@ -145,7 +209,8 @@ const HomepageRoomCard = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-slate-200/60 dark:border-slate-800/60 pt-3 mt-auto text-[10px] font-mono text-slate-600 dark:text-slate-400">
+      {/* Footer Details */}
+      <div className="flex items-center justify-between border-t border-slate-200/60 dark:border-slate-800/60 pt-2.5 text-[10px] font-mono text-slate-600 dark:text-slate-400">
         <span className="font-bold text-emerald-600 dark:text-emerald-500 uppercase">
           POT: {totalPot.toFixed(2)} USDC
         </span>
@@ -312,7 +377,7 @@ function HomeContent() {
               />
             ))
           ) : (
-            <div className="w-72 h-48 bg-slate-100 dark:bg-slate-900/40 animate-pulse rounded-2xl shrink-0" />
+            <div className="w-72 h-[230px] bg-slate-100 dark:bg-slate-900/40 animate-pulse rounded-2xl shrink-0" />
           )}
         </div>
       </section>
@@ -353,7 +418,7 @@ function HomeContent() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-48 bg-slate-100 dark:bg-slate-900/40 animate-pulse rounded-2xl" />
+                <div key={i} className="h-[230px] bg-slate-100 dark:bg-slate-900/40 animate-pulse rounded-2xl" />
               ))}
             </div>
           )}

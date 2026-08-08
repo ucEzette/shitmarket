@@ -323,7 +323,8 @@ export const AM_POOL_FACTORY_ABI = [
     inputs: [
       { name: 'conditionalTokens', type: 'address' },
       { name: 'conditionId', type: 'bytes32' },
-      { name: 'usdcToken', type: 'address' }
+      { name: 'usdcToken', type: 'address' },
+      { name: 'treasury', type: 'address' }
     ],
     outputs: [{ name: '', type: 'address' }]
   },
@@ -362,6 +363,20 @@ export const AM_POOL_ABI = [
     outputs: [{ name: '', type: 'uint256' }]
   },
   {
+    name: 'claimFees',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'getClaimableFees',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'lp', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
     name: 'buyShares',
     type: 'function',
     stateMutability: 'nonpayable',
@@ -380,6 +395,27 @@ export const AM_POOL_ABI = [
     type: 'function',
     stateMutability: 'view',
     inputs: [{ name: '', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'TOTAL_FEE_BPS',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'LP_FEE_BPS',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }]
+  },
+  {
+    name: 'TREASURY_FEE_BPS',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [],
     outputs: [{ name: '', type: 'uint256' }]
   },
   {
@@ -691,6 +727,7 @@ export interface AppState {
   claimEvmWinnings: (roomId: string) => Promise<any>;
   addAmmLiquidity: (roomId: string, amountUsdc: number) => Promise<any>;
   removeAmmLiquidity: (roomId: string, amountLp: number) => Promise<any>;
+  claimAmmFees: (roomId: string) => Promise<any>;
   mintTestnetUsdc: (amount?: number) => Promise<any>;
   disputeRoom: (roomId: string) => Promise<any>;
   resolveDispute: (roomId: string, winner: 'moon' | 'jeet' | 'draw' | null, overturned: boolean) => Promise<any>;
@@ -1766,7 +1803,7 @@ export const useAppState = create<AppState>()(
         const usdcAddress = CONTRACT_ADDRESSES.USDC;
         const resolutionTime = BigInt(Math.floor(room.expiry / 1000));
         
-        // Check allowance for MarketFactory creation fee (5 USDC)
+        // Check allowance for MarketFactory creation fee (3 USDC)
         try {
           const factoryAllowance = await publicClient.readContract({
             address: usdcAddress,
@@ -1781,7 +1818,7 @@ export const useAppState = create<AppState>()(
             args: [wallet.address as `0x${string}`, marketFactoryAddress]
           });
 
-          if (factoryAllowance < BigInt(5_000_000)) {
+          if (factoryAllowance < BigInt(3_000_000)) {
             get().updateToast(toastId, {
               type: 'loading',
               message: 'APPROVING CREATION FEE',
@@ -1892,7 +1929,7 @@ export const useAppState = create<AppState>()(
                 address: poolFactoryAddress,
                 abi: AM_POOL_FACTORY_ABI,
                 functionName: 'createPool',
-                args: [tokensAddress, actualRoomId as `0x${string}`, usdcAddress],
+                args: [tokensAddress, actualRoomId as `0x${string}`, usdcAddress, marketFactoryAddress],
                 account: wallet.address as `0x${string}`
               });
               const deployPoolHash = await evmWalletClient.writeContract({
@@ -2665,7 +2702,7 @@ export const useAppState = create<AppState>()(
           address: poolFactoryAddress,
           abi: AM_POOL_FACTORY_ABI,
           functionName: 'createPool',
-          args: [tokensAddress, roomId as `0x${string}`, usdcAddress],
+          args: [tokensAddress, roomId as `0x${string}`, usdcAddress, marketFactoryAddress],
           account: wallet.address as `0x${string}`
         });
         const deployPoolNonce = await publicClient.getTransactionCount({ address: wallet.address as `0x${string}` });
@@ -3180,7 +3217,7 @@ export const useAppState = create<AppState>()(
     if (moonRes > 0 && jeetRes > 0) {
       const rTarget = side === 'moon' ? moonRes : jeetRes;
       const rOpposite = side === 'moon' ? jeetRes : moonRes;
-      const fee = (amount * 30) / 10000;
+      const fee = (amount * 10) / 10000;
       const netUsdc = amount - fee;
       const k = rTarget * rOpposite;
       const newOppositeReserve = rOpposite + netUsdc;
@@ -3826,6 +3863,80 @@ export const useAppState = create<AppState>()(
       get().updateToast(toastId, {
         type: 'error',
         message: 'LP REMOVE MISSION FLUNKED',
+        description: err.message || String(err)
+      });
+      throw err;
+    } finally {
+      setTransactionLoading(false);
+    }
+  },
+
+  claimAmmFees: async (roomId: string) => {
+    const { wallet, setTransactionLoading, setTransactionError } = get();
+    if (!wallet || !wallet.address) {
+      get().addToast("WALLET NOT ENLISTED", "error", "Please enlist your EVM wallet first!");
+      return;
+    }
+    setTransactionLoading(true);
+    setTransactionError(null);
+    const toastId = get().addToast('CLAIMING LP SWAP FEES', 'loading', `Claiming accrued swap fees in USDC...`);
+
+    try {
+      let provider: any = null;
+      if (wallet.privyWallet && typeof wallet.privyWallet.getEthereumProvider === 'function') {
+        provider = await wallet.privyWallet.getEthereumProvider();
+      } else if (typeof (window as any).ethereum !== 'undefined') {
+        provider = (window as any).ethereum;
+      }
+      if (!provider) throw new Error("No EVM provider found.");
+      await ensureAvalancheFujiChain(provider);
+
+      const evmWalletClient = createWalletClient({
+        account: wallet.address as `0x${string}`,
+        chain: avalancheFuji,
+        transport: custom(provider)
+      });
+
+      const poolFactoryAddress = CONTRACT_ADDRESSES.AM_POOL_FACTORY;
+      const poolAddress = await publicClient.readContract({
+        address: poolFactoryAddress,
+        abi: AM_POOL_FACTORY_ABI,
+        functionName: 'getPool',
+        args: [roomId as `0x${string}`]
+      }) as `0x${string}`;
+
+      if (!poolAddress || poolAddress === '0x0000000000000000000000000000000000000000') {
+        throw new Error("AMM Pool does not exist for this market.");
+      }
+
+      const { request } = await publicClient.simulateContract({
+        address: poolAddress,
+        abi: AM_POOL_ABI,
+        functionName: 'claimFees',
+        account: wallet.address as `0x${string}`
+      });
+
+      const txHash = await evmWalletClient.writeContract({
+        ...request,
+        gas: BigInt(500000)
+      });
+      await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+      get().updateToast(toastId, {
+        type: 'success',
+        message: 'LP FEES HARVESTED',
+        description: `Successfully claimed accrued USDC swap fees to your wallet!`,
+        txSig: txHash
+      });
+
+      await get().fetchBalance();
+      await get().fetchSingleRoom(roomId);
+      return txHash;
+    } catch (err: any) {
+      console.error("Claim LP Fees failed:", err);
+      get().updateToast(toastId, {
+        type: 'error',
+        message: 'CLAIM MISSION FLUNKED',
         description: err.message || String(err)
       });
       throw err;

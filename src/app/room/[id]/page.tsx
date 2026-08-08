@@ -96,13 +96,15 @@ const LazyDexChart = ({ chainId, pairAddress }: { chainId: string; pairAddress: 
 };
 
 function LiquidityTabPanel({ roomId }: { roomId: string }) {
-  const { addAmmLiquidity, removeAmmLiquidity, wallet } = useAppState();
+  const { addAmmLiquidity, removeAmmLiquidity, claimAmmFees, wallet } = useAppState();
   const [usdcAmount, setUsdcAmount] = useState<string>('');
   const [lpAmount, setLpAmount] = useState<string>('');
   const [lpBalance, setLpBalance] = useState<number>(0);
+  const [claimableFees, setClaimableFees] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
+  const [claiming, setClaiming] = useState<boolean>(false);
 
-  const fetchLpBalance = async () => {
+  const fetchLpBalanceAndFees = async () => {
     if (!wallet?.address) return;
     try {
       const poolFactoryAddress = CONTRACT_ADDRESSES.AM_POOL_FACTORY;
@@ -129,6 +131,19 @@ function LiquidityTabPanel({ roomId }: { roomId: string }) {
           args: [wallet.address as `0x${string}`]
         }) as bigint;
         setLpBalance(Number(bal) / 1e6);
+
+        // Fetch claimable swap fees
+        try {
+          const fees = await publicClient.readContract({
+            address: poolAddress,
+            abi: AM_POOL_ABI,
+            functionName: 'getClaimableFees',
+            args: [wallet.address as `0x${string}`]
+          }) as bigint;
+          setClaimableFees(Number(fees) / 1e6);
+        } catch (feeErr) {
+          console.warn("Failed to fetch claimable fees:", feeErr);
+        }
       }
     } catch (e) {
       console.warn("Failed to fetch LP balance:", e);
@@ -136,8 +151,8 @@ function LiquidityTabPanel({ roomId }: { roomId: string }) {
   };
 
   useEffect(() => {
-    fetchLpBalance();
-    const interval = setInterval(fetchLpBalance, 10000);
+    fetchLpBalanceAndFees();
+    const interval = setInterval(fetchLpBalanceAndFees, 6000);
     return () => clearInterval(interval);
   }, [wallet?.address, roomId]);
 
@@ -147,7 +162,7 @@ function LiquidityTabPanel({ roomId }: { roomId: string }) {
     try {
       await addAmmLiquidity(roomId, Number(usdcAmount));
       setUsdcAmount('');
-      await fetchLpBalance();
+      await fetchLpBalanceAndFees();
     } catch (e) {
       console.error(e);
     } finally {
@@ -161,7 +176,7 @@ function LiquidityTabPanel({ roomId }: { roomId: string }) {
     try {
       await removeAmmLiquidity(roomId, Number(lpAmount));
       setLpAmount('');
-      await fetchLpBalance();
+      await fetchLpBalanceAndFees();
     } catch (e) {
       console.error(e);
     } finally {
@@ -169,11 +184,46 @@ function LiquidityTabPanel({ roomId }: { roomId: string }) {
     }
   };
 
+  const handleClaim = async () => {
+    if (claimableFees <= 0) return;
+    setClaiming(true);
+    try {
+      await claimAmmFees(roomId);
+      await fetchLpBalanceAndFees();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setClaiming(false);
+    }
+  };
+
   return (
     <div className="space-y-6 text-left p-2">
-      <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 font-mono text-xs flex justify-between items-center">
-        <span className="text-slate-500 uppercase font-bold">Your Liquidity Shares:</span>
-        <span className="font-extrabold text-slate-955 dark:text-white">{lpBalance.toFixed(2)} SM-LP</span>
+      {/* LP Balance & Claimable Fees Card */}
+      <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800 font-mono text-xs space-y-3">
+        <div className="flex justify-between items-center">
+          <span className="text-slate-500 uppercase font-bold">Your Liquidity Shares:</span>
+          <span className="font-extrabold text-slate-950 dark:text-white">{lpBalance.toFixed(2)} SM-LP</span>
+        </div>
+        <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-800">
+          <div>
+            <span className="text-slate-500 uppercase font-bold block">Accrued Swap Fees:</span>
+            <span className="text-[10px] text-slate-400">0.07% pro-rata trade volume</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="font-extrabold text-emerald-600 dark:text-neon-moon text-sm">
+              ${claimableFees.toFixed(4)} USDC
+            </span>
+            <button
+              onClick={handleClaim}
+              disabled={claiming || claimableFees <= 0}
+              className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-mono text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-sm flex items-center gap-1"
+            >
+              {claiming ? <Loader2 size={12} className="animate-spin" /> : <Coins size={12} />}
+              CLAIM FEES
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Add Liquidity section */}

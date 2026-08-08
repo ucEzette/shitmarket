@@ -126,9 +126,18 @@ export default function PresentationPage() {
             </nav>
             
             <div className="pt-4 border-t border-slate-100 text-[10px] font-mono text-slate-400 leading-normal">
-              <span className="block font-bold uppercase text-slate-500 mb-1">Contract Deployment:</span>
-              <span className="font-bold text-emerald-600">Avalanche Fuji Testnet</span>
-              <span className="block mt-1 truncate">0x554Ed...02C26</span>
+              <span className="block font-bold uppercase text-slate-500 mb-1">Hub Contract (Fuji):</span>
+              <a 
+                href="https://testnet.snowtrace.io/address/0x803E97FDffE050bfd781c26ba8a65DF069ae9cC6#code"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-bold text-emerald-600 hover:underline block truncate"
+              >
+                0x803E97FD...069ae9cC6 ↗
+              </a>
+              <Link href="/rules#contracts" className="block text-[9px] text-slate-500 hover:text-slate-800 underline mt-1.5 font-bold">
+                View All 7 Verified Contracts →
+              </Link>
             </div>
           </div>
         </aside>
@@ -293,20 +302,20 @@ export default function PresentationPage() {
             <div className="border border-slate-200 rounded-2xl p-5 space-y-3 font-mono text-xs text-slate-700 bg-slate-50">
               <div className="flex gap-2 items-start">
                 <CheckCircle size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong className="text-slate-900">Direct Swap Fees:</strong> Keep **0.30% to 1.00%** of all trading volume routed through your room's outcome pools.</p>
+                <p><strong className="text-slate-900">0.10% AMM Swap Fee Structure:</strong> Trades incur a 0.10% (10 bps) total fee: **0.07% (70%)** is allocated directly to Liquidity Providers and creators, while **0.03% (30%)** is routed to the platform treasury.</p>
               </div>
               <div className="flex gap-2 items-start">
                 <CheckCircle size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong className="text-slate-900">Zero Cold Start:</strong> Creators actively market their prediction rooms to their own community (Telegram, Discord, Twitter) to drive volume and capture fees.</p>
+                <p><strong className="text-slate-900">Separate Claimable Rewards:</strong> Fees accumulate in USDC via an on-chain accumulator (<code className="bg-slate-200 text-slate-900 px-1 py-0.5 rounded">accFeePerShare</code>). LPs and room creators can harvest their USDC yields anytime without withdrawing their liquidity position.</p>
               </div>
               <div className="flex gap-2 items-start">
                 <CheckCircle size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-                <p><strong className="text-slate-900">Dual-Sided Yield:</strong> Profit from both buy trades and sell trades as degens speculate on outcome ratios.</p>
+                <p><strong className="text-slate-900">Zero Cold Start & Low $3 Creation:</strong> Deploying prediction rooms costs just **$3 USDC** (anti-spam fee), incentivizing creators to market their rooms across Telegram, Discord, and Twitter to build volume.</p>
               </div>
             </div>
 
             <p className="text-slate-600 text-sm md:text-base pt-2">
-              Unlike traditional setups where the platform eats the volume spread, ShitMarket room creators act as the liquidity providers. You deploy the capital, you set the fee rate, you promote the room, and you harvest the yield. Below is an interactive projection tool to calculate potential creator earnings:
+              Unlike traditional setups where the platform extracts all volume spreads, ShitMarket room creators act as the liquidity providers. You deploy the capital, promote the room, and harvest the yield in real-time. Below is an interactive projection tool to calculate potential creator earnings:
             </p>
 
             {/* Light Mode Yield Calculator Card */}
@@ -334,9 +343,9 @@ export default function PresentationPage() {
                 </div>
 
                 <div className="flex justify-between items-center text-[11px]">
-                  <span className="text-slate-500 font-bold">Creator LP Swap Fee Rate:</span>
+                  <span className="text-slate-500 font-bold">Creator LP Swap Fee Share:</span>
                   <div className="flex gap-2">
-                    {[0.3, 0.5, 1.0].map((rate) => (
+                    {[0.07, 0.10, 0.20].map((rate) => (
                       <button 
                         key={rate} 
                         onClick={() => setCalcFeeRate(rate)}

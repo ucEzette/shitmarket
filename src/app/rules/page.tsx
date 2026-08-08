@@ -23,7 +23,7 @@ export default function RulesPage() {
   // Monitor scrolling to highlight Table of Contents active item
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['trading', 'creation', 'creator-fees', 'settlement', 'fees-gasless', 'referrals', 'risks'];
+      const sections = ['trading', 'creation', 'creator-fees', 'settlement', 'fees-gasless', 'referrals', 'contracts', 'risks'];
       const scrollPosition = window.scrollY + 150;
 
       for (const section of sections) {
@@ -62,7 +62,8 @@ export default function RulesPage() {
     { id: 'settlement', label: '4. TWAP & Settlement Resolution' },
     { id: 'fees-gasless', label: '5. Fees & Gasless Transactions' },
     { id: 'referrals', label: '6. Referrals & Trench Scores' },
-    { id: 'risks', label: '7. Risks & Compliance Manual' }
+    { id: 'contracts', label: '7. Verified Smart Contracts' },
+    { id: 'risks', label: '8. Risks & Compliance Manual' }
   ];
 
   return (
@@ -201,7 +202,7 @@ export default function RulesPage() {
               </div>
               <div className="flex gap-2 items-start">
                 <span className="text-emerald-600 font-bold select-none">3.</span>
-                <p><strong className="text-slate-900">Initial Seeding Requirement:</strong> To prevent spam rooms and initialize the Constant Product AMM curve, the creator must seed the room with initial USDC liquidity. This creates the starting 50/50 probability ($0.50 starting share price).</p>
+                <p><strong className="text-slate-900">Creation & Initial Seeding:</strong> Deploying a market requires a low **$3 USDC creation fee** (anti-spam deterrent) plus initial USDC liquidity seeded into the Constant Product AMM to establish starting outcome probabilities ($0.50 starting share price).</p>
               </div>
             </div>
           </section>
@@ -215,20 +216,20 @@ export default function RulesPage() {
               <Coins className="text-emerald-600" size={20} /> LP Fees & Creator Yield
             </h2>
             <p className="text-slate-600 text-sm md:text-base">
-              When you create a room and seed it with initial USDC collateral, you act as the primary **Liquidity Provider (LP)**. ShitMarket rewards room creators for facilitating liquidity:
+              When you create a room and seed it with initial USDC collateral, you act as the primary **Liquidity Provider (LP)**. ShitMarket rewards room creators and community LPs directly on every trade:
             </p>
             <div className="border border-slate-200 rounded-2xl p-5 bg-slate-50 space-y-4 font-mono text-xs text-slate-700">
               <div className="flex gap-2.5 items-start">
                 <span className="p-1 bg-emerald-50 text-emerald-600 rounded">✓</span>
-                <p><strong className="text-slate-900">Swap Fee Collection:</strong> You keep a **0.30% to 1.00% swap fee** on *every single buy and sell transaction* routed through your room's pools.</p>
+                <p><strong className="text-slate-900">0.10% Total Swap Fee:</strong> Every buy and sell swap incurs an ultra-low **0.10% (10 bps)** fee. Of this, **0.07% (70%)** goes directly to LPs/creators, and **0.03% (30%)** is routed to the platform treasury.</p>
               </div>
               <div className="flex gap-2.5 items-start">
                 <span className="p-1 bg-emerald-50 text-emerald-600 rounded">✓</span>
-                <p><strong className="text-slate-900">Community Marketing Incentive:</strong> Because room creators profit directly from volume, they are incentivized to promote their room's URL to their community (Telegram, Twitter, Discord), generating a compounding feedback loop of volume and LP fees.</p>
+                <p><strong className="text-slate-900">On-Demand USDC Fee Claiming:</strong> Swap fees accumulate separately on-chain in an accumulator (`accFeePerShare`). LPs and room creators can execute <code className="bg-slate-200 text-slate-900 px-1.5 py-0.5 rounded font-bold">claimFees()</code> at any time to claim their accrued USDC without needing to remove or burn their liquidity position.</p>
               </div>
               <div className="flex gap-2.5 items-start">
                 <span className="p-1 bg-emerald-50 text-emerald-600 rounded">✓</span>
-                <p><strong className="text-slate-900">Yield Accrual:</strong> Fees accumulate in real-time in the room's liquidity vault and are paid directly to your wallet upon pool termination or LP liquidity withdrawal.</p>
+                <p><strong className="text-slate-900">Community Marketing Incentive:</strong> Because room creators profit directly from volume, they are incentivized to promote their room's URL to their community (Telegram, Twitter, Discord), generating a compounding feedback loop of volume and claimable LP fees.</p>
               </div>
             </div>
           </section>
@@ -311,10 +312,137 @@ export default function RulesPage() {
             </div>
           </section>
 
-          {/* Section 7: Risks */}
+          {/* Section 7: Verified Smart Contracts */}
+          <section id="contracts" className="space-y-4 scroll-mt-24">
+            <div className="flex items-center gap-2 font-mono text-xs text-emerald-600 font-bold uppercase tracking-widest">
+              <Hash size={14} /> Section 7.0
+            </div>
+            <h2 className="font-sans text-2xl md:text-3xl font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
+              <ShieldCheck className="text-emerald-600" size={20} /> Verified Smart Contracts (Avalanche Fuji)
+            </h2>
+            <p className="text-slate-600 text-sm md:text-base">
+              All ShitMarket smart contracts are fully open-source, compiled with Solidity <code className="bg-slate-100 text-slate-900 px-1 py-0.5 rounded font-mono font-bold">0.8.24</code>, and verified on <strong>Snowscan / Routescan / Snowtrace</strong>. You can inspect the deployed source code, read methods, and verify parameters directly on-chain:
+            </p>
+            
+            <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-mono text-xs text-slate-700">
+                  <thead className="bg-slate-100/80 border-b border-slate-200 text-slate-900 font-bold uppercase text-[11px]">
+                    <tr>
+                      <th className="py-3 px-4">Contract</th>
+                      <th className="py-3 px-4">Fuji Address</th>
+                      <th className="py-3 px-4">Role & Verification</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-bold text-slate-900">AMPoolFactory</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">0x8634a6e6...Aa0DE5d</td>
+                      <td className="py-3 px-4">
+                        <a 
+                          href="https://testnet.snowtrace.io/address/0x8634a6e6346Ba056c6Bd11DeB00C99f68Aa0DE5d#code" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                          View Verified Code ↗
+                        </a>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-bold text-slate-900">MarketFactory</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">0x139E2Bd8...1f623167</td>
+                      <td className="py-3 px-4">
+                        <a 
+                          href="https://testnet.snowtrace.io/address/0x139E2Bd8A802f6fb37C8f1eE1ff798271f623167#code" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                          View Verified Code ↗
+                        </a>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-bold text-slate-900">ConditionalTokens</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">0x3DBa9D7E...f5297A2A</td>
+                      <td className="py-3 px-4">
+                        <a 
+                          href="https://testnet.snowtrace.io/address/0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A#code" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                          View Verified Code ↗
+                        </a>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-bold text-slate-900">OracleRegistry</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">0xD9Ea73D3...72a62095F</td>
+                      <td className="py-3 px-4">
+                        <a 
+                          href="https://testnet.snowtrace.io/address/0xD9Ea73D3c157528A133Bc610E02A6C972a62095F#code" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                          View Verified Code ↗
+                        </a>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-bold text-slate-900">PredictionRouter</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">0x8059fDbe...Aa9958524</td>
+                      <td className="py-3 px-4">
+                        <a 
+                          href="https://testnet.snowtrace.io/address/0x8059fDbeC0521F2b6bdCA1F99D5f978Aa9958524#code" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                          View Verified Code ↗
+                        </a>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-bold text-slate-900">ShitMarketCore</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">0x803E97FD...069ae9cC6</td>
+                      <td className="py-3 px-4">
+                        <a 
+                          href="https://testnet.snowtrace.io/address/0x803E97FDffE050bfd781c26ba8a65DF069ae9cC6#code" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                          View Verified Code ↗
+                        </a>
+                      </td>
+                    </tr>
+                    <tr className="hover:bg-slate-50">
+                      <td className="py-3 px-4 font-bold text-slate-900">MockUSDC</td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-600">0x17c48E06...5B158AAB2</td>
+                      <td className="py-3 px-4">
+                        <a 
+                          href="https://testnet.snowtrace.io/address/0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2#code" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                        >
+                          View Verified Code ↗
+                        </a>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          {/* Section 8: Risks */}
           <section id="risks" className="space-y-4 scroll-mt-24">
             <div className="flex items-center gap-2 font-mono text-xs text-rose-600 font-bold uppercase tracking-widest">
-              <Hash size={14} /> Section 7.0
+              <Hash size={14} /> Section 8.0
             </div>
             <h2 className="font-sans text-2xl md:text-3xl font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
               <ShieldAlert className="text-rose-600" size={20} /> Risks & Compliance Manual

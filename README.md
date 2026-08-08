@@ -26,13 +26,31 @@ Unlike traditional order-book prediction platforms that suffer from low liquidit
 * **Fair Price Discovery**: Every market starts at an intuitive 50/50 probability ($0.50 starting price per share), allowing immediate trading on both sides.
 * **Early Exits**: Traders do not need to wait for market expiry. They can sell outcome tokens back to the AMM pool at any time to take profit or cut losses.
 
-### 3. Yield for Market Creators
-* **Swap Fee Accrual**: By seeding a room with liquidity, creators earn a **0.30% to 1.00% swap fee** on every single buy and sell order routed through their pool.
+### 3. Yield for Market Creators & Liquidity Providers
+* **0.10% Total AMM Swap Fee**: Every swap incurs an ultra-low 0.10% fee. **0.07% (70%)** is accrued directly to Liquidity Providers and creators in USDC, and **0.03% (30%)** is routed to the platform treasury.
+* **On-Demand Fee Claiming**: LPs harvest accrued USDC swap fees anytime via `AMPool.claimFees()` without withdrawing or burning underlying LP tokens.
+* **$3 Permissionless Room Creation**: Low anti-spam fee of **$3 USDC** to create any custom prediction room.
 
 ### 4. Rug-Free, Tamper-Proof Settlement
 * **Multi-Oracle TWAP Aggregator**: Settlement prices are verified by aggregating and averaging data across DexScreener, Birdeye, Chainlink, and Pyth Network. A 20% outlier shield automatically filters out abnormal price spikes or flash loans.
 * **Arbitration & Dispute Window**: Once a market resolves, a 30-minute public dispute window opens. Anyone can challenge the settlement by posting a dispute bond, sending disputed events to admin arbitration for final verification.
 * **Locked Funds**: The smart contract locks pool capital until settlement. There are no admin-claim or cancel backdoors on active pools.
+
+---
+
+## Deployed & Verified Smart Contracts (Avalanche Fuji Testnet)
+
+All smart contracts are compiled with Solidity `0.8.24` (Cancun EVM, 200 Optimizer runs, `viaIR: true`), deployed on **Avalanche Fuji (Chain ID: 43113)**, and **fully verified on Snowscan / Routescan / Snowtrace**:
+
+| Contract Name | Fuji Address | Explorer & Verification Link | Description |
+| :--- | :--- | :--- | :--- |
+| **`AMPoolFactory`** | `0x8634a6e6346Ba056c6Bd11DeB00C99f68Aa0DE5d` | [View on Snowtrace](https://testnet.snowtrace.io/address/0x8634a6e6346Ba056c6Bd11DeB00C99f68Aa0DE5d#code) | Deploys CPMM outcome pools with 0.10% fee split & `claimFees()` accumulator. |
+| **`MarketFactory`** | `0x139E2Bd8A802f6fb37C8f1eE1ff798271f623167` | [View on Snowtrace](https://testnet.snowtrace.io/address/0x139E2Bd8A802f6fb37C8f1eE1ff798271f623167#code) | Factory for creating prediction rooms ($3 USDC creation fee). |
+| **`ConditionalTokens`** | `0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A` | [View on Snowtrace](https://testnet.snowtrace.io/address/0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A#code) | ERC-1155 prediction outcome tokens & collateral settlement. |
+| **`OracleRegistry`** | `0xD9Ea73D3c157528A133Bc610E02A6C972a62095F` | [View on Snowtrace](https://testnet.snowtrace.io/address/0xD9Ea73D3c157528A133Bc610E02A6C972a62095F#code) | Multi-oracle resolution adapter & EOA custom resolver registry. |
+| **`PredictionRouter`** | `0x8059fDbeC0521F2b6bdCA1F99D5f978Aa9958524` | [View on Snowtrace](https://testnet.snowtrace.io/address/0x8059fDbeC0521F2b6bdCA1F99D5f978Aa9958524#code) | Hybrid aggregator routing between CLOB order books and AMM pools. |
+| **`ShitMarketCore`** | `0x803E97FDffE050bfd781c26ba8a65DF069ae9cC6` | [View on Snowtrace](https://testnet.snowtrace.io/address/0x803E97FDffE050bfd781c26ba8a65DF069ae9cC6#code) | Core prediction market controller & escrow vault. |
+| **`MockUSDC`** | `0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2` | [View on Snowtrace](https://testnet.snowtrace.io/address/0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2#code) | 6-decimal testnet USDC collateral token with permissionless minting. |
 
 ---
 
@@ -72,6 +90,8 @@ shitmarket/
 * **Collateral Asset**: USDC (6 decimals)
 * **Outcome Shares**: 1:1 fully collateralized ERC-1155 tokens
 * **Price Scale**: Scaled as integer `int64` with 6 decimal places ($1.00 USDC = `1_000_000`)
+* **Room Creation Fee**: **$3.00 USDC** anti-spam fee
+* **AMM Swap Fee**: **0.10%** (0.07% claimable LP yield + 0.03% treasury)
 * **Settlement Fee**: **1.25%** platform fee deducted from the total losing pool on final claim execution
 
 ---

@@ -277,33 +277,39 @@ struct Room {
 | `RoomSettled` | `roomId`, `winner` |
 | `WinningsClaimed` | `roomId`, `claimer` |
 
-### 4.3 AMM Contract System
+### 4.3 AMM Contract System & Deployed Verified Addresses
 
-ShitMarket uses a Gnosis Conditional Tokens Framework (CTF)-inspired AMM stack:
+ShitMarket uses a Gnosis Conditional Tokens Framework (CTF)-inspired AMM stack, fully verified on **Snowscan / Routescan / Snowtrace (Chain ID: 43113)**:
 
-| Contract | ABI Export | Purpose |
-|---|---|---|
-| `MarketFactory` | `MARKET_FACTORY_ABI` | Creates Gnosis-style conditional markets (conditionId) |
-| `AMPoolFactory` | `AM_POOL_FACTORY_ABI` | Deploys a `AMPool` per conditionId |
-| `AMPool` | `AM_POOL_ABI` | CPMM pool; holds MOON/JEET reserves; handles buy/sell |
-| `ConditionalTokens` | `CONDITIONAL_TOKENS_ABI` | ERC-1155 outcome share tokens; redemption post-settlement |
-| `PredictionRouter` | `PREDICTION_ROUTER_ABI` | Hybrid router: fills against the AMM pool and/or signed limit order book |
+| Contract | ABI Export | Fuji Address | Purpose |
+|---|---|---|---|
+| `AMPoolFactory` | `AM_POOL_FACTORY_ABI` | `0x8634a6e6346Ba056c6Bd11DeB00C99f68Aa0DE5d` | Deploys a `AMPool` per conditionId with 0.10% total fee & LP claim accumulator |
+| `MarketFactory` | `MARKET_FACTORY_ABI` | `0x139E2Bd8A802f6fb37C8f1eE1ff798271f623167` | Creates Gnosis-style conditional markets ($3.00 USDC creation fee) |
+| `ConditionalTokens` | `CONDITIONAL_TOKENS_ABI` | `0x3DBa9D7EF6B71610149daeF07bd8fcc6f5297A2A` | ERC-1155 outcome share tokens; split/merge & redemption post-settlement |
+| `OracleRegistry` | `ORACLE_REGISTRY_ABI` | `0xD9Ea73D3c157528A133Bc610E02A6C972a62095F` | Multi-oracle resolution adapter & custom resolver registry |
+| `PredictionRouter` | `PREDICTION_ROUTER_ABI` | `0x8059fDbeC0521F2b6bdCA1F99D5f978Aa9958524` | Hybrid router: fills against the AMM pool and/or signed limit order book |
+| `ShitMarketCore` | `SHITMARKET_CORE_ABI` | `0x803E97FDffE050bfd781c26ba8a65DF069ae9cC6` | Main protocol controller, room state, escrow vault |
+| `MockUSDC` | `IERC20` | `0x17c48E0670548B798dcC3E56a18eb2f5B158AAB2` | 6-decimal collateral currency token |
 
-**AMM pricing formula (Constant Product Market Maker):**
+**AMM fee distribution & pricing formula (Constant Product Market Maker):**
 
 ```
+Total AMM Fee: 0.10% (10 BPS)
+  ├── Liquidity Providers (LPs): 0.07% (7 BPS) -> Accrued in USDC, claimable via claimFees()
+  └── Protocol Treasury:        0.03% (3 BPS) -> Transferred immediately to treasury
+
 k = moonReserves × jeetReserves   (constant)
 
 Buy MOON shares:
   newJeetReserves = k / (moonReserves - sharesToBuy)
   grossCost = newJeetReserves - jeetReserves
-  totalCost = grossCost × 10000 / 9970    // 0.30% swap fee
+  totalCost = grossCost × 10000 / 9990    // 0.10% total fee
 
 Sell MOON shares:
   newMoonReserves = moonReserves + sharesToSell
   newJeetReserves = k / newMoonReserves
   grossReceived = jeetReserves - newJeetReserves
-  netReceived = grossReceived × (1 - 0.0030)
+  netReceived = grossReceived × (1 - 0.0010)
 ```
 
 All pool reserves are denominated in USDC with **6 decimal places** on Avalanche.

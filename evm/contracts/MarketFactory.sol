@@ -28,7 +28,7 @@ contract MarketFactory is Ownable {
     IERC20 public immutable usdcToken;
     ConditionalTokens public immutable conditionalTokens;
     address public treasury;
-    uint256 public creationFee = 5 * 10**6; // 5 USDC creation fee
+    uint256 public creationFee = 3 * 10**6; // 3 USDC creation fee
 
     uint256 public marketCount;
     mapping(uint256 => Market) public markets;

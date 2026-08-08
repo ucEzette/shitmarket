@@ -25,17 +25,20 @@ contract AMPoolFactory {
     function createPool(
         address conditionalTokens,
         bytes32 conditionId,
-        address usdcToken
+        address usdcToken,
+        address treasury
     ) external returns (address) {
         require(conditionalTokens != address(0), "Invalid tokens contract");
         require(usdcToken != address(0), "Invalid USDC token");
+        require(treasury != address(0), "Invalid treasury");
         require(getPool[conditionId] == address(0), "Pool already exists");
 
         // Deploy new AMM pool contract
         AMPool pool = new AMPool(
             conditionalTokens,
             conditionId,
-            usdcToken
+            usdcToken,
+            treasury
         );
 
         address poolAddress = address(pool);

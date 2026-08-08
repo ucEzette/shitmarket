@@ -1,5 +1,25 @@
 import path from 'path';
 import { fileURLToPath } from 'url';
+import dc from 'node:diagnostics_channel';
+
+// Global polyfill for Node < 20
+if (dc && !dc.tracingChannel) {
+  dc.tracingChannel = function(nameOrObj) {
+    const name = typeof nameOrObj === 'string' ? nameOrObj : (nameOrObj?.name || 'unknown');
+    return {
+      name,
+      start: dc.channel(`tracing:${name}:start`),
+      end: dc.channel(`tracing:${name}:end`),
+      asyncStart: dc.channel(`tracing:${name}:asyncStart`),
+      asyncEnd: dc.channel(`tracing:${name}:asyncEnd`),
+      error: dc.channel(`tracing:${name}:error`),
+      traceSync: (fn, context, ...args) => fn(...args),
+      tracePromise: (fn, context, ...args) => fn(...args),
+      traceCallback: (fn, position, context, ...args) => fn(...args),
+      hasSubscribers: false,
+    };
+  };
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

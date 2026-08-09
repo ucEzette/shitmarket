@@ -314,6 +314,22 @@ Sell MOON shares:
 
 All pool reserves are denominated in USDC with **6 decimal places** on Avalanche.
 
+### 4.4 Room Creation & Seeding Lifecycle
+
+1. **Entry & Strike Price Modes**:
+   - **⚡ Live Market Spot Baseline**: Evaluates market outcome against the real-time spot price at room creation (fetched via DexScreener/Pyth). Resolves MOON if expiry price > entry price, JEET if lower.
+   - **🎯 Custom Target / Strike Price**: Room creator can define an exact USD target price threshold (with quick preset multipliers: +5%, +10%, +25%, +50%, +100% 2x target, or -10% short target). Resolves MOON if price hits/exceeds strike price.
+
+2. **Neutral 50/50 Liquidity Seeding**:
+   - Creators seed initial liquidity without choosing a biased side. Depositing $X USDC mints equal $X MOON + $X JEET outcome reserves into the CPMM pool (starting at fair $0.50 per share odds).
+   - Creator receives 100% of initial LP tokens and accrues 0.07% claimable swap fees on all future volume.
+
+3. **Pump.fun Style Anti-Frontrun First Buy (Dev Snipe)**:
+   - To prevent sniper bots or front-running on market launch, creators can optionally specify an initial **First Buy / Dev Snipe**:
+     - **Stance**: MOON / YES (Side 0) or JEET / NO (Side 1)
+     - **Amount**: $Y USDC
+   - Executed atomically in the same creation workflow immediately after pool deployment and liquidity seeding via `buyShares(outcomeIndex, amount)`.
+
 ---
 
 ## 5. Indexer / Backend Layer (`indexer/`)

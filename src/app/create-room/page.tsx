@@ -90,10 +90,14 @@ export default function CreateRoomPage() {
     const tzOffset = defaultDate.getTimezoneOffset() * 60000;
     return new Date(defaultDate.getTime() - tzOffset).toISOString().slice(0, 16);
   });
-  const [seedSide, setSeedSide] = useState<'moon' | 'jeet'>('moon');
   const [seedAmount, setSeedAmount] = useState<number>(10);
   const [openingPriceType, setOpeningPriceType] = useState<'market' | 'set'>('market');
   const [customSetPrice, setCustomSetPrice] = useState<string>('');
+
+  // Pump.fun style First Buy / Dev Snipe state (anti-frontrun)
+  const [enableFirstBuy, setEnableFirstBuy] = useState<boolean>(false);
+  const [snipeSide, setSnipeSide] = useState<'moon' | 'jeet'>('moon');
+  const [snipeAmount, setSnipeAmount] = useState<number>(0);
 
   useEffect(() => {
     if (arenaType === 'token') {
@@ -504,8 +508,19 @@ export default function CreateRoomPage() {
       return;
     }
 
-    if (user && user.balance < seedAmount) {
-      showAlert('INSUFFICIENT USDC AMMO BALANCE TO SEED THIS MARKET!', 'error', 'INSUFFICIENT FUNDS', undefined, rect);
+    const isEvm = process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
+    const creationFeeUsdc = isEvm ? 3 : 0;
+    const actualSnipeAmount = (enableFirstBuy && snipeAmount > 0) ? snipeAmount : 0;
+    const totalRequiredUsdc = creationFeeUsdc + seedAmount + actualSnipeAmount;
+
+    if (user && user.balance < totalRequiredUsdc) {
+      showAlert(
+        `INSUFFICIENT USDC AMMO BALANCE! Need at least ${totalRequiredUsdc} USDC (${creationFeeUsdc > 0 ? `$${creationFeeUsdc} creation fee + ` : ''}$${seedAmount} seed liquidity${actualSnipeAmount > 0 ? ` + $${actualSnipeAmount} first buy` : ''}).`,
+        'error',
+        'INSUFFICIENT FUNDS',
+        undefined,
+        rect
+      );
       return;
     }
 
@@ -545,8 +560,11 @@ export default function CreateRoomPage() {
       tokenAddress = creatorAddress;
     }
 
-    const moonSeed = seedSide === 'moon' ? seedAmount : 0;
-    const jeetSeed = seedSide === 'jeet' ? seedAmount : 0;
+    // Neutral 50/50 starting reserves + optional snipe bonus
+    const snipeMoonBonus = (enableFirstBuy && snipeSide === 'moon') ? actualSnipeAmount : 0;
+    const snipeJeetBonus = (enableFirstBuy && snipeSide === 'jeet') ? actualSnipeAmount : 0;
+    const moonSeed = seedAmount + snipeMoonBonus;
+    const jeetSeed = seedAmount + snipeJeetBonus;
 
     const targetOpeningPrice = arenaType === 'debate' 
       ? 1.0 
@@ -578,6 +596,8 @@ export default function CreateRoomPage() {
       createdAt: Date.now(),
       duration: computedDuration,
       openingPrice: targetOpeningPrice,
+      moonLabel: moonLabel || 'MOON',
+      jeetLabel: jeetLabel || 'JEET',
       
       // Oracle layer details
       oracleAddress: finalOracleAddress,
@@ -586,16 +606,8 @@ export default function CreateRoomPage() {
     };
 
     try {
-      const res = await createRoom(newRoom, openingPriceType === 'set' || arenaType === 'debate');
-      
-      const isEvm = res && res.roomPda && res.roomPda.startsWith('0x');
-      if (res && !res.alreadyExists && !isEvm) {
-        try {
-          await placeBet(res.roomPda, seedSide as any, seedAmount, true, `/room/${res.roomPda}`);
-        } catch (betErr) {
-          console.error("Initial seeding bet failed, but room was created:", betErr);
-        }
-      }
+      const initialSnipe = (enableFirstBuy && snipeAmount > 0) ? { side: snipeSide, amount: snipeAmount } : undefined;
+      const res = await createRoom(newRoom, openingPriceType === 'set' || arenaType === 'debate', initialSnipe);
       
       synthSound('explosion');
       if (res && res.alreadyExists) {
@@ -898,6 +910,136 @@ export default function CreateRoomPage() {
                           <span className="font-mono text-sm text-white font-extrabold truncate block mt-0.5">{tokenInfo.fdv}</span>
                         </div>
                       </div>
+
+                      {/* Entry & Strike Price Configuration */}
+                      <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 space-y-3.5">
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-1.5 border-b border-slate-800 pb-2.5">
+                          <div>
+                            <h5 className="font-sans text-xs font-extrabold text-white uppercase tracking-tight flex items-center gap-1.5">
+                              <Scale size={14} className="text-emerald-400" />
+                              <span>ENTRY & STRIKE PRICE CONFIGURATION</span>
+                            </h5>
+                            <p className="font-sans text-[11px] text-slate-400 mt-0.5">
+                              Specify whether predictions resolve against the live spot price or a custom target strike price.
+                            </p>
+                          </div>
+                          <span className="font-mono text-[9px] text-emerald-400 font-bold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30 uppercase w-fit">
+                            {openingPriceType === 'market' ? '⚡ LIVE SPOT BASELINE' : '🎯 CUSTOM STRIKE TARGET'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {/* Option 1: Live Market Price */}
+                          <div
+                            onClick={() => {
+                              setOpeningPriceType('market');
+                              synthSound('bet');
+                            }}
+                            className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                              openingPriceType === 'market'
+                                ? 'border-emerald-500 bg-emerald-950/30 shadow-sm'
+                                : 'border-slate-800 bg-black/40 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-sans text-[11px] font-extrabold text-white uppercase flex items-center gap-1">
+                                <span>⚡ LIVE MARKET PRICE</span>
+                              </span>
+                              {openingPriceType === 'market' && <CheckCircle2 size={14} className="text-emerald-400" />}
+                            </div>
+                            <div className="font-mono text-sm text-neon-moon font-extrabold truncate">
+                              {tokenInfo.priceUsd}
+                            </div>
+                            <p className="font-sans text-[10px] text-slate-400 mt-0.5 leading-tight">
+                              Locked at launch. Resolves <strong className="text-emerald-400">{moonLabel}</strong> if higher at expiry, <strong className="text-rose-400">{jeetLabel}</strong> if lower.
+                            </p>
+                          </div>
+
+                          {/* Option 2: Custom Strike Price */}
+                          <div
+                            onClick={() => {
+                              setOpeningPriceType('set');
+                              if (!customSetPrice && tokenInfo.rawPriceUsd) {
+                                setCustomSetPrice(tokenInfo.rawPriceUsd.toString());
+                              }
+                              synthSound('bet');
+                            }}
+                            className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                              openingPriceType === 'set'
+                                ? 'border-emerald-500 bg-emerald-950/30 shadow-sm'
+                                : 'border-slate-800 bg-black/40 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-sans text-[11px] font-extrabold text-white uppercase flex items-center gap-1">
+                                <span>🎯 CUSTOM TARGET / STRIKE</span>
+                              </span>
+                              {openingPriceType === 'set' && <CheckCircle2 size={14} className="text-emerald-400" />}
+                            </div>
+                            <div className="font-mono text-sm text-cyan-400 font-extrabold truncate">
+                              ${customSetPrice ? parseFloat(customSetPrice).toLocaleString('en-US', { maximumFractionDigits: 8 }) : '0.00'}
+                            </div>
+                            <p className="font-sans text-[10px] text-slate-400 mt-0.5 leading-tight">
+                              Custom target threshold. Resolves <strong className="text-emerald-400">{moonLabel}</strong> if price reaches target, <strong className="text-rose-400">{jeetLabel}</strong> if not.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Custom Price Inputs and Multiplier Chips */}
+                        {openingPriceType === 'set' && (
+                          <div className="space-y-2.5 pt-2.5 border-t border-slate-800 animate-fadeIn">
+                            <div className="space-y-1">
+                              <label className="block font-mono text-[10px] font-bold text-slate-300 uppercase">
+                                Specify Target Strike Price (USD):
+                              </label>
+                              <div className="relative flex items-center">
+                                <span className="absolute left-3 font-mono text-xs font-bold text-slate-400">$</span>
+                                <input
+                                  type="number"
+                                  step="any"
+                                  min="0"
+                                  placeholder="e.g. 0.00045"
+                                  value={customSetPrice}
+                                  onChange={(e) => setCustomSetPrice(e.target.value)}
+                                  className="w-full pl-7 pr-4 py-2 bg-black border border-slate-700 text-white font-mono text-xs rounded-lg focus:border-emerald-500 focus:outline-none font-bold"
+                                />
+                              </div>
+                            </div>
+
+                            {tokenInfo.rawPriceUsd && tokenInfo.rawPriceUsd > 0 && (
+                              <div className="space-y-1">
+                                <span className="font-mono text-[9px] text-slate-400 font-bold uppercase block">
+                                  QUICK TARGET PRESETS:
+                                </span>
+                                <div className="flex flex-wrap gap-1">
+                                  {[
+                                    { label: '+5% Moon', mult: 1.05 },
+                                    { label: '+10% Moon', mult: 1.10 },
+                                    { label: '+25% Moon', mult: 1.25 },
+                                    { label: '+50% Moon', mult: 1.50 },
+                                    { label: '2x Moon (+100%)', mult: 2.00 },
+                                    { label: '-10% Jeet (Dip)', mult: 0.90 },
+                                    { label: 'Spot Baseline', mult: 1.00 },
+                                  ].map((p) => (
+                                    <button
+                                      key={p.label}
+                                      type="button"
+                                      onClick={() => {
+                                        const targetP = (tokenInfo.rawPriceUsd || 0) * p.mult;
+                                        setCustomSetPrice(targetP.toFixed(targetP < 1 ? 8 : 4).replace(/0+$/, '').replace(/\.$/, ''));
+                                        synthSound('bet');
+                                      }}
+                                      className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-mono text-[9px] rounded font-bold transition-all uppercase"
+                                    >
+                                      {p.label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1090,7 +1232,7 @@ export default function CreateRoomPage() {
 
                   <div className="bg-slate-50 dark:bg-slate-950/80 border border-slate-200/60 dark:border-slate-800 p-2.5 rounded-xl text-center font-mono text-[10px] text-slate-600 dark:text-slate-300 font-bold uppercase mb-3.5">
                     {arenaType === 'token'
-                      ? `Will $${tokenInfo?.symbol || 'TKN'} close above $${tokenInfo?.priceUsd || '0.00'}?`
+                      ? `Will $${tokenInfo?.symbol || 'TKN'} close above ${openingPriceType === 'set' && customSetPrice ? `$${parseFloat(customSetPrice).toLocaleString('en-US', { maximumFractionDigits: 8 })}` : (tokenInfo?.priceUsd || '$0.00')} upon expiry?`
                       : `Will this event resolve to ${moonLabel || 'YES'}?`}
                   </div>
 
@@ -1276,28 +1418,28 @@ export default function CreateRoomPage() {
             </div>
           )}
 
-          {/* STEP 3: DURATION, LIQUIDITY SEEDING & LAUNCH */}
+          {/* STEP 3: DURATION, LIQUIDITY SEEDING & FIRST BUY (DEV SNIPE) */}
           {step === 3 && (
             <div className="space-y-8 animate-fadeIn">
               
               <div>
-                <h3 className="font-staatliches text-2xl text-slate-900 dark:text-white tracking-wider uppercase flex items-center gap-2">
-                  <Coins size={22} className="text-neon-moon" />
-                  <span>CONFIGURE DURATION & SEED AMMO</span>
+                <h3 className="font-sans text-xl font-extrabold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                  <Coins size={22} className="text-emerald-500" />
+                  <span>CONFIGURE DURATION, LIQUIDITY & FIRST BUY</span>
                 </h3>
-                <p className="font-sans text-xs text-gray-400 mt-1">
-                  Specify market expiry duration and seed initial USDC liquidity into your target side.
+                <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Specify market expiry, seed neutral AMM liquidity, and optionally execute a first buy (dev snipe) to protect against front-running.
                 </p>
               </div>
 
               {/* Duration Presets & Slider */}
-              <div className="bg-[#05080E] border border-gray-800 rounded-2xl p-6 space-y-6">
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6">
                 <div className="flex justify-between items-center">
-                  <label className="font-staatliches text-xl text-white tracking-wider uppercase flex items-center gap-2">
-                    <Clock size={18} className="text-neon-moon animate-pulse" />
+                  <label className="font-sans text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                    <Clock size={16} className="text-emerald-500 animate-pulse" />
                     <span>BATTLE EXPIRY DURATION:</span>
                   </label>
-                  <span className="font-mono text-sm text-neon-moon font-extrabold bg-emerald-950/60 px-3 py-1 border border-neon-moon/40 rounded-lg">
+                  <span className="font-mono text-xs text-emerald-500 font-extrabold bg-emerald-500/10 px-3 py-1 border border-emerald-500/20 rounded-lg">
                     {(() => {
                       const diffMs = new Date(expiryDate).getTime() - Date.now();
                       const diffMins = Math.max(0, Math.floor(diffMs / 60000));
@@ -1327,10 +1469,10 @@ export default function CreateRoomPage() {
                         key={preset.label}
                         type="button"
                         onClick={() => handlePresetSelect(preset.hours)}
-                        className={`py-2 rounded-lg font-staatliches text-sm tracking-wider uppercase transition-all border font-bold ${
+                        className={`py-2 rounded-xl font-mono text-xs uppercase transition-all border font-bold ${
                           isSelected
-                            ? 'bg-neon-moon text-black border-neon-moon shadow-[0_0_12px_rgba(57,255,20,0.25)]'
-                            : 'bg-[#0A0E17] border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                            ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                         }`}
                       >
                         {preset.label}
@@ -1341,7 +1483,7 @@ export default function CreateRoomPage() {
 
                 {/* Range Slider */}
                 <div className="space-y-2">
-                  <div className="flex justify-between text-[10px] text-gray-500 font-mono font-bold">
+                  <div className="flex justify-between text-[10px] text-slate-400 font-mono font-bold">
                     <span>1 HOUR</span>
                     <span>1 WEEK</span>
                     <span>1 MONTH</span>
@@ -1354,16 +1496,13 @@ export default function CreateRoomPage() {
                     step="1"
                     value={hoursToSliderVal(getExpiryHours())}
                     onChange={(e) => handleSliderChange(parseFloat(e.target.value))}
-                    className="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-neon-moon focus:outline-none"
-                    style={{
-                      background: `linear-gradient(to right, #39FF14 ${hoursToSliderVal(getExpiryHours())}%, #1F2937 ${hoursToSliderVal(getExpiryHours())}%)`
-                    }}
+                    className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500 focus:outline-none"
                   />
                 </div>
 
                 {/* Manual Date/Time Picker */}
-                <div className="space-y-2 pt-2 border-t border-gray-900">
-                  <span className="text-[10px] text-gray-500 font-mono font-bold uppercase block">
+                <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-850">
+                  <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono font-bold uppercase block">
                     MANUAL EXACT EXPIRY TIME (MAX 1 YEAR LIMIT):
                   </span>
                   <input 
@@ -1383,70 +1522,31 @@ export default function CreateRoomPage() {
                     }}
                     min={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 60 * 60000).toISOString().slice(0, 16)}
                     max={new Date(Date.now() - new Date().getTimezoneOffset() * 60000 + 365 * 24 * 60 * 60000).toISOString().slice(0, 16)}
-                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-emerald-500 focus:outline-none font-bold cursor-pointer"
+                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs px-4 py-3 rounded-xl focus:border-emerald-500 focus:outline-none font-bold cursor-pointer"
                   />
                 </div>
               </div>
 
-              {/* Initial Ammo Seeding Box */}
-              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-6">
-                
-                <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-4">
+              {/* CARD 1: Initial Liquidity Seeding (Neutral 50/50 AMM Pool) */}
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
                   <div>
-                    <h4 className="font-sans text-lg text-slate-900 dark:text-white font-extrabold uppercase">
-                      INITIAL LIQUIDITY SEEDING
+                    <h4 className="font-sans text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                      <Layers size={18} className="text-emerald-500" />
+                      <span>1. INITIAL POOL LIQUIDITY (NEUTRAL SEEDING)</span>
                     </h4>
-                    <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Deploy initial USDC to fund the prediction pool and activate this market.
+                    <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Deposit USDC into the AMM liquidity pool. This creates equal 50/50 YES and NO outcome reserves (starting at $0.50 each) and earns you 0.07% claimable fees on all future swaps.
                     </p>
                   </div>
-                  <span className="font-mono text-lg text-emerald-500 font-extrabold">
-                    {seedAmount} USDC
+                  <span className="font-mono text-sm text-emerald-500 font-extrabold bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20 w-fit shrink-0">
+                    {seedAmount} USDC (50/50 LP)
                   </span>
                 </div>
 
-                {/* Seed Side Selector */}
                 <div className="space-y-3">
-                  <span className="block font-mono text-xs font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider">
-                    CHOOSE YOUR INITIAL STANCE:
-                  </span>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      type="button"
-                      onClick={() => { setSeedSide('moon'); synthSound('bet'); }}
-                      className={`py-4 rounded-xl font-mono text-xs uppercase tracking-wider transition-all border-2 font-bold flex flex-col items-center justify-center gap-1 ${
-                        seedSide === 'moon'
-                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
-                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <span className="text-base">🚀</span>
-                      <span>YES / MOON</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setSeedSide('jeet'); synthSound('bet'); }}
-                      className={`py-4 rounded-xl font-mono text-xs uppercase tracking-wider transition-all border-2 font-bold flex flex-col items-center justify-center gap-1 ${
-                        seedSide === 'jeet'
-                          ? 'bg-red-500 text-white border-red-500 shadow-md shadow-red-500/20'
-                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                      }`}
-                    >
-                      <span className="text-base">💀</span>
-                      <span>NO / JEET</span>
-                    </button>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-mono italic">
-                    {seedSide === 'moon' 
-                      ? "You are betting that the target condition WILL be met (BULLISH)." 
-                      : "You are betting that the target condition WILL NOT be met (BEARISH)."}
-                  </p>
-                </div>
-
-                {/* Seeding Amount Input */}
-                <div className="space-y-2">
-                  <label className="block font-mono text-xs font-bold text-slate-700 dark:text-gray-300 uppercase tracking-wider">
-                    USDC Seeding Amount:
+                  <label className="block font-mono text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    USDC Liquidity Amount to Seed:
                   </label>
                   <div className="relative flex items-center">
                     <input
@@ -1465,48 +1565,302 @@ export default function CreateRoomPage() {
                       USDC
                     </span>
                   </div>
+
+                  {/* Quick Seed Presets */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-mono text-[10px] text-slate-400 font-bold uppercase">PRESETS:</span>
+                    {[5, 10, 25, 50, 100, 250].map((amt) => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => {
+                          setSeedAmount(amt);
+                          synthSound('bet');
+                        }}
+                        className={`px-3 py-1 rounded-lg font-mono text-xs font-bold transition-all uppercase border ${
+                          seedAmount === amt
+                            ? 'bg-emerald-500 text-white border-emerald-500'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
+                        }`}
+                      >
+                        ${amt}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="p-3 bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 rounded-xl flex items-center gap-2.5 text-[11px] font-sans text-slate-600 dark:text-slate-300">
+                    <ShieldCheck size={16} className="text-emerald-500 shrink-0" />
+                    <span>
+                      <strong>Neutral Seeding:</strong> You do not pick a side here. Your ${seedAmount} USDC mints {seedAmount} {moonLabel} + {seedAmount} {jeetLabel} tokens to bootstrap fair 50/50 trading.
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Complete Deployment Order Summary */}
+              {/* CARD 2: First Buy / Dev Snipe (Pump.fun Anti-Frontrun Style) */}
+              <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-5">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-4">
+                  <div>
+                    <h4 className="font-sans text-sm font-extrabold text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-2">
+                      <Flame size={18} className="text-amber-500" />
+                      <span>2. FIRST BUY / DEV SNIPE (OPTIONAL)</span>
+                    </h4>
+                    <p className="font-sans text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Instantly buy outcome shares directly from your seeded pool in the same creation transaction before sniper bots or external traders can front-run your market.
+                    </p>
+                  </div>
+                  <span className="font-mono text-[10px] text-amber-500 font-extrabold bg-amber-500/10 px-2.5 py-1 rounded-md border border-amber-500/20 uppercase w-fit shrink-0 flex items-center gap-1">
+                    <Zap size={12} />
+                    <span>ANTI-FRONTRUN</span>
+                  </span>
+                </div>
+
+                {/* Enable First Buy Toggle */}
+                <div
+                  onClick={() => {
+                    const nextVal = !enableFirstBuy;
+                    setEnableFirstBuy(nextVal);
+                    if (nextVal && snipeAmount === 0) {
+                      setSnipeAmount(5);
+                    }
+                    synthSound('bet');
+                  }}
+                  className={`p-4 rounded-xl border-2 cursor-pointer transition-all flex items-center justify-between ${
+                    enableFirstBuy
+                      ? 'border-amber-500 bg-amber-500/5 dark:bg-amber-950/20 shadow-sm'
+                      : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/60 hover:border-slate-300 dark:hover:border-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center border transition-all ${
+                      enableFirstBuy
+                        ? 'bg-amber-500 text-black border-amber-500'
+                        : 'border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950'
+                    }`}>
+                      {enableFirstBuy && <Check size={14} className="stroke-[3]" />}
+                    </div>
+                    <div>
+                      <span className="font-sans text-xs font-extrabold text-slate-900 dark:text-white uppercase block">
+                        EXECUTE FIRST BUY ON LAUNCH (DEV SNIPE)
+                      </span>
+                      <span className="font-sans text-[11px] text-slate-500 dark:text-slate-400 block mt-0.5">
+                        Secures your initial prediction bag immediately upon pool creation at base odds.
+                      </span>
+                    </div>
+                  </div>
+                  <span className="font-mono text-xs font-bold text-amber-500 uppercase">
+                    {enableFirstBuy ? 'ENABLED' : 'DISABLED'}
+                  </span>
+                </div>
+
+                {/* First Buy Parameters Form */}
+                {enableFirstBuy && (
+                  <div className="space-y-4 pt-2 animate-fadeIn">
+                    
+                    {/* Outcome Selection */}
+                    <div className="space-y-2">
+                      <label className="block font-mono text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                        CHOOSE OUTCOME TO SNIPE / BUY:
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => { setSnipeSide('moon'); synthSound('bet'); }}
+                          className={`py-3 px-4 rounded-xl font-mono text-xs uppercase tracking-wider transition-all border-2 font-bold flex items-center justify-center gap-2 ${
+                            snipeSide === 'moon'
+                              ? 'bg-emerald-500 text-white border-emerald-500 shadow-md shadow-emerald-500/20'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <span>🚀</span>
+                          <span>{moonLabel} ({arenaType === 'token' ? 'BULLISH' : 'YES'})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setSnipeSide('jeet'); synthSound('bet'); }}
+                          className={`py-3 px-4 rounded-xl font-mono text-xs uppercase tracking-wider transition-all border-2 font-bold flex items-center justify-center gap-2 ${
+                            snipeSide === 'jeet'
+                              ? 'bg-rose-500 text-white border-rose-500 shadow-md shadow-rose-500/20'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          }`}
+                        >
+                          <span>💀</span>
+                          <span>{jeetLabel} ({arenaType === 'token' ? 'BEARISH' : 'NO'})</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Snipe Amount Input */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="block font-mono text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                          First Buy Amount (USDC):
+                        </label>
+                        <span className="font-mono text-[11px] text-slate-400">
+                          Wallet Ammo: <strong>{user?.balance ? user.balance.toFixed(2) : '0.00'} USDC</strong>
+                        </span>
+                      </div>
+                      <div className="relative flex items-center">
+                        <input
+                          type="number"
+                          step="any"
+                          min="0.1"
+                          placeholder="ENTER FIRST BUY AMOUNT..."
+                          value={snipeAmount || ''}
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value);
+                            setSnipeAmount(isNaN(val) ? 0 : val);
+                          }}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-sm px-4 py-3 rounded-xl focus:border-amber-500 focus:outline-none font-bold"
+                        />
+                        <span className="absolute right-4 font-mono text-xs text-slate-500 dark:text-slate-400 font-extrabold uppercase">
+                          USDC
+                        </span>
+                      </div>
+
+                      {/* Quick Presets for Snipe */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-[10px] text-slate-400 font-bold uppercase">QUICK BUY:</span>
+                        {[1, 5, 10, 25, 50].map((amt) => (
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={() => {
+                              setSnipeAmount(amt);
+                              synthSound('bet');
+                            }}
+                            className={`px-3 py-1 rounded-lg font-mono text-xs font-bold transition-all uppercase border ${
+                              snipeAmount === amt
+                                ? 'bg-amber-500 text-black border-amber-500'
+                                : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-700'
+                            }`}
+                          >
+                            ${amt}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Live CPMM Snipe Simulator Box */}
+                    {snipeAmount > 0 && seedAmount > 0 && (
+                      <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl space-y-2.5 font-mono text-xs animate-fadeIn">
+                        <span className="font-sans text-[10px] font-extrabold text-amber-400 uppercase tracking-wider block flex items-center gap-1.5">
+                          <Sparkles size={13} className="text-amber-400" />
+                          <span>SNIPE SIMULATION & POST-TRADE ODDS</span>
+                        </span>
+                        
+                        {(() => {
+                          const k = seedAmount * seedAmount;
+                          const poolMoon = seedAmount;
+                          const poolJeet = seedAmount;
+                          const isMoon = snipeSide === 'moon';
+                          
+                          // CPMM swap math
+                          const newReserveIn = (isMoon ? poolJeet : poolMoon) + snipeAmount;
+                          const newReserveOut = k / newReserveIn;
+                          const sharesReceived = (isMoon ? poolMoon : poolJeet) - newReserveOut;
+                          
+                          const postMoonPool = isMoon ? poolMoon - sharesReceived + snipeAmount : poolMoon;
+                          const postJeetPool = !isMoon ? poolJeet - sharesReceived + snipeAmount : poolJeet;
+                          const totalOdds = postMoonPool + postJeetPool;
+                          const moonOddsPct = Math.round((postMoonPool / totalOdds) * 100);
+                          const jeetOddsPct = 100 - moonOddsPct;
+
+                          return (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center pt-1">
+                              <div className="bg-black/50 p-2 rounded-lg border border-slate-800">
+                                <span className="text-[9px] text-slate-400 uppercase block font-bold">EST. SHARES</span>
+                                <span className="text-xs text-white font-extrabold truncate block mt-0.5">
+                                  ~{sharesReceived.toFixed(2)} {snipeSide.toUpperCase()}
+                                </span>
+                              </div>
+                              <div className="bg-black/50 p-2 rounded-lg border border-slate-800">
+                                <span className="text-[9px] text-slate-400 uppercase block font-bold">AVG BUY PRICE</span>
+                                <span className="text-xs text-amber-400 font-extrabold truncate block mt-0.5">
+                                  ${sharesReceived > 0 ? (snipeAmount / sharesReceived).toFixed(3) : '0.500'}
+                                </span>
+                              </div>
+                              <div className="bg-black/50 p-2 rounded-lg border border-slate-800">
+                                <span className="text-[9px] text-slate-400 uppercase block font-bold">POST-SNIPE ODDS</span>
+                                <span className="text-xs text-emerald-400 font-extrabold truncate block mt-0.5">
+                                  {moonOddsPct}% / {jeetOddsPct}%
+                                </span>
+                              </div>
+                              <div className="bg-black/50 p-2 rounded-lg border border-slate-800">
+                                <span className="text-[9px] text-slate-400 uppercase block font-bold">MAX PAYOUT</span>
+                                <span className="text-xs text-neon-moon font-extrabold truncate block mt-0.5">
+                                  ${sharesReceived.toFixed(2)} USDC
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                  </div>
+                )}
+              </div>
+
+              {/* CARD 3: Complete Pre-Deployment Order Summary & Balance Check */}
               <div className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 space-y-4">
-                <h4 className="font-sans text-sm text-slate-900 dark:text-white font-extrabold uppercase flex items-center gap-2">
-                  <CheckCircle2 size={18} className="text-emerald-500" />
-                  <span>PRE-DEPLOYMENT ORDER SUMMARY</span>
-                </h4>
+                <div className="flex justify-between items-center">
+                  <h4 className="font-sans text-sm text-slate-900 dark:text-white font-extrabold uppercase flex items-center gap-2">
+                    <CheckCircle2 size={18} className="text-emerald-500" />
+                    <span>PRE-DEPLOYMENT ORDER SUMMARY</span>
+                  </h4>
+                  <span className="font-mono text-[10px] text-slate-400 uppercase">
+                    Chain: <strong>Avalanche Fuji</strong>
+                  </span>
+                </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
-                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">TARGET MARKET</span>
-                    <span className="text-slate-900 dark:text-white font-bold block truncate mt-0.5">
-                      {arenaType === 'token' ? (tokenInfo?.name || 'Chart Battle') : (debateName || 'Custom Event')}
-                    </span>
-                  </div>
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
-                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">ORACLE RESOLVER</span>
-                    <span className="text-emerald-500 font-bold block truncate mt-0.5">
-                      {selectedOracleId.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
-                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">EXPIRY TIME</span>
+                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">ROOM CREATION FEE</span>
                     <span className="text-slate-900 dark:text-white font-bold block mt-0.5">
-                      {(() => {
-                        const diffMs = new Date(expiryDate).getTime() - Date.now();
-                        const diffMins = Math.max(0, Math.floor(diffMs / 60000));
-                        if (diffMins >= 1440) return `${(diffMins / 1440).toFixed(1)} DAYS`;
-                        if (diffMins >= 60) return `${(diffMins / 60).toFixed(1)} HOURS`;
-                        return `${diffMins} MINS`;
-                      })()}
+                      $3.00 USDC
                     </span>
                   </div>
                   <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
-                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">INITIAL POT</span>
+                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">SEED LIQUIDITY (LP)</span>
+                    <span className="text-emerald-500 font-bold block mt-0.5">
+                      ${seedAmount} USDC (50/50)
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">DEV FIRST BUY</span>
                     <span className="text-amber-500 font-bold block mt-0.5">
-                      {seedAmount} USDC ({seedSide.toUpperCase()})
+                      {enableFirstBuy && snipeAmount > 0 ? `$${snipeAmount} USDC (${snipeSide.toUpperCase()})` : 'None ($0.00)'}
+                    </span>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-3 rounded-xl">
+                    <span className="text-slate-500 dark:text-slate-400 uppercase block font-bold text-[9px]">TOTAL REQUIRED</span>
+                    <span className="text-neon-moon font-extrabold block mt-0.5">
+                      ${(3 + seedAmount + (enableFirstBuy ? snipeAmount : 0)).toFixed(2)} USDC
                     </span>
                   </div>
                 </div>
+
+                {/* Ammo Balance Check Banner */}
+                {user && (
+                  <div className={`p-3 rounded-xl border flex items-center justify-between text-xs font-mono ${
+                    user.balance >= (3 + seedAmount + (enableFirstBuy ? snipeAmount : 0))
+                      ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                      : 'bg-rose-500/5 border-rose-500/20 text-rose-600 dark:text-rose-400'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <Coins size={15} />
+                      <span>
+                        Your Balance: <strong>{user.balance.toFixed(2)} USDC</strong> / Needed: <strong>${(3 + seedAmount + (enableFirstBuy ? snipeAmount : 0)).toFixed(2)} USDC</strong>
+                      </span>
+                    </div>
+                    {user.balance < (3 + seedAmount + (enableFirstBuy ? snipeAmount : 0)) && (
+                      <span className="font-bold uppercase text-[10px] bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/30">
+                        INSUFFICIENT FUNDS
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Wizard Nav & Submit Buttons */}
@@ -1523,7 +1877,7 @@ export default function CreateRoomPage() {
                 <button
                   type="submit"
                   disabled={isTransactionLoading}
-                  className="px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 disabled:cursor-not-allowed font-mono text-xs text-white rounded-xl shadow-md transition-all uppercase flex items-center justify-center gap-3 font-extrabold"
+                  className="px-8 py-3.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-slate-100 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 disabled:cursor-not-allowed font-mono text-xs text-white rounded-xl shadow-md transition-all uppercase flex items-center justify-center gap-3 font-extrabold cursor-pointer"
                 >
                   {isTransactionLoading ? (
                     <>
@@ -1533,7 +1887,7 @@ export default function CreateRoomPage() {
                   ) : (
                     <>
                       <PepePortrait src={PEPE_ASSETS.diamondHands} size={20} className="rounded-full" />
-                      <span>LAUNCH ARENA</span>
+                      <span>LAUNCH ARENA (${(3 + seedAmount + (enableFirstBuy ? snipeAmount : 0)).toFixed(0)} USDC)</span>
                     </>
                   )}
                 </button>

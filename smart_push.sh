@@ -11,20 +11,20 @@ cd "$(git rev-parse --show-toplevel)"
 git fetch origin
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCH 1: Contract addresses config + contract dual-copy ERC-1155 upgrade
+# BATCH 1: State store — createRoom initial snipe (Pump.fun anti-frontrun)
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 1: Config utility + ERC-1155 upgrade in both contract copies ---"
-git add src/utils/config.ts contracts/ShitMarketCore.sol evm/contracts/ShitMarketCore.sol
-git commit -m "feat(contracts): upgrade ShitMarketCore to ERC-1155 outcome tokens; centralise contract addresses
+echo "--- BATCH 1: useAppState — createRoom Pump.fun-style initial snipe/dev buy ---"
+git add src/store/useAppState.ts
+git commit -m "feat(state): add optional initialSnipe param to createRoom for Pump.fun-style anti-frontrun first buy
 
-- Inherit ERC1155 in ShitMarketCore; pass empty URI to constructor
-- Add getOutcomeTokenId(roomId, side) pure helper to derive deterministic token IDs
-- Mint ERC-1155 outcome tokens to bettor on placeBet; amount = USDC wagered
-- Refactor claimWinnings to use balanceOf() instead of Bet.claimed flag; burn tokens on claim
-- Handle Draw path (return 100% of token balance) and conditional bet.claimed backfill
-- Add CONTRACT_ADDRESSES const map to src/utils/config.ts (USDC, ORACLE_REGISTRY, MARKET_FACTORY, CONDITIONAL_TOKENS, AM_POOL_FACTORY, PREDICTION_ROUTER, CORE_CONTRACT)
-- Sync changes across both contracts/ and evm/contracts/ copies"
+- Extend createRoom signature with optional initialSnipe: { side: 'moon' | 'jeet', amount: number }
+- EVM path: after addLiquidity completes, execute buyShares(outcomeIdx, amountScaled) on the pool atomically
+- Record userBet locally and fire-and-forget POST to /api/bets indexer with txSignature
+- Toast progression: shows 'SECURING FIRST BUY POSITION' during snipe; non-fatal on failure (room still created)
+- Solana path: after room creation and fetchRooms, call placeBet(roomPda, side, amount) if initialSnipe set
+- Fix optimistic moonSeed/jeetSeed to include snipe bonus so room preview shows accurate opening reserves
+- Remove duplicate currentUser declaration (now hoisted earlier in EVM flow)"
 
 echo "Pushing batch 1..."
 git push origin main
@@ -34,17 +34,22 @@ echo "Waiting ${SLEEP_1}s before next batch..."
 sleep $SLEEP_1
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCH 2: App state — ABI extensions + replace inline address fallbacks
+# BATCH 2: Create-room UI — First Buy toggle + strike price config panel
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 2: useAppState — ABI additions + CONTRACT_ADDRESSES refactor ---"
-git add src/store/useAppState.ts
-git commit -m "refactor(state): centralise contract address resolution and extend ABIs
+echo "--- BATCH 2: Create-room UI — First Buy toggle and Entry/Strike Price panel ---"
+git add src/app/create-room/page.tsx
+git commit -m "feat(create-room): add First Buy (dev snipe) toggle and Entry/Strike Price configuration panel
 
-- Replace all inline process.env fallback address strings with CONTRACT_ADDRESSES from config.ts
-- Add resolveMarket, conditionToMarketId, and markets ABI entries to MARKET_FACTORY_ABI
-- Add isResolved and outcomeCounts view ABI entries to CONDITIONAL_TOKENS_ABI
-- Declare addAmmLiquidity and removeAmmLiquidity method signatures on AppState interface"
+- Add enableFirstBuy, snipeSide, snipeAmount state fields (Pump.fun-style optional initial position)
+- Compute totalRequiredUsdc = creation fee (3 USDC EVM / 0 Solana) + seedAmount + actualSnipeAmount for balance gate
+- Replace seedSide directional seed with neutral 50/50 seeding; snipe bonus added on top per side
+- Pass initialSnipe to createRoom when enableFirstBuy is toggled on and snipeAmount > 0
+- Remove old placeBet(seedSide) post-room call (now handled in state via initialSnipe)
+- Include moonLabel/jeetLabel in newRoom object so custom outcome labels are persisted from creation
+- Add 'Entry & Strike Price Configuration' panel: Live Market Spot (default) vs Custom Strike Price selector
+  - Live mode displays current DexScreener price badge with moon/jeet label hints
+  - Custom mode enables a target price input with quick-preset multipliers (+5%, +10%, +25%, +50%, ×2, -10%)"
 
 echo "Pushing batch 2..."
 git push origin main
@@ -54,92 +59,34 @@ echo "Waiting ${SLEEP_2}s before next batch..."
 sleep $SLEEP_2
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCH 3: Room detail page — Liquidity tab panel
+# BATCH 3: design.md + diagnostics_channel_mock.js
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 3: Room detail — LiquidityTabPanel component ---"
-git add "src/app/room/[id]/page.tsx"
-git commit -m "feat(room): add LiquidityTabPanel for AMM liquidity add/remove on EVM rooms
+echo "--- BATCH 3: design.md room lifecycle section + diagnostics channel mock fix ---"
+git add design.md diagnostics_channel_mock.js
+git commit -m "docs + fix: document room creation lifecycle in design.md and fix diagnostics_channel mock
 
-- Import publicClient, AM_POOL_ABI, AM_POOL_FACTORY_ABI from state store and CONTRACT_ADDRESSES from config
-- Add LiquidityTabPanel component: fetches user SM-LP balance every 10s from pool contract
-- Expose ADD USDC LIQUIDITY input (calls addAmmLiquidity) and REMOVE LP RESERVES input (calls removeAmmLiquidity)
-- Disabled states and loading flag prevent double-submits; balance gate prevents over-removal"
+- design.md: add section 4.4 'Room Creation & Seeding Lifecycle'
+  - Entry & Strike Price modes: Live Spot Baseline vs Custom Target/Strike Price (preset multipliers)
+  - Neutral 50/50 seeding: equal MOON + JEET reserves minted, creator receives all LP tokens
+  - Pump.fun-style anti-frontrun Dev Snipe: atomic buyShares after addLiquidity, MOON (Side 0) or JEET (Side 1)
+- diagnostics_channel_mock.js: rewrite to properly bridge native Node.js diagnostics_channel (dc.channel, dc.subscribe, etc.)
+  - Replace stub tracingChannel with createTracingChannel using real dc.channel per event type
+  - Delegate subscribe, unsubscribe, hasSubscribers to native dc equivalents with fallbacks
+  - Correctly export all aliases (tracingChannel, channel, hasSubscribers)"
 
 echo "Pushing batch 3..."
 git push origin main
 
-SLEEP_3=$(( 180 + RANDOM % 61 ))
-echo "Waiting ${SLEEP_3}s before next batch..."
-sleep $SLEEP_3
-
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCH 4: UMA Oracle integration contracts
+# BATCH 4: smart_push.sh — updated script
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 4: New UMA oracle adapter and mock OOv3 contracts ---"
-git add evm/contracts/UmaOracleAdapter.sol evm/contracts/MockOptimisticOracleV3.sol
-git commit -m "feat(contracts): add UmaOracleAdapter and MockOptimisticOracleV3 for dispute resolution
-
-- UmaOracleAdapter: implements IOracle; wraps UMA Optimistic Oracle v3 assertTruthWithDefaults
-  - assertOutcome() submits ANCILLARY_DATA claim to OOv3 and maps assertionId => marketId
-  - assertionResolvedCallback() receives settled truth state; records finalOutcomes and resolvedMarkets
-  - resolveMarket() callable after resolution to propagate winner to MarketFactory
-- MockOptimisticOracleV3: test-only OOv3 shim; stores assertions and allows manual settlement via resolveAssertion()"
+echo "--- BATCH 4: smart_push.sh — updated with current batch plan ---"
+git add smart_push.sh
+git commit -m "chore(scripts): update smart_push.sh with current release cycle batch plan"
 
 echo "Pushing batch 4..."
-git push origin main
-
-SLEEP_4=$(( 180 + RANDOM % 61 ))
-echo "Waiting ${SLEEP_4}s before next batch..."
-sleep $SLEEP_4
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BATCH 5: EVM test suite additions
-# ─────────────────────────────────────────────────────────────────────────────
-echo ""
-echo "--- BATCH 5: EVM test suites — ERC-1155 minting/burning and AMPool LP ---"
-git add evm/test/ShitMarketCore.test.js evm/test/AMPool.test.js evm/test/UmaOracleAdapter.test.js
-git commit -m "test(evm): add ERC-1155 outcome token tests, AMPool LP tests, and UMA adapter tests
-
-- ShitMarketCore.test.js: assert ERC-1155 tokens minted equal to bet amount on placeBet; assert tokens burned and USDC payout received on claimWinnings (Moon wins scenario)
-- AMPool.test.js: full LP lifecycle — deploy MarketFactory + AMPoolFactory, create condition, seed pool, verify LP token minting, swap conditional tokens, redeem via ConditionalTokens after settlement
-- UmaOracleAdapter.test.js: deploy MockOOv3 + UmaOracleAdapter, assert outcome through mock oracle, simulate callback resolution, verify finalOutcomes mapping updated"
-
-echo "Pushing batch 5..."
-git push origin main
-
-SLEEP_5=$(( 180 + RANDOM % 61 ))
-echo "Waiting ${SLEEP_5}s before next batch..."
-sleep $SLEEP_5
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BATCH 6: EVM utility scripts + roadmap doc
-# ─────────────────────────────────────────────────────────────────────────────
-echo ""
-echo "--- BATCH 6: EVM debug scripts and world-class market roadmap ---"
-git add evm/scripts/get_ct_address.js evm/scripts/simulate_add_lp.js world_class_market_roadmap.md
-git commit -m "chore(evm): add pool debug scripts and world-class market feature roadmap
-
-- evm/scripts/get_ct_address.js: reads conditionalTokens address from MarketFactory deployment
-- evm/scripts/simulate_add_lp.js: reads pool metadata (USDC, CT, conditionId), mints USDC, approves and addLiquidity against deployed AMPool for local testing
-- world_class_market_roadmap.md: documents roadmap gaps and proposed implementations for Gnosis CTF integration, UMA optimistic dispute resolution, and Circle CCTP / Across bridge cross-chain deposits"
-
-echo "Pushing batch 6..."
-git push origin main
-
-# ─────────────────────────────────────────────────────────────────────────────
-# BATCH 7: Scratch utility + smart_push.sh update
-# ─────────────────────────────────────────────────────────────────────────────
-echo ""
-echo "--- BATCH 7: Scratch debug script + push script update ---"
-git add scratch/get_ct_address.js smart_push.sh
-git commit -m "chore(scripts): add scratch CT address helper and update smart push script
-
-- scratch/get_ct_address.js: standalone conditional tokens address lookup via ethers RPC (mirrors evm/scripts version, used outside Hardhat context)
-- smart_push.sh: updated with current batch plan and accurate commit messages for this release cycle"
-
-echo "Pushing batch 7..."
 git push origin main
 
 echo ""

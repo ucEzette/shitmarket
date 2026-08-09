@@ -720,7 +720,7 @@ export interface AppState {
   updateSettings: (updates: Partial<AppState['settings']>) => void;
 
   isEvm: boolean;
-  createRoom: (room: Room, isSetPrice?: boolean) => Promise<any>;
+  createRoom: (room: Room, isSetPrice?: boolean, initialSnipe?: { side: 'moon' | 'jeet', amount: number }) => Promise<any>;
   placeBet: (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => Promise<any>;
   placeEvmBet: (roomId: string, side: 'moon' | 'jeet', amount: number) => Promise<any>;
   claimWinnings: (roomId: string) => Promise<any>;
@@ -1760,7 +1760,7 @@ export const useAppState = create<AppState>()(
     }
   },
 
-  createRoom: async (room: Room, isSetPrice?: boolean) => {
+  createRoom: async (room: Room, isSetPrice?: boolean, initialSnipe?: { side: 'moon' | 'jeet', amount: number }) => {
     const isEvmMode = process.env.NEXT_PUBLIC_CORE_CHAIN === 'avalanche';
     if (isEvmMode) {
       const { wallet, setTransactionLoading, setTransactionError } = get();
@@ -2033,15 +2033,82 @@ export const useAppState = create<AppState>()(
             });
             await publicClient.waitForTransactionReceipt({ hash: addLiquidityHash });
             console.log("AMPool seeding complete! Tx:", addLiquidityHash);
+
+            // Optional First Buy / Dev Snipe (Pump.fun style anti-frontrun)
+            if (initialSnipe && initialSnipe.amount > 0) {
+              try {
+                const snipeAmountScaled = BigInt(Math.round(initialSnipe.amount * 1e6));
+                const outcomeIdx = initialSnipe.side === 'moon' ? 0 : 1;
+                
+                get().updateToast(toastId, {
+                  type: 'loading',
+                  message: 'SECURING FIRST BUY POSITION',
+                  description: `Executing initial snipe for ${initialSnipe.amount} USDC on ${initialSnipe.side.toUpperCase()}...`
+                });
+
+                const { request: snipeReq } = await publicClient.simulateContract({
+                  address: targetPoolAddress as `0x${string}`,
+                  abi: AM_POOL_ABI,
+                  functionName: 'buyShares',
+                  args: [outcomeIdx, snipeAmountScaled],
+                  account: wallet.address as `0x${string}`
+                });
+                const snipeHash = await evmWalletClient.writeContract({
+                  ...snipeReq,
+                  gas: BigInt(800000)
+                });
+                await publicClient.waitForTransactionReceipt({ hash: snipeHash });
+                console.log("Initial snipe executed! Tx:", snipeHash);
+
+                // Record user bet locally & sync to indexer
+                const userBet = {
+                  id: `${actualRoomId}-${Date.now()}`,
+                  roomId: actualRoomId,
+                  side: initialSnipe.side,
+                  amount: initialSnipe.amount,
+                  shares: initialSnipe.amount * 1.5,
+                  pricePaid: 0.5,
+                  timestamp: Date.now(),
+                  user: wallet.address,
+                  claimed: false,
+                };
+                const currentUser = get().user;
+                if (currentUser) {
+                  const updatedUser = {
+                    ...currentUser,
+                    bets: [userBet, ...currentUser.bets]
+                  };
+                  set({ user: updatedUser });
+                }
+
+                fetch(`${INDEXER_URL}/api/bets`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    roomPubkey: actualRoomId,
+                    userPubkey: wallet.address,
+                    direction: initialSnipe.side === 'moon' ? 'MOON' : 'JEET',
+                    amount: initialSnipe.amount,
+                    shares: initialSnipe.amount * 1.5,
+                    txSignature: snipeHash
+                  })
+                }).catch(err => console.warn("Failed syncing initial snipe to indexer:", err));
+              } catch (snipeErr: any) {
+                console.error("Initial snipe failed:", snipeErr);
+                get().addToast("INITIAL SNIPE FAILED", "error", `Room created & seeded, but first buy failed: ${extractErrorMessage(snipeErr)}`);
+              }
+            }
           } catch (seedErr: any) {
             console.error("Failed to seed AMM pool during room creation:", seedErr);
             throw new Error(`Seeding AMM pool failed: ${extractErrorMessage(seedErr)}`);
           }
         }
 
-        // Two-Sided AMM Seeding: 100 USDC seeding mints 100 MOON + 100 JEET tokens into CPMM reserves
-        const moonSeed = room.moonPool || seedAmount;
-        const jeetSeed = room.jeetPool || seedAmount;
+        // Two-Sided AMM Seeding: seedAmount USDC seeding mints equal MOON + JEET tokens into CPMM reserves
+        const snipeBonusMoon = (initialSnipe && initialSnipe.side === 'moon' && initialSnipe.amount > 0) ? initialSnipe.amount : 0;
+        const snipeBonusJeet = (initialSnipe && initialSnipe.side === 'jeet' && initialSnipe.amount > 0) ? initialSnipe.amount : 0;
+        const moonSeed = (room.moonPool || seedAmount) + snipeBonusMoon;
+        const jeetSeed = (room.jeetPool || seedAmount) + snipeBonusJeet;
 
         const optimisticRoom: Room = {
           ...room,
@@ -2052,7 +2119,6 @@ export const useAppState = create<AppState>()(
         };
         const updatedRooms = [optimisticRoom, ...get().rooms.filter(r => !isSameRoom(r.id, optimisticRoom.id))];
         
-        const currentUser = get().user;
         set({
           rooms: updatedRooms
         });
@@ -2367,6 +2433,14 @@ export const useAppState = create<AppState>()(
       
       // Force refreshing the rooms list in the background
       get().fetchRooms();
+
+      if (initialSnipe && initialSnipe.amount > 0) {
+        try {
+          await get().placeBet(roomPda.toBase58(), initialSnipe.side, initialSnipe.amount, true);
+        } catch (snipeErr) {
+          console.warn("Solana initial snipe bet failed:", snipeErr);
+        }
+      }
 
       get().updateToast(toastId, {
         type: 'success',

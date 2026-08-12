@@ -767,12 +767,15 @@ roomsRouter.post('/:pubkey/chats', validate(roomPubkeyParamSchema, 'params'), as
 roomsRouter.get('/token-price/:mintAddress', async (req, res) => {
   try {
     const { mintAddress } = req.params;
-    const { pythFeedId } = req.query;
+    const { pythFeedId, pairAddress } = req.query;
     
     // Compute aggregated price utilizing all connected oracles (DexScreener, Birdeye, Jupiter, Chainlink, Pyth)
     const result = await aggregatePrice(
       mintAddress, 
-      pythFeedId as string | undefined
+      pythFeedId as string | undefined,
+      undefined,
+      undefined,
+      pairAddress as string | undefined
     );
     
     if (!result) {

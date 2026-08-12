@@ -77,8 +77,29 @@ export function getLookupAddress(tokenMint: string): string {
 
 // ─── Internal fetch helpers ───────────────────────────────────────────────────
 
-async function fetchDexScreener(tokenMint: string): Promise<number | null> {
+async function fetchDexScreener(tokenMint: string, pairAddress?: string): Promise<number | null> {
   try {
+    // Fast path: if we have the exact pair address, query it directly (more reliable for EVM/Avalanche)
+    if (pairAddress && pairAddress.startsWith('0x')) {
+      try {
+        const pairUrl = `${config.external.dexscreenerUrl}/pairs/${pairAddress}`;
+        const { data: pairData } = await axios.get(pairUrl, {
+          timeout: 5000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/json'
+          }
+        });
+        const pair = pairData?.pair || pairData?.pairs?.[0];
+        const pairPrice = parseFloat(pair?.priceUsd);
+        if (isFinite(pairPrice) && pairPrice > 0) {
+          return Math.round(pairPrice * USD_SCALE);
+        }
+      } catch {
+        // fall through to token address lookup below
+      }
+    }
+
     const lookupAddress = getLookupAddress(tokenMint);
     const url = `${config.external.dexscreenerUrl}/tokens/${lookupAddress}`;
     const { data } = await axios.get(url, { 
@@ -338,10 +359,11 @@ export async function aggregatePrice(
   tokenMint: string,
   pythFeedId?: string,
   historicalSamples?: PriceSample[],
-  twapWindowSeconds?: number
+  twapWindowSeconds?: number,
+  pairAddress?: string
 ): Promise<PriceResult | null> {
   const fetches: Promise<{ source: string; price: number | null }>[] = [
-    fetchDexScreener(tokenMint).then((p) => ({ source: 'dexscreener', price: p })),
+    fetchDexScreener(tokenMint, pairAddress).then((p) => ({ source: 'dexscreener', price: p })),
     fetchBirdeye(tokenMint).then((p) => ({ source: 'birdeye', price: p })),
     fetchJupiter(tokenMint).then((p) => ({ source: 'jupiter', price: p })),
     fetchChainlink(tokenMint).then((p) => ({ source: 'chainlink', price: p })),

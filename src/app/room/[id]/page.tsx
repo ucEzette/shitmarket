@@ -656,8 +656,11 @@ export default function RoomDetailPage() {
 
     const fetchLivePrice = async () => {
       try {
-        const queryParams = room.priceFeedId ? `?pythFeedId=${room.priceFeedId}` : '';
-        const indexerUrl = `${process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001'}/api/rooms/token-price/${room.token.address}${queryParams}`;
+        const params = new URLSearchParams();
+        if (room.priceFeedId) params.set('pythFeedId', room.priceFeedId);
+        if (room.token.pairAddress) params.set('pairAddress', room.token.pairAddress);
+        const qs = params.toString() ? `?${params.toString()}` : '';
+        const indexerUrl = `${process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001'}/api/rooms/token-price/${room.token.address}${qs}`;
         
         const res = await fetch(indexerUrl);
         if (res.ok) {
@@ -1521,7 +1524,7 @@ export default function RoomDetailPage() {
               }
             </h1>
 
-            <p className="font-sans text-sm text-slate-500 dark:text-slate-400 max-w-4xl leading-relaxed">
+            <p className="font-sans text-sm text-slate-500 dark:text-slate-400 max-w-4xl leading-relaxed" suppressHydrationWarning>
               {room.resolutionCriteria 
                 ? `This market resolves according to the following condition: "${room.resolutionCriteria.split('| Ref:')[0].trim()}"` 
                 : `This market resolves YES if the price of ${room.token.symbol} closes above $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} on resolution target time ${new Date(expirySafe).toLocaleString()}, as reported by oracle price feeds.`
@@ -1570,10 +1573,30 @@ export default function RoomDetailPage() {
                 <span>Ends:</span>
                 <span className="text-slate-800 dark:text-slate-350 font-bold">{countdownText}</span>
               </div>
-              <div className="flex items-center gap-1.5 select-all cursor-pointer hover:text-emerald-500 transition-colors" title="Copy Address">
-                <span>Address:</span>
+              <div 
+                onClick={() => {
+                  navigator.clipboard.writeText(room.id);
+                  addToast("ROOM CONTRACT COPIED!", 'success');
+                }}
+                className="flex items-center gap-1.5 select-all cursor-pointer hover:text-emerald-500 transition-colors" 
+                title={`Copy Room CA: ${room.id}`}
+              >
+                <span>Room CA:</span>
                 <span className="text-slate-800 dark:text-slate-350 font-bold">{room.id.slice(0, 6)}...{room.id.slice(-4)}</span>
               </div>
+              {!isDebateMarket && room.token.address && (
+                <div 
+                  onClick={() => {
+                    navigator.clipboard.writeText(room.token.address);
+                    addToast("TOKEN CONTRACT COPIED!", 'success');
+                  }}
+                  className="flex items-center gap-1.5 select-all cursor-pointer hover:text-emerald-500 transition-colors" 
+                  title={`Copy Token CA: ${room.token.address}`}
+                >
+                  <span>Token CA:</span>
+                  <span className="text-slate-800 dark:text-slate-350 font-bold">{room.token.address.slice(0, 6)}...{room.token.address.slice(-4)}</span>
+                </div>
+              )}
               <div className="flex items-center gap-1">
                 <span>Volume:</span>
                 <span className="text-slate-800 dark:text-slate-350 font-bold">{totalPotSafe.toFixed(2)} USDC</span>

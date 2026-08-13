@@ -311,49 +311,6 @@ export default function RoomsPage() {
             : 'border-red-600/30 dark:border-jeet-red/30 dark:shadow-none hover:border-rose-600 dark:hover:border-jeet-red/70 dark:hover:shadow-[0_0_20px_rgba(244,63,94,0.15)]'
         }`}
       >
-        {/* Action Buttons Top Right */}
-        <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
-          {/* Bookmark Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              toggleBookmark(room.id);
-              synthSound('bet');
-            }}
-            className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
-              watchlistedIds.includes(room.id)
-                ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 fill-emerald-500 dark:fill-emerald-400'
-                : 'bg-white/80 dark:bg-trench-black border-slate-200 dark:border-trench-sandbag/40 hover:bg-slate-100 dark:hover:bg-trench-black/85'
-            }`}
-            title={watchlistedIds.includes(room.id) ? "Remove Bookmark" : "Bookmark Room"}
-          >
-            <Bookmark size={12} className={watchlistedIds.includes(room.id) ? "fill-current" : ""} />
-          </button>
-
-          {/* Parlay Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              if (isInParlay) {
-                removeLegFromParlay(room.id);
-              } else {
-                addLegToParlay(room.id, room.moonPool > room.jeetPool ? 'moon' : 'jeet');
-              }
-              synthSound('bet');
-            }}
-            className={`p-1.5 rounded-lg border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
-              isInParlay
-                ? 'bg-teal-50 dark:bg-emerald-950/30 border-teal-500/40 dark:border-green-600/30 text-teal-600 dark:text-emerald-400'
-                : 'bg-white/80 dark:bg-trench-black border-slate-200 dark:border-trench-sandbag/40 hover:bg-slate-100 dark:hover:bg-trench-black/85'
-            }`}
-            title={isInParlay ? "Remove from Parlay" : "Add to Parlay"}
-          >
-            <Layers size={12} />
-          </button>
-        </div>
-
         {/* Card Header */}
         <div className="flex items-start justify-between gap-3 mb-4">
           <div className="flex items-start gap-3">
@@ -381,25 +338,51 @@ export default function RoomsPage() {
               )}
             </div>
             {/* Question */}
-            <div className="min-w-0 pr-16">
-              <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 line-clamp-2 leading-snug tracking-wide group-hover:text-teal-700 dark:group-hover:text-white transition-colors">
+            <div className="min-w-0 pr-0 overflow-hidden">
+              <h4 className="font-bold text-sm text-slate-900 dark:text-slate-100 leading-snug tracking-wide group-hover:text-teal-700 dark:group-hover:text-white transition-colors overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', wordBreak: 'break-word' }}>
                 {isDebateRoom 
-                  ? (room.resolutionCriteria ? room.resolutionCriteria.split('| Ref:')[0].split('Ref:')[0].trim() : room.token.name)
+                  ? (() => {
+                      const raw = room.token.name || 'Prediction Market';
+                      // Strip any resolution criteria text that may have been concatenated into tokenName.
+                      // Pattern: "[TITLE] Some description..." → extract "[TITLE]" or the text before first ". "
+                      const bracketMatch = raw.match(/^(\[.+?\])/);
+                      if (bracketMatch) return bracketMatch[1].replace(/[\[\]]/g, '').trim();
+                      // Fall back: take text before first period-space or pipe
+                      const cutIdx = raw.search(/\.\s+[A-Z]|\s*[|]\s*/);
+                      return cutIdx > 10 ? raw.slice(0, cutIdx).trim() : raw;
+                    })()
                   : `Will ${room.token.symbol.startsWith('$') ? room.token.symbol.toUpperCase() : `$${room.token.symbol.toUpperCase()}`} end above ${room.openingPrice !== undefined && formatPrice(room.openingPrice) !== 'N/A' ? `$${formatPrice(room.openingPrice)}` : '$1.00'}?`}
               </h4>
-              {!isDebateRoom && room.token.address && (
-                <span 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(room.token.address);
-                    addToast("CONTRACT COPIED!", 'success');
-                  }}
-                  className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask hover:text-slate-800 dark:hover:text-slate-300 transition-colors cursor-pointer select-all truncate mt-0.5 inline-block max-w-[150px]"
-                  title="Click to copy CA"
-                >
-                  CA: {room.token.address.slice(0, 6)}...{room.token.address.slice(-4)}
-                </span>
-              )}
+              <div className="flex items-center gap-2 mt-0.5">
+                {room.token.address && !isDebateRoom && (
+                  <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      navigator.clipboard.writeText(room.token.address);
+                      addToast("TOKEN CONTRACT COPIED!", 'success');
+                    }}
+                    className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask hover:text-slate-800 dark:hover:text-slate-350 transition-colors cursor-pointer select-all truncate inline-block max-w-[120px]"
+                    title={`Click to copy Token CA: ${room.token.address}`}
+                  >
+                    TOKEN: {room.token.address.slice(0, 6)}...{room.token.address.slice(-4)}
+                  </span>
+                )}
+                {room.id && (
+                  <span 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      navigator.clipboard.writeText(room.id);
+                      addToast("ROOM CONTRACT COPIED!", 'success');
+                    }}
+                    className="font-mono text-[9px] text-slate-500 dark:text-trench-gasmask hover:text-slate-800 dark:hover:text-slate-350 transition-colors cursor-pointer select-all truncate inline-block max-w-[120px]"
+                    title={`Click to copy Room CA: ${room.id}`}
+                  >
+                    ROOM: {room.id.slice(0, 6)}...{room.id.slice(-4)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -484,7 +467,7 @@ export default function RoomsPage() {
         {/* Card Footer */}
         <div className="flex items-center justify-between border-t border-cyan-200 dark:border-trench-sandbag/40 pt-3 mt-auto text-[10px] font-mono text-slate-600 dark:text-trench-gasmask">
           {/* Left Info Badges */}
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap max-w-[75%]">
             {/* Market Type / Network Tag */}
             {(() => {
               const isDebate = (room.category as string) === 'debate' || 
@@ -534,6 +517,49 @@ export default function RoomsPage() {
               </div>
             )}
           </div>
+
+          {/* Action Buttons Right aligned */}
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Bookmark Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                toggleBookmark(room.id);
+                synthSound('bet');
+              }}
+              className={`p-1 rounded-md border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
+                watchlistedIds.includes(room.id)
+                  ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 fill-emerald-500 dark:fill-emerald-400'
+                  : 'bg-white/80 dark:bg-trench-black border-slate-200 dark:border-trench-sandbag/40 hover:bg-slate-100 dark:hover:bg-trench-black/85'
+              }`}
+              title={watchlistedIds.includes(room.id) ? "Remove Bookmark" : "Bookmark Room"}
+            >
+              <Bookmark size={10} className={watchlistedIds.includes(room.id) ? "fill-current" : ""} />
+            </button>
+
+            {/* Parlay Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                if (isInParlay) {
+                  removeLegFromParlay(room.id);
+                } else {
+                  addLegToParlay(room.id, room.moonPool > room.jeetPool ? 'moon' : 'jeet');
+                }
+                synthSound('bet');
+              }}
+              className={`p-1 rounded-md border transition-all text-slate-500 hover:text-slate-850 dark:text-slate-400 dark:hover:text-white ${
+                isInParlay
+                  ? 'bg-teal-50 dark:bg-emerald-950/30 border-teal-500/40 dark:border-green-600/30 text-teal-600 dark:text-emerald-400'
+                  : 'bg-white/80 dark:bg-trench-black border-slate-200 dark:border-trench-sandbag/40 hover:bg-slate-100 dark:hover:bg-trench-black/85'
+              }`}
+              title={isInParlay ? "Remove from Parlay" : "Add to Parlay"}
+            >
+              <Layers size={10} />
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -555,6 +581,14 @@ export default function RoomsPage() {
   );
 
   const filteredRooms = getFilteredAndSortedRooms();
+
+  if (!mounted) {
+    return (
+      <div className="w-full px-4 md:px-8 py-6 flex-1 flex flex-col items-center justify-center min-h-[60vh] font-mono text-xs uppercase tracking-widest text-trench-gasmask animate-pulse">
+        <span>ESTABLISHING TARGET SCAN... SECURING ENCRYPTED LINK</span>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full px-4 md:px-8 py-6 flex-1 flex flex-col select-none max-w-full">

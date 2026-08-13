@@ -561,10 +561,11 @@ export default function CreateRoomPage() {
     }
 
     // Neutral 50/50 starting reserves + optional snipe bonus
+    const halfSeed = seedAmount / 2;
     const snipeMoonBonus = (enableFirstBuy && snipeSide === 'moon') ? actualSnipeAmount : 0;
     const snipeJeetBonus = (enableFirstBuy && snipeSide === 'jeet') ? actualSnipeAmount : 0;
-    const moonSeed = seedAmount + snipeMoonBonus;
-    const jeetSeed = seedAmount + snipeJeetBonus;
+    const moonSeed = halfSeed + snipeMoonBonus;
+    const jeetSeed = halfSeed + snipeJeetBonus;
 
     const targetOpeningPrice = arenaType === 'debate' 
       ? 1.0 

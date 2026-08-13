@@ -1884,7 +1884,9 @@ export const useAppState = create<AppState>()(
         }
 
         // On-chain pool seeding logic for EVM
-        const seedAmount = Number(room.moonPool || 0) + Number(room.jeetPool || 0);
+        const snipeMoonBonus = (initialSnipe && initialSnipe.side === 'moon' && initialSnipe.amount > 0) ? initialSnipe.amount : 0;
+        const snipeJeetBonus = (initialSnipe && initialSnipe.side === 'jeet' && initialSnipe.amount > 0) ? initialSnipe.amount : 0;
+        const seedAmount = (Number(room.moonPool || 0) - snipeMoonBonus) + (Number(room.jeetPool || 0) - snipeJeetBonus);
         const seedAmountScaled = BigInt(Math.round(seedAmount * 1e6));
 
         if (seedAmountScaled > BigInt(0)) {
@@ -2081,16 +2083,14 @@ export const useAppState = create<AppState>()(
                   set({ user: updatedUser });
                 }
 
-                fetch(`${INDEXER_URL}/api/bets`, {
+                fetch(`${INDEXER_URL}/api/rooms/${actualRoomId}/bets`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    roomPubkey: actualRoomId,
                     userPubkey: wallet.address,
-                    direction: initialSnipe.side === 'moon' ? 'MOON' : 'JEET',
-                    amount: initialSnipe.amount,
-                    shares: initialSnipe.amount * 1.5,
-                    txSignature: snipeHash
+                    side: initialSnipe.side,
+                    amount: Math.round(initialSnipe.amount * 1e6),
+                    txSig: snipeHash
                   })
                 }).catch(err => console.warn("Failed syncing initial snipe to indexer:", err));
               } catch (snipeErr: any) {
@@ -2105,10 +2105,11 @@ export const useAppState = create<AppState>()(
         }
 
         // Two-Sided AMM Seeding: seedAmount USDC seeding mints equal MOON + JEET tokens into CPMM reserves
+        const halfSeed = seedAmount / 2;
         const snipeBonusMoon = (initialSnipe && initialSnipe.side === 'moon' && initialSnipe.amount > 0) ? initialSnipe.amount : 0;
         const snipeBonusJeet = (initialSnipe && initialSnipe.side === 'jeet' && initialSnipe.amount > 0) ? initialSnipe.amount : 0;
-        const moonSeed = (room.moonPool || seedAmount) + snipeBonusMoon;
-        const jeetSeed = (room.jeetPool || seedAmount) + snipeBonusJeet;
+        const moonSeed = halfSeed + snipeBonusMoon;
+        const jeetSeed = halfSeed + snipeBonusJeet;
 
         const optimisticRoom: Room = {
           ...room,

@@ -401,12 +401,32 @@ export default function RoomDetailPage() {
     return () => clearInterval(timer);
   }, [room?.status, room?.settlementTimestamp]);
 
+  const isEvm = room?.id?.startsWith('0x') || room?.token?.chainId === 'avalanche';
+
   // Bulletproof safety parsers for all numeric room fields
-  const moonPoolSafe = typeof room?.moonPool === 'number' ? room.moonPool : parseFloat(room?.moonPool as any) || 0;
-  const jeetPoolSafe = typeof room?.jeetPool === 'number' ? room.jeetPool : parseFloat(room?.jeetPool as any) || 0;
+  const rawMoonPool = typeof room?.moonPool === 'number' ? room.moonPool : parseFloat(room?.moonPool as any) || 0;
+  const rawJeetPool = typeof room?.jeetPool === 'number' ? room.jeetPool : parseFloat(room?.jeetPool as any) || 0;
+  
+  // For EVM CPMM pools, the actual USDC value of each reserve side is reserves * price.
+  // Starting at 50/50, $500 USDC seed creates 500 YES + 500 NO reserves (worth $250 each).
+  // We divide the reserve count by 2 (or multiply by price) to show the correct USDC value.
+  const moonPoolSafe = isEvm 
+    ? (rawMoonPool + rawJeetPool > 0 ? rawMoonPool * (rawJeetPool / (rawMoonPool + rawJeetPool)) : 0)
+    : rawMoonPool;
+  const jeetPoolSafe = isEvm 
+    ? (rawMoonPool + rawJeetPool > 0 ? rawJeetPool * (rawMoonPool / (rawMoonPool + rawJeetPool)) : 0)
+    : rawJeetPool;
+
   const totalPotSafe = moonPoolSafe + jeetPoolSafe;
-  const moonPercentageSafe = totalPotSafe > 0 ? (moonPoolSafe / totalPotSafe) * 100 : 50;
-  const jeetPercentageSafe = totalPotSafe > 0 ? (jeetPoolSafe / totalPotSafe) * 100 : 50;
+
+  // Implied odds / percentages are calculated based on the market price (ratio of reserves).
+  // For EVM: price of Moon = jeetPool / (moonPool + jeetPool).
+  const moonPercentageSafe = (rawMoonPool + rawJeetPool) > 0 
+    ? (rawJeetPool / (rawMoonPool + rawJeetPool)) * 100 
+    : 50;
+  const jeetPercentageSafe = (rawMoonPool + rawJeetPool) > 0 
+    ? (rawMoonPool / (rawMoonPool + rawJeetPool)) * 100 
+    : 50;
 
   const openingPriceSafe = typeof room?.openingPrice === 'number' ? room.openingPrice : room?.openingPrice ? parseFloat(room.openingPrice as any) || 0 : undefined;
   const finalPriceSafe = typeof room?.finalPrice === 'number' ? room.finalPrice : room?.finalPrice ? parseFloat(room.finalPrice as any) || 0 : undefined;
@@ -1525,10 +1545,22 @@ export default function RoomDetailPage() {
             </h1>
 
             <p className="font-sans text-sm text-slate-500 dark:text-slate-400 max-w-4xl leading-relaxed" suppressHydrationWarning>
-              {room.resolutionCriteria 
-                ? `This market resolves according to the following condition: "${room.resolutionCriteria.split('| Ref:')[0].trim()}"` 
-                : `This market resolves YES if the price of ${room.token.symbol} closes above $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} on resolution target time ${new Date(expirySafe).toLocaleString()}, as reported by oracle price feeds.`
-              }
+              {!isDebateMarket ? (
+                <>
+                  This market resolves YES if the price of <strong>{room.token.symbol}</strong> closes above <strong>${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}</strong> at the resolution target time of <strong>{new Date(expirySafe).toLocaleString()}</strong>, as reported by oracle price feeds.
+                  {room.resolutionCriteria && 
+                   room.resolutionCriteria.trim().toUpperCase() !== room.token.symbol.toUpperCase() && 
+                   room.resolutionCriteria.trim().toUpperCase() !== room.token.name.toUpperCase() && (
+                    <span className="block mt-2 text-xs text-slate-400 dark:text-slate-500">
+                      Additional Criteria: "{room.resolutionCriteria.split('| Ref:')[0].trim()}"
+                    </span>
+                  )}
+                </>
+              ) : (
+                room.resolutionCriteria 
+                  ? `This market resolves according to the following condition: "${room.resolutionCriteria.split('| Ref:')[0].trim()}"` 
+                  : `This market resolves YES if the target criteria is met before the expiry date.`
+              )}
             </p>
 
             {/* Crypto Market Live Price Trackers */}

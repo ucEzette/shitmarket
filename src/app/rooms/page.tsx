@@ -291,10 +291,27 @@ export default function RoomsPage() {
       (!!room.resolutionCriteria && room.resolutionCriteria.length > 0 && (!room.token.pairAddress || room.token.pairAddress === '')) ||
       room.token.address === room.creator;
 
-    const isMoonLeading = room.moonPool > room.jeetPool;
-    const totalPot = room.moonPool + room.jeetPool;
-    const moonPercentage = totalPot > 0 ? (room.moonPool / totalPot) * 100 : 50;
-    const jeetPercentage = totalPot > 0 ? (room.jeetPool / totalPot) * 100 : 50;
+    const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
+    const rawMoon = room.moonPool;
+    const rawJeet = room.jeetPool;
+    
+    const moonPoolVal = isEvm 
+      ? (rawMoon + rawJeet > 0 ? rawMoon * (rawJeet / (rawMoon + rawJeet)) : 0)
+      : rawMoon;
+    const jeetPoolVal = isEvm 
+      ? (rawMoon + rawJeet > 0 ? rawJeet * (rawMoon / (rawMoon + rawJeet)) : 0)
+      : rawJeet;
+
+    const totalPot = moonPoolVal + jeetPoolVal;
+    
+    // For EVM: Moon price increases as YES reserve (rawMoon) decreases
+    const isMoonLeading = isEvm ? rawJeet > rawMoon : rawMoon > rawJeet;
+    const moonPercentage = isEvm 
+      ? ((rawMoon + rawJeet) > 0 ? (rawJeet / (rawMoon + rawJeet)) * 100 : 50)
+      : (totalPot > 0 ? (moonPoolVal / totalPot) * 100 : 50);
+    const jeetPercentage = isEvm
+      ? ((rawMoon + rawJeet) > 0 ? (rawMoon / (rawMoon + rawJeet)) * 100 : 50)
+      : (totalPot > 0 ? (jeetPoolVal / totalPot) * 100 : 50);
 
     const timeText = timeRemainingText[room.id] || '00:00:00';
     const isSettled = room.status === 'settled';

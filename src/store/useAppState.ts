@@ -1803,10 +1803,34 @@ export const useAppState = create<AppState>()(
         const usdcAddress = CONTRACT_ADDRESSES.USDC;
         const resolutionTime = BigInt(Math.floor(room.expiry / 1000));
         
-        // Check allowance for MarketFactory creation fee (3 USDC)
+        // Check allowance for MarketFactory creation fee (dynamically retrieved from contract to prevent mismatches)
         try {
+          const factoryUsdcAddress = await publicClient.readContract({
+            address: marketFactoryAddress,
+            abi: [{
+              name: 'usdcToken',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [],
+              outputs: [{ name: '', type: 'address' }]
+            }] as const,
+            functionName: 'usdcToken'
+          }) as `0x${string}`;
+
+          const factoryCreationFee = await publicClient.readContract({
+            address: marketFactoryAddress,
+            abi: [{
+              name: 'creationFee',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [],
+              outputs: [{ name: '', type: 'uint256' }]
+            }] as const,
+            functionName: 'creationFee'
+          }) as bigint;
+
           const factoryAllowance = await publicClient.readContract({
-            address: usdcAddress,
+            address: factoryUsdcAddress,
             abi: [{
               name: 'allowance',
               type: 'function',
@@ -1818,14 +1842,14 @@ export const useAppState = create<AppState>()(
             args: [wallet.address as `0x${string}`, marketFactoryAddress]
           });
 
-          if (factoryAllowance < BigInt(3_000_000)) {
+          if (factoryAllowance < factoryCreationFee) {
             get().updateToast(toastId, {
               type: 'loading',
               message: 'APPROVING CREATION FEE',
               description: `Approving USDC creation fee to Market Factory...`
             });
             const { request: approveFactoryReq } = await publicClient.simulateContract({
-              address: usdcAddress,
+              address: factoryUsdcAddress,
               abi: [{
                 name: 'approve',
                 type: 'function',
@@ -1843,8 +1867,9 @@ export const useAppState = create<AppState>()(
             });
             await publicClient.waitForTransactionReceipt({ hash: approveFactoryHash });
           }
-        } catch (allowanceErr) {
-          console.warn("Failed checking factory allowance:", allowanceErr);
+        } catch (allowanceErr: any) {
+          console.error("Failed checking/approving factory allowance:", allowanceErr);
+          throw new Error(`Failed USDC allowance check/approval for Market Factory: ${allowanceErr?.message || allowanceErr}`);
         }
 
         const { request } = await publicClient.simulateContract({

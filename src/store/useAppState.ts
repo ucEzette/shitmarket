@@ -1693,7 +1693,7 @@ export const useAppState = create<AppState>()(
         const nativeBalBigInt = await publicClient.getBalance({ address: wallet.address as `0x${string}` });
         const avaxBal = Number(nativeBalBigInt) / 1e18;
 
-        const usdcAddress = process.env.NEXT_PUBLIC_USDC_TOKEN_ADDRESS as `0x${string}`;
+        const usdcAddress = CONTRACT_ADDRESSES.USDC;
         let usdcBal = 0;
         if (usdcAddress) {
           try {

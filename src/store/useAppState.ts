@@ -1861,9 +1861,13 @@ export const useAppState = create<AppState>()(
               args: [marketFactoryAddress, BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935')],
               account: wallet.address as `0x${string}`
             });
+            const approveNonce = await publicClient.getTransactionCount({
+              address: wallet.address as `0x${string}`
+            });
             const approveFactoryHash = await evmWalletClient.writeContract({
               ...approveFactoryReq,
-              gas: BigInt(100000)
+              gas: BigInt(100000),
+              nonce: approveNonce
             });
             await publicClient.waitForTransactionReceipt({ hash: approveFactoryHash });
           }
@@ -1886,9 +1890,13 @@ export const useAppState = create<AppState>()(
           account: wallet.address as `0x${string}`
         });
         
+        const createMarketNonce = await publicClient.getTransactionCount({
+          address: wallet.address as `0x${string}`
+        });
         const txHash = await evmWalletClient.writeContract({
           ...request,
-          gas: BigInt(500000)
+          gas: BigInt(500000),
+          nonce: createMarketNonce
         });
         console.log("EVM Room created! Tx:", txHash);
         

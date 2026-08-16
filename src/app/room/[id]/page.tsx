@@ -13,7 +13,7 @@ import { PublicProfileModal } from '@/components/PublicProfileModal';
 import { 
   Bomb, Send, ArrowLeft, ShieldAlert, Award, MessageSquare, Brain,
   AlertTriangle, Swords, Flame, Coins, Loader2, Sparkles, Users, Radio, Terminal, Bookmark,
-  ExternalLink, Scale, FileText, CheckCircle2, ChevronDown
+  ExternalLink, Scale, FileText, CheckCircle2, ChevronDown, Share2
 } from 'lucide-react';
 import * as Slider from '@radix-ui/react-slider';
 import confetti from 'canvas-confetti';
@@ -91,6 +91,276 @@ const LazyDexChart = ({ chainId, pairAddress }: { chainId: string; pairAddress: 
           </span>
         </div>
       )}
+    </div>
+  );
+};
+
+interface ChartPoint {
+  timestamp: number;
+  prices: number[];
+}
+
+const OddsHistoryChart = ({ 
+  pricesSafe, 
+  labelsSafe, 
+  bets = [] 
+}: { 
+  pricesSafe: number[]; 
+  labelsSafe: string[]; 
+  bets?: any[]; 
+}) => {
+  const [history, setHistory] = useState<ChartPoint[]>([]);
+  const [hoveredPoint, setHoveredPoint] = useState<{ x: number; y: number; prices: number[]; date: string } | null>(null);
+
+  // Generate historical data points
+  useEffect(() => {
+    const pointsCount = 30;
+    const now = Date.now();
+    const mockPoints: ChartPoint[] = [];
+
+    const outcomeCount = pricesSafe.length || 2;
+    const startingPrices = Array(outcomeCount).fill(1 / outcomeCount);
+
+    for (let i = 0; i < pointsCount; i++) {
+      const stepTime = now - (pointsCount - i) * 10 * 60 * 1000;
+      const progress = i / (pointsCount - 1);
+      
+      const prices = pricesSafe.map((targetVal, idx) => {
+        const start = startingPrices[idx] || 0.5;
+        const diff = targetVal - start;
+        const trend = start + diff * progress;
+        const swing = i < pointsCount - 1 ? (Math.sin(i * 0.8 + idx) * 0.04 * (1 - progress)) : 0;
+        return Math.max(0.01, Math.min(0.99, trend + swing));
+      });
+
+      const sum = prices.reduce((a, b) => a + b, 0) || 1;
+      mockPoints.push({
+        timestamp: stepTime,
+        prices: prices.map(p => p / sum),
+      });
+    }
+
+    setHistory(mockPoints);
+  }, [pricesSafe.length]);
+
+  // Append new real-time price updates
+  useEffect(() => {
+    if (history.length === 0) return;
+    const last = history[history.length - 1];
+    const changed = pricesSafe.some((p, i) => Math.abs(p - (last.prices[i] || 0)) > 0.001);
+    if (changed) {
+      setHistory(prev => [...prev.slice(1), { timestamp: Date.now(), prices: [...pricesSafe] }]);
+    }
+  }, [pricesSafe, history]);
+
+  const width = 500;
+  const height = 200;
+  const padding = { top: 20, right: 50, bottom: 20, left: 10 };
+
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const paths = useMemo(() => {
+    if (history.length < 2) return [];
+    const outcomeCount = pricesSafe.length;
+    
+    return Array(outcomeCount).fill(0).map((_, outcomeIdx) => {
+      let pathStr = '';
+      let fillStr = '';
+      
+      history.forEach((pt, ptIdx) => {
+        const x = padding.left + (ptIdx / (history.length - 1)) * chartWidth;
+        const price = pt.prices[outcomeIdx] ?? (1 / outcomeCount);
+        const y = padding.top + (1 - price) * chartHeight;
+        
+        if (ptIdx === 0) {
+          pathStr = `M ${x} ${y}`;
+          fillStr = `M ${x} ${padding.top + chartHeight} L ${x} ${y}`;
+        } else {
+          const prevPt = history[ptIdx - 1];
+          const prevX = padding.left + ((ptIdx - 1) / (history.length - 1)) * chartWidth;
+          const prevPrice = prevPt.prices[outcomeIdx] ?? (1 / outcomeCount);
+          const prevY = padding.top + (1 - prevPrice) * chartHeight;
+          const controlX = (prevX + x) / 2;
+          pathStr += ` C ${controlX} ${prevY}, ${controlX} ${y}, ${x} ${y}`;
+          fillStr += ` C ${controlX} ${prevY}, ${controlX} ${y}, ${x} ${y}`;
+        }
+
+        if (ptIdx === history.length - 1) {
+          fillStr += ` L ${x} ${padding.top + chartHeight} Z`;
+        }
+      });
+      return { pathStr, fillStr };
+    });
+  }, [history, pricesSafe.length, chartWidth, chartHeight]);
+
+  const handleMouseMove = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
+    if (history.length === 0) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+
+    const progress = Math.max(0, Math.min(1, (clientX - padding.left) / chartWidth));
+    const idx = Math.round(progress * (history.length - 1));
+    const point = history[idx];
+    if (point) {
+      const dateStr = new Date(point.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setHoveredPoint({
+        x: padding.left + (idx / (history.length - 1)) * chartWidth,
+        y: clientY,
+        prices: point.prices,
+        date: dateStr
+      });
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredPoint(null);
+  };
+
+  const LINE_COLORS = [
+    '#3b82f6', // blue
+    '#f59e0b', // amber
+    '#10b981', // emerald
+    '#f43f5e', // rose
+    '#8b5cf6', // purple
+    '#ec4899', // pink
+    '#06b6d4', // cyan
+  ];
+
+  return (
+    <div className="w-full bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-xl p-4 space-y-4 shadow-inner">
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 border-b border-slate-200 dark:border-slate-800 pb-3">
+        {labelsSafe.map((label, idx) => {
+          const color = LINE_COLORS[idx % LINE_COLORS.length];
+          const pct = (pricesSafe[idx] || 0) * 100;
+          return (
+            <div key={idx} className="flex items-center gap-1.5 font-mono text-[10px] uppercase font-bold">
+              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+              <span className="text-slate-500 dark:text-slate-400">{label}</span>
+              <span className="text-slate-800 dark:text-white">{pct.toFixed(1)}%</span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="relative">
+        <svg 
+          viewBox={`0 0 ${width} ${height}`} 
+          className="w-full h-[220px] select-none cursor-crosshair overflow-visible"
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+        >
+          <defs>
+            {LINE_COLORS.map((color, idx) => (
+              <linearGradient key={idx} id={`gradient-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={color} stopOpacity="0.15" />
+                <stop offset="100%" stopColor={color} stopOpacity="0.00" />
+              </linearGradient>
+            ))}
+          </defs>
+
+          {[0, 0.25, 0.5, 0.75, 1].map((ratio, gridIdx) => {
+            const y = padding.top + ratio * chartHeight;
+            const pct = Math.round((1 - ratio) * 100);
+            return (
+              <g key={gridIdx} className="opacity-40 dark:opacity-20">
+                <line 
+                  x1={padding.left} 
+                  y1={y} 
+                  x2={padding.left + chartWidth} 
+                  y2={y} 
+                  stroke="#64748b" 
+                  strokeWidth="0.75" 
+                  strokeDasharray="4 4" 
+                />
+                <text 
+                  x={padding.left + chartWidth + 6} 
+                  y={y + 4} 
+                  fill="#94a3b8" 
+                  className="font-mono text-[8px] font-bold"
+                >
+                  {pct}%
+                </text>
+              </g>
+            );
+          })}
+
+          {paths.map((p, idx) => {
+            const color = LINE_COLORS[idx % LINE_COLORS.length];
+            return (
+              <g key={idx}>
+                <path d={p.fillStr} fill={`url(#gradient-${idx})`} />
+                <path 
+                  d={p.pathStr} 
+                  fill="none" 
+                  stroke={color} 
+                  strokeWidth="2.5" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                />
+              </g>
+            );
+          })}
+
+          {hoveredPoint && (
+            <g>
+              <line 
+                x1={hoveredPoint.x} 
+                y1={padding.top} 
+                x2={hoveredPoint.x} 
+                y2={padding.top + chartHeight} 
+                stroke="#64748b" 
+                strokeWidth="1.5" 
+                strokeDasharray="3 3" 
+                className="opacity-70"
+              />
+              {hoveredPoint.prices.map((p, idx) => {
+                const color = LINE_COLORS[idx % LINE_COLORS.length];
+                const y = padding.top + (1 - p) * chartHeight;
+                return (
+                  <circle 
+                    key={idx} 
+                    cx={hoveredPoint.x} 
+                    cy={y} 
+                    r="4" 
+                    fill={color} 
+                    stroke="#0f172a" 
+                    strokeWidth="1.5" 
+                  />
+                );
+              })}
+            </g>
+          )}
+        </svg>
+
+        {hoveredPoint && (
+          <div 
+            className="absolute z-30 pointer-events-none bg-slate-950/95 border border-slate-800 p-2.5 rounded-lg shadow-xl font-mono text-[9px] text-left space-y-1"
+            style={{ 
+              left: `${Math.min(hoveredPoint.x + 10, width - 110)}px`,
+              top: `${Math.max(10, hoveredPoint.y - 60)}px` 
+            }}
+          >
+            <div className="text-slate-500 font-bold border-b border-slate-900 pb-1 mb-1">
+              TIME: {hoveredPoint.date}
+            </div>
+            {labelsSafe.map((label, idx) => {
+              const color = LINE_COLORS[idx % LINE_COLORS.length];
+              const pct = (hoveredPoint.prices[idx] || 0) * 100;
+              return (
+                <div key={idx} className="flex justify-between items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="text-slate-400 truncate max-w-[70px]">{label}</span>
+                  </div>
+                  <span className="text-white font-bold">{pct.toFixed(1)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -347,25 +617,47 @@ export default function RoomDetailPage() {
     return (dx * 10000) / 9970;
   };
 
-  const getEvmSharesReceived = (usdcAmount: number, side: 'moon' | 'jeet', moonRes: number, jeetRes: number): number => {
-    const rTarget = side === 'moon' ? jeetRes : moonRes;
-    const rOpposite = side === 'moon' ? moonRes : jeetRes;
-    if (rTarget <= 0 || rOpposite <= 0) return usdcAmount / 0.5;
+  const getEvmSharesReceived = (usdcAmount: number, side: 'moon' | 'jeet' | number, reserves: number[]): number => {
+    let outcomeIndex = 0;
+    if (typeof side === 'number') {
+      outcomeIndex = side;
+    } else {
+      outcomeIndex = side === 'moon' ? 0 : 1;
+    }
+    const reservesCount = reserves.length;
+    if (reservesCount < 2) return usdcAmount / 0.5;
+
     const netUsdc = (usdcAmount * 9970) / 10000;
-    const k = rTarget * rOpposite;
-    const newOppositeReserve = rOpposite + netUsdc;
-    const newTargetReserve = k / newOppositeReserve;
-    return netUsdc + rTarget - newTargetReserve;
+    const targetReserve = reserves[outcomeIndex] || 0;
+    if (targetReserve <= 0) return usdcAmount / 0.5;
+
+    let prodBefore = 1;
+    let prodAfter = 1;
+    for (let j = 0; j < reservesCount; j++) {
+      if (j !== outcomeIndex) {
+        prodBefore *= reserves[j] || 1;
+        prodAfter *= ((reserves[j] || 0) + netUsdc) || 1;
+      }
+    }
+    const newTargetReserve = (targetReserve * prodBefore) / prodAfter;
+    return netUsdc + targetReserve - newTargetReserve;
   };
 
-  const getEvmSellReceived = (shares: number, side: 'moon' | 'jeet', moonRes: number, jeetRes: number): number => {
-    const rTarget = side === 'moon' ? jeetRes : moonRes;
-    const rOpposite = side === 'moon' ? moonRes : jeetRes;
-    if (rTarget <= 0 || rOpposite <= 0) return shares * 0.5;
-    const k = rTarget * rOpposite;
-    const newOppositeReserve = k / (rTarget + shares);
-    const dx = rOpposite - newOppositeReserve;
-    return (dx * 9970) / 10000;
+  const getEvmSellReceived = (shares: number, side: 'moon' | 'jeet' | number, reserves: number[]): number => {
+    let outcomeIndex = 0;
+    if (typeof side === 'number') {
+      outcomeIndex = side;
+    } else {
+      outcomeIndex = side === 'moon' ? 0 : 1;
+    }
+    const reservesCount = reserves.length;
+    if (reservesCount < 2) return shares * 0.5;
+
+    const targetReserve = reserves[outcomeIndex] || 0;
+    if (targetReserve <= 0) return shares * 0.5;
+
+    const price = targetReserve > 0 ? (1 / targetReserve) / (reserves.reduce((acc, r) => acc + (r > 0 ? 1 / r : 0), 0) || 1) : 0.5;
+    return shares * price * 0.99;
   };
 
   const isDebateMarket = room ? (
@@ -406,27 +698,41 @@ export default function RoomDetailPage() {
   // Bulletproof safety parsers for all numeric room fields
   const rawMoonPool = typeof room?.moonPool === 'number' ? room.moonPool : parseFloat(room?.moonPool as any) || 0;
   const rawJeetPool = typeof room?.jeetPool === 'number' ? room.jeetPool : parseFloat(room?.jeetPool as any) || 0;
-  
-  // For EVM CPMM pools, the actual USDC value of each reserve side is reserves * price.
-  // Starting at 50/50, $500 USDC seed creates 500 YES + 500 NO reserves (worth $250 each).
-  // We divide the reserve count by 2 (or multiply by price) to show the correct USDC value.
-  const moonPoolSafe = isEvm 
-    ? (rawMoonPool + rawJeetPool > 0 ? rawMoonPool * (rawJeetPool / (rawMoonPool + rawJeetPool)) : 0)
-    : rawMoonPool;
-  const jeetPoolSafe = isEvm 
-    ? (rawMoonPool + rawJeetPool > 0 ? rawJeetPool * (rawMoonPool / (rawMoonPool + rawJeetPool)) : 0)
-    : rawJeetPool;
 
-  const totalPotSafe = moonPoolSafe + jeetPoolSafe;
+  const labelsSafe: string[] = room?.outcomeLabels && room.outcomeLabels.length >= 2
+    ? room.outcomeLabels
+    : [room?.moonLabel || 'YES', room?.jeetLabel || 'NO'];
 
-  // Implied odds / percentages are calculated based on the market price (ratio of reserves).
-  // For EVM: price of Moon = jeetPool / (moonPool + jeetPool).
-  const moonPercentageSafe = (rawMoonPool + rawJeetPool) > 0 
-    ? (rawJeetPool / (rawMoonPool + rawJeetPool)) * 100 
-    : 50;
-  const jeetPercentageSafe = (rawMoonPool + rawJeetPool) > 0 
-    ? (rawMoonPool / (rawMoonPool + rawJeetPool)) * 100 
-    : 50;
+  const isMultiOutcome = labelsSafe.length > 2;
+
+  const rawReserves: number[] = room?.poolReserves && room.poolReserves.length >= 2
+    ? room.poolReserves
+    : [rawMoonPool, rawJeetPool];
+
+  // Sum of reciprocals for multi-outcome CPMM pricing
+  let sumReciprocals = 0;
+  for (const r of rawReserves) {
+    if (r > 0) {
+      sumReciprocals += 1 / r;
+    }
+  }
+  const poolUSDCVal = sumReciprocals > 0 ? 1 / sumReciprocals : 0;
+
+  const reservesSafe = isEvm 
+    ? rawReserves.map(() => poolUSDCVal)
+    : rawReserves;
+
+  const pricesSafe = rawReserves.map(r => {
+    if (!isEvm) return r / (rawReserves.reduce((a, b) => a + b, 0) || 1);
+    return r > 0 ? (1 / r) / (sumReciprocals || 1) : 0.5;
+  });
+
+  const totalPotSafe = reservesSafe.reduce((a, b) => a + b, 0);
+
+  const moonPoolSafe = reservesSafe[0] || 0;
+  const jeetPoolSafe = reservesSafe[1] || 0;
+  const moonPercentageSafe = (pricesSafe[0] || 0.5) * 100;
+  const jeetPercentageSafe = (pricesSafe[1] || 0.5) * 100;
 
   const openingPriceSafe = typeof room?.openingPrice === 'number' ? room.openingPrice : room?.openingPrice ? parseFloat(room.openingPrice as any) || 0 : undefined;
   const finalPriceSafe = typeof room?.finalPrice === 'number' ? room.finalPrice : room?.finalPrice ? parseFloat(room.finalPrice as any) || 0 : undefined;
@@ -434,7 +740,11 @@ export default function RoomDetailPage() {
   const durationSafe = typeof room?.duration === 'number' ? room.duration : room?.duration ? parseFloat(room.duration as any) || 0 : undefined;
   const expirySafe = typeof room?.expiry === 'number' ? room.expiry : room?.expiry ? parseFloat(room.expiry as any) || 0 : 0;
 
-  const [selectedSide, setSelectedSide] = useState<'moon' | 'jeet'>('moon');
+  const [selectedOutcomeIndex, setSelectedOutcomeIndex] = useState<number>(0);
+  const selectedSide = selectedOutcomeIndex === 0 ? 'moon' : 'jeet';
+  const setSelectedSide = (side: 'moon' | 'jeet') => {
+    setSelectedOutcomeIndex(side === 'moon' ? 0 : 1);
+  };
   const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
   const [stakeAmount, setStakeAmount] = useState<number>(10);
   const [chatInput, setChatInput] = useState('');
@@ -457,9 +767,11 @@ export default function RoomDetailPage() {
   const [onChainBets, setOnChainBets] = useState<any[]>([]);
   const [selectedBetToList, setSelectedBetToList] = useState<any | null>(null);
   const [askPriceInput, setAskPriceInput] = useState<string>('');
+  const [shareCardHolding, setShareCardHolding] = useState<any | null>(null);
   const [mounted, setMounted] = useState(false);
-  const [evmYesBalance, setEvmYesBalance] = useState<number>(0);
-  const [evmNoBalance, setEvmNoBalance] = useState<number>(0);
+  const [evmBalances, setEvmBalances] = useState<number[]>([]);
+  const evmYesBalance = evmBalances[0] || 0;
+  const evmNoBalance = evmBalances[1] || 0;
 
   useEffect(() => {
     setMounted(true);
@@ -509,67 +821,64 @@ export default function RoomDetailPage() {
     if (!wallet?.address || !roomId.startsWith('0x') || !room) return;
     try {
       const tokensAddress = CONTRACT_ADDRESSES.CONDITIONAL_TOKENS;
-      
-      const tokenId0 = await publicClient.readContract({
-        address: tokensAddress,
-        abi: CONDITIONAL_TOKENS_ABI,
-        functionName: 'getTokenId',
-        args: [roomId as `0x${string}`, BigInt(0)]
-      }) as bigint;
+      const outcomeCount = room?.outcomeLabels && room.outcomeLabels.length >= 2
+        ? room.outcomeLabels.length
+        : 2;
 
-      const tokenId1 = await publicClient.readContract({
-        address: tokensAddress,
-        abi: CONDITIONAL_TOKENS_ABI,
-        functionName: 'getTokenId',
-        args: [roomId as `0x${string}`, BigInt(1)]
-      }) as bigint;
+      const balances: number[] = [];
+      for (let i = 0; i < outcomeCount; i++) {
+        const tokenId = await publicClient.readContract({
+          address: tokensAddress,
+          abi: CONDITIONAL_TOKENS_ABI,
+          functionName: 'getTokenId',
+          args: [roomId as `0x${string}`, BigInt(i)]
+        }) as bigint;
 
-      const bal0 = await publicClient.readContract({
-        address: tokensAddress,
-        abi: CONDITIONAL_TOKENS_ABI,
-        functionName: 'balanceOf',
-        args: [wallet.address as `0x${string}`, tokenId0]
-      }) as bigint;
-
-      const bal1 = await publicClient.readContract({
-        address: tokensAddress,
-        abi: CONDITIONAL_TOKENS_ABI,
-        functionName: 'balanceOf',
-        args: [wallet.address as `0x${string}`, tokenId1]
-      }) as bigint;
-
-      setEvmYesBalance(Number(bal0) / 1e6);
-      setEvmNoBalance(Number(bal1) / 1e6);
+        const bal = await publicClient.readContract({
+          address: tokensAddress,
+          abi: CONDITIONAL_TOKENS_ABI,
+          functionName: 'balanceOf',
+          args: [wallet.address as `0x${string}`, tokenId]
+        }) as bigint;
+        balances.push(Number(bal) / 1e6);
+      }
+      setEvmBalances(balances);
     } catch (e) {
       console.warn("Failed to fetch EVM outcome balances:", e);
     }
   }, [wallet?.address, roomId, room]);
 
-  const handleSwitchTabOrSide = useCallback((newOrderType: 'buy' | 'sell', newSide: 'moon' | 'jeet') => {
+  const handleSwitchTabOrSide = useCallback((newOrderType: 'buy' | 'sell', newSide: 'moon' | 'jeet', newOutcomeIndex?: number) => {
     setOrderType(newOrderType);
-    setSelectedSide(newSide);
+    if (newOutcomeIndex !== undefined) {
+      setSelectedOutcomeIndex(newOutcomeIndex);
+    } else {
+      setSelectedOutcomeIndex(newSide === 'moon' ? 0 : 1);
+    }
     synthSound('bet');
     
     if (newOrderType === 'sell' && room) {
       const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
-      const moonPool = room.moonPool || 0;
-      const jeetPool = room.jeetPool || 0;
-      const totalPool = moonPool + jeetPool;
-      const priceMoon = totalPool > 0 ? (moonPool + 10) / (totalPool + 20) : 0.5;
-      const priceJeet = totalPool > 0 ? (jeetPool + 10) / (totalPool + 20) : 0.5;
+      const outcomeIdx = newOutcomeIndex !== undefined ? newOutcomeIndex : (newSide === 'moon' ? 0 : 1);
       const userBetsInRoom = user ? user.bets.filter(b => isSameRoom(b.roomId, room.id)) : [];
-      const moonSharesOwned = isEvm 
-        ? evmYesBalance 
-        : userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || (b.amount / priceMoon)), 0);
-      const jeetSharesOwned = isEvm 
-        ? evmNoBalance 
-        : userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || (b.amount / priceJeet)), 0);
-      const selectedSharesOwned = newSide === 'moon' ? moonSharesOwned : jeetSharesOwned;
+      
+      let selectedSharesOwned = 0;
+      if (isEvm) {
+        selectedSharesOwned = evmBalances[outcomeIdx] || 0;
+      } else {
+        const totalPool = (room.moonPool || 0) + (room.jeetPool || 0);
+        const priceMoon = totalPool > 0 ? (room.moonPool + 10) / (totalPool + 20) : 0.5;
+        const priceJeet = totalPool > 0 ? (room.jeetPool + 10) / (totalPool + 20) : 0.5;
+        const price = outcomeIdx === 0 ? priceMoon : priceJeet;
+        selectedSharesOwned = userBetsInRoom
+          .filter(b => b.side === (outcomeIdx === 0 ? 'moon' : 'jeet'))
+          .reduce((sum, b) => sum + (b.shares || (b.amount / price)), 0);
+      }
       setSharesInput(selectedSharesOwned > 0 ? selectedSharesOwned : 0);
     } else {
       setSharesInput(10);
     }
-  }, [room, user, evmYesBalance, evmNoBalance]);
+  }, [room, user, evmBalances]);
 
   const synthSound = (type: 'bet' | 'explosion' | 'whistle' | 'victory' | 'defeat' | 'degen') => {
     if (!isMuted && typeof window !== 'undefined' && (window as any).playDAppSound) {
@@ -1031,11 +1340,11 @@ export default function RoomDetailPage() {
     if (isEvm) {
       if (orderType === 'buy') {
         const usdcAmount = sharesInput;
-        sharesToTrade = getEvmSharesReceived(usdcAmount, selectedSide, moonPool, jeetPool);
+        sharesToTrade = getEvmSharesReceived(usdcAmount, selectedOutcomeIndex, reservesSafe);
         totalCost = usdcAmount;
       } else {
         const sharesToSell = sharesInput;
-        totalCost = getEvmSellReceived(sharesToSell, selectedSide, moonPool, jeetPool);
+        totalCost = getEvmSellReceived(sharesToSell, selectedOutcomeIndex, reservesSafe);
         sharesToTrade = sharesToSell;
       }
     } else {
@@ -1112,11 +1421,11 @@ export default function RoomDetailPage() {
 
     try {
       if (mode === 'limit') {
-        await placeLimitOrder(room.id, orderType, selectedSide === 'moon' ? 0 : 1, limitPrice, sharesToTrade);
+        await placeLimitOrder(room.id, orderType, selectedOutcomeIndex, limitPrice, sharesToTrade);
       } else {
         const slippageMultiplier = orderType === 'buy' ? 1.03 : 0.97;
         const limitUsdc = totalCost * slippageMultiplier;
-        await executeEvmMarketTrade(room.id, selectedSide, sharesToTrade, orderType, limitUsdc);
+        await executeEvmMarketTrade(room.id, selectedOutcomeIndex, sharesToTrade, orderType, limitUsdc);
         fetchEvmBalances();
       }
       
@@ -1361,164 +1670,193 @@ export default function RoomDetailPage() {
         )}
       </div>
 
-      {/* 2. THE SPLIT-SCREEN TRENCH HEADER (Full-Bleed Across Screen) */}
+      {/* 2. THE SPLIT-SCREEN TRENCH HEADER OR MULTI-OUTCOME REAL-TIME CHART */}
       {room && (
-        <section 
-          className="relative w-full min-h-[220px] sm:min-h-[280px] h-[30vh] sm:h-[35vh] md:h-[38vh] overflow-hidden border-b-4 border-slate-800 flex z-10 scanlines bg-[#020501] select-none" 
-          id="battlefield"
-        >
-          {/* Real-time Mortar Container Overlay */}
-          <div className="mortar-container" id="mortar-container">
-            {mortars.map((m) => (
-              <div
-                key={m.id}
-                className={`mortar ${m.side === 'moon' ? 'mortar-moon' : 'mortar-jeet'}`}
-                style={{
-                  left: '50%',
-                  bottom: '0px',
-                  '--tx': `${m.tx}px`,
-                  '--ty': `${m.ty}px`,
-                  '--tx-half': `${m.txHalf}px`,
-                  '--ty-peak': `${m.tyPeak}px`,
-                } as React.CSSProperties}
-              />
-            ))}
-            {explosions.map((e) => (
-              <div
-                key={e.id}
-                className={`explosion ${e.side === 'moon' ? 'explosion-moon' : 'explosion-jeet'}`}
-                style={{
-                  left: `calc(50% + ${e.x}px)`,
-                  bottom: `calc(10px + ${Math.abs(e.y)}px)`,
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Left Side: Moon Army (Charging Pepes) */}
-          <div className="w-1/2 h-full bg-slate-950 relative group overflow-hidden border-r-2 border-dashed border-slate-800/40">
-            <div className="absolute inset-0">
-              <img 
-                alt="Moon Army Charging" 
-                className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 filter sepia saturate-[350%] hue-rotate-[85deg] contrast-[1.2]" 
-                src={PEPE_ASSETS.moonJuice}
+        isMultiOutcome ? (
+          <section className="relative w-full bg-slate-950 border-b-4 border-slate-800 p-6 flex flex-col justify-center z-10 scanlines select-none">
+            <div className="max-w-7xl mx-auto w-full space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="font-mono text-xs font-bold text-slate-400 tracking-wider">LIVE ODDS REAL-TIME TELEMETRY</span>
+                <span className="font-mono text-[10px] text-emerald-500 font-extrabold flex items-center gap-1.5 animate-pulse">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  REAL-TIME SYNC
+                </span>
+              </div>
+              <OddsHistoryChart 
+                pricesSafe={pricesSafe} 
+                labelsSafe={labelsSafe} 
+                bets={roomBets}
               />
             </div>
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-emerald-500/10 to-transparent mix-blend-color opacity-90 pointer-events-none"></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
-            
-            {/* Moon Army Commander Portrait */}
-            <div className="absolute top-4 left-4 border-2 border-dashed border-emerald-500 bg-slate-950/90 px-3 py-1 rotate-[-4deg] shadow-lg flex items-center gap-1.5 z-10">
-              <PepePortrait src={PEPE_ASSETS.chadBull} size={24} loading="eager" className="rounded-full shrink-0" />
-              <span className="font-mono text-emerald-500 text-xs font-bold uppercase tracking-wider block">BULLISH TRENCH</span>
-            </div>
-            
-            {/* Moon Stats Counter Card */}
-            <div className="absolute bottom-4 left-4 bg-slate-950/85 border border-emerald-500/50 p-3 rounded-xl backdrop-blur-sm z-10 select-none text-left">
-              <span className="font-mono text-[9px] text-emerald-500 uppercase tracking-widest block font-bold">MOON POT</span>
-              <span className="font-mono text-white text-lg font-bold block mt-0.5">
-                {moonPoolSafe.toFixed(2)} USDC
-              </span>
-              <span className="font-mono text-[9px] text-slate-400 mt-0.5 block font-bold">
-                Implied Odds: <span className="text-white">{moonPercentageSafe.toFixed(0)}%</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Right Side: Jeet Army (Charging Skeletons) */}
-          <div className="w-1/2 h-full bg-slate-950 relative group overflow-hidden">
-            <div className="absolute inset-0">
-              <img 
-                alt="Jeet Army Fleeing" 
-                className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 filter sepia saturate-[250%] hue-rotate-[320deg] contrast-[1.1]" 
-                src={PEPE_ASSETS.jeetSkeleton}
-              />
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-l from-slate-950 via-rose-500/10 to-transparent mix-blend-color opacity-90 pointer-events-none"></div>
-            <div className="absolute inset-0 bg-gradient-to-l from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
-            
-            {/* Jeet Army Commander Portrait */}
-            <div className="absolute top-4 right-4 border-2 border-dashed border-rose-500 bg-slate-950/90 px-3 py-1 rotate-[4deg] shadow-lg flex items-center gap-1.5 z-10">
-              <PepePortrait src={PEPE_ASSETS.jeetSkeleton} size={24} loading="eager" className="rounded-full shrink-0" />
-              <span className="font-mono text-rose-500 text-xs font-bold uppercase tracking-wider block">BEARISH WASTELAND</span>
+          </section>
+        ) : (
+          <section 
+            className="relative w-full min-h-[220px] sm:min-h-[280px] h-[30vh] sm:h-[35vh] md:h-[38vh] overflow-hidden border-b-4 border-slate-800 flex z-10 scanlines bg-[#020501] select-none" 
+            id="battlefield"
+          >
+            {/* Real-time Mortar Container Overlay */}
+            <div className="mortar-container" id="mortar-container">
+              {mortars.map((m) => (
+                <div
+                  key={m.id}
+                  className={`mortar ${m.side === 'moon' ? 'mortar-moon' : 'mortar-jeet'}`}
+                  style={{
+                    left: '50%',
+                    bottom: '0px',
+                    '--tx': `${m.tx}px`,
+                    '--ty': `${m.ty}px`,
+                    '--tx-half': `${m.txHalf}px`,
+                    '--ty-peak': `${m.tyPeak}px`,
+                  } as React.CSSProperties}
+                />
+              ))}
+              {explosions.map((e) => (
+                <div
+                  key={e.id}
+                  className={`explosion ${e.side === 'moon' ? 'explosion-moon' : 'explosion-jeet'}`}
+                  style={{
+                    left: `calc(50% + ${e.x}px)`,
+                    bottom: `calc(10px + ${Math.abs(e.y)}px)`,
+                  }}
+                />
+              ))}
             </div>
 
-            {/* Jeet Stats Counter Card */}
-            <div className="absolute bottom-4 right-4 bg-slate-950/85 border border-rose-500/50 p-3 rounded-xl backdrop-blur-sm z-10 text-right select-none">
-              <span className="font-mono text-[9px] text-rose-500 uppercase tracking-widest block font-bold">JEET POT</span>
-              <span className="font-mono text-white text-lg font-bold block mt-0.5">
-                {jeetPoolSafe.toFixed(2)} USDC
-              </span>
-              <span className="font-mono text-[9px] text-slate-400 mt-0.5 block font-bold">
-                Implied Odds: <span className="text-white">{jeetPercentageSafe.toFixed(0)}%</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Interactive Center Command Deck */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-3">
-            {/* Mute/Sound Toggle Badge */}
-            <button
-              onClick={() => {
-                setIsMuted(!isMuted);
-                synthSound('bet');
-              }}
-              className="bg-black/90 hover:bg-slate-900 border border-slate-700/60 px-3 py-1.5 rounded-full font-mono text-[9px] text-white uppercase tracking-wider font-extrabold shadow-lg transition-all active:scale-95 flex items-center gap-1"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-              <span>{isMuted ? 'SOUND MUTED' : 'SOUNDS PLAYING'}</span>
-            </button>
-
-            {/* Interactive Battle Swords - fires test artillery shell when clicked! */}
-            <button
-              onClick={() => {
-                synthSound('whistle');
-                const targetSide = (Math.random() > 0.5 ? 'moon' : 'jeet') as 'moon' | 'jeet';
-                const tx = targetSide === 'moon' ? -100 - Math.random() * 200 : 100 + Math.random() * 200;
-                const ty = -60 - Math.random() * 120;
-                const newMortar = { id: Date.now(), side: targetSide, tx, ty, txHalf: tx / 2, tyPeak: ty - 100 };
-                setMortars((prev) => [...prev, newMortar]);
-                setTimeout(() => {
-                  synthSound('explosion');
-                  setExplosions((prev) => [...prev, { id: Date.now(), side: targetSide, x: tx, y: ty }]);
-                  setMortars((prev) => prev.filter((m) => m.id !== newMortar.id));
-                  setTimeout(() => {
-                    setExplosions((prev) => prev.filter((e) => e.id !== newMortar.id));
-                  }, 500);
-                }, 800);
-              }}
-              className="w-16 h-16 rounded-full bg-black/90 hover:bg-slate-950 border-4 border-slate-800 text-white flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all group relative cursor-pointer"
-              title="Click to Deploy Test Artillery Payload"
-            >
-              <Swords className="text-white group-hover:rotate-12 transition-transform" size={24} />
-            </button>
-
-            {/* User Fighter Role Stance Badge */}
-            {(() => {
-              const userBetsInRoom = user ? user.bets.filter(b => b.roomId === room.id) : [];
-              const hasMoon = userBetsInRoom.some(b => b.side === 'moon');
-              const hasJeet = userBetsInRoom.some(b => b.side === 'jeet');
+            {/* Left Side: Moon Army (Charging Pepes) */}
+            <div className="w-1/2 h-full bg-slate-950 relative group overflow-hidden border-r-2 border-dashed border-slate-800/40">
+              <div className="absolute inset-0">
+                <img 
+                  alt="Moon Army Charging" 
+                  className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 filter sepia saturate-[350%] hue-rotate-[85deg] contrast-[1.2]" 
+                  src={PEPE_ASSETS.moonJuice}
+                />
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-emerald-500/10 to-transparent mix-blend-color opacity-90 pointer-events-none"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
               
-              let fighterText = 'OBSERVER 🕵️‍♂️';
-              if (hasMoon && hasJeet) fighterText = 'DOUBLE AGENT 🎭';
-              else if (hasMoon) fighterText = 'YES SOLDIER 🚀';
-              else if (hasJeet) fighterText = 'NO SOLDIER 💀';
+              {/* Moon Army Commander Portrait */}
+              <div className="absolute top-4 left-4 border-2 border-dashed border-emerald-500 bg-slate-950/90 px-3 py-1 rotate-[-4deg] shadow-lg flex items-center gap-1.5 z-10">
+                <PepePortrait src={PEPE_ASSETS.chadBull} size={24} loading="eager" className="rounded-full shrink-0" />
+                <span className="font-mono text-emerald-500 text-xs font-bold uppercase tracking-wider block">BULLISH TRENCH</span>
+              </div>
+              
+              {/* Moon Stats Counter Card */}
+              <div className="absolute bottom-4 left-4 bg-slate-950/85 border border-emerald-500/50 p-3 rounded-xl backdrop-blur-sm z-10 select-none text-left">
+                <span className="font-mono text-[9px] text-emerald-500 uppercase tracking-widest block font-bold">MOON POT</span>
+                <span className="font-mono text-white text-lg font-bold block mt-0.5">
+                  {moonPoolSafe.toFixed(2)} USDC
+                </span>
+                <span className="font-mono text-[9px] text-slate-400 mt-0.5 block font-bold">
+                  Implied Odds: <span className="text-white">{moonPercentageSafe.toFixed(0)}%</span>
+                </span>
+              </div>
+            </div>
 
-              return (
-                <div className="bg-black/90 border border-slate-800 px-4 py-1.5 rounded font-mono text-[9px] text-slate-400 uppercase tracking-widest font-extrabold">
-                  YOU ARE FIGHTING FOR: <span className="text-white">{fighterText}</span>
-                </div>
-              );
-            })()}
-          </div>
-        </section>
+            {/* Right Side: Jeet Army (Charging Skeletons) */}
+            <div className="w-1/2 h-full bg-slate-950 relative group overflow-hidden">
+              <div className="absolute inset-0">
+                <img 
+                  alt="Jeet Army Fleeing" 
+                  className="w-full h-full object-cover opacity-75 group-hover:scale-105 transition-transform duration-700 filter sepia saturate-[250%] hue-rotate-[320deg] contrast-[1.1]" 
+                  src={PEPE_ASSETS.jeetSkeleton}
+                />
+              </div>
+              <div className="absolute inset-0 bg-gradient-to-l from-slate-950 via-rose-500/10 to-transparent mix-blend-color opacity-90 pointer-events-none"></div>
+              <div className="absolute inset-0 bg-gradient-to-l from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
+              
+              {/* Jeet Army Commander Portrait */}
+              <div className="absolute top-4 right-4 border-2 border-dashed border-rose-500 bg-slate-950/90 px-3 py-1 rotate-[4deg] shadow-lg flex items-center gap-1.5 z-10">
+                <PepePortrait src={PEPE_ASSETS.jeetSkeleton} size={24} loading="eager" className="rounded-full shrink-0" />
+                <span className="font-mono text-rose-500 text-xs font-bold uppercase tracking-wider block">BEARISH WASTELAND</span>
+              </div>
+
+              {/* Jeet Stats Counter Card */}
+              <div className="absolute bottom-4 right-4 bg-slate-950/85 border border-rose-500/50 p-3 rounded-xl backdrop-blur-sm z-10 text-right select-none">
+                <span className="font-mono text-[9px] text-rose-500 uppercase tracking-widest block font-bold">JEET POT</span>
+                <span className="font-mono text-white text-lg font-bold block mt-0.5">
+                  {jeetPoolSafe.toFixed(2)} USDC
+                </span>
+                <span className="font-mono text-[9px] text-slate-400 mt-0.5 block font-bold">
+                  Implied Odds: <span className="text-white">{jeetPercentageSafe.toFixed(0)}%</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Interactive Center Command Deck */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-3">
+              {/* Mute/Sound Toggle Badge */}
+              <button
+                onClick={() => {
+                  setIsMuted(!isMuted);
+                  synthSound('bet');
+                }}
+                className="bg-black/90 hover:bg-slate-900 border border-slate-700/60 px-3 py-1.5 rounded-full font-mono text-[9px] text-white uppercase tracking-wider font-extrabold shadow-lg transition-all active:scale-95 flex items-center gap-1"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span>{isMuted ? 'SOUND MUTED' : 'SOUNDS PLAYING'}</span>
+              </button>
+
+              {/* Interactive Battle Swords - fires test artillery shell when clicked! */}
+              <button
+                onClick={() => {
+                  synthSound('whistle');
+                  const targetSide = (Math.random() > 0.5 ? 'moon' : 'jeet') as 'moon' | 'jeet';
+                  const tx = targetSide === 'moon' ? -100 - Math.random() * 200 : 100 + Math.random() * 200;
+                  const ty = -60 - Math.random() * 120;
+                  const newMortar = { id: Date.now(), side: targetSide, tx, ty, txHalf: tx / 2, tyPeak: ty - 100 };
+                  setMortars((prev) => [...prev, newMortar]);
+                  setTimeout(() => {
+                    synthSound('explosion');
+                    setExplosions((prev) => [...prev, { id: Date.now(), side: targetSide, x: tx, y: ty }]);
+                    setMortars((prev) => prev.filter((m) => m.id !== newMortar.id));
+                    setTimeout(() => {
+                      setExplosions((prev) => prev.filter((e) => e.id !== newMortar.id));
+                    }, 500);
+                  }, 800);
+                }}
+                className="w-16 h-16 rounded-full bg-black/90 hover:bg-slate-950 border-4 border-slate-800 text-white flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all group relative cursor-pointer"
+                title="Click to Deploy Test Artillery Payload"
+              >
+                <Swords className="text-white group-hover:rotate-12 transition-transform" size={24} />
+              </button>
+
+              {/* User Fighter Role Stance Badge */}
+              {(() => {
+                const userBetsInRoom = user ? user.bets.filter(b => b.roomId === room.id) : [];
+                const hasMoon = userBetsInRoom.some(b => b.side === 'moon');
+                const hasJeet = userBetsInRoom.some(b => b.side === 'jeet');
+                
+                let fighterText = 'OBSERVER 🕵️‍♂️';
+                if (hasMoon && hasJeet) fighterText = 'DOUBLE AGENT 🎭';
+                else if (hasMoon) fighterText = 'YES SOLDIER 🚀';
+                else if (hasJeet) fighterText = 'NO SOLDIER 💀';
+
+                return (
+                  <div className="bg-black/90 border border-slate-800 px-4 py-1.5 rounded font-mono text-[9px] text-slate-400 uppercase tracking-widest font-extrabold">
+                    YOU ARE FIGHTING FOR: <span className="text-white">{fighterText}</span>
+                  </div>
+                );
+              })()}
+            </div>
+          </section>
+        )
       )}
 
       {/* 3. odds color split bar indicator separating visual header from content */}
       {room && (
         <div className="w-full h-2 flex z-10 relative">
-          <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${moonPercentageSafe}%` }} />
-          <div className="bg-rose-500 h-full transition-all duration-500" style={{ width: `${jeetPercentageSafe}%` }} />
+          {labelsSafe.map((_, idx) => {
+            const pct = (pricesSafe[idx] || 0) * 100;
+            const colors = ['bg-emerald-500', 'bg-rose-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500'];
+            const colorClass = colors[idx % colors.length];
+            return (
+              <div 
+                key={idx}
+                className={`${colorClass} h-full transition-all duration-500`} 
+                style={{ width: `${pct}%` }} 
+              />
+            );
+          })}
         </div>
       )}
 
@@ -1654,43 +1992,50 @@ export default function RoomDetailPage() {
           {/* COLUMN 1: TRADING TERMINAL & MEDIA CONTENT (lg:col-span-8) */}
           <div className="lg:col-span-8 space-y-6">
             
-            {/* Big YES / NO percentage card */}
+            {/* Big outcomes percentage card */}
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                {/* YES box */}
-                <div 
-                  onClick={() => { setSelectedSide('moon'); setOrderType('buy'); synthSound('bet'); }}
-                  className={`border rounded-xl p-5 text-center cursor-pointer transition-all duration-200 ${
-                    selectedSide === 'moon' && orderType === 'buy'
-                      ? 'bg-emerald-500/5 border-emerald-500 shadow-md shadow-emerald-500/10'
-                      : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                  }`}
-                >
-                  <span className="font-mono text-xs text-emerald-500 font-bold uppercase tracking-wider block">{room.moonLabel || 'YES'}</span>
-                  <span className="font-sans text-4xl font-extrabold text-emerald-500 mt-2 block">
-                    {moonPercentageSafe.toFixed(1)}%
-                  </span>
-                </div>
-                {/* NO box */}
-                <div 
-                  onClick={() => { setSelectedSide('jeet'); setOrderType('buy'); synthSound('bet'); }}
-                  className={`border rounded-xl p-5 text-center cursor-pointer transition-all duration-200 ${
-                    selectedSide === 'jeet' && orderType === 'buy'
-                      ? 'bg-rose-500/5 border-rose-500 shadow-md shadow-rose-500/10'
-                      : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
-                  }`}
-                >
-                  <span className="font-mono text-xs text-rose-500 font-bold uppercase tracking-wider block">{room.jeetLabel || 'NO'}</span>
-                  <span className="font-sans text-4xl font-extrabold text-rose-500 mt-2 block">
-                    {jeetPercentageSafe.toFixed(1)}%
-                  </span>
-                </div>
+              <div className={`grid gap-4 ${
+                labelsSafe.length > 2 
+                  ? 'grid-cols-2 md:grid-cols-3' 
+                  : 'grid-cols-2'
+              }`}>
+                {labelsSafe.map((label, idx) => {
+                  const pct = (pricesSafe[idx] || 0) * 100;
+                  const isSelected = selectedOutcomeIndex === idx;
+                  return (
+                    <div 
+                      key={idx}
+                      onClick={() => { setSelectedOutcomeIndex(idx); setOrderType('buy'); synthSound('bet'); }}
+                      className={`border rounded-xl p-5 text-center cursor-pointer transition-all duration-200 ${
+                        isSelected && orderType === 'buy'
+                          ? 'bg-emerald-500/5 border-emerald-500 shadow-md shadow-emerald-500/10'
+                          : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                      }`}
+                    >
+                      <span className="font-mono text-xs text-emerald-500 font-bold uppercase tracking-wider block">{label}</span>
+                      <span className="font-sans text-3xl font-extrabold text-emerald-500 mt-2 block">
+                        {pct.toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* Progress Bar split */}
               <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
-                <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${moonPercentageSafe}%` }} />
-                <div className="bg-rose-500 h-full transition-all duration-500" style={{ width: `${jeetPercentageSafe}%` }} />
+                {labelsSafe.map((_, idx) => {
+                  const pct = (pricesSafe[idx] || 0) * 100;
+                  // Dynamic colors for each bar slice
+                  const colors = ['bg-emerald-500', 'bg-rose-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500'];
+                  const colorClass = colors[idx % colors.length];
+                  return (
+                    <div 
+                      key={idx}
+                      className={`${colorClass} h-full transition-all duration-500`} 
+                      style={{ width: `${pct}%` }} 
+                    />
+                  );
+                })}
               </div>
             </div>
 
@@ -1752,50 +2097,52 @@ export default function RoomDetailPage() {
                        <label className="block font-mono text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                          CHOOSE OUTCOME:
                        </label>
-                       <div className="grid grid-cols-2 gap-4">
-                         <button
-                           type="button"
-                           onClick={() => handleSwitchTabOrSide(orderType, 'moon')}
-                           className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex items-center justify-center gap-2 ${
-                             selectedSide === 'moon'
-                               ? 'border-emerald-500 bg-emerald-500/5 text-emerald-500'
-                               : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                           }`}
-                         >
-                           <span>{room.moonLabel || 'YES'}</span>
-                           <span className="text-[10px] opacity-75">{moonPercentageSafe.toFixed(0)}%</span>
-                         </button>
-                         <button
-                           type="button"
-                           onClick={() => handleSwitchTabOrSide(orderType, 'jeet')}
-                           className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex items-center justify-center gap-2 ${
-                             selectedSide === 'jeet'
-                               ? 'border-rose-500 bg-rose-500/5 text-rose-500'
-                               : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                           }`}
-                         >
-                           <span>{room.jeetLabel || 'NO'}</span>
-                           <span className="text-[10px] opacity-75">{jeetPercentageSafe.toFixed(0)}%</span>
-                         </button>
+                       <div className={`grid gap-3 ${
+                         labelsSafe.length > 2 
+                           ? 'grid-cols-2 md:grid-cols-3' 
+                           : 'grid-cols-2'
+                       }`}>
+                         {labelsSafe.map((label, idx) => {
+                           const pct = (pricesSafe[idx] || 0) * 100;
+                           const isSelected = selectedOutcomeIndex === idx;
+                           const isYesSide = idx === 0;
+                           const borderClass = isSelected 
+                             ? (isYesSide ? 'border-emerald-500 bg-emerald-500/5 text-emerald-500' : 'border-rose-500 bg-rose-500/5 text-rose-500')
+                             : 'border-slate-200 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white';
+                           return (
+                             <button
+                               key={idx}
+                               type="button"
+                               onClick={() => handleSwitchTabOrSide(orderType, idx === 0 ? 'moon' : 'jeet', idx)}
+                               className={`py-4 rounded-xl border-2 font-mono text-xs uppercase font-bold transition-all flex flex-col items-center justify-center gap-1 ${borderClass}`}
+                             >
+                               <span className="truncate max-w-full px-2">{label}</span>
+                               <span className="text-[10px] opacity-75">{pct.toFixed(0)}%</span>
+                             </button>
+                           );
+                         })}
                        </div>
                     </div>
 
                     {/* Quantity Input */}
                     {(() => {
                       const userBetsInRoom = user ? user.bets.filter(b => isSameRoom(b.roomId, room.id)) : [];
-                      const moonPool = room.moonPool || 0;
-                      const jeetPool = room.jeetPool || 0;
-                      const totalPool = moonPool + jeetPool;
-                      const priceMoon = totalPool > 0 ? (moonPool + 10) / (totalPool + 20) : 0.5;
-                      const priceJeet = totalPool > 0 ? (jeetPool + 10) / (totalPool + 20) : 0.5;
                       const isEvm = room.id.startsWith('0x') || room.token.chainId === 'avalanche';
-                      const moonSharesOwned = isEvm 
-                        ? evmYesBalance 
-                        : userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || (b.amount / priceMoon)), 0);
-                      const jeetSharesOwned = isEvm 
-                        ? evmNoBalance 
-                        : userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || (b.amount / priceJeet)), 0);
-                      const selectedSharesOwned = selectedSide === 'moon' ? moonSharesOwned : jeetSharesOwned;
+                      let selectedSharesOwned = 0;
+                      
+                      if (isEvm) {
+                        selectedSharesOwned = evmBalances[selectedOutcomeIndex] || 0;
+                      } else {
+                        const moonPool = room.moonPool || 0;
+                        const jeetPool = room.jeetPool || 0;
+                        const totalPool = moonPool + jeetPool;
+                        const priceMoon = totalPool > 0 ? (moonPool + 10) / (totalPool + 20) : 0.5;
+                        const priceJeet = totalPool > 0 ? (jeetPool + 10) / (totalPool + 20) : 0.5;
+                        const price = selectedOutcomeIndex === 0 ? priceMoon : priceJeet;
+                        selectedSharesOwned = userBetsInRoom
+                          .filter(b => b.side === (selectedOutcomeIndex === 0 ? 'moon' : 'jeet'))
+                          .reduce((sum, b) => sum + (b.shares || (b.amount / price)), 0);
+                      }
 
                       return (
                         <div className="space-y-2">
@@ -1816,7 +2163,7 @@ export default function RoomDetailPage() {
                                     )}
                                   </>
                                 : <>
-                                    Balance: {selectedSharesOwned.toFixed(2)} {selectedSide === 'moon' ? (room.moonLabel || 'YES') : (room.jeetLabel || 'NO')} Shares
+                                    Balance: {selectedSharesOwned.toFixed(2)} {labelsSafe[selectedOutcomeIndex]} Shares
                                     {selectedSharesOwned > 0 && (
                                       <button 
                                         type="button"
@@ -1861,25 +2208,26 @@ export default function RoomDetailPage() {
                       let estReturn = 0;
                       let avgPrice = currentPrice;
 
-                      if (orderType === 'buy') {
-                        cost = sharesInput;
-                        estShares = getEvmSharesReceived(sharesInput, selectedSide, moonPool, jeetPool);
-                        avgPrice = estShares > 0 ? cost / estShares : currentPrice;
-                      } else {
-                        estShares = sharesInput;
-                        estReturn = getEvmSellReceived(sharesInput, selectedSide, moonPool, jeetPool);
-                        avgPrice = estShares > 0 ? estReturn / estShares : currentPrice;
-                      }
+                       if (orderType === 'buy') {
+                         cost = sharesInput;
+                         estShares = getEvmSharesReceived(sharesInput, selectedOutcomeIndex, reservesSafe);
+                         avgPrice = estShares > 0 ? cost / estShares : currentPrice;
+                       } else {
+                         estShares = sharesInput;
+                         estReturn = getEvmSellReceived(sharesInput, selectedOutcomeIndex, reservesSafe);
+                         avgPrice = estShares > 0 ? estReturn / estShares : currentPrice;
+                       }
 
-                      let slippagePercent = 0;
-                      if (orderType === 'buy' && cost > 0 && estShares > 0) {
-                        const targetPoolRes = selectedSide === 'moon' ? jeetPool : moonPool; 
-                        const oppositePoolRes = selectedSide === 'moon' ? moonPool : jeetPool;
-                        if (oppositePoolRes > 0 && targetPoolRes > 0) {
-                          const initialPrice = oppositePoolRes / targetPoolRes;
-                          slippagePercent = ((avgPrice - initialPrice) / initialPrice) * 100;
-                        }
-                      }
+                       let slippagePercent = 0;
+                       if (orderType === 'buy' && cost > 0 && estShares > 0) {
+                         const targetPoolRes = reservesSafe[selectedOutcomeIndex] || 0; 
+                         let oppositeSum = 0;
+                         reservesSafe.forEach((r, idx) => { if (idx !== selectedOutcomeIndex) oppositeSum += r; });
+                         if (oppositeSum > 0 && targetPoolRes > 0) {
+                           const initialPrice = currentPrice;
+                           slippagePercent = ((avgPrice - initialPrice) / initialPrice) * 100;
+                         }
+                       }
 
                       const maxPayout = orderType === 'buy' ? estShares : estReturn;
                       const profit = maxPayout - cost;
@@ -1967,20 +2315,12 @@ export default function RoomDetailPage() {
 
                 {/* 2. CHART PANEL */}
                 {activeMainTab === 'chart' && room && (
-                  <div className="h-[380px] bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden relative">
-                    {room.token.chainId && room.token.pairAddress ? (
-                      <LazyDexChart
-                        chainId={room.token.chainId}
-                        pairAddress={room.token.pairAddress}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 bg-slate-50 dark:bg-slate-950 text-slate-400 dark:text-slate-500">
-                        <Loader2 size={32} className="animate-spin text-emerald-500 mb-4" />
-                        <span className="font-mono text-xs uppercase tracking-widest font-bold">
-                          No integrated chart available for this custom debate.
-                        </span>
-                      </div>
-                    )}
+                  <div className="space-y-4">
+                    <OddsHistoryChart 
+                      pricesSafe={pricesSafe} 
+                      labelsSafe={labelsSafe} 
+                      bets={roomBets}
+                    />
                   </div>
                 )}
 
@@ -1989,20 +2329,66 @@ export default function RoomDetailPage() {
                   <div className="space-y-4 font-mono text-xs text-left">
                     {(() => {
                       const userBetsInRoom = user ? user.bets.filter(b => isSameRoom(b.roomId, room.id)) : [];
-                      const moonPool = room.moonPool || 0;
-                      const jeetPool = room.jeetPool || 0;
-                      const totalPool = moonPool + jeetPool;
-                      const priceMoon = totalPool > 0 ? (moonPool + 10) / (totalPool + 20) : 0.5;
-                      const priceJeet = totalPool > 0 ? (jeetPool + 10) / (totalPool + 20) : 0.5;
+                      
+                      const holdings = labelsSafe.map((label, idx) => {
+                        let sharesOwned = 0;
+                        if (isEvm) {
+                          sharesOwned = evmBalances[idx] || 0;
+                        } else {
+                          const totalPool = (room.moonPool || 0) + (room.jeetPool || 0);
+                          const priceMoon = totalPool > 0 ? (room.moonPool + 10) / (totalPool + 20) : 0.5;
+                          const priceJeet = totalPool > 0 ? (room.jeetPool + 10) / (totalPool + 20) : 0.5;
+                          const price = idx === 0 ? priceMoon : priceJeet;
+                          sharesOwned = userBetsInRoom
+                            .filter(b => b.side === (idx === 0 ? 'moon' : 'jeet'))
+                            .reduce((sum, b) => sum + (b.shares || (b.amount / price)), 0);
+                        }
 
-                      const moonSharesOwned = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + (b.shares || (b.amount / priceMoon)), 0);
-                      const jeetSharesOwned = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + (b.shares || (b.amount / priceJeet)), 0);
-                      const totalSpentMoon = userBetsInRoom.filter(b => b.side === 'moon').reduce((sum, b) => sum + b.amount, 0);
-                      const avgMoonPrice = moonSharesOwned > 0 ? totalSpentMoon / moonSharesOwned : 0;
-                      const totalSpentJeet = userBetsInRoom.filter(b => b.side === 'jeet').reduce((sum, b) => sum + b.amount, 0);
-                      const avgJeetPrice = jeetSharesOwned > 0 ? totalSpentJeet / jeetSharesOwned : 0;
+                        // Calculate amount spent
+                        let totalSpent = 0;
+                        if (isEvm) {
+                          const userAddressStr = (wallet?.address || '').toLowerCase();
+                          const userBets = roomBets.filter(
+                            (b) => (b.user || '').toLowerCase() === userAddressStr &&
+                                   (
+                                     b.side === String(idx) ||
+                                     b.side === `outcome_${idx}` ||
+                                     (b.side === 'moon' && idx === 0) ||
+                                     (b.side === 'jeet' && idx === 1)
+                                   )
+                          );
+                          totalSpent = userBets.reduce((sum, b) => sum + Number(b.amount || 0), 0);
+                        } else {
+                          totalSpent = userBetsInRoom
+                            .filter(b => b.side === (idx === 0 ? 'moon' : 'jeet'))
+                            .reduce((sum, b) => sum + b.amount, 0);
+                        }
 
-                      if (moonSharesOwned === 0 && jeetSharesOwned === 0) {
+                        // If they own shares but we don't have bet records logged, calculate a default spent based on current price
+                        if (sharesOwned > 0 && totalSpent === 0) {
+                          totalSpent = sharesOwned * (pricesSafe[idx] || 0.5);
+                        }
+
+                        const avgCost = sharesOwned > 0 ? totalSpent / sharesOwned : 0;
+                        const currentPrice = pricesSafe[idx] || 0.5;
+                        const currentValue = sharesOwned * currentPrice;
+                        const pnl = currentValue - totalSpent;
+                        const pnlPercent = totalSpent > 0 ? (pnl / totalSpent) * 100 : 0;
+
+                        return {
+                          label,
+                          idx,
+                          sharesOwned,
+                          totalSpent,
+                          avgCost,
+                          currentPrice,
+                          currentValue,
+                          pnl,
+                          pnlPercent,
+                        };
+                      }).filter(h => h.sharesOwned > 0.01);
+
+                      if (holdings.length === 0) {
                         return (
                           <div className="text-center py-10 text-slate-400 dark:text-slate-500">
                             NO ACTIVE POSITIONS FOUND IN THIS ARENA
@@ -2012,26 +2398,37 @@ export default function RoomDetailPage() {
 
                       return (
                         <div className="space-y-3">
-                          {moonSharesOwned > 0 && (
-                            <div className="flex justify-between items-center bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/20">
-                              <div>
-                                <div className="font-bold text-emerald-500 uppercase text-[10px]">YES shares</div>
-                                <div className="text-xs text-slate-600 dark:text-slate-400 font-bold mt-1">
-                                  Shares Owned: {moonSharesOwned.toFixed(1)} | Avg Cost: {avgMoonPrice.toFixed(2)} USDC
+                          {holdings.map((h, idx) => {
+                            const isPositive = h.pnl >= 0;
+                            const colorClass = isPositive ? 'text-emerald-500' : 'text-rose-500';
+                            const bgClass = isPositive ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-rose-500/5 border-rose-500/20';
+                            const badgeBorderClass = isPositive ? 'border-emerald-500/30' : 'border-rose-500/30';
+                            
+                            return (
+                              <div key={idx} className={`flex justify-between items-center p-4 rounded-xl border ${bgClass}`}>
+                                <div>
+                                  <div className={`font-bold uppercase text-[10px] ${colorClass}`}>{h.label} Position</div>
+                                  <div className="text-xs text-slate-600 dark:text-slate-400 font-bold mt-1">
+                                    Shares Owned: {h.sharesOwned.toFixed(1)} | Avg Cost: ${h.avgCost.toFixed(2)} USDC
+                                  </div>
+                                  <div className="text-[10px] text-slate-500 dark:text-slate-450 mt-0.5 font-mono">
+                                    PnL: <span className={`font-extrabold ${colorClass}`}>{isPositive ? '+' : ''}${h.pnl.toFixed(2)} ({isPositive ? '+' : ''}{h.pnlPercent.toFixed(1)}%)</span>
+                                  </div>
                                 </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShareCardHolding(h);
+                                    synthSound('bet');
+                                  }}
+                                  className={`px-3 py-1.5 bg-slate-900 hover:bg-slate-800 dark:bg-slate-950 dark:hover:bg-slate-900 border ${badgeBorderClass} text-white font-mono text-[10px] font-bold rounded-lg transition-all flex items-center gap-1 active:scale-95 cursor-pointer`}
+                                >
+                                  <Share2 size={12} className={colorClass} />
+                                  <span>SHARE</span>
+                                </button>
                               </div>
-                            </div>
-                          )}
-                          {jeetSharesOwned > 0 && (
-                            <div className="flex justify-between items-center bg-rose-500/5 p-4 rounded-xl border border-rose-500/20">
-                              <div>
-                                <div className="font-bold text-rose-500 uppercase text-[10px]">NO shares</div>
-                                <div className="text-xs text-slate-600 dark:text-slate-400 font-bold mt-1">
-                                  Shares Owned: {jeetSharesOwned.toFixed(1)} | Avg Cost: {avgJeetPrice.toFixed(2)} USDC
-                                </div>
-                              </div>
-                            </div>
-                          )}
+                            );
+                          })}
                         </div>
                       );
                     })()}
@@ -2224,6 +2621,24 @@ export default function RoomDetailPage() {
                   </p>
                 </div>
 
+                {room.rules && (
+                  <div className="space-y-1.5 pt-3 border-t border-slate-100 dark:border-slate-800/60">
+                    <span className="block font-mono text-[9px] text-slate-400 dark:text-slate-500 uppercase font-extrabold">Market Rules / Guidelines</span>
+                    <p className="font-sans text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {room.rules}
+                    </p>
+                  </div>
+                )}
+
+                {room.context && (
+                  <div className="space-y-1.5 pt-3 border-t border-slate-100 dark:border-slate-800/60">
+                    <span className="block font-mono text-[9px] text-slate-400 dark:text-slate-500 uppercase font-extrabold">Market Context / Background</span>
+                    <p className="font-sans text-xs text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-wrap">
+                      {room.context}
+                    </p>
+                  </div>
+                )}
+
                 {/* 2. Structured Strike Rules */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 font-mono text-xs">
                   <div className="space-y-1">
@@ -2361,6 +2776,237 @@ export default function RoomDetailPage() {
           walletAddress={selectedProfileAddress}
           onClose={() => setSelectedProfileAddress(null)}
         />
+      )}
+
+      {shareCardHolding && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl p-6 space-y-6 text-center">
+            
+            {/* Modal Header */}
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="font-mono text-xs font-bold text-slate-400 tracking-wider">SHARE POSITION RECEIPT</span>
+              <button 
+                type="button"
+                onClick={() => setShareCardHolding(null)}
+                className="text-slate-500 hover:text-slate-300 font-mono text-xs cursor-pointer font-bold"
+              >
+                [CLOSE]
+              </button>
+            </div>
+
+            {/* Premium Preview Receipt Ticket */}
+            <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 text-left relative overflow-hidden shadow-inner space-y-4">
+              {/* Decorative ticket cutouts */}
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-slate-900 rounded-r-full border-y border-r border-slate-800" />
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-slate-900 rounded-l-full border-y border-l border-slate-800" />
+
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="font-mono text-[10px] text-emerald-500 font-extrabold tracking-widest uppercase">SHITMARKET ARENA</h4>
+                  <span className="font-sans text-xs text-slate-500 font-bold block mt-0.5">BATTLEFIELD POSITION</span>
+                </div>
+                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center font-mono text-xs font-black text-emerald-500">
+                  ⚔️
+                </div>
+              </div>
+
+              {/* Dotted border separator */}
+              <div className="border-t border-dashed border-slate-850 my-2" />
+
+              <div className="space-y-1.5">
+                <span className="font-mono text-[9px] text-slate-500 font-bold uppercase tracking-wider block">CHALLENGE:</span>
+                <p className="font-sans text-sm text-white font-extrabold leading-snug line-clamp-2">
+                  {room.resolutionCriteria}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 mt-2">
+                <span className={`px-2.5 py-1 text-[10px] font-black tracking-wider rounded-lg border font-mono uppercase ${
+                  shareCardHolding.pnl >= 0 
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' 
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+                }`}>
+                  {shareCardHolding.label}
+                </span>
+              </div>
+
+              <div className="border-t border-dashed border-slate-855 my-2" />
+
+              {/* Data Table */}
+              <div className="space-y-2.5 font-mono text-[11px]">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold uppercase">SHARES OWNED:</span>
+                  <span className="text-white font-extrabold">{shareCardHolding.sharesOwned.toFixed(1)} @ ${shareCardHolding.avgCost.toFixed(2)} Avg</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold uppercase">INVESTMENT:</span>
+                  <span className="text-white font-extrabold">${shareCardHolding.totalSpent.toFixed(2)} USDC</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500 font-bold uppercase">PROFIT / LOSS:</span>
+                  <span className={`font-black ${shareCardHolding.pnl >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                    {shareCardHolding.pnl >= 0 ? '+' : ''}${shareCardHolding.pnl.toFixed(2)} ({shareCardHolding.pnl >= 0 ? '+' : ''}{shareCardHolding.pnlPercent.toFixed(1)}%)
+                  </span>
+                </div>
+              </div>
+
+              <div className="border-t border-dashed border-slate-800 my-2" />
+
+              <div className="flex justify-between items-center text-[9px] text-slate-600 font-bold tracking-widest font-mono">
+                <span>WWW.SHITMARKET.FUN</span>
+                <span>PILOT: {wallet?.address ? (wallet.address.slice(0, 6) + '...' + wallet.address.slice(-4)).toUpperCase() : 'ANON'}</span>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                type="button"
+                onClick={() => {
+                  const canvas = document.createElement('canvas');
+                  canvas.width = 600;
+                  canvas.height = 500;
+                  const ctx = canvas.getContext('2d');
+                  if (!ctx) return;
+
+                  const grad = ctx.createLinearGradient(0, 0, 0, 500);
+                  grad.addColorStop(0, '#090d16');
+                  grad.addColorStop(1, '#162235');
+                  ctx.fillStyle = grad;
+                  ctx.fillRect(0, 0, 600, 500);
+
+                  ctx.strokeStyle = '#1e293b';
+                  ctx.lineWidth = 15;
+                  ctx.strokeRect(7.5, 7.5, 585, 485);
+                  ctx.strokeStyle = '#38bdf8';
+                  ctx.lineWidth = 2;
+                  ctx.strokeRect(15, 15, 570, 470);
+
+                  ctx.fillStyle = '#ffffff';
+                  ctx.font = 'bold 24px monospace';
+                  ctx.fillText('SHITMARKET ARENA', 40, 60);
+
+                  ctx.fillStyle = '#38bdf8';
+                  ctx.font = 'bold 12px monospace';
+                  ctx.fillText('BATTLEFIELD RECEIPT', 40, 85);
+
+                  ctx.strokeStyle = '#334155';
+                  ctx.lineWidth = 1;
+                  ctx.setLineDash([6, 6]);
+                  ctx.beginPath();
+                  ctx.moveTo(40, 110);
+                  ctx.lineTo(560, 110);
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+
+                  ctx.fillStyle = '#94a3b8';
+                  ctx.font = 'bold 11px monospace';
+                  ctx.fillText('MARKET CHALLENGE:', 40, 140);
+
+                  ctx.fillStyle = '#ffffff';
+                  ctx.font = 'bold 16px sans-serif';
+                  const topic = room?.resolutionCriteria || 'Battlefield Arena Challenge';
+                  const words = topic.split(' ');
+                  let line = '';
+                  let y = 175;
+                  for (let n = 0; n < words.length; n++) {
+                    let testLine = line + words[n] + ' ';
+                    let metrics = ctx.measureText(testLine);
+                    if (metrics.width > 520 && n > 0) {
+                      ctx.fillText(line, 40, y);
+                      line = words[n] + ' ';
+                      y += 24;
+                    } else {
+                      line = testLine;
+                    }
+                  }
+                  ctx.fillText(line, 40, y);
+
+                  y += 25;
+
+                  ctx.fillStyle = '#1e293b';
+                  ctx.beginPath();
+                  ctx.roundRect(40, y, 520, 45, 8);
+                  ctx.fill();
+                  ctx.strokeStyle = shareCardHolding.pnl >= 0 ? '#10b981' : '#f43f5e';
+                  ctx.lineWidth = 1.5;
+                  ctx.stroke();
+
+                  ctx.fillStyle = shareCardHolding.pnl >= 0 ? '#10b981' : '#f43f5e';
+                  ctx.font = 'bold 14px monospace';
+                  ctx.fillText(`OUTCOME: ${shareCardHolding.label.toUpperCase()}`, 60, y + 27);
+
+                  y += 85;
+
+                  ctx.fillStyle = '#94a3b8';
+                  ctx.font = '13px monospace';
+                  ctx.fillText('Shares Owned:', 40, y);
+                  ctx.fillStyle = '#ffffff';
+                  ctx.font = 'bold 13px monospace';
+                  ctx.fillText(`${shareCardHolding.sharesOwned.toFixed(1)} Shares @ $${shareCardHolding.avgCost.toFixed(2)} Avg`, 220, y);
+
+                  y += 30;
+                  ctx.fillStyle = '#94a3b8';
+                  ctx.font = '13px monospace';
+                  ctx.fillText('Investment:', 40, y);
+                  ctx.fillStyle = '#ffffff';
+                  ctx.font = 'bold 13px monospace';
+                  ctx.fillText(`$${shareCardHolding.totalSpent.toFixed(2)} USDC`, 220, y);
+
+                  y += 30;
+                  ctx.fillStyle = '#94a3b8';
+                  ctx.font = '13px monospace';
+                  ctx.fillText('Profit / Loss:', 40, y);
+                  const pnlSign = shareCardHolding.pnl >= 0 ? '+' : '';
+                  ctx.fillStyle = shareCardHolding.pnl >= 0 ? '#10b981' : '#f43f5e';
+                  ctx.font = 'bold 13px monospace';
+                  ctx.fillText(`${pnlSign}$${shareCardHolding.pnl.toFixed(2)} (${pnlSign}${shareCardHolding.pnlPercent.toFixed(1)}%)`, 220, y);
+
+                  y += 40;
+                  ctx.strokeStyle = '#334155';
+                  ctx.lineWidth = 1;
+                  ctx.setLineDash([6, 6]);
+                  ctx.beginPath();
+                  ctx.moveTo(40, y);
+                  ctx.lineTo(560, y);
+                  ctx.stroke();
+                  ctx.setLineDash([]);
+
+                  y += 30;
+                  ctx.fillStyle = '#475569';
+                  ctx.font = 'bold 10px monospace';
+                  ctx.fillText('WWW.SHITMARKET.FUN', 40, y);
+
+                  const userAddr = wallet?.address ? (wallet.address.slice(0, 6) + '...' + wallet.address.slice(-4)) : 'ANONYMOUS';
+                  ctx.fillText(`PILOT: ${userAddr.toUpperCase()}`, 420, y);
+
+                  const url = canvas.toDataURL('image/png');
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `shitmarket_receipt_${room.id.slice(0, 6)}.png`;
+                  a.click();
+                  synthSound('victory');
+                }}
+                className="py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-mono text-xs uppercase font-extrabold rounded-xl transition-all shadow-md shadow-emerald-500/10 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                📥 DOWNLOAD RECEIPT
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pnlSign = shareCardHolding.pnl >= 0 ? '+' : '';
+                  const text = `⚔️ SHITMARKET ARENA BATTLEFIELD RECEIPT ⚔️\n\n🎯 Market: ${room.resolutionCriteria}\n🛡️ Position: ${shareCardHolding.label.toUpperCase()}\n📈 PnL: ${pnlSign}$${shareCardHolding.pnl.toFixed(2)} (${pnlSign}${shareCardHolding.pnlPercent.toFixed(1)}%)\n\nJoin the arena at www.shitmarket.fun !`;
+                  navigator.clipboard.writeText(text);
+                  useAppState.getState().addToast("RECEIPT COPIED", "success", "Share receipt copied to clipboard!");
+                  synthSound('degen');
+                }}
+                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-white font-mono text-xs uppercase font-extrabold rounded-xl transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                📋 COPY TEXT
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

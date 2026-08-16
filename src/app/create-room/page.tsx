@@ -75,6 +75,8 @@ export default function CreateRoomPage() {
   const [customOracleAddress, setCustomOracleAddress] = useState('');
   const [oracleFeeSol, setOracleFeeSol] = useState<number>(0);
   const [resolutionCriteria, setResolutionCriteria] = useState('');
+  const [rules, setRules] = useState('');
+  const [context, setContext] = useState('');
   const [referenceUrl, setReferenceUrl] = useState('');
   
   // Platform Keeper address cached
@@ -83,6 +85,7 @@ export default function CreateRoomPage() {
   // Form State - Outcome labels (moon/jeet or yes/no)
   const [moonLabel, setMoonLabel] = useState('MOON');
   const [jeetLabel, setJeetLabel] = useState('JEET');
+  const [outcomes, setOutcomes] = useState<string[]>(['MOON', 'JEET']);
 
   // Form State - Config & Seeding
   const [expiryDate, setExpiryDate] = useState<string>(() => {
@@ -103,9 +106,11 @@ export default function CreateRoomPage() {
     if (arenaType === 'token') {
       setMoonLabel('MOON');
       setJeetLabel('JEET');
+      setOutcomes(['MOON', 'JEET']);
     } else {
       setMoonLabel('YES');
       setJeetLabel('NO');
+      setOutcomes(['YES', 'NO']);
     }
   }, [arenaType]);
 
@@ -597,13 +602,16 @@ export default function CreateRoomPage() {
       createdAt: Date.now(),
       duration: computedDuration,
       openingPrice: targetOpeningPrice,
-      moonLabel: moonLabel || 'MOON',
-      jeetLabel: jeetLabel || 'JEET',
+      moonLabel: outcomes[0] || 'YES',
+      jeetLabel: outcomes[1] || 'NO',
+      outcomeLabels: outcomes,
       
       // Oracle layer details
       oracleAddress: finalOracleAddress,
       oracleFeeLamports: finalOracleFeeLamports,
-      resolutionCriteria: finalCriteriaText
+      resolutionCriteria: finalCriteriaText,
+      rules: rules.trim() || undefined,
+      context: context.trim() || undefined
     };
 
     try {
@@ -1160,37 +1168,84 @@ export default function CreateRoomPage() {
                   <span>CUSTOM OUTCOME LABELS</span>
                 </h4>
                 <p className="font-sans text-xs text-slate-500 dark:text-slate-400">
-                  Customize outcome names for Side 0 (Bullish/Yes) and Side 1 (Bearish/No).
+                  {arenaType === 'token' ? 'Customize outcome names.' : 'Customize outcomes for this market (add 2 or more options).'}
                 </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="block font-mono text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                      Side 0 Label (Default: {arenaType === 'token' ? 'MOON' : 'YES'})
-                    </label>
-                    <input
-                      type="text"
-                      value={moonLabel}
-                      onChange={(e) => setMoonLabel(e.target.value.toUpperCase().slice(0, 15))}
-                      placeholder={arenaType === 'token' ? 'MOON' : 'YES'}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs rounded-xl focus:border-emerald-500 focus:outline-none uppercase font-bold"
-                    />
+                {arenaType === 'token' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="block font-mono text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
+                        Side 0 Label (Default: MOON)
+                      </label>
+                      <input
+                        type="text"
+                        value={moonLabel}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase().slice(0, 15);
+                          setMoonLabel(val);
+                          setOutcomes([val, jeetLabel]);
+                        }}
+                        placeholder="MOON"
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs rounded-xl focus:border-emerald-500 focus:outline-none uppercase font-bold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block font-mono text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
+                        Side 1 Label (Default: JEET)
+                      </label>
+                      <input
+                        type="text"
+                        value={jeetLabel}
+                        onChange={(e) => {
+                          const val = e.target.value.toUpperCase().slice(0, 15);
+                          setJeetLabel(val);
+                          setOutcomes([moonLabel, val]);
+                        }}
+                        placeholder="JEET"
+                        className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs rounded-xl focus:border-emerald-500 focus:outline-none uppercase font-bold"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <label className="block font-mono text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase">
-                      Side 1 Label (Default: {arenaType === 'token' ? 'JEET' : 'NO'})
-                    </label>
-                    <input
-                      type="text"
-                      value={jeetLabel}
-                      onChange={(e) => setJeetLabel(e.target.value.toUpperCase().slice(0, 15))}
-                      placeholder={arenaType === 'token' ? 'JEET' : 'NO'}
-                      className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs rounded-xl focus:border-emerald-500 focus:outline-none uppercase font-bold"
-                    />
+                ) : (
+                  <div className="space-y-3">
+                    {outcomes.map((outcome, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <div className="font-mono text-xs text-slate-400 dark:text-slate-500 w-16">Option {idx}:</div>
+                        <input
+                          type="text"
+                          value={outcome}
+                          onChange={(e) => {
+                            const newOutcomes = [...outcomes];
+                            newOutcomes[idx] = e.target.value.toUpperCase().slice(0, 20);
+                            setOutcomes(newOutcomes);
+                          }}
+                          placeholder={`Option ${idx + 1}`}
+                          className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs rounded-xl focus:border-emerald-500 focus:outline-none uppercase font-bold"
+                        />
+                        {outcomes.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newOutcomes = outcomes.filter((_, i) => i !== idx);
+                              setOutcomes(newOutcomes);
+                            }}
+                            className="p-3 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl transition font-mono text-xs font-bold"
+                          >
+                            REMOVE
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setOutcomes([...outcomes, `OPTION_${outcomes.length + 1}`])}
+                      className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-850 text-slate-700 dark:text-slate-300 font-mono text-xs font-bold rounded-xl transition flex items-center justify-center gap-1.5"
+                    >
+                      + ADD OUTCOME OPTION
+                    </button>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Beautified Live Room Card Replica Preview */}
               <div className="bg-slate-50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 space-y-4">
                 <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider block flex items-center gap-1.5">
                   <Sparkles size={14} className="text-emerald-500" />
@@ -1324,12 +1379,41 @@ export default function CreateRoomPage() {
                   </div>
 
                   <div className="space-y-2">
+                    <label className="block font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Resolution Criteria / Objective (Required):
+                    </label>
                     <textarea
                       required
                       rows={4}
                       placeholder="ENTER PRECISE RESOLUTION CRITERIA... e.g., RESOLVES MOON IF BITCOIN TRADES ABOVE $100K USD BEFORE DEC 2026. RESOLVES JEET OTHERWISE."
                       value={resolutionCriteria}
                       onChange={(e) => setResolutionCriteria(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none uppercase tracking-wide font-bold transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Market Rules / Settlement Guidelines (Optional):
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="SPECIFY ANY SPECIFIC MARKET RULES OR SETTLEMENT GUIDELINES..."
+                      value={rules}
+                      onChange={(e) => setRules(e.target.value)}
+                      className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none uppercase tracking-wide font-bold transition-all"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block font-mono text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Market Context / Background Info (Optional):
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="PROVIDE ADDITIONAL CONTEXT, BACKSTORY, OR SOURCE DETAILS FOR THE OUTCOMES..."
+                      value={context}
+                      onChange={(e) => setContext(e.target.value)}
                       className="w-full px-4 py-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-mono text-xs placeholder-slate-400 rounded-xl focus:border-emerald-500 focus:outline-none uppercase tracking-wide font-bold transition-all"
                     />
                   </div>

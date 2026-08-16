@@ -574,6 +574,8 @@ export interface Room {
   creator: string;
   moonPool: number;
   jeetPool: number;
+  poolReserves?: number[];
+  outcomeLabels?: string[];
   expiry: number; // unix timestamp in ms
   status: 'active' | 'settled' | 'cancelled' | 'pending' | 'disputed';
   winner?: 'moon' | 'jeet' | 'draw';
@@ -598,6 +600,8 @@ export interface Room {
   oracleLogs?: string;
   moonLabel?: string;
   jeetLabel?: string;
+  rules?: string;
+  context?: string;
 }
 
 export interface UserProfile {
@@ -769,7 +773,7 @@ export interface AppState {
   // AMM Swap Actions
   executeImmediateTrade: (roomId: string, side: 'moon' | 'jeet', amount: number, action: 'buy' | 'sell') => Promise<void>;
   placeLimitOrder: (roomId: string, side: 'buy' | 'sell', outcomeIndex: number, price: number, amount: number) => Promise<any>;
-  executeEvmMarketTrade: (roomId: string, side: 'moon' | 'jeet', amountShares: number, orderType: 'buy' | 'sell', maxUsdcSpentOrMinReceived: number) => Promise<void>;
+  executeEvmMarketTrade: (roomId: string, side: 'moon' | 'jeet' | number, amountShares: number, orderType: 'buy' | 'sell', maxUsdcSpentOrMinReceived: number) => Promise<void>;
 
   // Relay Protocol Cross-Chain Deposit Modal
   isRelayDepositOpen: boolean;
@@ -852,6 +856,10 @@ export const mapApiRoom = (apiRoom: any): Room => {
     creator: apiRoom.creator || 'Unknown',
     moonPool: Number(apiRoom.moonPool || 0) / (apiRoom.chainId === 'avalanche' || apiRoom.roomPubkey?.startsWith('0x') ? 1e6 : 1e9),
     jeetPool: Number(apiRoom.jeetPool || 0) / (apiRoom.chainId === 'avalanche' || apiRoom.roomPubkey?.startsWith('0x') ? 1e6 : 1e9),
+    poolReserves: apiRoom.poolReserves 
+      ? apiRoom.poolReserves.map((r: number) => r / (apiRoom.chainId === 'avalanche' || apiRoom.roomPubkey?.startsWith('0x') ? 1e6 : 1e9))
+      : undefined,
+    outcomeLabels: apiRoom.outcomeLabels || undefined,
     expiry: new Date(apiRoom.expiry).getTime(),
     status: apiRoom.status as 'active' | 'settled' | 'cancelled' | 'pending' | 'disputed',
     winner: apiRoom.winner ? (apiRoom.winner as 'moon' | 'jeet' | 'draw') : undefined,
@@ -867,6 +875,8 @@ export const mapApiRoom = (apiRoom: any): Room => {
     disputeChallenger: apiRoom.disputeChallenger || undefined,
     disputeBond: apiRoom.disputeBond ? Number(apiRoom.disputeBond) : undefined,
     oracleLogs: apiRoom.oracleLogs || undefined,
+    rules: apiRoom.rules || undefined,
+    context: apiRoom.context || undefined,
   };
 };
 
@@ -1872,13 +1882,17 @@ export const useAppState = create<AppState>()(
           throw new Error(`Failed USDC allowance check/approval for Market Factory: ${allowanceErr?.message || allowanceErr}`);
         }
 
+        const outcomeCount = room.outcomeLabels && room.outcomeLabels.length >= 2
+          ? BigInt(room.outcomeLabels.length)
+          : BigInt(2);
+
         const { request } = await publicClient.simulateContract({
           address: marketFactoryAddress,
           abi: MARKET_FACTORY_ABI,
           functionName: 'createMarket',
           args: [
             room.token.name || 'Unknown Room',
-            BigInt(2),
+            outcomeCount,
             oracleRegistryAddress,
             resolutionTime,
             wallet.address as `0x${string}` // Creator resolves the market
@@ -2141,6 +2155,9 @@ export const useAppState = create<AppState>()(
           id: actualRoomId,
           moonPool: moonSeed,
           jeetPool: jeetSeed,
+          poolReserves: room.outcomeLabels 
+            ? room.outcomeLabels.map(() => seedAmount / room.outcomeLabels!.length)
+            : [moonSeed, jeetSeed],
           status: 'active' as const,
         };
         const updatedRooms = [optimisticRoom, ...get().rooms.filter(r => !isSameRoom(r.id, optimisticRoom.id))];
@@ -2172,7 +2189,10 @@ export const useAppState = create<AppState>()(
             duration: room.duration,
             status: 'active',
             moonLabel: room.moonLabel || 'MOON',
-            jeetLabel: room.jeetLabel || 'JEET'
+            jeetLabel: room.jeetLabel || 'JEET',
+            outcomeLabels: room.outcomeLabels,
+            rules: room.rules,
+            context: room.context
           })
         }).catch(err => console.warn("Failed to post EVM room to indexer:", err));
         
@@ -2453,7 +2473,10 @@ export const useAppState = create<AppState>()(
           duration: room.duration,
           status: 'active',
           moonLabel: room.moonLabel || 'MOON',
-          jeetLabel: room.jeetLabel || 'JEET'
+          jeetLabel: room.jeetLabel || 'JEET',
+          outcomeLabels: room.outcomeLabels,
+          rules: room.rules,
+          context: room.context
         })
       }).catch(err => console.warn("Failed to post Solana room to indexer:", err));
       
@@ -2741,7 +2764,7 @@ export const useAppState = create<AppState>()(
     }
   },
 
-  executeEvmMarketTrade: async (roomId: string, side: 'moon' | 'jeet', amountShares: number, orderType: 'buy' | 'sell', maxUsdcSpentOrMinReceived: number) => {
+  executeEvmMarketTrade: async (roomId: string, side: 'moon' | 'jeet' | number, amountShares: number, orderType: 'buy' | 'sell', maxUsdcSpentOrMinReceived: number) => {
     const { wallet, addToast } = get();
     if (!wallet || !wallet.address || !wallet.privyWallet) {
       addToast("WALLET NOT ENLISTED", "error", "Please connect your wallet first!");
@@ -2859,7 +2882,17 @@ export const useAppState = create<AppState>()(
       const fillAmounts: bigint[] = [];
       
       const amountSharesScaled = BigInt(Math.round(amountShares * 1e6));
-      const outcomeIndex = side === 'moon' ? 0 : 1;
+      
+      let outcomeIndex = 0;
+      if (typeof side === 'number') {
+        outcomeIndex = side;
+      } else if (!isNaN(Number(side))) {
+        outcomeIndex = Number(side);
+      } else if (side.startsWith('outcome_')) {
+        outcomeIndex = Number(side.replace('outcome_', ''));
+      } else {
+        outcomeIndex = side === 'moon' ? 0 : 1;
+      }
 
       if (data.success) {
         if (orderType === 'buy') {
@@ -3195,7 +3228,7 @@ export const useAppState = create<AppState>()(
         roomId,
         user: wallet.address,
         currentOwner: wallet.address,
-        side,
+        side: typeof side === 'number' ? (side === 0 ? 'moon' : 'jeet') : side,
         amount: Math.round(maxUsdcSpentOrMinReceived * 100) / 100,
         claimed: false,
         timestamp: Date.now(),

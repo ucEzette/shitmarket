@@ -453,6 +453,8 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
         creator: room.creator,
         moonPool: cached?.moonPool ?? null,
         jeetPool: cached?.jeetPool ?? null,
+        poolReserves: cached?.poolReserves ? cached.poolReserves.split(',').map(Number) : null,
+        outcomeLabels: room.outcomeLabels ? JSON.parse(room.outcomeLabels) : null,
       };
     });
 
@@ -486,7 +488,10 @@ roomsRouter.post('/', async (req, res) => {
       duration,
       status,
       moonLabel,
-      jeetLabel
+      jeetLabel,
+      outcomeLabels,
+      rules,
+      context
     } = req.body;
 
     if (!roomPubkey) {
@@ -527,6 +532,9 @@ roomsRouter.post('/', async (req, res) => {
         totalPool: totalPoolScaled,
         moonLabel: moonLabel || 'MOON',
         jeetLabel: jeetLabel || 'JEET',
+        outcomeLabels: outcomeLabels ? JSON.stringify(outcomeLabels) : null,
+        rules: rules || null,
+        context: context || null,
       },
       update: {
         status: status || 'active',
@@ -545,6 +553,9 @@ roomsRouter.post('/', async (req, res) => {
         creator: normCreator || undefined,
         moonLabel: moonLabel || undefined,
         jeetLabel: jeetLabel || undefined,
+        outcomeLabels: outcomeLabels ? JSON.stringify(outcomeLabels) : undefined,
+        rules: rules || undefined,
+        context: context || undefined,
       }
     });
 
@@ -639,6 +650,8 @@ roomsRouter.get('/:pubkey', validate(roomPubkeyParamSchema, 'params'), async (re
         disputeBond: room.disputeBond ? room.disputeBond.toString() : null,
         moonPool: cached?.moonPool ?? '0',
         jeetPool: cached?.jeetPool ?? '0',
+        poolReserves: cached?.poolReserves ? cached.poolReserves.split(',').map(Number) : null,
+        outcomeLabels: room.outcomeLabels ? JSON.parse(room.outcomeLabels) : null,
         pairAddress: cached?.pairAddress || (await fetchTokenMeta(room.tokenMint)).pairAddress || '',
         bets: room.bets.map((b) => ({
           ...b,

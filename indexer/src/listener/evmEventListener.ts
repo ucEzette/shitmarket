@@ -481,7 +481,7 @@ async function handleSwap(log: EvmLog) {
     data: log.data as `0x${string}`,
     topics: log.topics as any
   }) as any;
-  const { swapper, outcomeIndex, usdcSpent, reserveYES, reserveNO } = decoded.args;
+  const { swapper, outcomeIndex, usdcSpent } = decoded.args;
 
   let conditionId: string | null = null;
   try {
@@ -516,9 +516,26 @@ async function handleSwap(log: EvmLog) {
     }
 
     const amount = isSell ? -BigInt(usdcSpent) : BigInt(usdcSpent);
-    const side = isSell 
-      ? (outcomeIndex === 0 ? 'jeet' : 'moon')
-      : (outcomeIndex === 0 ? 'moon' : 'jeet');
+    let side = 'moon';
+    
+    let isMulti = false;
+    try {
+      const room = await prisma.room.findUnique({ where: { roomPubkey: roomId } });
+      if (room && room.outcomeLabels) {
+        const parsed = JSON.parse(room.outcomeLabels);
+        if (Array.isArray(parsed) && parsed.length > 2) {
+          isMulti = true;
+        }
+      }
+    } catch (e) {}
+
+    if (isMulti) {
+      side = String(outcomeIndex);
+    } else {
+      side = isSell 
+        ? (outcomeIndex === 0 ? 'jeet' : 'moon')
+        : (outcomeIndex === 0 ? 'moon' : 'jeet');
+    }
 
     // Log the Bet in Prisma
     await prisma.bet.create({
@@ -531,25 +548,74 @@ async function handleSwap(log: EvmLog) {
       }
     });
 
+    // Query reserves from pool contract
+    let outcomeCount = 2n;
+    try {
+      outcomeCount = await publicClient.readContract({
+        address: log.address as `0x${string}`,
+        abi: [{
+          name: 'outcomeCount',
+          type: 'function',
+          stateMutability: 'view',
+          inputs: [],
+          outputs: [{ name: '', type: 'uint256' }]
+        }] as const,
+        functionName: 'outcomeCount'
+      } as any) as bigint;
+    } catch (err) {
+      logger.warn({ msg: 'Failed to read outcomeCount, defaulting to 2', pool: log.address, err });
+    }
+
+    const reserves: bigint[] = [];
+    let totalPool = 0n;
+    for (let i = 0n; i < outcomeCount; i++) {
+      try {
+        const reserve = await publicClient.readContract({
+          address: log.address as `0x${string}`,
+          abi: [{
+            name: 'reserves',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: '', type: 'uint256' }],
+            outputs: [{ name: '', type: 'uint256' }]
+          }] as const,
+          functionName: 'reserves',
+          args: [i]
+        } as any) as bigint;
+        reserves.push(reserve);
+        totalPool += reserve;
+      } catch (err) {
+        logger.error({ msg: 'Failed to read reserve index', index: i.toString(), pool: log.address, err });
+      }
+    }
+
     await prisma.room.update({
       where: { roomPubkey: roomId },
       data: {
-        totalPool: { increment: amount }
+        totalPool
       }
     });
 
-    await cacheRoom(roomId, {
-      moonPool: reserveYES.toString(),
-      jeetPool: reserveNO.toString(),
-    });
+    const cachePayload: Record<string, string> = {
+      poolReserves: reserves.map(r => r.toString()).join(','),
+    };
+    if (outcomeCount === 2n) {
+      cachePayload.moonPool = reserves[0].toString();
+      cachePayload.jeetPool = reserves[1].toString();
+    }
+
+    await cacheRoom(roomId, cachePayload);
 
     await publishRoomUpdate(roomId, {
       type: 'BetPlaced',
       user: swapper.toLowerCase(),
       side,
       amount: amount.toString(),
-      moonPool: reserveYES.toString(),
-      jeetPool: reserveNO.toString(),
+      poolReserves: reserves.map(r => r.toString()),
+      ...(outcomeCount === 2n ? {
+        moonPool: reserves[0].toString(),
+        jeetPool: reserves[1].toString(),
+      } : {})
     });
 
     logger.info({ msg: isSell ? 'EVM AMM Sell indexed' : 'EVM AMM Buy indexed', pool: log.address, swapper, side, amount: amount.toString() });
@@ -636,32 +702,42 @@ async function handleLiquidityAddedOrRemoved(log: EvmLog) {
   if (conditionId) {
     const roomId = conditionId;
     try {
-      const reserve0 = await publicClient.readContract({
-        address: log.address as `0x${string}`,
-        abi: [{
-          name: 'reserves',
-          type: 'function',
-          stateMutability: 'view',
-          inputs: [{ name: '', type: 'uint256' }],
-          outputs: [{ name: '', type: 'uint256' }]
-        }] as const,
-        functionName: 'reserves',
-        args: [BigInt(0)]
-      } as any) as bigint;
-      const reserve1 = await publicClient.readContract({
-        address: log.address as `0x${string}`,
-        abi: [{
-          name: 'reserves',
-          type: 'function',
-          stateMutability: 'view',
-          inputs: [{ name: '', type: 'uint256' }],
-          outputs: [{ name: '', type: 'uint256' }]
-        }] as const,
-        functionName: 'reserves',
-        args: [BigInt(1)]
-      } as any) as bigint;
+      let outcomeCount = 2n;
+      try {
+        outcomeCount = await publicClient.readContract({
+          address: log.address as `0x${string}`,
+          abi: [{
+            name: 'outcomeCount',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [],
+            outputs: [{ name: '', type: 'uint256' }]
+          }] as const,
+          functionName: 'outcomeCount'
+        } as any) as bigint;
+      } catch (err) {
+        logger.warn({ msg: 'Failed to read outcomeCount, defaulting to 2', pool: log.address, err });
+      }
 
-      const totalPool = reserve0 + reserve1;
+      const reserves: bigint[] = [];
+      let totalPool = 0n;
+      for (let i = 0n; i < outcomeCount; i++) {
+        const reserve = await publicClient.readContract({
+          address: log.address as `0x${string}`,
+          abi: [{
+            name: 'reserves',
+            type: 'function',
+            stateMutability: 'view',
+            inputs: [{ name: '', type: 'uint256' }],
+            outputs: [{ name: '', type: 'uint256' }]
+          }] as const,
+          functionName: 'reserves',
+          args: [i]
+        } as any) as bigint;
+        reserves.push(reserve);
+        totalPool += reserve;
+      }
+
       await prisma.room.update({
         where: { roomPubkey: roomId },
         data: {
@@ -669,18 +745,26 @@ async function handleLiquidityAddedOrRemoved(log: EvmLog) {
         }
       });
 
-      await cacheRoom(roomId, {
-        moonPool: reserve0.toString(),
-        jeetPool: reserve1.toString(),
-      });
+      const cachePayload: Record<string, string> = {
+        poolReserves: reserves.map(r => r.toString()).join(','),
+      };
+      if (outcomeCount === 2n) {
+        cachePayload.moonPool = reserves[0].toString();
+        cachePayload.jeetPool = reserves[1].toString();
+      }
+
+      await cacheRoom(roomId, cachePayload);
 
       await publishRoomUpdate(roomId, {
         type: 'PoolLiquidityUpdated',
-        moonPool: reserve0.toString(),
-        jeetPool: reserve1.toString(),
+        poolReserves: reserves.map(r => r.toString()),
+        ...(outcomeCount === 2n ? {
+          moonPool: reserves[0].toString(),
+          jeetPool: reserves[1].toString(),
+        } : {})
       });
 
-      logger.info({ msg: 'EVM Pool Liquidity sync complete', pool: log.address, reserve0: reserve0.toString(), reserve1: reserve1.toString() });
+      logger.info({ msg: 'EVM Pool Liquidity sync complete', pool: log.address, reserves: reserves.map(r => r.toString()) });
     } catch (err) {
       logger.error({ msg: 'Failed to sync EVM pool reserves on liquidity event', pool: log.address, err });
     }

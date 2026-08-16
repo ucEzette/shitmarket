@@ -47,6 +47,9 @@ model Room {
   oracleLogs          String?   @map("oracle_logs") @db.Text
   moonLabel           String    @default("MOON") @map("moon_label") @db.VarChar(50)
   jeetLabel           String    @default("JEET") @map("jeet_label") @db.VarChar(50)
+  outcomeLabels       String?   @map("outcome_labels") @db.Text
+  rules               String?   @map("rules") @db.Text
+  context             String?   @map("context") @db.Text
 
   bets            Bet[]
   payouts         Payout[]

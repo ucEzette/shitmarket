@@ -559,6 +559,7 @@ export const detectCategory = (tokenName?: string, tokenSymbol?: string, descrip
 
 export interface Room {
   id: string;
+  roomPubkey?: string;
   category?: MarketCategory;
   token: {
     address: string;
@@ -842,6 +843,7 @@ export const mapApiRoom = (apiRoom: any): Room => {
 
   return {
     id: apiRoom.roomPubkey,
+    roomPubkey: apiRoom.roomPubkey,
     duration: apiRoom.duration || apiRoom.durationMinutes || 60,
     category: apiRoom.category || detectCategory(apiRoom.tokenName, apiRoom.tokenSymbol, apiRoom.resolutionCriteria),
     openingPrice: openingPriceNum,
@@ -3056,6 +3058,29 @@ export const useAppState = create<AppState>()(
             await publicClient.waitForTransactionReceipt({ hash: approveHash });
           }
 
+          // Validate outcome index against on-chain pool outcome count
+          let poolOutcomeCount = 2;
+          try {
+            const countOnChain = await publicClient.readContract({
+              address: poolAddress,
+              abi: [{
+                name: 'outcomeCount',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [],
+                outputs: [{ name: '', type: 'uint256' }]
+              }] as const,
+              functionName: 'outcomeCount'
+            }) as bigint;
+            poolOutcomeCount = Number(countOnChain);
+          } catch (cErr) {
+            console.warn("Could not read outcomeCount from pool:", cErr);
+          }
+
+          if (outcomeIndex >= poolOutcomeCount) {
+            throw new Error(`This legacy room was deployed with ${poolOutcomeCount} on-chain outcomes. Outcome index ${outcomeIndex} is out of range. Please trade indices 0-${poolOutcomeCount - 1} or create a new multi-outcome room.`);
+          }
+
           // Direct buyShares on AMPool
           const { request } = await publicClient.simulateContract({
             address: poolAddress,
@@ -3099,6 +3124,29 @@ export const useAppState = create<AppState>()(
               nonce: approveTokensNonce
             });
             await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          }
+
+          // Validate outcome index against on-chain pool outcome count
+          let poolOutcomeCount = 2;
+          try {
+            const countOnChain = await publicClient.readContract({
+              address: poolAddress,
+              abi: [{
+                name: 'outcomeCount',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [],
+                outputs: [{ name: '', type: 'uint256' }]
+              }] as const,
+              functionName: 'outcomeCount'
+            }) as bigint;
+            poolOutcomeCount = Number(countOnChain);
+          } catch (cErr) {
+            console.warn("Could not read outcomeCount from pool:", cErr);
+          }
+
+          if (outcomeIndex >= poolOutcomeCount) {
+            throw new Error(`This legacy room was deployed with ${poolOutcomeCount} on-chain outcomes. Outcome index ${outcomeIndex} is out of range. Please trade indices 0-${poolOutcomeCount - 1} or create a new multi-outcome room.`);
           }
 
           const { request } = await publicClient.simulateContract({
@@ -3241,8 +3289,31 @@ export const useAppState = create<AppState>()(
         const updatedRooms = state.rooms.map((r) => {
           if (isSameRoom(r.id, roomId)) {
             const addedUsdc = orderType === 'buy' ? maxUsdcSpentOrMinReceived : -maxUsdcSpentOrMinReceived;
+            let nextReserves = r.poolReserves ? [...r.poolReserves] : undefined;
+            if (nextReserves && nextReserves.length >= 2) {
+              const idx = typeof side === 'number' ? side : (side === 'moon' ? 0 : 1);
+              if (orderType === 'buy') {
+                const targetRes = nextReserves[idx];
+                let prodBefore = 1;
+                let prodAfter = 1;
+                for (let j = 0; j < nextReserves.length; j++) {
+                  if (j !== idx) {
+                    prodBefore *= nextReserves[j];
+                    prodAfter *= (nextReserves[j] + addedUsdc);
+                  }
+                }
+                const newTargetRes = prodAfter > 0 ? (targetRes * prodBefore) / prodAfter : targetRes;
+                nextReserves[idx] = Math.max(0.01, newTargetRes);
+                for (let j = 0; j < nextReserves.length; j++) {
+                  if (j !== idx) {
+                    nextReserves[j] += addedUsdc;
+                  }
+                }
+              }
+            }
             return {
               ...r,
+              poolReserves: nextReserves,
               moonPool: side === 'moon' ? Math.max(0, (r.moonPool || 0) + addedUsdc) : (r.moonPool || 0),
               jeetPool: side === 'jeet' ? Math.max(0, (r.jeetPool || 0) + addedUsdc) : (r.jeetPool || 0),
             };

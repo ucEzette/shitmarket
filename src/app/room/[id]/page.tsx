@@ -141,7 +141,7 @@ const OddsHistoryChart = ({
     }
 
     setHistory(mockPoints);
-  }, [pricesSafe.length]);
+  }, [JSON.stringify(pricesSafe)]);
 
   // Append new real-time price updates
   useEffect(() => {
@@ -667,6 +667,38 @@ export default function RoomDetailPage() {
     room.token.address === room.creator
   ) : false;
 
+  const [evmBalances, setEvmBalances] = useState<number[]>([]);
+  const [evmReserves, setEvmReserves] = useState<number[]>([]);
+  const [selectedOutcomeIndex, setSelectedOutcomeIndex] = useState<number>(0);
+  const selectedSide = selectedOutcomeIndex === 0 ? 'moon' : 'jeet';
+  const setSelectedSide = (side: 'moon' | 'jeet') => {
+    setSelectedOutcomeIndex(side === 'moon' ? 0 : 1);
+  };
+  const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
+  const [stakeAmount, setStakeAmount] = useState<number>(10);
+  const [chatInput, setChatInput] = useState('');
+  const [countdownText, setCountdownText] = useState('00:00:00');
+  const [isRoomSettling, setIsRoomSettling] = useState(false);
+  
+  // AMM Trade states
+  const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
+  const [tradeMode, setTradeMode] = useState<'market' | 'limit'>('limit');
+  const [limitPrice, setLimitPrice] = useState<number>(0.50);
+  const [sharesInput, setSharesInput] = useState<number>(10);
+  const [selectedProfileAddress, setSelectedProfileAddress] = useState<string | null>(null);
+  const [activeRulesTab, setActiveRulesTab] = useState<'rules' | 'context'>('rules');
+  const [activeMainTab, setActiveMainTab] = useState<'trade' | 'chart' | 'liquidity' | 'holdings' | 'activity' | 'discussion'>('trade');
+  const [localShake, setLocalShake] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [watchlistedIds, setWatchlistedIds] = useState<string[]>([]);
+  const [onChainBets, setOnChainBets] = useState<any[]>([]);
+  const [selectedBetToList, setSelectedBetToList] = useState<any | null>(null);
+  const [askPriceInput, setAskPriceInput] = useState<string>('');
+  const [shareCardHolding, setShareCardHolding] = useState<any | null>(null);
+  const [mounted, setMounted] = useState(false);
+
   const [disputeCountdown, setDisputeCountdown] = useState<string | null>(null);
   const [arbitrationWinner, setArbitrationWinner] = useState<'moon' | 'jeet' | 'draw'>('moon');
   const [arbitrationOverturned, setArbitrationOverturned] = useState<boolean>(true);
@@ -705,9 +737,25 @@ export default function RoomDetailPage() {
 
   const isMultiOutcome = labelsSafe.length > 2;
 
-  const rawReserves: number[] = room?.poolReserves && room.poolReserves.length >= 2
-    ? room.poolReserves
-    : [rawMoonPool, rawJeetPool];
+  const targetCount = labelsSafe.length;
+  let rawReserves: number[] = [];
+
+  if (evmReserves.length === targetCount && evmReserves.some(r => r > 0)) {
+    rawReserves = evmReserves;
+  } else if (room?.poolReserves && room.poolReserves.length === targetCount && room.poolReserves.some(r => r > 0)) {
+    rawReserves = room.poolReserves;
+  } else {
+    // If on-chain pool has a different number of outcomes or is initializing, normalize gracefully
+    const totalSeed = (rawMoonPool + rawJeetPool) || 500;
+    const defaultPerOutcome = totalSeed / targetCount;
+    rawReserves = Array(targetCount).fill(defaultPerOutcome);
+    const sourceRes = evmReserves.length >= 2 ? evmReserves : (room?.poolReserves || [rawMoonPool, rawJeetPool]);
+    sourceRes.forEach((r, i) => {
+      if (i < targetCount && r > 0) {
+        rawReserves[i] = r;
+      }
+    });
+  }
 
   // Sum of reciprocals for multi-outcome CPMM pricing
   let sumReciprocals = 0;
@@ -723,8 +771,11 @@ export default function RoomDetailPage() {
     : rawReserves;
 
   const pricesSafe = rawReserves.map(r => {
-    if (!isEvm) return r / (rawReserves.reduce((a, b) => a + b, 0) || 1);
-    return r > 0 ? (1 / r) / (sumReciprocals || 1) : 0.5;
+    if (!isEvm) {
+      const sum = rawReserves.reduce((a, b) => a + b, 0);
+      return sum > 0 ? r / sum : (1 / targetCount);
+    }
+    return (r > 0 && sumReciprocals > 0) ? (1 / r) / sumReciprocals : (1 / targetCount);
   });
 
   const totalPotSafe = reservesSafe.reduce((a, b) => a + b, 0);
@@ -740,36 +791,7 @@ export default function RoomDetailPage() {
   const durationSafe = typeof room?.duration === 'number' ? room.duration : room?.duration ? parseFloat(room.duration as any) || 0 : undefined;
   const expirySafe = typeof room?.expiry === 'number' ? room.expiry : room?.expiry ? parseFloat(room.expiry as any) || 0 : 0;
 
-  const [selectedOutcomeIndex, setSelectedOutcomeIndex] = useState<number>(0);
-  const selectedSide = selectedOutcomeIndex === 0 ? 'moon' : 'jeet';
-  const setSelectedSide = (side: 'moon' | 'jeet') => {
-    setSelectedOutcomeIndex(side === 'moon' ? 0 : 1);
-  };
-  const [activeChatTab, setActiveChatTab] = useState<'moon' | 'jeet'>('moon');
-  const [stakeAmount, setStakeAmount] = useState<number>(10);
-  const [chatInput, setChatInput] = useState('');
-  const [countdownText, setCountdownText] = useState('00:00:00');
-  const [isRoomSettling, setIsRoomSettling] = useState(false);
-  
-  // AMM Trade states
-  const [orderType, setOrderType] = useState<'buy' | 'sell'>('buy');
-  const [tradeMode, setTradeMode] = useState<'market' | 'limit'>('limit');
-  const [limitPrice, setLimitPrice] = useState<number>(0.50);
-  const [sharesInput, setSharesInput] = useState<number>(10);
-  const [selectedProfileAddress, setSelectedProfileAddress] = useState<string | null>(null);
-  const [activeRulesTab, setActiveRulesTab] = useState<'rules' | 'context'>('rules');
-  const [activeMainTab, setActiveMainTab] = useState<'trade' | 'chart' | 'liquidity' | 'holdings' | 'activity' | 'discussion'>('trade');
-  const [localShake, setLocalShake] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [livePrice, setLivePrice] = useState<number | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [watchlistedIds, setWatchlistedIds] = useState<string[]>([]);
-  const [onChainBets, setOnChainBets] = useState<any[]>([]);
-  const [selectedBetToList, setSelectedBetToList] = useState<any | null>(null);
-  const [askPriceInput, setAskPriceInput] = useState<string>('');
-  const [shareCardHolding, setShareCardHolding] = useState<any | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const [evmBalances, setEvmBalances] = useState<number[]>([]);
+
   const evmYesBalance = evmBalances[0] || 0;
   const evmNoBalance = evmBalances[1] || 0;
 
@@ -818,35 +840,93 @@ export default function RoomDetailPage() {
   };
 
   const fetchEvmBalances = useCallback(async () => {
-    if (!wallet?.address || !roomId.startsWith('0x') || !room) return;
+    const targetConditionId = (room?.roomPubkey?.startsWith('0x') 
+      ? room.roomPubkey 
+      : (room?.id?.startsWith('0x') ? room.id : (roomId?.startsWith('0x') ? roomId : ''))) as `0x${string}`;
+
+    if (!wallet?.address || !targetConditionId || !room) return;
     try {
       const tokensAddress = CONTRACT_ADDRESSES.CONDITIONAL_TOKENS;
       const outcomeCount = room?.outcomeLabels && room.outcomeLabels.length >= 2
         ? room.outcomeLabels.length
         : 2;
 
-      const balances: number[] = [];
+      const promises = [];
       for (let i = 0; i < outcomeCount; i++) {
-        const tokenId = await publicClient.readContract({
-          address: tokensAddress,
-          abi: CONDITIONAL_TOKENS_ABI,
-          functionName: 'getTokenId',
-          args: [roomId as `0x${string}`, BigInt(i)]
-        }) as bigint;
+        promises.push((async () => {
+          try {
+            const tokenId = await publicClient.readContract({
+              address: tokensAddress,
+              abi: CONDITIONAL_TOKENS_ABI,
+              functionName: 'getTokenId',
+              args: [targetConditionId, BigInt(i)]
+            }) as bigint;
 
-        const bal = await publicClient.readContract({
-          address: tokensAddress,
-          abi: CONDITIONAL_TOKENS_ABI,
-          functionName: 'balanceOf',
-          args: [wallet.address as `0x${string}`, tokenId]
-        }) as bigint;
-        balances.push(Number(bal) / 1e6);
+            const bal = await publicClient.readContract({
+              address: tokensAddress,
+              abi: CONDITIONAL_TOKENS_ABI,
+              functionName: 'balanceOf',
+              args: [wallet.address as `0x${string}`, tokenId]
+            }) as bigint;
+            return Number(bal) / 1e6;
+          } catch {
+            return 0;
+          }
+        })());
       }
+      const balances = await Promise.all(promises);
       setEvmBalances(balances);
     } catch (e) {
       console.warn("Failed to fetch EVM outcome balances:", e);
     }
   }, [wallet?.address, roomId, room]);
+
+  const fetchEvmPoolReserves = useCallback(async () => {
+    const targetConditionId = (room?.roomPubkey?.startsWith('0x') 
+      ? room.roomPubkey 
+      : (room?.id?.startsWith('0x') ? room.id : (roomId?.startsWith('0x') ? roomId : ''))) as `0x${string}`;
+      
+    if (!targetConditionId) return;
+    try {
+      const poolFactoryAddress = CONTRACT_ADDRESSES.AM_POOL_FACTORY;
+      const poolAddress = await publicClient.readContract({
+        address: poolFactoryAddress,
+        abi: AM_POOL_FACTORY_ABI,
+        functionName: 'getPool',
+        args: [targetConditionId]
+      }) as `0x${string}`;
+
+      if (poolAddress && poolAddress !== '0x0000000000000000000000000000000000000000') {
+        const outcomeCount = room?.outcomeLabels && room.outcomeLabels.length >= 2
+          ? room.outcomeLabels.length
+          : 2;
+
+        const promises = [];
+        for (let i = 0; i < outcomeCount; i++) {
+          promises.push(
+            publicClient.readContract({
+              address: poolAddress,
+              abi: [{
+                name: 'reserves',
+                type: 'function',
+                stateMutability: 'view',
+                inputs: [{ name: '', type: 'uint256' }],
+                outputs: [{ name: '', type: 'uint256' }]
+              }] as const,
+              functionName: 'reserves',
+              args: [BigInt(i)]
+            }).then((val: any) => Number(val) / 1e6).catch(() => 0)
+          );
+        }
+        const reserves = await Promise.all(promises);
+        if (reserves.some(r => r > 0)) {
+          setEvmReserves(reserves);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to fetch EVM pool reserves directly on-chain:", e);
+    }
+  }, [roomId, room]);
 
   const handleSwitchTabOrSide = useCallback((newOrderType: 'buy' | 'sell', newSide: 'moon' | 'jeet', newOutcomeIndex?: number) => {
     setOrderType(newOrderType);
@@ -963,6 +1043,7 @@ export default function RoomDetailPage() {
     fetchBalance();
     fetchRoomBets();
     fetchEvmBalances();
+    fetchEvmPoolReserves();
 
     const interval = setInterval(() => {
       fetchSingleRoom(roomId);
@@ -971,13 +1052,14 @@ export default function RoomDetailPage() {
       fetchBalance();
       fetchRoomBets();
       fetchEvmBalances();
+      fetchEvmPoolReserves();
     }, 5000);
 
     return () => {
       active = false;
       clearInterval(interval);
     };
-  }, [roomId, fetchSingleRoom, refreshProfile, fetchBalance, fetchRoomBets, fetchEvmBalances]);
+  }, [roomId, fetchSingleRoom, refreshProfile, fetchBalance, fetchRoomBets, fetchEvmBalances, fetchEvmPoolReserves]);
 
   // Poll live token price aggregator (DexScreener, Birdeye, Jupiter, Chainlink, Pyth) every 5 seconds
   useEffect(() => {
@@ -1427,6 +1509,7 @@ export default function RoomDetailPage() {
         const limitUsdc = totalCost * slippageMultiplier;
         await executeEvmMarketTrade(room.id, selectedOutcomeIndex, sharesToTrade, orderType, limitUsdc);
         fetchEvmBalances();
+        fetchEvmPoolReserves();
       }
       
       // Optimistic update for Activity tab
@@ -1844,16 +1927,16 @@ export default function RoomDetailPage() {
 
       {/* 3. odds color split bar indicator separating visual header from content */}
       {room && (
-        <div className="w-full h-2 flex z-10 relative">
+        <div className="w-full h-1 flex z-10 relative bg-slate-950">
           {labelsSafe.map((_, idx) => {
             const pct = (pricesSafe[idx] || 0) * 100;
-            const colors = ['bg-emerald-500', 'bg-rose-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500'];
+            const colors = ['bg-emerald-500', 'bg-rose-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-teal-500'];
             const colorClass = colors[idx % colors.length];
             return (
               <div 
                 key={idx}
-                className={`${colorClass} h-full transition-all duration-500`} 
-                style={{ width: `${pct}%` }} 
+                className={`${colorClass} h-full transition-all duration-700 ease-out`} 
+                style={{ width: `${Math.max(0.5, pct)}%` }} 
               />
             );
           })}
@@ -2002,18 +2085,31 @@ export default function RoomDetailPage() {
                 {labelsSafe.map((label, idx) => {
                   const pct = (pricesSafe[idx] || 0) * 100;
                   const isSelected = selectedOutcomeIndex === idx;
+                  const themeColors = [
+                    { text: 'text-emerald-500 dark:text-emerald-400', border: 'border-emerald-500', bg: 'bg-emerald-500/5', dot: 'bg-emerald-500' },
+                    { text: 'text-rose-500 dark:text-rose-400', border: 'border-rose-500', bg: 'bg-rose-500/5', dot: 'bg-rose-500' },
+                    { text: 'text-blue-500 dark:text-blue-400', border: 'border-blue-500', bg: 'bg-blue-500/5', dot: 'bg-blue-500' },
+                    { text: 'text-amber-500 dark:text-amber-400', border: 'border-amber-500', bg: 'bg-amber-500/5', dot: 'bg-amber-500' },
+                    { text: 'text-purple-500 dark:text-purple-400', border: 'border-purple-500', bg: 'bg-purple-500/5', dot: 'bg-purple-500' },
+                    { text: 'text-teal-500 dark:text-teal-400', border: 'border-teal-500', bg: 'bg-teal-500/5', dot: 'bg-teal-500' }
+                  ];
+                  const theme = themeColors[idx % themeColors.length];
+
                   return (
                     <div 
                       key={idx}
                       onClick={() => { setSelectedOutcomeIndex(idx); setOrderType('buy'); synthSound('bet'); }}
-                      className={`border rounded-xl p-5 text-center cursor-pointer transition-all duration-200 ${
+                      className={`border rounded-xl p-4 sm:p-5 text-center cursor-pointer transition-all duration-200 relative overflow-hidden ${
                         isSelected && orderType === 'buy'
-                          ? 'bg-emerald-500/5 border-emerald-500 shadow-md shadow-emerald-500/10'
-                          : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                          ? `${theme.bg} ${theme.border} shadow-lg shadow-emerald-500/5 ring-1 ring-emerald-500/30`
+                          : 'bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
-                      <span className="font-mono text-xs text-emerald-500 font-bold uppercase tracking-wider block">{label}</span>
-                      <span className="font-sans text-3xl font-extrabold text-emerald-500 mt-2 block">
+                      <div className="flex items-center justify-center gap-1.5 mb-1.5">
+                        <span className={`w-2 h-2 rounded-full ${theme.dot}`} />
+                        <span className="font-mono text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-slate-300 truncate max-w-[150px]">{label}</span>
+                      </div>
+                      <span className={`font-sans text-3xl font-black ${theme.text} block tracking-tight`}>
                         {pct.toFixed(1)}%
                       </span>
                     </div>
@@ -2021,21 +2117,34 @@ export default function RoomDetailPage() {
                 })}
               </div>
 
-              {/* Progress Bar split */}
-              <div className="w-full h-3 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden flex">
-                {labelsSafe.map((_, idx) => {
-                  const pct = (pricesSafe[idx] || 0) * 100;
-                  // Dynamic colors for each bar slice
-                  const colors = ['bg-emerald-500', 'bg-rose-500', 'bg-blue-500', 'bg-amber-500', 'bg-purple-500', 'bg-pink-500'];
-                  const colorClass = colors[idx % colors.length];
-                  return (
-                    <div 
-                      key={idx}
-                      className={`${colorClass} h-full transition-all duration-500`} 
-                      style={{ width: `${pct}%` }} 
-                    />
-                  );
-                })}
+              {/* Industry-Standard Slim Odds Distribution Bar */}
+              <div className="space-y-2 pt-1">
+                <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800/80 p-0.5 overflow-hidden flex gap-0.5 shadow-inner border border-slate-200/40 dark:border-slate-800/60">
+                  {labelsSafe.map((_, idx) => {
+                    const pct = (pricesSafe[idx] || 0) * 100;
+                    const colors = [
+                      'from-emerald-400 to-emerald-500 shadow-emerald-500/20',
+                      'from-rose-400 to-rose-500 shadow-rose-500/20',
+                      'from-blue-400 to-blue-500 shadow-blue-500/20',
+                      'from-amber-400 to-amber-500 shadow-amber-500/20',
+                      'from-purple-400 to-purple-500 shadow-purple-500/20',
+                      'from-teal-400 to-teal-500 shadow-teal-500/20'
+                    ];
+                    const colorGradient = colors[idx % colors.length];
+                    return (
+                      <div 
+                        key={idx}
+                        title={`${labelsSafe[idx]}: ${pct.toFixed(1)}%`}
+                        className={`bg-gradient-to-r ${colorGradient} h-full rounded-full transition-all duration-700 ease-out relative group`} 
+                        style={{ width: `${Math.max(0.5, pct)}%` }} 
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 dark:text-slate-400 px-0.5">
+                  <span>MARKET PROBABILITY SPREAD</span>
+                  <span className="font-extrabold text-emerald-500">100% ALLOCATED</span>
+                </div>
               </div>
             </div>
 
@@ -2795,65 +2904,80 @@ export default function RoomDetailPage() {
             </div>
 
             {/* Premium Preview Receipt Ticket */}
-            <div className="bg-slate-950/80 border border-slate-800/80 rounded-2xl p-5 text-left relative overflow-hidden shadow-inner space-y-4">
+            <div className={`border-2 rounded-2xl p-5 text-left relative overflow-hidden shadow-lg space-y-4 transition-all duration-300 ${
+              shareCardHolding.pnl >= 0 
+                ? 'bg-gradient-to-b from-emerald-950/80 to-slate-950/95 border-emerald-500/40 shadow-emerald-500/5' 
+                : 'bg-gradient-to-b from-rose-950/80 to-slate-950/95 border-rose-500/40 shadow-rose-500/5'
+            }`}>
               {/* Decorative ticket cutouts */}
               <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-slate-900 rounded-r-full border-y border-r border-slate-800" />
               <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 bg-slate-900 rounded-l-full border-y border-l border-slate-800" />
 
               <div className="flex justify-between items-start">
                 <div>
-                  <h4 className="font-mono text-[10px] text-emerald-500 font-extrabold tracking-widest uppercase">SHITMARKET ARENA</h4>
-                  <span className="font-sans text-xs text-slate-500 font-bold block mt-0.5">BATTLEFIELD POSITION</span>
+                  <h4 className="font-mono text-[10px] text-slate-400 font-extrabold tracking-widest uppercase">SHITMARKET.LOL</h4>
+                  <span className={`font-mono text-[9px] font-bold block mt-0.5 uppercase tracking-wider ${
+                    shareCardHolding.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                  }`}>LIVE POSITION RECEIPT</span>
                 </div>
-                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center font-mono text-xs font-black text-emerald-500">
-                  ⚔️
+                <div className={`px-2.5 py-1 text-[9px] font-black tracking-widest rounded-lg border font-mono uppercase ${
+                  shareCardHolding.pnl >= 0 
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                }`}>
+                  {shareCardHolding.pnl >= 0 ? 'PROFIT CONFIRMED' : 'LOSS REPORTED'}
                 </div>
               </div>
 
-              {/* Dotted border separator */}
-              <div className="border-t border-dashed border-slate-850 my-2" />
+              {/* Separator */}
+              <div className="border-t border-white/5 my-2" />
 
-              <div className="space-y-1.5">
-                <span className="font-mono text-[9px] text-slate-500 font-bold uppercase tracking-wider block">CHALLENGE:</span>
-                <p className="font-sans text-sm text-white font-extrabold leading-snug line-clamp-2">
+              <div className="space-y-1">
+                <span className="font-mono text-[8px] text-slate-500 font-bold uppercase tracking-wider block">MARKET CONTRACT:</span>
+                <p className="font-sans text-xs text-white font-bold leading-snug line-clamp-2">
                   {room.resolutionCriteria}
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 mt-2">
-                <span className={`px-2.5 py-1 text-[10px] font-black tracking-wider rounded-lg border font-mono uppercase ${
-                  shareCardHolding.pnl >= 0 
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' 
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+              {/* Chosen Faction Badge */}
+              <div className="bg-white/5 border border-white/5 px-3 py-2 rounded-xl flex items-center justify-between">
+                <span className="font-mono text-[9px] text-slate-400 font-extrabold tracking-wider">SELECTED OUTCOME:</span>
+                <span className={`font-sans text-xs font-black uppercase ${
+                  shareCardHolding.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
                 }`}>
                   {shareCardHolding.label}
                 </span>
               </div>
 
-              <div className="border-t border-dashed border-slate-855 my-2" />
+              {/* PnL Display */}
+              <div className="py-2">
+                <div className={`font-sans text-5xl font-black tracking-tighter ${
+                  shareCardHolding.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                }`}>
+                  {shareCardHolding.pnl >= 0 ? '+' : ''}{shareCardHolding.pnlPercent.toFixed(1)}%
+                </div>
+                <span className="font-mono text-[8px] text-slate-500 font-bold tracking-wider mt-1 block">
+                  {shareCardHolding.pnl >= 0 ? 'TOTAL NET REVENUE' : 'TOTAL LOSS VALUE'}
+                </span>
+              </div>
 
               {/* Data Table */}
-              <div className="space-y-2.5 font-mono text-[11px]">
+              <div className="space-y-2.5 font-mono text-[10px] bg-white/5 p-3 rounded-xl border border-white/5">
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-bold uppercase">SHARES OWNED:</span>
-                  <span className="text-white font-extrabold">{shareCardHolding.sharesOwned.toFixed(1)} @ ${shareCardHolding.avgCost.toFixed(2)} Avg</span>
+                  <span className="text-slate-400 font-bold uppercase">SHARES HELD:</span>
+                  <span className="text-white font-extrabold">{shareCardHolding.sharesOwned.toFixed(1)} UNITS @ ${shareCardHolding.avgCost.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-500 font-bold uppercase">INVESTMENT:</span>
+                  <span className="text-slate-400 font-bold uppercase">TOTAL SPENT:</span>
                   <span className="text-white font-extrabold">${shareCardHolding.totalSpent.toFixed(2)} USDC</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500 font-bold uppercase">PROFIT / LOSS:</span>
-                  <span className={`font-black ${shareCardHolding.pnl >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {shareCardHolding.pnl >= 0 ? '+' : ''}${shareCardHolding.pnl.toFixed(2)} ({shareCardHolding.pnl >= 0 ? '+' : ''}{shareCardHolding.pnlPercent.toFixed(1)}%)
-                  </span>
                 </div>
               </div>
 
-              <div className="border-t border-dashed border-slate-800 my-2" />
+              {/* Separator */}
+              <div className="border-t border-white/5 my-2" />
 
-              <div className="flex justify-between items-center text-[9px] text-slate-600 font-bold tracking-widest font-mono">
-                <span>WWW.SHITMARKET.FUN</span>
+              <div className="flex justify-between items-center text-[9px] text-slate-500 font-bold tracking-widest font-mono">
+                <span>WWW.SHITMARKET.LOL</span>
                 <span>PILOT: {wallet?.address ? (wallet.address.slice(0, 6) + '...' + wallet.address.slice(-4)).toUpperCase() : 'ANON'}</span>
               </div>
             </div>
@@ -2864,121 +2988,164 @@ export default function RoomDetailPage() {
                 type="button"
                 onClick={() => {
                   const canvas = document.createElement('canvas');
-                  canvas.width = 600;
-                  canvas.height = 500;
+                  const scale = 2; // Render at 2x resolution for extreme crispness
+                  canvas.width = 600 * scale;
+                  canvas.height = 480 * scale;
                   const ctx = canvas.getContext('2d');
                   if (!ctx) return;
+                  ctx.scale(scale, scale);
 
-                  const grad = ctx.createLinearGradient(0, 0, 0, 500);
-                  grad.addColorStop(0, '#090d16');
-                  grad.addColorStop(1, '#162235');
+                  const isProfit = shareCardHolding.pnl >= 0;
+
+                  // 1. Dynamic Vibrant Base Background Gradient
+                  const grad = ctx.createLinearGradient(0, 0, 0, 480);
+                  if (isProfit) {
+                    grad.addColorStop(0, '#061d14'); // Deep Emerald
+                    grad.addColorStop(0.5, '#04150e');
+                    grad.addColorStop(1, '#020b07');
+                  } else {
+                    grad.addColorStop(0, '#26060c'); // Deep Crimson
+                    grad.addColorStop(0.5, '#190307');
+                    grad.addColorStop(1, '#0c0103');
+                  }
                   ctx.fillStyle = grad;
-                  ctx.fillRect(0, 0, 600, 500);
+                  ctx.fillRect(0, 0, 600, 480);
 
-                  ctx.strokeStyle = '#1e293b';
-                  ctx.lineWidth = 15;
-                  ctx.strokeRect(7.5, 7.5, 585, 485);
-                  ctx.strokeStyle = '#38bdf8';
-                  ctx.lineWidth = 2;
-                  ctx.strokeRect(15, 15, 570, 470);
+                  // 2. High-contrast Glowing Outer Borders
+                  ctx.strokeStyle = isProfit ? 'rgba(0, 255, 170, 0.15)' : 'rgba(255, 51, 102, 0.15)';
+                  ctx.lineWidth = 16;
+                  ctx.strokeRect(8, 8, 584, 464);
 
+                  ctx.strokeStyle = isProfit ? '#00ffaa' : '#ff3366'; // Glowing neon borders
+                  ctx.lineWidth = 3;
+                  ctx.strokeRect(16, 16, 568, 448);
+
+                  // 3. Header Branding
                   ctx.fillStyle = '#ffffff';
-                  ctx.font = 'bold 24px monospace';
-                  ctx.fillText('SHITMARKET ARENA', 40, 60);
+                  ctx.font = '900 22px sans-serif';
+                  ctx.fillText('SHITMARKET.LOL', 40, 55);
 
-                  ctx.fillStyle = '#38bdf8';
-                  ctx.font = 'bold 12px monospace';
-                  ctx.fillText('BATTLEFIELD RECEIPT', 40, 85);
+                  ctx.fillStyle = isProfit ? '#00ffaa' : '#ff3366';
+                  ctx.font = 'bold 9px monospace';
+                  ctx.fillText('LIVE POSITION RECEIPT', 40, 75);
 
-                  ctx.strokeStyle = '#334155';
-                  ctx.lineWidth = 1;
-                  ctx.setLineDash([6, 6]);
+                  // Header Badge (PROFIT vs LOSS)
+                  ctx.fillStyle = isProfit ? 'rgba(0, 255, 170, 0.12)' : 'rgba(255, 51, 102, 0.12)';
                   ctx.beginPath();
-                  ctx.moveTo(40, 110);
-                  ctx.lineTo(560, 110);
+                  ctx.roundRect(435, 38, 125, 24, 6);
+                  ctx.fill();
+                  ctx.strokeStyle = isProfit ? '#00ffaa' : '#ff3366';
+                  ctx.lineWidth = 1;
                   ctx.stroke();
-                  ctx.setLineDash([]);
 
-                  ctx.fillStyle = '#94a3b8';
-                  ctx.font = 'bold 11px monospace';
-                  ctx.fillText('MARKET CHALLENGE:', 40, 140);
+                  ctx.fillStyle = isProfit ? '#00ffaa' : '#ff3366';
+                  ctx.font = '900 10px monospace';
+                  ctx.textAlign = 'center';
+                  ctx.fillText(isProfit ? 'PROFIT CONFIRMED' : 'LOSS REPORTED', 497, 54);
+                  ctx.textAlign = 'left';
+
+                  // Separator line
+                  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                  ctx.lineWidth = 1.5;
+                  ctx.beginPath();
+                  ctx.moveTo(40, 95);
+                  ctx.lineTo(560, 95);
+                  ctx.stroke();
+
+                  // 4. Market Challenge Title (Wrap lines)
+                  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+                  ctx.font = 'bold 9px monospace';
+                  ctx.fillText('MARKET CONTRACT:', 40, 120);
 
                   ctx.fillStyle = '#ffffff';
-                  ctx.font = 'bold 16px sans-serif';
-                  const topic = room?.resolutionCriteria || 'Battlefield Arena Challenge';
+                  ctx.font = 'bold 15px sans-serif';
+                  const topic = room?.resolutionCriteria || 'Battlefield Prediction Arena';
                   const words = topic.split(' ');
                   let line = '';
-                  let y = 175;
+                  let y = 142;
                   for (let n = 0; n < words.length; n++) {
                     let testLine = line + words[n] + ' ';
                     let metrics = ctx.measureText(testLine);
                     if (metrics.width > 520 && n > 0) {
                       ctx.fillText(line, 40, y);
                       line = words[n] + ' ';
-                      y += 24;
+                      y += 20;
                     } else {
                       line = testLine;
                     }
                   }
                   ctx.fillText(line, 40, y);
 
-                  y += 25;
+                  y += 18;
 
-                  ctx.fillStyle = '#1e293b';
+                  // 5. Chosen Faction Badge
+                  ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
                   ctx.beginPath();
-                  ctx.roundRect(40, y, 520, 45, 8);
+                  ctx.roundRect(40, y, 520, 36, 8);
                   ctx.fill();
-                  ctx.strokeStyle = shareCardHolding.pnl >= 0 ? '#10b981' : '#f43f5e';
-                  ctx.lineWidth = 1.5;
+                  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                  ctx.lineWidth = 1;
                   ctx.stroke();
 
-                  ctx.fillStyle = shareCardHolding.pnl >= 0 ? '#10b981' : '#f43f5e';
-                  ctx.font = 'bold 14px monospace';
-                  ctx.fillText(`OUTCOME: ${shareCardHolding.label.toUpperCase()}`, 60, y + 27);
+                  ctx.fillStyle = '#ffffff';
+                  ctx.font = '900 11px monospace';
+                  ctx.fillText('SELECTED OUTCOME:', 55, y + 22);
+
+                  ctx.fillStyle = isProfit ? '#00ffaa' : '#ff3366';
+                  ctx.font = '900 13px sans-serif';
+                  ctx.fillText(shareCardHolding.label.toUpperCase(), 210, y + 23);
+
+                  y += 50;
+
+                  // 6. Giant Centered PnL Percentage display
+                  ctx.fillStyle = isProfit ? '#00ffaa' : '#ff3366';
+                  ctx.font = '900 52px sans-serif';
+                  const pnlSign = shareCardHolding.pnl >= 0 ? '+' : '';
+                  const pctText = `${pnlSign}${shareCardHolding.pnlPercent.toFixed(1)}%`;
+                  ctx.fillText(pctText, 40, y + 45);
+
+                  // Subtext
+                  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                  ctx.font = 'bold 9px monospace';
+                  ctx.fillText(isProfit ? 'TOTAL NET REVENUE' : 'TOTAL LOSS VALUE', 40, y + 62);
+
+                  // 7. Mini Stats Grid on the Right
+                  const statX = 350;
+                  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                  ctx.font = '10px monospace';
+                  ctx.fillText('Shares Held:', statX, y + 10);
+                  ctx.fillStyle = '#ffffff';
+                  ctx.font = 'bold 11px monospace';
+                  ctx.fillText(`${shareCardHolding.sharesOwned.toFixed(1)} units @ $${shareCardHolding.avgCost.toFixed(2)}`, statX, y + 25);
+
+                  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                  ctx.font = '10px monospace';
+                  ctx.fillText('Total Spent:', statX, y + 45);
+                  ctx.fillStyle = '#ffffff';
+                  ctx.font = 'bold 11px monospace';
+                  ctx.fillText(`$${shareCardHolding.totalSpent.toFixed(2)} USDC`, statX, y + 60);
 
                   y += 85;
 
-                  ctx.fillStyle = '#94a3b8';
-                  ctx.font = '13px monospace';
-                  ctx.fillText('Shares Owned:', 40, y);
-                  ctx.fillStyle = '#ffffff';
-                  ctx.font = 'bold 13px monospace';
-                  ctx.fillText(`${shareCardHolding.sharesOwned.toFixed(1)} Shares @ $${shareCardHolding.avgCost.toFixed(2)} Avg`, 220, y);
-
-                  y += 30;
-                  ctx.fillStyle = '#94a3b8';
-                  ctx.font = '13px monospace';
-                  ctx.fillText('Investment:', 40, y);
-                  ctx.fillStyle = '#ffffff';
-                  ctx.font = 'bold 13px monospace';
-                  ctx.fillText(`$${shareCardHolding.totalSpent.toFixed(2)} USDC`, 220, y);
-
-                  y += 30;
-                  ctx.fillStyle = '#94a3b8';
-                  ctx.font = '13px monospace';
-                  ctx.fillText('Profit / Loss:', 40, y);
-                  const pnlSign = shareCardHolding.pnl >= 0 ? '+' : '';
-                  ctx.fillStyle = shareCardHolding.pnl >= 0 ? '#10b981' : '#f43f5e';
-                  ctx.font = 'bold 13px monospace';
-                  ctx.fillText(`${pnlSign}$${shareCardHolding.pnl.toFixed(2)} (${pnlSign}${shareCardHolding.pnlPercent.toFixed(1)}%)`, 220, y);
-
-                  y += 40;
-                  ctx.strokeStyle = '#334155';
+                  // Bottom divider
+                  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
                   ctx.lineWidth = 1;
-                  ctx.setLineDash([6, 6]);
                   ctx.beginPath();
                   ctx.moveTo(40, y);
                   ctx.lineTo(560, y);
                   ctx.stroke();
-                  ctx.setLineDash([]);
 
-                  y += 30;
-                  ctx.fillStyle = '#475569';
-                  ctx.font = 'bold 10px monospace';
-                  ctx.fillText('WWW.SHITMARKET.FUN', 40, y);
+                  y += 22;
+
+                  // 8. Footer Info
+                  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+                  ctx.font = '900 10px monospace';
+                  ctx.fillText('WWW.SHITMARKET.LOL', 40, y);
 
                   const userAddr = wallet?.address ? (wallet.address.slice(0, 6) + '...' + wallet.address.slice(-4)) : 'ANONYMOUS';
-                  ctx.fillText(`PILOT: ${userAddr.toUpperCase()}`, 420, y);
+                  ctx.textAlign = 'right';
+                  ctx.fillText(`PILOT: ${userAddr.toUpperCase()}`, 560, y);
+                  ctx.textAlign = 'left';
 
                   const url = canvas.toDataURL('image/png');
                   const a = document.createElement('a');
@@ -2995,7 +3162,7 @@ export default function RoomDetailPage() {
                 type="button"
                 onClick={() => {
                   const pnlSign = shareCardHolding.pnl >= 0 ? '+' : '';
-                  const text = `⚔️ SHITMARKET ARENA BATTLEFIELD RECEIPT ⚔️\n\n🎯 Market: ${room.resolutionCriteria}\n🛡️ Position: ${shareCardHolding.label.toUpperCase()}\n📈 PnL: ${pnlSign}$${shareCardHolding.pnl.toFixed(2)} (${pnlSign}${shareCardHolding.pnlPercent.toFixed(1)}%)\n\nJoin the arena at www.shitmarket.fun !`;
+                  const text = `⚔️ SHITMARKET ARENA BATTLEFIELD RECEIPT ⚔️\n\n🎯 Market: ${room.resolutionCriteria}\n🛡️ Position: ${shareCardHolding.label.toUpperCase()}\n📈 PnL: ${pnlSign}$${shareCardHolding.pnl.toFixed(2)} (${pnlSign}${shareCardHolding.pnlPercent.toFixed(1)}%)\n\nJoin the arena at www.shitmarket.lol !`;
                   navigator.clipboard.writeText(text);
                   useAppState.getState().addToast("RECEIPT COPIED", "success", "Share receipt copied to clipboard!");
                   synthSound('degen');

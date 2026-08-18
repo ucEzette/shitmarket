@@ -572,6 +572,9 @@ roomsRouter.post('/', async (req, res) => {
       openingPrice: openingPriceBigInt.toString(),
       moonPool: moonPoolScaled.toString(),
       jeetPool: jeetPoolScaled.toString(),
+      poolReserves: outcomeLabels && Array.isArray(outcomeLabels) && outcomeLabels.length >= 2
+        ? outcomeLabels.map(() => Math.round((Number(totalPool || 0) * decimalFactor) / outcomeLabels.length)).join(',')
+        : `${moonPoolScaled},${jeetPoolScaled}`,
       expiry: expiryDate.toISOString(),
       pairAddress: '',
     });

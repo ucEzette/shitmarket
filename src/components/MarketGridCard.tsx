@@ -58,9 +58,9 @@ export const MarketGridCard: React.FC<MarketGridCardProps> = ({
     const totalSeed = (rawMoon + rawJeet) || 500;
     const defaultPerOutcome = totalSeed / targetCount;
     rawReserves = Array(targetCount).fill(defaultPerOutcome);
-    if (rawMoon > 0 || rawJeet > 0) {
-      if (rawReserves[0] !== undefined) rawReserves[0] = rawMoon || defaultPerOutcome;
-      if (rawReserves[1] !== undefined) rawReserves[1] = rawJeet || defaultPerOutcome;
+    if (targetCount === 2 && (rawMoon > 0 || rawJeet > 0)) {
+      rawReserves[0] = rawMoon || defaultPerOutcome;
+      rawReserves[1] = rawJeet || defaultPerOutcome;
     }
   }
 
@@ -89,6 +89,11 @@ export const MarketGridCard: React.FC<MarketGridCardProps> = ({
   const isDebateRoom = 
     (room.category as string) === 'debate' || 
     (room.category as string) === 'prediction' || 
+    (room.category as string) === 'politics' ||
+    (room.category as string) === 'entertainment' ||
+    (room.category as string) === 'sports' ||
+    (room.category as string) === 'world' ||
+    (!!room.outcomeLabels && room.outcomeLabels.length > 2) ||
     (!!room.resolutionCriteria && room.resolutionCriteria.length > 0 && (!room.token.pairAddress || room.token.pairAddress === '')) ||
     room.token.address === room.creator;
 

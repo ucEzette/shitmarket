@@ -749,12 +749,10 @@ export default function RoomDetailPage() {
     const totalSeed = (rawMoonPool + rawJeetPool) || 500;
     const defaultPerOutcome = totalSeed / targetCount;
     rawReserves = Array(targetCount).fill(defaultPerOutcome);
-    const sourceRes = evmReserves.length >= 2 ? evmReserves : (room?.poolReserves || [rawMoonPool, rawJeetPool]);
-    sourceRes.forEach((r, i) => {
-      if (i < targetCount && r > 0) {
-        rawReserves[i] = r;
-      }
-    });
+    if (targetCount === 2 && (rawMoonPool > 0 || rawJeetPool > 0)) {
+      rawReserves[0] = rawMoonPool || defaultPerOutcome;
+      rawReserves[1] = rawJeetPool || defaultPerOutcome;
+    }
   }
 
   // Sum of reciprocals for multi-outcome CPMM pricing
@@ -779,11 +777,12 @@ export default function RoomDetailPage() {
   });
 
   const totalPotSafe = reservesSafe.reduce((a, b) => a + b, 0);
+  const betsVolume = (room?.bets || []).reduce((sum: number, b: any) => sum + (Number(b.amount) || 0), 0);
+  const totalVolumeSafe = totalPotSafe + betsVolume;
 
   const moonPoolSafe = reservesSafe[0] || 0;
   const jeetPoolSafe = reservesSafe[1] || 0;
   const moonPercentageSafe = (pricesSafe[0] || 0.5) * 100;
-  const jeetPercentageSafe = (pricesSafe[1] || 0.5) * 100;
 
   const openingPriceSafe = typeof room?.openingPrice === 'number' ? room.openingPrice : room?.openingPrice ? parseFloat(room.openingPrice as any) || 0 : undefined;
   const finalPriceSafe = typeof room?.finalPrice === 'number' ? room.finalPrice : room?.finalPrice ? parseFloat(room.finalPrice as any) || 0 : undefined;
@@ -1966,7 +1965,11 @@ export default function RoomDetailPage() {
             </h1>
 
             <p className="font-sans text-sm text-slate-500 dark:text-slate-400 max-w-4xl leading-relaxed" suppressHydrationWarning>
-              {!isDebateMarket ? (
+              {isDebateMarket ? (
+                room.resolutionCriteria 
+                  ? room.resolutionCriteria.split('| Ref:')[0].trim() 
+                  : (room.rules || `This market resolves according to the designated real-world event criteria before expiry.`)
+              ) : (
                 <>
                   This market resolves YES if the price of <strong>{room.token.symbol}</strong> closes above <strong>${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}</strong> at the resolution target time of <strong>{new Date(expirySafe).toLocaleString()}</strong>, as reported by oracle price feeds.
                   {room.resolutionCriteria && 
@@ -1977,10 +1980,6 @@ export default function RoomDetailPage() {
                     </span>
                   )}
                 </>
-              ) : (
-                room.resolutionCriteria 
-                  ? `This market resolves according to the following condition: "${room.resolutionCriteria.split('| Ref:')[0].trim()}"` 
-                  : `This market resolves YES if the target criteria is met before the expiry date.`
               )}
             </p>
 
@@ -2008,17 +2007,37 @@ export default function RoomDetailPage() {
             {/* Resolution Rules Details */}
             <div className="bg-slate-50/50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800 p-4 rounded-xl max-w-4xl space-y-2 text-xs font-mono">
               <div className="text-slate-900 dark:text-white font-bold uppercase">Market Resolution Rules:</div>
-              <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-400 font-bold">
-                <li>
-                  <span className="text-emerald-500">YES Outcome ({room.moonLabel || 'YES'}):</span> The final oracle price at expiry is strictly greater than <span className="text-slate-900 dark:text-white">${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : '0.00'}</span>.
-                </li>
-                <li>
-                  <span className="text-rose-500">NO Outcome ({room.jeetLabel || 'NO'}):</span> The final oracle price at expiry is less than or equal to <span className="text-slate-900 dark:text-white">${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : '0.00'}</span>.
-                </li>
-                <li>
-                  <span className="text-slate-900 dark:text-white">Settlement Oracle:</span> Verified EVM Oracle Registry via assigned resolver address ({room.oracleAddress ? `${room.oracleAddress.slice(0, 8)}...${room.oracleAddress.slice(-6)}` : 'N/A'}).
-                </li>
-              </ul>
+              {isDebateMarket ? (
+                <div className="space-y-2 text-slate-600 dark:text-slate-400 font-sans text-xs leading-relaxed">
+                  <p className="font-semibold text-slate-800 dark:text-slate-200">
+                    {room.resolutionCriteria 
+                      ? room.resolutionCriteria.split('| Ref:')[0].trim() 
+                      : (room.rules || 'Market resolves based on the verified real-world event outcome at or before expiry.')}
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 font-mono text-[11px] text-slate-500 dark:text-slate-400 pt-1">
+                    {labelsSafe.map((label, idx) => (
+                      <li key={idx}>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">{label}:</span> Resolves to 100% payout if this outcome is verified.
+                      </li>
+                    ))}
+                    <li>
+                      <span className="text-slate-900 dark:text-white font-bold">Settlement Oracle / Resolver:</span> {room.oracleAddress ? `Verified Oracle (${room.oracleAddress.slice(0, 6)}...${room.oracleAddress.slice(-4)})` : 'Designated Market Resolver'}
+                    </li>
+                  </ul>
+                </div>
+              ) : (
+                <ul className="list-disc list-inside space-y-1 text-slate-500 dark:text-slate-400 font-bold">
+                  <li>
+                    <span className="text-emerald-500">YES Outcome ({room.moonLabel || 'YES'}):</span> The final oracle price at expiry is strictly greater than <span className="text-slate-900 dark:text-white">${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : '0.00'}</span>.
+                  </li>
+                  <li>
+                    <span className="text-rose-500">NO Outcome ({room.jeetLabel || 'NO'}):</span> The final oracle price at expiry is less than or equal to <span className="text-slate-900 dark:text-white">${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : '0.00'}</span>.
+                  </li>
+                  <li>
+                    <span className="text-slate-900 dark:text-white">Settlement Oracle:</span> Verified EVM Oracle Registry via assigned resolver address ({room.oracleAddress ? `${room.oracleAddress.slice(0, 8)}...${room.oracleAddress.slice(-6)}` : 'N/A'}).
+                  </li>
+                </ul>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 pt-2 border-t border-slate-100 dark:border-slate-850 font-mono text-xs text-slate-400 dark:text-slate-500">
@@ -2052,7 +2071,7 @@ export default function RoomDetailPage() {
               )}
               <div className="flex items-center gap-1">
                 <span>Volume:</span>
-                <span className="text-slate-800 dark:text-slate-350 font-bold">{totalPotSafe.toFixed(2)} USDC</span>
+                <span className="text-slate-800 dark:text-slate-350 font-bold">{totalVolumeSafe.toFixed(2)} USDC</span>
               </div>
               {room.resolutionCriteria && room.resolutionCriteria.includes('Ref:') && (
                 <a 
@@ -2682,16 +2701,16 @@ export default function RoomDetailPage() {
                     <span className="text-slate-800 dark:text-slate-350 font-bold">{totalPotSafe.toFixed(2)} USDC</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400 dark:text-slate-500">YES Shares</span>
+                    <span className="text-slate-400 dark:text-slate-500">{labelsSafe[0] || 'YES'} Shares</span>
                     <span className="text-emerald-500 font-bold">{moonPercentageSafe.toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-slate-400 dark:text-slate-500">NO Shares</span>
+                    <span className="text-slate-400 dark:text-slate-500">{labelsSafe[1] || 'NO'} Shares</span>
                     <span className="text-rose-500 font-bold">{jeetPercentageSafe.toFixed(1)}%</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-slate-400 dark:text-slate-500">Total Volume</span>
-                    <span className="text-slate-800 dark:text-slate-350 font-bold">{totalPotSafe.toFixed(2)} USDC</span>
+                    <span className="text-slate-800 dark:text-slate-350 font-bold">{totalVolumeSafe.toFixed(2)} USDC</span>
                   </div>
                   <div className="flex justify-between items-center border-t border-slate-100 dark:border-slate-855 pt-3">
                     <span className="text-slate-400 dark:text-slate-500">Created</span>
@@ -2723,9 +2742,13 @@ export default function RoomDetailPage() {
                 <div className="space-y-1.5">
                   <span className="block font-mono text-[9px] text-slate-400 dark:text-slate-500 uppercase font-extrabold">Market Criteria Statement</span>
                   <p className="font-sans text-sm text-slate-800 dark:text-slate-200 font-bold leading-snug">
-                    {room.resolutionCriteria && room.resolutionCriteria.split('| Ref:')[0].trim().length > 10
-                      ? room.resolutionCriteria.split('| Ref:')[0].trim()
-                      : `Will the final TWAP price of ${room.token.name} (${room.token.symbol}) end strictly above the strike price of $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} at the expiry target time?`
+                    {isDebateMarket 
+                      ? (room.resolutionCriteria && room.resolutionCriteria.split('| Ref:')[0].trim().length > 0
+                          ? room.resolutionCriteria.split('| Ref:')[0].trim()
+                          : (room.rules || 'Market resolves based on the verified real-world event outcome before expiry.'))
+                      : (room.resolutionCriteria && room.resolutionCriteria.split('| Ref:')[0].trim().length > 10
+                          ? room.resolutionCriteria.split('| Ref:')[0].trim()
+                          : `Will the final TWAP price of ${room.token.name} (${room.token.symbol}) end strictly above the strike price of $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'} at the expiry target time?`)
                     }
                   </p>
                 </div>
@@ -2748,17 +2771,31 @@ export default function RoomDetailPage() {
                   </div>
                 )}
 
-                {/* 2. Structured Strike Rules */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 font-mono text-xs">
-                  <div className="space-y-1">
-                    <span className="text-slate-400 text-[9px] font-bold uppercase block">🟢 MOON (YES) WINS IF</span>
-                    <span className="font-bold text-slate-800 dark:text-white">Final Price &gt; $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}</span>
+                {/* 2. Structured Rules */}
+                {!isDebateMarket ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 font-mono text-xs">
+                    <div className="space-y-1">
+                      <span className="text-slate-400 text-[9px] font-bold uppercase block">🟢 {labelsSafe[0] || 'YES'} WINS IF</span>
+                      <span className="font-bold text-slate-800 dark:text-white">Final Price &gt; ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}</span>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-slate-400 text-[9px] font-bold uppercase block">🔴 {labelsSafe[1] || 'NO'} WINS IF</span>
+                      <span className="font-bold text-slate-800 dark:text-white">Final Price &lt; ${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}</span>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-slate-400 text-[9px] font-bold uppercase block">🔴 JEET (NO) WINS IF</span>
-                    <span className="font-bold text-slate-800 dark:text-white">Final Price &lt; $${openingPriceSafe !== undefined ? formatPrice(openingPriceSafe) : 'N/A'}</span>
+                ) : (
+                  <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800/80 font-mono text-xs space-y-2">
+                    <span className="text-slate-400 text-[9px] font-bold uppercase block">OUTCOME RESOLUTION RULES</span>
+                    <div className="space-y-1.5">
+                      {labelsSafe.map((label, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-800 dark:text-slate-200">{label}</span>
+                          <span className="text-emerald-500 font-bold">100% Payout on Verification</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* 3. Oracle and Settlement Feed Details */}
                 <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-800/80">

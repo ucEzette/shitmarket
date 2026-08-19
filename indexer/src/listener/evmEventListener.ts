@@ -10,7 +10,7 @@ import axios from 'axios';
 import { config } from '../config';
 import { logger } from '../logger';
 import { prisma } from '../db';
-import { redis, cacheRoom, publishRoomUpdate, updateLeaderboard } from '../redis';
+import { redis, cacheRoom, getCachedRoom, publishRoomUpdate, updateLeaderboard } from '../redis';
 import { createPublicClient, http, decodeEventLog, decodeFunctionData } from 'viem';
 import { avalancheFuji } from 'viem/chains';
 import {
@@ -421,7 +421,6 @@ async function handleMarketCreated(log: EvmLog) {
       oracleAddress: oracle.toLowerCase(),
       oracleFeeLamports: BigInt(0),
       resolutionCriteria: finalCriteria,
-      category: existing?.category || 'debate',
       moonLabel: existing?.moonLabel || 'YES',
       jeetLabel: existing?.jeetLabel || 'NO',
       outcomeLabels: existing?.outcomeLabels || null,

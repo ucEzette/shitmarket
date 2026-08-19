@@ -385,46 +385,76 @@ async function handleMarketCreated(log: EvmLog) {
   const expiry = new Date(Number(resolutionTime) * 1000);
   const roomId = conditionId;
 
+  const existing = await prisma.room.findFirst({
+    where: {
+      OR: [
+        { roomPubkey: roomId },
+        { tokenMint: conditionId },
+        { originalAddress: marketId.toString() },
+      ]
+    }
+  });
+
+  const finalTitle = existing?.tokenName && !existing.tokenName.startsWith('Market #') 
+    ? existing.tokenName 
+    : (ipfsHash && ipfsHash.length > 0 && !ipfsHash.startsWith('Qm') && !ipfsHash.startsWith('0x') ? ipfsHash : `Market #${marketId}`);
+
+  const finalCriteria = existing?.resolutionCriteria && existing.resolutionCriteria.length > 0
+    ? existing.resolutionCriteria 
+    : ipfsHash;
+
   const room = await prisma.room.upsert({
     where: { roomPubkey: roomId },
     create: {
       roomPubkey: roomId,
       tokenMint: conditionId,
       priceFeed: 'evm-market-factory',
-      tokenName: `Market #${marketId}`,
-      tokenSymbol: 'PRED',
+      tokenName: finalTitle,
+      tokenSymbol: existing?.tokenSymbol || 'PRED',
       chainId: 'avalanche',
       originalAddress: marketId.toString(),
-      duration: 5,
-      openingPrice: BigInt(500000), // 0.50 USDC
+      duration: existing?.duration || 5,
+      openingPrice: existing?.openingPrice || BigInt(500000), // 0.50 USDC
       expiry,
       status: 'active',
       creator: creator.toLowerCase(),
       oracleAddress: oracle.toLowerCase(),
       oracleFeeLamports: BigInt(0),
-      resolutionCriteria: ipfsHash,
+      resolutionCriteria: finalCriteria,
+      category: existing?.category || 'debate',
+      moonLabel: existing?.moonLabel || 'YES',
+      jeetLabel: existing?.jeetLabel || 'NO',
+      outcomeLabels: existing?.outcomeLabels || null,
+      rules: existing?.rules || null,
+      context: existing?.context || null,
     },
     update: {
       expiry,
       oracleAddress: oracle.toLowerCase(),
-      resolutionCriteria: ipfsHash,
+      originalAddress: marketId.toString(),
+      ...(existing?.tokenName && !existing.tokenName.startsWith('Market #') ? {} : { tokenName: finalTitle }),
+      ...(!existing?.resolutionCriteria ? { resolutionCriteria: finalCriteria } : {}),
     },
   });
+
+  const existingCache = await getCachedRoom(roomId);
 
   await cacheRoom(roomId, {
     status: 'active',
     tokenMint: conditionId,
-    tokenName: room.tokenName || `Market #${marketId}`,
+    tokenName: room.tokenName || finalTitle,
     tokenSymbol: room.tokenSymbol || 'PRED',
-    openingPrice: '500000',
-    moonPool: '0',
-    jeetPool: '0',
+    openingPrice: existingCache?.openingPrice || '500000',
+    moonPool: existingCache?.moonPool || '0',
+    jeetPool: existingCache?.jeetPool || '0',
+    ...(existingCache?.poolReserves ? { poolReserves: existingCache.poolReserves } : {}),
+    ...(existingCache?.tradesCount ? { tradesCount: existingCache.tradesCount } : {}),
     expiry: expiry.toISOString(),
   });
 
   await publishRoomUpdate(roomId, {
     type: 'RoomCreated',
-    tokenName: room.tokenName || `Market #${marketId}`,
+    tokenName: room.tokenName || finalTitle,
     tokenSymbol: room.tokenSymbol || 'PRED',
     chainId: 'avalanche',
     originalAddress: conditionId,

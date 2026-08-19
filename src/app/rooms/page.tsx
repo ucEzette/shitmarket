@@ -92,6 +92,27 @@ export default function RoomsPage() {
   const [mounted, setMounted] = useState(false);
   const [watchlistedIds, setWatchlistedIds] = useState<string[]>([]);
   const [showWatchlistDrawer, setShowWatchlistDrawer] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(16);
+  const observerTarget = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount(prev => prev + 16);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+    
+    return () => {
+      if (observerTarget.current) observer.unobserve(observerTarget.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -771,9 +792,16 @@ export default function RoomsPage() {
         {showSkeleton ? (
           renderGridSkeleton()
         ) : filteredRooms.length > 0 ? (
-          <div className="flex md:grid overflow-x-auto md:overflow-x-visible md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-4 md:pb-0 scrollbar-none snap-x select-text">
-            {filteredRooms.map((room) => renderRoomCard(room, quickAmount))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 pb-4">
+              {filteredRooms.slice(0, visibleCount).map((room) => renderRoomCard(room, quickAmount))}
+            </div>
+            {visibleCount < filteredRooms.length && (
+              <div ref={observerTarget} className="w-full h-20 flex items-center justify-center text-slate-400">
+                <Flame className="animate-bounce text-emerald-500" size={24} />
+              </div>
+            )}
+          </>
         ) : (
           renderEmptyGrid()
         )}

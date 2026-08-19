@@ -151,9 +151,9 @@ function HomeContent() {
         <h3 className="font-sans text-2xl font-extrabold text-slate-900 dark:text-white mb-6 uppercase tracking-tight flex items-center gap-2">
           <Flame className="text-emerald-500" /> Trending
         </h3>
-        <div className="flex overflow-x-auto gap-6 pb-4 scrollbar-none snap-x">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6 pb-4">
           {mounted ? (
-            trendingRooms.map(room => (
+            trendingRooms.slice(0, 12).map(room => (
               <MarketGridCard 
                 key={room.id} 
                 room={room} 

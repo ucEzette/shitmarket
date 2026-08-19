@@ -158,7 +158,7 @@ export const MarketGridCard: React.FC<MarketGridCardProps> = ({
         router.push(`/room/${room.id}`);
         synthSound('bet');
       }}
-      className={`bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none relative group hover:-translate-y-1 shadow-sm hover:shadow-md text-slate-800 dark:text-white shrink-0 snap-start ${
+      className={`bg-white dark:bg-slate-900/90 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 flex flex-col justify-between cursor-pointer transition-all duration-300 select-none relative group hover:-translate-y-1 shadow-sm hover:shadow-md text-slate-800 dark:text-white w-full ${
         isMultiOutcome ? 'min-h-[290px]' : 'min-h-[260px]'
       } ${
         isMoonLeading

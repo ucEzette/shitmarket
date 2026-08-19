@@ -450,9 +450,13 @@ export const ClientWrapper: React.FC<{ children: React.ReactNode }> = ({ childre
             if (eventType === 'BetPlaced') {
               const isEvm = roomPubkey.startsWith('0x');
               const decimalFactor = isEvm ? 1e6 : 1e9;
-              const moonAmount = Number(data.moonPool) / decimalFactor;
-              const jeetAmount = Number(data.jeetPool) / decimalFactor;
-              updateRoomPools(roomPubkey, moonAmount, jeetAmount);
+              const moonAmount = Number(data.moonPool || 0) / decimalFactor;
+              const jeetAmount = Number(data.jeetPool || 0) / decimalFactor;
+              const poolReservesParsed = data.poolReserves && Array.isArray(data.poolReserves)
+                ? data.poolReserves.map((r: string | number) => Number(r) / decimalFactor)
+                : undefined;
+              const tradesCount = data.tradesCount !== undefined ? Number(data.tradesCount) : undefined;
+              updateRoomPools(roomPubkey, moonAmount, jeetAmount, poolReservesParsed, tradesCount);
               
               const formattedUser = `${data.user.slice(0, 6)}...${data.user.slice(-4)}`;
               const betSol = Number(data.amount) / decimalFactor;

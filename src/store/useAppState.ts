@@ -601,6 +601,7 @@ export interface Room {
   oracleLogs?: string;
   moonLabel?: string;
   jeetLabel?: string;
+  tradesCount?: number;
   rules?: string;
   context?: string;
 }
@@ -726,8 +727,8 @@ export interface AppState {
 
   isEvm: boolean;
   createRoom: (room: Room, isSetPrice?: boolean, initialSnipe?: { side: 'moon' | 'jeet', amount: number }) => Promise<any>;
-  placeBet: (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => Promise<any>;
-  placeEvmBet: (roomId: string, side: 'moon' | 'jeet', amount: number) => Promise<any>;
+  placeBet: (roomId: string, side: 'moon' | 'jeet' | number, amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => Promise<any>;
+  placeEvmBet: (roomId: string, side: 'moon' | 'jeet' | number, amount: number) => Promise<any>;
   claimWinnings: (roomId: string) => Promise<any>;
   claimEvmWinnings: (roomId: string) => Promise<any>;
   addAmmLiquidity: (roomId: string, amountUsdc: number) => Promise<any>;
@@ -784,7 +785,7 @@ export interface AppState {
 
   // Real-time synchronization actions
   addRoom: (room: Room) => void;
-  updateRoomPools: (roomId: string, moonPool: number, jeetPool: number) => void;
+  updateRoomPools: (roomId: string, moonPool: number, jeetPool: number, poolReserves?: number[], tradesCount?: number) => void;
   markBetClaimed: (roomId: string, userAddress: string) => void;
   addUserBet: (bet: Bet) => void;
 }
@@ -877,6 +878,7 @@ export const mapApiRoom = (apiRoom: any): Room => {
     disputeChallenger: apiRoom.disputeChallenger || undefined,
     disputeBond: apiRoom.disputeBond ? Number(apiRoom.disputeBond) : undefined,
     oracleLogs: apiRoom.oracleLogs || undefined,
+    tradesCount: apiRoom.tradesCount !== undefined ? Number(apiRoom.tradesCount) : (apiRoom.bets ? apiRoom.bets.length : (apiRoom._count?.bets ?? 0)),
     rules: apiRoom.rules || undefined,
     context: apiRoom.context || undefined,
   };
@@ -2522,7 +2524,7 @@ export const useAppState = create<AppState>()(
     }
   },
 
-  placeBet: async (roomId: string, side: 'moon' | 'jeet', amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => {
+  placeBet: async (roomId: string, side: 'moon' | 'jeet' | number, amount: number, isNewRoom?: boolean, onCloseRedirectUrl?: string) => {
     // If EVM side (e.g. no wallet, or specific chain ID check)
     if (get().isEvm) {
       return await get().placeEvmBet(roomId, side, amount);
@@ -2539,11 +2541,12 @@ export const useAppState = create<AppState>()(
     
     const roomObj = get().rooms.find((r) => r.id === roomId);
     const assetSym = roomObj?.token?.symbol || 'UNKNOWN';
+    const solanaSide: 'moon' | 'jeet' = typeof side === 'number' ? (side === 0 ? 'moon' : 'jeet') : side;
 
     const toastId = get().addToast(
       'CHARGING ENEMY LINES',
       'loading',
-      `Deploying ${amount} SOL on ${side.toUpperCase()} for ${assetSym}...`
+      `Deploying ${amount} SOL on ${solanaSide.toUpperCase()} for ${assetSym}...`
     );
 
     try {
@@ -2551,7 +2554,7 @@ export const useAppState = create<AppState>()(
       const roomPda = safePublicKey(roomId);
       if (!roomPda) throw new Error(`Invalid room address: ${roomId}`);
       const escrowPda = getEscrowPda(roomPda);
-      const betPda = getBetPda(roomPda, wallet.publicKey, side);
+      const betPda = getBetPda(roomPda, wallet.publicKey, solanaSide);
       const configPda = getPlatformConfigPda();
       
       const priorityFeeValue = getPriorityFeePrice(get().settings);
@@ -2567,7 +2570,7 @@ export const useAppState = create<AppState>()(
         if (betAccountInfo && betAccountInfo.data.length === 83) {
           console.log(`[Migration] Legacy 83-byte bet account detected at ${betPda.toBase58()}. Prepending migrate_bet...`);
           const migrateIx = await (program.methods as any)
-            .migrateBet(side === 'moon' ? { moon: {} } : { jeet: {} })
+            .migrateBet(solanaSide === 'moon' ? { moon: {} } : { jeet: {} })
             .accounts({
               bet: betPda,
               room: roomPda,
@@ -2583,7 +2586,7 @@ export const useAppState = create<AppState>()(
 
       const txObj = await (program.methods as any)
         .placeBet(
-          side === 'moon' ? { moon: {} } : { jeet: {} },
+          solanaSide === 'moon' ? { moon: {} } : { jeet: {} },
           new BN(amount * 1e9) // convert SOL to lamports
         )
         .accounts({
@@ -2611,7 +2614,7 @@ export const useAppState = create<AppState>()(
           id: 'opt-' + Date.now() + Math.random(),
           roomId: roomId,
           user: wallet.publicKey.toBase58(),
-          side: side,
+          side: solanaSide,
           amount: amount,
           claimed: false,
           timestamp: Date.now(),
@@ -2623,8 +2626,8 @@ export const useAppState = create<AppState>()(
       // Add to personal activity log
       get().addActivity({
         type: 'bet',
-        title: `DEPLOYED ${amount} SOL ON ${side.toUpperCase()}`,
-        message: `You stacked ${amount} SOL on ${side.toUpperCase()} in room ${roomId}.`,
+        title: `DEPLOYED ${amount} SOL ON ${solanaSide.toUpperCase()}`,
+        message: `You stacked ${amount} SOL on ${solanaSide.toUpperCase()} in room ${roomId}.`,
         link: `/room/${roomId}`
       });
 
@@ -2639,7 +2642,7 @@ export const useAppState = create<AppState>()(
       
       get().setShareCardData({
         roomId,
-        side,
+        side: solanaSide,
         tokenSymbol,
         duration,
         amount,
@@ -2652,7 +2655,7 @@ export const useAppState = create<AppState>()(
       get().updateToast(toastId, {
         type: 'success',
         message: 'BATTLE POSITION SECURED',
-        description: `Staked ${amount} SOL on ${side.toUpperCase()}.`,
+        description: `Staked ${amount} SOL on ${solanaSide.toUpperCase()}.`,
         txSig: tx
       });
 
@@ -3313,6 +3316,7 @@ export const useAppState = create<AppState>()(
             }
             return {
               ...r,
+              tradesCount: (r.tradesCount || 0) + 1,
               poolReserves: nextReserves,
               moonPool: side === 'moon' ? Math.max(0, (r.moonPool || 0) + addedUsdc) : (r.moonPool || 0),
               jeetPool: side === 'jeet' ? Math.max(0, (r.jeetPool || 0) + addedUsdc) : (r.jeetPool || 0),
@@ -3412,26 +3416,30 @@ export const useAppState = create<AppState>()(
     }
   },
 
-  placeEvmBet: async (roomId: string, side: 'moon' | 'jeet', amount: number) => {
+  placeEvmBet: async (roomId: string, side: 'moon' | 'jeet' | number, amount: number) => {
     const roomObj = get().rooms.find((r) => r.id === roomId);
-    const moonRes = roomObj?.moonPool || 0;
-    const jeetRes = roomObj?.jeetPool || 0;
+    const reserves = roomObj?.poolReserves || [roomObj?.moonPool || 0, roomObj?.jeetPool || 0];
+    const outcomeIdx = typeof side === 'number' ? side : (side === 'moon' ? 0 : 1);
     
     let sharesToBuy = amount * 2;
-    if (moonRes > 0 && jeetRes > 0) {
-      const rTarget = side === 'moon' ? moonRes : jeetRes;
-      const rOpposite = side === 'moon' ? jeetRes : moonRes;
+    if (reserves.length >= 2 && reserves.every(r => r > 0)) {
+      const targetReserve = reserves[outcomeIdx] || 1;
       const fee = (amount * 10) / 10000;
       const netUsdc = amount - fee;
-      const k = rTarget * rOpposite;
-      const newOppositeReserve = rOpposite + netUsdc;
-      const newTargetReserve = k / newOppositeReserve;
-      sharesToBuy = rTarget - newTargetReserve;
+      let prodBefore = 1;
+      let prodAfter = 1;
+      for (let j = 0; j < reserves.length; j++) {
+        if (j !== outcomeIdx) {
+          prodBefore *= reserves[j];
+          prodAfter *= (reserves[j] + netUsdc);
+        }
+      }
+      const newTargetReserve = prodAfter > 0 ? (targetReserve * prodBefore) / prodAfter : targetReserve;
+      sharesToBuy = targetReserve + netUsdc - newTargetReserve;
     }
     
-    // Use a 1% slippage buffer for EVM market swaps to allow room for precise CPMM matching
-    const maxUsdcSpent = amount * 1.01;
-    return await get().executeEvmMarketTrade(roomId, side, sharesToBuy, 'buy', maxUsdcSpent);
+    const maxUsdcSpent = amount * 1.03;
+    return await get().executeEvmMarketTrade(roomId, outcomeIdx, sharesToBuy, 'buy', maxUsdcSpent);
   },
 
   executeImmediateTrade: async (roomId: string, side: 'moon' | 'jeet', amount: number, action: 'buy' | 'sell') => {
@@ -5364,12 +5372,18 @@ export const useAppState = create<AppState>()(
     });
   },
 
-  updateRoomPools: (roomId: string, moonPool: number, jeetPool: number) => {
+  updateRoomPools: (roomId: string, moonPool: number, jeetPool: number, poolReserves?: number[], tradesCount?: number) => {
     set((state) => ({
       rooms: state.rooms.map((r) => {
         if (r.id !== roomId) return r;
-        if (Math.abs(r.moonPool - moonPool) < 1e-9 && Math.abs(r.jeetPool - jeetPool) < 1e-9) return r;
-        return { ...r, moonPool, jeetPool };
+        const newTradesCount = tradesCount !== undefined ? tradesCount : ((r.tradesCount || 0) + 1);
+        return {
+          ...r,
+          moonPool: !isNaN(moonPool) && moonPool > 0 ? moonPool : r.moonPool,
+          jeetPool: !isNaN(jeetPool) && jeetPool > 0 ? jeetPool : r.jeetPool,
+          poolReserves: poolReserves && poolReserves.length > 0 ? poolReserves : r.poolReserves,
+          tradesCount: newTradesCount
+        };
       }),
     }));
   },

@@ -425,6 +425,9 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
           oracleLogs: true,
           moonLabel: true,
           jeetLabel: true,
+          _count: {
+            select: { bets: true }
+          },
         },
       });
 
@@ -434,6 +437,7 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
         totalPool: r.totalPool.toString(),
         oracleFeeLamports: r.oracleFeeLamports ? r.oracleFeeLamports.toString() : null,
         disputeBond: r.disputeBond ? r.disputeBond.toString() : null,
+        tradesCount: (r as any)._count?.bets || 0,
       }));
 
       try {
@@ -455,6 +459,7 @@ roomsRouter.get('/', validate(roomsQuerySchema), async (req, res) => {
         jeetPool: cached?.jeetPool ?? null,
         poolReserves: cached?.poolReserves ? cached.poolReserves.split(',').map(Number) : null,
         outcomeLabels: room.outcomeLabels ? JSON.parse(room.outcomeLabels) : null,
+        tradesCount: cached?.tradesCount ? Number(cached.tradesCount) : (room.tradesCount || 0),
       };
     });
 
@@ -573,8 +578,9 @@ roomsRouter.post('/', async (req, res) => {
       moonPool: moonPoolScaled.toString(),
       jeetPool: jeetPoolScaled.toString(),
       poolReserves: outcomeLabels && Array.isArray(outcomeLabels) && outcomeLabels.length >= 2
-        ? outcomeLabels.map(() => Math.round((Number(totalPool || 0) * decimalFactor) / outcomeLabels.length)).join(',')
+        ? outcomeLabels.map(() => Math.round(((Number(moonPool || 0) + Number(jeetPool || 0)) * decimalFactor) / outcomeLabels.length)).join(',')
         : `${moonPoolScaled},${jeetPoolScaled}`,
+      tradesCount: '0',
       expiry: expiryDate.toISOString(),
       pairAddress: '',
     });
@@ -655,6 +661,7 @@ roomsRouter.get('/:pubkey', validate(roomPubkeyParamSchema, 'params'), async (re
         jeetPool: cached?.jeetPool ?? '0',
         poolReserves: cached?.poolReserves ? cached.poolReserves.split(',').map(Number) : null,
         outcomeLabels: room.outcomeLabels ? JSON.parse(room.outcomeLabels) : null,
+        tradesCount: room.bets ? room.bets.length : (cached?.tradesCount ? Number(cached.tradesCount) : 0),
         pairAddress: cached?.pairAddress || (await fetchTokenMeta(room.tokenMint)).pairAddress || '',
         bets: room.bets.map((b) => ({
           ...b,

@@ -596,8 +596,11 @@ async function handleSwap(log: EvmLog) {
       }
     });
 
+    const tradesCount = await prisma.bet.count({ where: { roomPubkey: roomId } });
+
     const cachePayload: Record<string, string> = {
       poolReserves: reserves.map(r => r.toString()).join(','),
+      tradesCount: tradesCount.toString(),
     };
     if (outcomeCount === 2n) {
       cachePayload.moonPool = reserves[0].toString();
@@ -612,6 +615,7 @@ async function handleSwap(log: EvmLog) {
       side,
       amount: amount.toString(),
       poolReserves: reserves.map(r => r.toString()),
+      tradesCount,
       ...(outcomeCount === 2n ? {
         moonPool: reserves[0].toString(),
         jeetPool: reserves[1].toString(),

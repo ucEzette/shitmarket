@@ -428,7 +428,9 @@ async function handleBetPlaced(event: BetPlacedEvent, signature?: string): Promi
     // Update Redis cache
     const moonPool = event.moonPool.toString();
     const jeetPool = event.jeetPool.toString();
-    await cacheRoom(roomPubkey, { moonPool, jeetPool });
+    const tradesCount = await prisma.bet.count({ where: { roomPubkey } });
+
+    await cacheRoom(roomPubkey, { moonPool, jeetPool, tradesCount: tradesCount.toString() });
 
     await publishRoomUpdate(roomPubkey, {
       type: 'BetPlaced',
@@ -437,6 +439,7 @@ async function handleBetPlaced(event: BetPlacedEvent, signature?: string): Promi
       amount: amount.toString(),
       moonPool,
       jeetPool,
+      tradesCount,
     });
 
     // Upsert user profile

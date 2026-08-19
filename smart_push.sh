@@ -11,17 +11,16 @@ cd "$(git rev-parse --show-toplevel)"
 git fetch origin
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCH 1: Contract - Multi-outcome AMM support
+# BATCH 1: Indexer tradesCount tracking
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 1: evm/contracts/AMPool.sol ---"
-git add evm/contracts/AMPool.sol
-git commit -m "feat(contracts): upgrade AMPool to support multi-outcome CPMM
+echo "--- BATCH 1: Indexer listeners and rooms API tradesCount ---"
+git add indexer/src/api/routes/rooms.ts indexer/src/listener/eventListener.ts indexer/src/listener/evmEventListener.ts
+git commit -m "feat(indexer): add real-time tradesCount tracking to rooms API and listeners
 
-- Refactored \`reserves\` from a fixed length array of 2 to a dynamic array of N outcomes
-- Added \`outcomeCount\` immutable fetched from ConditionalTokens during initialization
-- Updated \`addLiquidity\` and \`removeLiquidity\` to dynamically split and merge across all available outcomes
-- Updated \`Swap\` event to emit the full array of reserves"
+- Queries prisma.bet.count() on every bet and swap event
+- Saves tradesCount to Redis cache and exposes it through the /rooms API payload
+- Emits tradesCount down the websockets for real-time frontend updates"
 
 echo "Pushing batch 1..."
 git push origin main
@@ -31,17 +30,15 @@ echo "Waiting ${SLEEP_1}s before next batch..."
 sleep $SLEEP_1
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCH 2: Indexer - Schema and listener updates for multi-outcome
+# BATCH 2: App state tradesCount piping
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 2: Indexer schema and evmEventListener.ts updates ---"
-git add indexer/prisma/schema.prisma indexer/src/listener/evmEventListener.ts indexer/src/api/routes/rooms.ts
-git commit -m "feat(indexer): support N-outcome markets and extended metadata
+echo "--- BATCH 2: Frontend useAppState and ClientWrapper tradesCount ---"
+git add src/store/useAppState.ts src/components/ClientWrapper.tsx
+git commit -m "feat(frontend): pipe tradesCount from websocket and API to app state
 
-- schema.prisma: add \`outcomeLabels\`, \`rules\`, and \`context\` optional fields to Room
-- evmEventListener.ts: update \`handleSwap\` and liquidity handlers to query \`outcomeCount\` and the full \`reserves\` array dynamically from the pool contract
-- Save full \`poolReserves\` string to Redis cache and fallback side formatting based on outcome count
-- api/routes/rooms.ts: expose new metadata fields"
+- ClientWrapper.tsx: passes tradesCount from websocket BetPlaced payload into updateRoomPools dispatcher
+- useAppState.ts: maps tradesCount from API and updates room object in the zustand store"
 
 echo "Pushing batch 2..."
 git push origin main
@@ -51,16 +48,16 @@ echo "Waiting ${SLEEP_2}s before next batch..."
 sleep $SLEEP_2
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCH 3: Frontend - Multi-outcome UI and app state
+# BATCH 3: Component Extraction - MarketGridCard 1/2
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 3: Frontend UI and App State updates ---"
-git add src/app/create-room/page.tsx "src/app/room/[id]/page.tsx" src/store/useAppState.ts
-git commit -m "feat(frontend): multi-outcome market creation and room UI
+echo "--- BATCH 3: MarketGridCard component extraction ---"
+git add src/components/MarketGridCard.tsx src/app/page.tsx
+git commit -m "refactor(ui): extract MarketGridCard component and implement on homepage
 
-- create-room/page.tsx: add UI to dynamically add/remove custom outcome labels for debate markets; pass \`rules\`, \`context\`, and \`outcomeLabels\` to createRoom
-- useAppState.ts: pipe new metadata fields to the indexer API and handle placing bets with dynamic outcome IDs
-- room/[id]/page.tsx: support rendering arbitrary number of outcome pools based on \`outcomeLabels\`"
+- Abstracted the complex room card UI from the homepage into a reusable src/components/MarketGridCard.tsx component
+- Ensures consistent styling, multi-outcome support, and behavior across different pages
+- page.tsx: removed inline HomepageRoomCard and replaced with imported MarketGridCard"
 
 echo "Pushing batch 3..."
 git push origin main
@@ -70,15 +67,15 @@ echo "Waiting ${SLEEP_3}s before next batch..."
 sleep $SLEEP_3
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BATCH 4: Misc - Docs generator script and smart push
+# BATCH 4: Component Extraction - MarketGridCard 2/2 + Script
 # ─────────────────────────────────────────────────────────────────────────────
 echo ""
-echo "--- BATCH 4: Python docx generator and push script ---"
-git add generate_doc.py smart_push.sh
-git commit -m "chore: add generate_doc.py utility and update smart_push.sh
+echo "--- BATCH 4: Apply MarketGridCard to rooms page and update push script ---"
+git add src/app/rooms/page.tsx smart_push.sh
+git commit -m "refactor(ui): implement MarketGridCard on rooms index and update push script
 
-- generate_doc.py: added python script using python-docx to generate customized tables and MS Word documents for project reporting
-- smart_push.sh: updated for the multi-outcome support release batches"
+- rooms/page.tsx: use the new unified MarketGridCard component instead of maintaining separate card UI code
+- smart_push.sh: update for tradesCount and MarketGridCard release batches"
 
 echo "Pushing batch 4..."
 git push origin main

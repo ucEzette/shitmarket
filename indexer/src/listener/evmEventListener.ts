@@ -385,7 +385,7 @@ async function handleMarketCreated(log: EvmLog) {
   const expiry = new Date(Number(resolutionTime) * 1000);
   const roomId = conditionId;
 
-  await prisma.room.upsert({
+  const room = await prisma.room.upsert({
     where: { roomPubkey: roomId },
     create: {
       roomPubkey: roomId,
@@ -414,8 +414,8 @@ async function handleMarketCreated(log: EvmLog) {
   await cacheRoom(roomId, {
     status: 'active',
     tokenMint: conditionId,
-    tokenName: `Market #${marketId}`,
-    tokenSymbol: 'PRED',
+    tokenName: room.tokenName || `Market #${marketId}`,
+    tokenSymbol: room.tokenSymbol || 'PRED',
     openingPrice: '500000',
     moonPool: '0',
     jeetPool: '0',
@@ -424,8 +424,8 @@ async function handleMarketCreated(log: EvmLog) {
 
   await publishRoomUpdate(roomId, {
     type: 'RoomCreated',
-    tokenName: `Market #${marketId}`,
-    tokenSymbol: 'PRED',
+    tokenName: room.tokenName || `Market #${marketId}`,
+    tokenSymbol: room.tokenSymbol || 'PRED',
     chainId: 'avalanche',
     originalAddress: conditionId,
     expiry: expiry.toISOString(),
